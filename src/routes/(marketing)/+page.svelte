@@ -41,25 +41,25 @@
 	}
 
 	const mobileNavItems: {
-		href: string;
+		section: string;
 		label: string;
 		blurb: string;
 		icon: typeof LucideIcon;
 	}[] = [
 		{
-			href: '#features',
+			section: 'features',
 			label: 'Features',
 			blurb: 'Builder, booking sync & automation',
 			icon: Sparkles
 		},
 		{
-			href: '#how-it-works',
+			section: 'how-it-works',
 			label: 'How it works',
 			blurb: 'From reservation to signed waiver',
 			icon: Waypoints
 		},
 		{
-			href: '#pricing',
+			section: 'pricing',
 			label: 'Pricing',
 			blurb: 'Straightforward plans for teams',
 			icon: CircleDollarSign
@@ -275,10 +275,10 @@
 							class="flex flex-1 flex-col gap-2.5 py-4"
 							aria-label="Mobile section links"
 						>
-							{#each mobileNavItems as item, i (item.href)}
+							{#each mobileNavItems as item, i (item.section)}
 								{@const Icon = item.icon}
 								<a
-									href={item.href}
+									href={resolve(`/#${item.section}`)}
 									class="mkt-mobile-nav-item group no-underline outline-none"
 									style="animation-delay: {45 + i * 70}ms;"
 									onclick={closeMobileNav}
