@@ -1,12 +1,39 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import { ChevronRight } from '@lucide/svelte';
 
-	const footerLinks: Record<string, string[]> = {
-		Product: ['Features', 'How it Works', 'Pricing', 'Changelog'],
-		Integrations: ['Bookeo', 'Resova', 'Xola', 'API Docs'],
-		Company: ['About', 'Blog', 'Privacy Policy', 'Terms of Service']
-	};
+	type FooterEntry =
+		| { label: string; href: '/#features' | '/#how-it-works' | '/#pricing' }
+		| { label: string; comingSoon: true };
+
+	const footerColumns: { title: string; entries: readonly FooterEntry[] }[] = [
+		{
+			title: 'Product',
+			entries: [
+				{ label: 'Features', href: '/#features' },
+				{ label: 'How it Works', href: '/#how-it-works' },
+				{ label: 'Pricing', href: '/#pricing' },
+				{ label: 'Changelog', comingSoon: true }
+			] as const
+		},
+		{
+			title: 'Integrations',
+			entries: [
+				{ label: 'Bookeo', comingSoon: true },
+				{ label: 'Resova', comingSoon: true },
+				{ label: 'Xola', comingSoon: true },
+				{ label: 'API docs', comingSoon: true }
+			] as const
+		},
+		{
+			title: 'Company',
+			entries: [
+				{ label: 'About', comingSoon: true },
+				{ label: 'Blog', comingSoon: true },
+				{ label: 'Privacy Policy', comingSoon: true },
+				{ label: 'Terms of Service', comingSoon: true }
+			] as const
+		}
+	];
 </script>
 
 <footer class="border-t py-12 px-6" style="background: var(--m-surface); border-color: var(--m-border);">
@@ -32,25 +59,36 @@
 				</p>
 			</div>
 
-			{#each Object.entries(footerLinks) as [category, links] (category)}
+			{#each footerColumns as column (column.title)}
 				<div>
 					<p
 						class="mb-3 text-[11px] font-semibold uppercase tracking-widest"
 						style="color: var(--m-text-3);"
 					>
-						{category}
+						{column.title}
 					</p>
 					<ul>
-						{#each links as link (link)}
+						{#each column.entries as entry (entry.label)}
 							<li>
-								<a
-									href={resolve('/')}
-									class="mb-2 block text-[13px] no-underline transition-opacity hover:opacity-100"
-									style="color: var(--m-text-2); opacity: 0.8;"
-								>
-									{link}
-									<ChevronRight class="inline size-2.5 opacity-40" aria-hidden="true" />
-								</a>
+								{#if 'comingSoon' in entry}
+									<span
+										class="mb-2 block text-[13px]"
+										style="color: var(--m-text-2); opacity: 0.8;"
+									>
+										{entry.label}
+										<span class="ml-1 text-[11px] font-normal" style="color: var(--m-text-3);"
+											>(coming soon)</span
+										>
+									</span>
+								{:else}
+									<a
+										href={resolve(entry.href)}
+										class="mb-2 block text-[13px] no-underline transition-opacity hover:opacity-100"
+										style="color: var(--m-text-2); opacity: 0.8;"
+									>
+										{entry.label}
+									</a>
+								{/if}
 							</li>
 						{/each}
 					</ul>
@@ -63,7 +101,7 @@
 			style="border-color: var(--m-border);"
 		>
 			<p class="text-[12px]" style="color: var(--m-text-3);">
-				© 2026 Waiver Director. All rights reserved.
+				&copy; 2026 Waiver Director. All rights reserved.
 			</p>
 			<p class="text-[12px]" style="color: var(--m-text-3);">Built for every booking experience.</p>
 		</div>

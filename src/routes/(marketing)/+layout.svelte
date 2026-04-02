@@ -15,8 +15,15 @@
 </svelte:head>
 
 <div class="mkt flex min-h-screen flex-col">
+	<a
+		href="#marketing-main"
+		class="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-100 focus:rounded-lg focus:px-4 focus:py-2.5 focus:text-sm focus:font-semibold focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[oklch(0.09_0.006_286)]"
+		style="--tw-ring-color: var(--m-accent); background: var(--m-accent); color: var(--m-accent-fg);"
+	>
+		Skip to main content
+	</a>
 	<MarketingNav />
-	<main id="marketing-main" class="flex flex-1 flex-col">
+	<main id="marketing-main" class="flex flex-1 flex-col" tabindex="-1">
 		{@render children()}
 	</main>
 	<MarketingFooter />

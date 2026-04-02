@@ -1,13 +1,7 @@
-<svelte:head>
-	<title>Waiver Director — Digital Waivers for Any Booking Experience</title>
-	<meta
-		name="description"
-		content="Waiver Director captures every participant's email when they sign — not just the lead booker. Connects to Bookeo, Resova, and Xola with automated follow-ups for every booking experience."
-	/>
-</svelte:head>
-
 <script lang="ts">
 	import { resolve } from '$app/paths';
+	import { PUBLIC_APP_URL } from '$env/static/public';
+	import MarketingPricing from '$lib/components/marketing/MarketingPricing.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import {
 		ArrowRight,
@@ -18,9 +12,15 @@
 		Users,
 		FileText,
 		Link2,
-		Zap,
-		ChevronRight
+		Zap
 	} from '@lucide/svelte';
+
+	const pageTitle = 'Waiver Director — Digital Waivers for Any Booking Experience';
+	const pageDescription =
+		"Waiver Director captures every participant's email when they sign — not just the lead booker. Connects to Bookeo, Resova, and Xola with automated follow-ups for every booking experience.";
+
+	const siteBase = (PUBLIC_APP_URL ?? '').replace(/\/$/, '');
+	const canonicalUrl = siteBase ? `${siteBase}/` : '';
 
 	const features = [
 		{
@@ -129,6 +129,21 @@
 	];
 </script>
 
+<svelte:head>
+	<title>{pageTitle}</title>
+	<meta name="description" content={pageDescription} />
+	<meta property="og:title" content={pageTitle} />
+	<meta property="og:description" content={pageDescription} />
+	<meta property="og:type" content="website" />
+	{#if canonicalUrl}
+		<link rel="canonical" href={canonicalUrl} />
+		<meta property="og:url" content={canonicalUrl} />
+	{/if}
+	<meta name="twitter:card" content="summary" />
+	<meta name="twitter:title" content={pageTitle} />
+	<meta name="twitter:description" content={pageDescription} />
+</svelte:head>
+
 <!-- ======================================================= HERO -->
 	<section
 		class="relative flex min-h-screen flex-col items-center justify-center overflow-hidden px-6 pb-24 pt-16"
@@ -198,7 +213,7 @@
 					<ArrowRight size={16} aria-hidden="true" />
 				</Button>
 				<Button
-					href="#how-it-works"
+					href={resolve('/#how-it-works')}
 					variant="outline"
 					class="h-11 rounded-xl px-8 text-sm font-medium"
 					style="border-color: var(--m-border-strong); color: var(--m-text-2); background: transparent;"
@@ -227,9 +242,9 @@
 					<div
 						class="rounded-md border px-3 py-1 text-[11px]"
 						style="color: var(--m-text-3); background: var(--m-elevated); border-color: var(--m-border);"
-						aria-label="URL: app.waiverdirector.com/sessions"
+						aria-hidden="true"
 					>
-						app.waiverdirector.com/sessions
+						/sessions (preview)
 					</div>
 					<div class="flex items-center gap-1.5">
 						<span
@@ -337,13 +352,13 @@
 										class="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium"
 										style="color: var(--m-amber); background: var(--m-amber-dim);"
 									>Pending</span>
-									<button
-										class="shrink-0 cursor-pointer border-0 bg-transparent p-0 text-[11px] font-medium"
+									<span
+										class="inline-flex shrink-0 items-center gap-0.5 text-[11px] font-medium"
 										style="color: var(--m-accent);"
-										aria-label="Send reminder to {p.name}"
+										aria-hidden="true"
 									>
-										Send reminder <ChevronRight class="inline size-2.5" aria-hidden="true" />
-									</button>
+										Send reminder
+									</span>
 								{/if}
 							</div>
 						{/each}
@@ -580,10 +595,11 @@
 							<p class="text-[10px]" style="color: var(--m-text-3);">Draw or type below</p>
 						</div>
 						<div class="flex items-center gap-3">
-							<button
-								class="cursor-pointer rounded-lg border-0 px-3 py-1.5 text-[12px] font-semibold"
+							<span
+								class="rounded-lg px-3 py-1.5 text-[12px] font-semibold"
 								style="background: var(--m-accent); color: var(--m-accent-fg);"
-							>Publish v2</button>
+								aria-hidden="true"
+							>Publish v2</span>
 							<span class="text-[11px]" style="color: var(--m-text-3);">3 changes since v1</span>
 						</div>
 					</div>
@@ -696,13 +712,14 @@
 							<span class="min-w-0 flex-1 truncate text-[12px]" style="color: var(--m-text-2);"
 								>waivers.yourvenue.com/adventure-tour</span
 							>
-							<button
-								class="shrink-0 cursor-pointer rounded-md border-0 px-2.5 py-1 text-[11px] font-semibold"
+							<span
+								class="shrink-0 rounded-md px-2.5 py-1 text-[11px] font-semibold"
 								style="background: var(--m-accent-dim); color: var(--m-accent);"
-							>Copy</button>
+								aria-hidden="true"
+							>Copy</span>
 						</div>
 						<div class="mb-4 flex flex-wrap items-center gap-2">
-							{#each ['✉ Email', '📱 SMS', '📅 Booking confirmation'] as method (method)}
+							{#each ['Email', 'SMS', 'Booking confirmation'] as method (method)}
 								<span
 									class="rounded-full border px-3 py-1 text-[11px] font-medium"
 									style="color: var(--m-text-2); border-color: var(--m-border-strong); background: var(--m-card);"
@@ -805,9 +822,11 @@
 							style="color: var(--m-text-2); border-color: var(--m-border-strong); background: var(--m-elevated);"
 							>Last 7 days</span
 						>
-						<button
-							class="cursor-pointer border-0 bg-transparent p-0 text-[11px] font-medium"
-							style="color: var(--m-accent);">Export CSV</button
+						<span
+							class="text-[11px] font-medium"
+							style="color: var(--m-accent);"
+							aria-hidden="true"
+						>Export CSV</span
 						>
 					</div>
 				</div>
@@ -859,202 +878,67 @@
 						{/each}
 					</div>
 
-					<!-- Session table -->
-					<div class="mt-5 overflow-hidden rounded-lg border" style="border-color: var(--m-border);">
-						<!-- Table header -->
-						<div
-							class="hidden grid-cols-[2fr_1.4fr_1fr_0.8fr_0.8fr_0.6fr_1fr] gap-2 px-4 py-2.5 text-[10px] uppercase tracking-wide md:grid"
-							style="background: var(--m-elevated); color: var(--m-text-3);"
-							role="row"
+					<!-- Session table (semantic markup; scroll horizontally on narrow viewports) -->
+					<div class="mt-5 overflow-x-auto rounded-lg border" style="border-color: var(--m-border);">
+						<table
+							class="w-full min-w-176 border-collapse text-left text-[12px]"
+							style="border-color: var(--m-border);"
 						>
-							<span>Session</span>
-							<span>Date</span>
-							<span>Provider</span>
-							<span>Expected</span>
-							<span>Signed</span>
-							<span>Rate</span>
-							<span>Status</span>
-						</div>
-						{#each sessionRows as row (row.session)}
-							<div
-								class="grid grid-cols-1 gap-1 border-t px-4 py-3 text-[12px] md:grid-cols-[2fr_1.4fr_1fr_0.8fr_0.8fr_0.6fr_1fr] md:items-center md:gap-2"
-								style="border-color: var(--m-border);"
-							>
-								<span class="truncate font-medium" style="color: var(--m-text);">{row.session}</span>
-								<span style="color: var(--m-text-2);">{row.date}</span>
-								<span style="color: var(--m-text-2);">{row.provider}</span>
-								<span class="hidden md:block" style="color: var(--m-text-2);">{row.expected}</span>
-								<span class="hidden md:block" style="color: var(--m-text-2);">{row.signed}</span>
-								<span class="hidden md:block" style="color: var(--m-text-2);">{row.rate}</span>
-								<span
-									class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold"
-									style="color: {row.color}; background: {row.bg};">{row.status}</span
+							<caption class="sr-only">
+								Sample sessions with expected signers, signed counts, completion rate, and status
+							</caption>
+							<thead>
+								<tr
+									class="text-[10px] uppercase tracking-wide"
+									style="background: var(--m-elevated); color: var(--m-text-3);"
 								>
-							</div>
-						{/each}
+									<th scope="col" class="px-4 py-2.5 font-semibold">Session</th>
+									<th scope="col" class="px-4 py-2.5 font-semibold">Date</th>
+									<th scope="col" class="px-4 py-2.5 font-semibold">Provider</th>
+									<th scope="col" class="px-4 py-2.5 font-semibold">Expected</th>
+									<th scope="col" class="px-4 py-2.5 font-semibold">Signed</th>
+									<th scope="col" class="px-4 py-2.5 font-semibold">Rate</th>
+									<th scope="col" class="px-4 py-2.5 font-semibold">Status</th>
+								</tr>
+							</thead>
+							<tbody>
+								{#each sessionRows as row (row.session)}
+									<tr class="border-t" style="border-color: var(--m-border);">
+										<td class="max-w-48 truncate px-4 py-3 font-medium" style="color: var(--m-text);">
+											{row.session}
+										</td>
+										<td class="whitespace-nowrap px-4 py-3" style="color: var(--m-text-2);">
+											{row.date}
+										</td>
+										<td class="whitespace-nowrap px-4 py-3" style="color: var(--m-text-2);">
+											{row.provider}
+										</td>
+										<td class="whitespace-nowrap px-4 py-3" style="color: var(--m-text-2);">
+											{row.expected}
+										</td>
+										<td class="whitespace-nowrap px-4 py-3" style="color: var(--m-text-2);">
+											{row.signed}
+										</td>
+										<td class="whitespace-nowrap px-4 py-3" style="color: var(--m-text-2);">
+											{row.rate}
+										</td>
+										<td class="px-4 py-3">
+											<span
+												class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold"
+												style="color: {row.color}; background: {row.bg};">{row.status}</span
+											>
+										</td>
+									</tr>
+								{/each}
+							</tbody>
+						</table>
 					</div>
 				</div>
 			</div>
 		</div>
 	</section>
 
-	<!-- ======================================================= PRICING -->
-	<section
-		id="pricing"
-		class="border-t py-24"
-		style="background: var(--m-bg); border-color: var(--m-border);"
-	>
-		<div class="mx-auto max-w-6xl px-6">
-			<div class="mb-12 text-center">
-				<p
-					class="mb-3 text-[11px] font-semibold uppercase tracking-widest"
-					style="color: var(--m-accent);"
-				>
-					Pricing
-				</p>
-				<h2
-					class="mb-3 font-extrabold tracking-tight"
-					style="font-family: 'Bricolage Grotesque', sans-serif; font-size: clamp(28px, 4vw, 42px); letter-spacing: -0.02em; color: var(--m-text);"
-				>
-					Simple pricing for every venue.
-				</h2>
-				<p class="text-[16px]" style="color: var(--m-text-2);">Start free. Upgrade as you grow.</p>
-			</div>
-
-			<div class="mx-auto grid max-w-5xl grid-cols-1 gap-5 md:grid-cols-3">
-				<!-- Free -->
-				<div
-					class="flex flex-col gap-5 rounded-xl border p-6"
-					style="border-color: var(--m-border-strong); background: var(--m-surface);"
-				>
-					<div>
-						<p
-							class="mb-1 text-[20px] font-bold"
-							style="font-family: 'Bricolage Grotesque', sans-serif; color: var(--m-text);"
-						>
-							Free
-						</p>
-						<p
-							class="text-[28px] font-black"
-							style="font-family: 'Bricolage Grotesque', sans-serif; color: var(--m-text);"
-						>
-							$0 <span class="text-[14px] font-medium" style="color: var(--m-text-3);">/ mo</span>
-						</p>
-						<p class="mt-1 text-[13px]" style="color: var(--m-text-2);">For getting started.</p>
-					</div>
-					<ul class="flex flex-1 flex-col gap-2.5">
-						{#each ['1 workspace', '25 waivers / month', '1 waiver template', 'Basic dashboard', 'Email support'] as item (item)}
-							<li class="flex items-center gap-2 text-[13px]" style="color: var(--m-text-2);">
-								<Check class="size-3.5 shrink-0" style="color: var(--m-green);" aria-hidden="true" />
-								{item}
-							</li>
-						{/each}
-					</ul>
-				<Button
-					href={resolve('/sign-up')}
-					variant="outline"
-					class="h-10 w-full rounded-lg text-sm font-semibold"
-					style="border-color: var(--m-border-strong); color: var(--m-text-2);"
-				>Get started free</Button>
-				</div>
-
-				<!-- Pro -->
-				<div
-					class="relative flex flex-col gap-5 rounded-xl border p-6"
-					style="border-color: var(--m-accent); background: var(--m-surface); box-shadow: 0 0 40px var(--m-accent-glow);"
-				>
-					<div
-						class="absolute right-4 top-4 rounded-full px-2.5 py-1 text-[10px] font-semibold"
-						style="background: var(--m-accent-dim); color: var(--m-accent);"
-					>
-						Most popular
-					</div>
-					<div>
-						<p
-							class="mb-1 text-[20px] font-bold"
-							style="font-family: 'Bricolage Grotesque', sans-serif; color: var(--m-text);"
-						>
-							Pro
-						</p>
-						<p
-							class="text-[28px] font-black"
-							style="font-family: 'Bricolage Grotesque', sans-serif; color: var(--m-text);"
-						>
-							$29 <span class="text-[14px] font-medium" style="color: var(--m-text-3);">/ mo</span>
-						</p>
-						<p class="mt-1 text-[13px]" style="color: var(--m-text-2);">For serious operators.</p>
-					</div>
-					<ul class="flex flex-1 flex-col gap-2.5">
-						{#each [
-							'Unlimited waivers',
-							'Unlimited templates',
-							'Bookeo · Resova · Xola sync',
-							'Email automation (all participants)',
-							'Full analytics',
-							'Team access',
-							'PDF export',
-							'Audit trail'
-						] as item (item)}
-							<li class="flex items-center gap-2 text-[13px]" style="color: var(--m-text-2);">
-								<Check class="size-3.5 shrink-0" style="color: var(--m-green);" aria-hidden="true" />
-								{item}
-							</li>
-						{/each}
-					</ul>
-				<Button
-					href={resolve('/sign-up')}
-					class="h-10 w-full rounded-lg border-0 text-sm font-semibold"
-					style="background: var(--m-accent); color: var(--m-accent-fg); box-shadow: 0 0 20px var(--m-accent-glow);"
-				>Start free trial</Button>
-				</div>
-
-				<!-- Business -->
-				<div
-					class="flex flex-col gap-5 rounded-xl border p-6"
-					style="border-color: var(--m-border-strong); background: var(--m-surface);"
-				>
-					<div>
-						<p
-							class="mb-1 text-[20px] font-bold"
-							style="font-family: 'Bricolage Grotesque', sans-serif; color: var(--m-text);"
-						>
-							Business
-						</p>
-						<p
-							class="text-[28px] font-black"
-							style="font-family: 'Bricolage Grotesque', sans-serif; color: var(--m-text);"
-						>
-							$79 <span class="text-[14px] font-medium" style="color: var(--m-text-3);">/ mo</span>
-						</p>
-						<p class="mt-1 text-[13px]" style="color: var(--m-text-2);">
-							For multi-location operators.
-						</p>
-					</div>
-					<ul class="flex flex-1 flex-col gap-2.5">
-						{#each [
-							'Everything in Pro',
-							'Multiple workspaces',
-							'Priority support',
-							'Custom email sender domain',
-							'SLA guarantee',
-							'Dedicated onboarding'
-						] as item (item)}
-							<li class="flex items-center gap-2 text-[13px]" style="color: var(--m-text-2);">
-								<Check class="size-3.5 shrink-0" style="color: var(--m-green);" aria-hidden="true" />
-								{item}
-							</li>
-						{/each}
-					</ul>
-					<Button
-				href={resolve('/')}
-					variant="outline"
-					class="h-10 w-full rounded-lg text-sm font-semibold"
-					style="border-color: var(--m-border-strong); color: var(--m-text-2);"
-				>Contact sales</Button>
-				</div>
-			</div>
-		</div>
-	</section>
+	<MarketingPricing />
 
 	<!-- ======================================================= CTA BANNER -->
 	<section
