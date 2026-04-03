@@ -45,58 +45,42 @@
 </script>
 
 <nav
-	class="sticky top-0 z-50 h-14 border-b"
+	class="sticky top-0 z-50 border-b pt-[env(safe-area-inset-top,0px)]"
 	style="background: oklch(0.09 0.006 286 / 82%); backdrop-filter: blur(20px) saturate(180%); border-color: var(--m-border);"
 	aria-label="Main navigation"
 >
 	<div
-		class="mx-auto flex h-full max-w-6xl items-center justify-between gap-4 px-6 md:grid md:grid-cols-[1fr_auto_1fr] md:items-center"
+		class="mx-auto flex h-14 max-w-6xl items-center justify-between gap-3 px-4 sm:gap-4 sm:px-6 md:grid md:grid-cols-[1fr_auto_1fr] md:items-center"
 	>
-		<a href={resolve('/')} class="flex items-center gap-2.5 justify-self-start no-underline">
+		<a href={resolve('/')} class="mkt-brand-link flex items-center gap-2.5 justify-self-start no-underline">
 			<div
-				class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[11px] font-black"
+				class="mkt-brand-mark flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[11px] font-black transition-[box-shadow] duration-200 ease-out"
 				style="background: var(--m-accent); color: var(--m-accent-fg); box-shadow: 0 0 12px var(--m-accent-glow); font-family: 'Bricolage Grotesque', sans-serif;"
 				aria-hidden="true"
 			>
 				WD
 			</div>
-			<span
-				class="hidden font-bold sm:block"
-				style="font-family: 'Bricolage Grotesque', sans-serif; font-size: 15px; color: var(--m-text);"
-				>Waiver Director</span
-			>
+			<span class="mkt-brand-wordmark hidden font-bold sm:block">Waiver Director</span>
 		</a>
 
 		<div class="hidden items-center justify-center gap-6 md:flex">
-			<a
-				href={resolve('/#features')}
-				class="nav-link text-[13px] no-underline"
-				style="color: var(--m-text-2);">Features</a
+			<a href={resolve('/#features')} class="nav-link text-[13px] font-medium no-underline">Features</a>
+			<a href={resolve('/#how-it-works')} class="nav-link text-[13px] font-medium no-underline"
+				>How it works</a
 			>
-			<a
-				href={resolve('/#how-it-works')}
-				class="nav-link text-[13px] no-underline"
-				style="color: var(--m-text-2);">How it works</a
-			>
-			<a
-				href={resolve('/#pricing')}
-				class="nav-link text-[13px] no-underline"
-				style="color: var(--m-text-2);">Pricing</a
-			>
+			<a href={resolve('/#pricing')} class="nav-link text-[13px] font-medium no-underline">Pricing</a>
 		</div>
 
 		<div class="hidden items-center justify-end gap-2 justify-self-end md:flex">
 			<Button
 				href={resolve('/sign-in')}
 				variant="ghost"
-				class="h-8 rounded-lg px-4 text-xs font-semibold"
-				style="color: var(--m-text-2);"
+				class="btn-mkt-ghost h-8 rounded-lg px-4 text-xs font-semibold"
 				>Sign in</Button
 			>
 			<Button
 				href={resolve('/sign-up')}
-				class="h-8 rounded-lg border-0 px-4 text-xs font-semibold"
-				style="background: var(--m-accent); color: var(--m-accent-fg); box-shadow: 0 0 16px var(--m-accent-glow);"
+				class="btn-mkt-accent h-8 rounded-lg px-4 text-xs font-semibold"
 				>Get early access</Button
 			>
 		</div>
@@ -107,8 +91,7 @@
 					type="button"
 					variant="ghost"
 					size="icon-sm"
-					class="rounded-lg"
-					style="color: var(--m-text-2);"
+					class="mkt-nav-menu-trigger rounded-lg"
 					aria-label="Open menu"
 					aria-expanded={mobileNavOpen}
 					aria-controls="mobile-nav-menu"
@@ -172,19 +155,17 @@
 						class="flex-col gap-2 border-t pt-6 sm:flex-col"
 						style="border-color: oklch(1 0 0 / 10%);"
 					>
-						<Button
-							href={resolve('/sign-in')}
-							variant="outline"
-							class="h-10 w-full rounded-lg border font-semibold"
-							style="border-color: oklch(1 0 0 / 14%); color: var(--m-text); background: transparent;"
-							onclick={closeMobileNav}>Sign in</Button
-						>
-						<Button
-							href={resolve('/sign-up')}
-							class="h-10 w-full rounded-lg border-0 font-semibold"
-							style="background: var(--m-accent); color: var(--m-accent-fg); box-shadow: 0 0 16px var(--m-accent-glow);"
-							onclick={closeMobileNav}>Get early access</Button
-						>
+					<Button
+						href={resolve('/sign-in')}
+						variant="outline"
+						class="sheet-btn-outline h-10 w-full rounded-lg border font-semibold"
+						onclick={closeMobileNav}>Sign in</Button
+					>
+					<Button
+						href={resolve('/sign-up')}
+						class="sheet-btn-accent h-10 w-full rounded-lg font-semibold"
+						onclick={closeMobileNav}>Get early access</Button
+					>
 					</Sheet.Footer>
 				</Sheet.Content>
 			</Sheet.Root>
@@ -193,11 +174,48 @@
 </nav>
 
 <style>
-	.nav-link {
+	.mkt-brand-wordmark {
+		font-family: 'Bricolage Grotesque', sans-serif;
+		font-size: 15px;
+		color: var(--m-text);
 		transition: color 0.15s ease;
 	}
-	.nav-link:hover {
-		color: oklch(0.97 0 0);
+
+	@media (hover: hover) and (pointer: fine) {
+		.mkt-brand-link:hover .mkt-brand-wordmark {
+			color: oklch(0.99 0 0);
+		}
+
+		.mkt-brand-link:hover .mkt-brand-mark {
+			box-shadow:
+				0 0 16px var(--m-accent-glow),
+				0 0 28px oklch(0.52 0.22 277 / 22%);
+		}
+	}
+
+	.mkt-brand-link:focus-visible {
+		outline: none;
+		border-radius: 0.6rem;
+		box-shadow: 0 0 0 2px oklch(0.09 0.006 286), 0 0 0 4px oklch(0.52 0.22 277 / 45%);
+	}
+
+	/* Plain text nav (not shadcn): keep color in CSS so :hover can win — never inline color here. */
+	.nav-link {
+		color: var(--m-text-2);
+		transition: color 0.15s ease;
+	}
+
+	@media (hover: hover) and (pointer: fine) {
+		.nav-link:hover {
+			color: var(--m-text);
+		}
+	}
+
+	.nav-link:focus-visible {
+		outline: none;
+		color: var(--m-text);
+		border-radius: 0.25rem;
+		box-shadow: 0 0 0 2px oklch(0.09 0.006 286), 0 0 0 4px oklch(0.52 0.22 277 / 40%);
 	}
 
 	:global([data-slot='sheet-content'].mkt-mobile-sheet) {
@@ -289,19 +307,52 @@
 		transform: scale(1.04);
 	}
 
-	@media (prefers-reduced-motion: reduce) {
-		:global([data-slot='sheet-content'].mkt-mobile-sheet[data-state='open'] .mkt-mobile-nav-item) {
-			animation: none !important;
-		}
-		:global([data-slot='sheet-content'].mkt-mobile-sheet .mkt-mobile-nav-item),
-		:global([data-slot='sheet-content'].mkt-mobile-sheet .mkt-mobile-nav-icon) {
-			transition: none !important;
-		}
-		:global([data-slot='sheet-content'].mkt-mobile-sheet .mkt-mobile-nav-item:hover) {
-			transform: none !important;
-		}
-		:global([data-slot='sheet-content'].mkt-mobile-sheet .mkt-mobile-nav-item:hover .mkt-mobile-nav-icon) {
-			transform: none !important;
-		}
+	/* Sheet footer buttons */
+	:global([data-slot='sheet-content'].mkt-mobile-sheet [data-slot='button'].sheet-btn-accent) {
+		background: var(--m-accent);
+		color: var(--m-accent-fg);
+		border: none;
+		box-shadow:
+			0 0 0 1px oklch(0.52 0.22 277 / 32%),
+			0 0 20px oklch(0.52 0.22 277 / 28%),
+			inset 0 1px 0 oklch(1 0 0 / 12%);
+		transition:
+			background 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+			box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+			transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+	}
+	:global([data-slot='sheet-content'].mkt-mobile-sheet [data-slot='button'].sheet-btn-accent:hover) {
+		background: oklch(0.58 0.21 277);
+		box-shadow:
+			0 0 0 1px oklch(0.52 0.22 277 / 45%),
+			0 0 34px oklch(0.52 0.22 277 / 36%),
+			inset 0 1px 0 oklch(1 0 0 / 16%);
+		transform: translateY(-1px);
+	}
+	:global([data-slot='sheet-content'].mkt-mobile-sheet [data-slot='button'].sheet-btn-accent:active) {
+		transform: translateY(0) scale(0.98);
+		box-shadow:
+			0 0 0 1px oklch(0.52 0.22 277 / 35%),
+			0 0 16px var(--m-accent-glow),
+			inset 0 1px 0 oklch(1 0 0 / 8%);
+	}
+	:global([data-slot='sheet-content'].mkt-mobile-sheet [data-slot='button'].sheet-btn-outline) {
+		border: 1px solid oklch(1 0 0 / 14%);
+		color: var(--m-text);
+		background: transparent;
+		transition:
+			background 0.2s ease,
+			border-color 0.2s ease,
+			transform 0.2s ease;
+	}
+	:global([data-slot='sheet-content'].mkt-mobile-sheet [data-slot='button'].sheet-btn-outline:hover) {
+		background: oklch(0.52 0.22 277 / 10%);
+		border-color: oklch(0.52 0.22 277 / 42%);
+		transform: translateY(-1px);
+	}
+	:global([data-slot='sheet-content'].mkt-mobile-sheet [data-slot='button'].sheet-btn-outline:active) {
+		transform: translateY(0) scale(0.99);
+		background: oklch(0.52 0.22 277 / 6%);
+		border-color: oklch(0.52 0.22 277 / 32%);
 	}
 </style>

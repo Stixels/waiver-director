@@ -21,6 +21,8 @@
 				{ label: 'Bookeo', comingSoon: true },
 				{ label: 'Resova', comingSoon: true },
 				{ label: 'Xola', comingSoon: true },
+				{ label: 'Mailchimp', comingSoon: true },
+				{ label: 'Constant Contact', comingSoon: true },
 				{ label: 'API docs', comingSoon: true }
 			] as const
 		},
@@ -36,7 +38,20 @@
 	];
 </script>
 
-<footer class="border-t py-12 px-6" style="background: var(--m-surface); border-color: var(--m-border);">
+<footer
+	class="relative border-t px-4 py-12 sm:px-6"
+	style="background: var(--m-surface); border-color: var(--m-border);"
+>
+	<!-- Gradient accent line at top -->
+	<div
+		class="pointer-events-none absolute inset-x-0 top-0 flex justify-center"
+		aria-hidden="true"
+	>
+		<div
+			class="h-px w-1/2 max-w-lg"
+			style="background: linear-gradient(90deg, transparent, oklch(0.52 0.22 277 / 35%), transparent);"
+		></div>
+	</div>
 	<div class="mx-auto max-w-6xl">
 		<div class="mb-10 grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-4">
 			<div>

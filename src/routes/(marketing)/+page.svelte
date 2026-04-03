@@ -12,12 +12,13 @@
 		Users,
 		FileText,
 		Link2,
+		Plug,
 		Zap
 	} from '@lucide/svelte';
 
 	const pageTitle = 'Waiver Director — Digital Waivers for Any Booking Experience';
 	const pageDescription =
-		"Waiver Director captures every participant's email when they sign — not just the lead booker. Connects to Bookeo, Resova, and Xola with automated follow-ups for every booking experience.";
+		"Digital waivers for tours & activities: capture every guest's email, sync Bookeo/Resova/Xola, and automate follow-ups for customer feedback, review requests & reminders. Optional Mailchimp & Constant Contact.";
 
 	const siteBase = (PUBLIC_APP_URL ?? '').replace(/\/$/, '');
 	const canonicalUrl = siteBase ? `${siteBase}/` : '';
@@ -29,14 +30,24 @@
 			desc: 'Structured templates with rich text, custom fields, and signature blocks. Versioned so past waivers are never altered.'
 		},
 		{
+			icon: Mail,
+			title: 'Email Automation',
+			desc: 'Rule-based sends around booking time — every participant, not just the lead. Cancel any message before it goes out, and use follow-ups for thank-yous, customer feedback, and review requests after the visit.'
+		},
+		{
 			icon: Link2,
 			title: 'Booking Sync',
 			desc: 'Connects to Bookeo, Resova, and Xola. Upcoming sessions sync automatically with expected participant counts.'
 		},
 		{
-			icon: Mail,
-			title: 'Email Automation',
-			desc: 'Rule-based email jobs relative to booking time. Send to every participant — not just the lead contact — and cancel any job before it fires.'
+			icon: Plug,
+			title: 'Mailchimp & Constant Contact',
+			desc: 'Sync waiver signers into the marketing lists you already use — so broadcasts and automations match who actually showed up.'
+		},
+		{
+			icon: Users,
+			title: 'Team Access',
+			desc: 'Owner and staff roles per workspace. One account can manage multiple venues or business locations.'
 		},
 		{
 			icon: BarChart3,
@@ -47,11 +58,6 @@
 			icon: Shield,
 			title: 'Audit Trail',
 			desc: 'Every open, draft, submit, void, and export is recorded immutably. On-demand PDF exports reference the exact signed version.'
-		},
-		{
-			icon: Users,
-			title: 'Team Access',
-			desc: 'Owner and staff roles per workspace. One account can manage multiple venues or business locations.'
 		}
 	];
 
@@ -127,6 +133,38 @@
 			bg: 'var(--m-elevated)'
 		}
 	];
+
+	const featureConfig = [
+		{ lg: 'lg:col-span-4', md: 'md:col-span-2', hero: true },
+		{ lg: 'lg:col-span-2', md: 'md:col-span-1', hero: false },
+		{ lg: 'lg:col-span-2', md: 'md:col-span-1', hero: false },
+		{ lg: 'lg:col-span-2', md: 'md:col-span-1', hero: false },
+		{ lg: 'lg:col-span-2', md: 'md:col-span-1', hero: false },
+		{ lg: 'lg:col-span-4', md: 'md:col-span-2', hero: true },
+		{ lg: 'lg:col-span-2', md: 'md:col-span-1', hero: false }
+	];
+
+	function scrollReveal(node: Element): { destroy(): void } {
+		if (typeof IntersectionObserver === 'undefined') return { destroy() {} };
+		// rootMargin: trigger when element is 80px into the viewport from the bottom.
+		// This is better than a percentage threshold for tall sections on mobile,
+		// where a percentage threshold requires scrolling deep into the section.
+		const observer = new IntersectionObserver(
+			([entry]) => {
+				if (entry.isIntersecting) {
+					node.classList.add('is-revealed');
+					observer.disconnect();
+				}
+			},
+			{ rootMargin: '0px 0px -80px 0px', threshold: 0 }
+		);
+		observer.observe(node);
+		return {
+			destroy() {
+				observer.disconnect();
+			}
+		};
+	}
 </script>
 
 <svelte:head>
@@ -146,7 +184,7 @@
 
 <!-- ======================================================= HERO -->
 	<section
-		class="relative flex min-h-screen flex-col items-center justify-center overflow-hidden px-6 pb-24 pt-16"
+		class="relative flex min-h-screen flex-col items-center justify-center overflow-hidden px-4 pb-24 pt-14 sm:px-6 sm:pt-16"
 	>
 		<!-- Dot grid background -->
 		<div class="dot-grid absolute inset-0 opacity-40" aria-hidden="true"></div>
@@ -169,10 +207,12 @@
 		></div>
 
 		<!-- Content column -->
-		<div class="relative z-10 mx-auto flex max-w-[680px] flex-col items-center text-center">
+		<div
+			class="relative z-10 mx-auto flex w-full min-w-0 max-w-[680px] flex-col items-center text-center"
+		>
 			<!-- Badge strip -->
 			<div
-				class="ani-up mb-6 inline-flex items-center gap-2 rounded-full border px-4 py-1.5 text-[12px] font-medium"
+				class="ani-up mb-6 inline-flex max-w-full flex-wrap items-center justify-center gap-x-2 gap-y-1 rounded-full border px-3 py-1.5 text-center text-[11px] font-medium sm:px-4 sm:text-[12px]"
 				style="background: var(--m-surface); border-color: var(--m-border-strong); color: var(--m-text-2);"
 			>
 				<span
@@ -186,28 +226,27 @@
 
 			<!-- Headline -->
 			<h1
-				class="ani-up d1 mb-6 font-black tracking-tight"
-				style="font-family: 'Bricolage Grotesque', sans-serif; font-size: clamp(44px, 7vw, 80px); letter-spacing: -0.03em; line-height: 1.04;"
+				class="ani-up d1 mb-6 max-w-full font-black tracking-tight text-balance"
+				style="font-family: 'Bricolage Grotesque', sans-serif; font-size: clamp(32px, 7vw, 80px); letter-spacing: -0.03em; line-height: 1.04;"
 			>
 				<span style="color: var(--m-text);">Your waiver is your</span><br />
-				<span style="color: var(--m-accent);">best customer list.</span>
+				<span class="accent-shimmer">best customer list.</span>
 			</h1>
 
 			<!-- Subheadline -->
-			<p
-				class="ani-up d2 mx-auto mb-8 max-w-[520px] text-[17px] leading-relaxed"
-				style="color: var(--m-text-2);"
-			>
+		<p
+			class="ani-up d2 mx-auto mb-8 max-w-[520px] text-[15px] leading-relaxed sm:text-[17px]"
+			style="color: var(--m-text-2);"
+		>
 				Waiver Director captures every participant's email when they sign — not just the lead
-				booker. Then sends automated follow-ups tied to your booking system.
+				booker. Automated follow-ups help you gather feedback and reviews after each visit.
 			</p>
 
 			<!-- CTAs -->
 			<div class="ani-up d3 flex flex-wrap items-center justify-center gap-3">
 				<Button
 					href={resolve('/sign-up')}
-					class="h-11 gap-2 rounded-xl border-0 px-8 text-sm font-semibold"
-					style="background: var(--m-accent); color: var(--m-accent-fg); box-shadow: 0 0 32px var(--m-accent-glow);"
+					class="btn-mkt-accent h-11 gap-2 rounded-xl px-8 text-sm font-semibold"
 				>
 					Start for free
 					<ArrowRight size={16} aria-hidden="true" />
@@ -215,8 +254,7 @@
 				<Button
 					href={resolve('/#how-it-works')}
 					variant="outline"
-					class="h-11 rounded-xl px-8 text-sm font-medium"
-					style="border-color: var(--m-border-strong); color: var(--m-text-2); background: transparent;"
+					class="btn-mkt-outline h-11 rounded-xl px-8 text-sm font-medium"
 				>
 					See how it works
 				</Button>
@@ -231,22 +269,22 @@
 			>
 				<!-- Browser chrome -->
 				<div
-					class="flex h-9 items-center justify-between border-b px-4"
+					class="flex min-h-9 flex-wrap items-center justify-between gap-2 border-b px-3 py-2 sm:h-9 sm:flex-nowrap sm:px-4 sm:py-0"
 					style="background: var(--m-card); border-color: var(--m-border);"
 				>
-					<div class="flex items-center gap-1.5" aria-hidden="true">
+					<div class="order-1 flex shrink-0 items-center gap-1.5" aria-hidden="true">
 						<div class="h-2.5 w-2.5 rounded-full" style="background: #ff5f57;"></div>
 						<div class="h-2.5 w-2.5 rounded-full" style="background: #febc2e;"></div>
 						<div class="h-2.5 w-2.5 rounded-full" style="background: #28c840;"></div>
 					</div>
 					<div
-						class="rounded-md border px-3 py-1 text-[11px]"
+						class="order-3 min-w-0 max-w-full basis-full truncate rounded-md border px-2 py-1 text-center text-[10px] sm:order-2 sm:basis-auto sm:max-w-[min(100%,14rem)] sm:px-3 sm:text-[11px]"
 						style="color: var(--m-text-3); background: var(--m-elevated); border-color: var(--m-border);"
 						aria-hidden="true"
 					>
 						/sessions (preview)
 					</div>
-					<div class="flex items-center gap-1.5">
+					<div class="order-2 flex shrink-0 items-center gap-1.5 sm:order-3">
 						<span
 							class="live-dot h-1.5 w-1.5 rounded-full"
 							style="background: var(--m-green);"
@@ -259,45 +297,58 @@
 				<!-- Dashboard body -->
 				<div class="p-5 md:p-6">
 					<!-- Session header -->
-					<div class="mb-5 flex items-start justify-between gap-4">
-						<div>
+					<div
+						class="mb-5 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4"
+					>
+						<div class="min-w-0">
 							<p class="mb-1 text-[10px] uppercase tracking-widest" style="color: var(--m-text-3);">
 								Active Session
 							</p>
-							<h3
-								class="mb-0.5 text-[18px] font-bold"
-								style="font-family: 'Bricolage Grotesque', sans-serif; color: var(--m-text);"
-							>
-								Wilderness Zipline Tour
-							</h3>
+						<h3
+							class="mb-0.5 text-[15px] font-bold sm:text-[18px]"
+							style="font-family: 'Bricolage Grotesque', sans-serif; color: var(--m-text);"
+						>
+							Wilderness Zipline Tour
+						</h3>
 							<p class="text-[12px]" style="color: var(--m-text-3);">Today · 2:00 PM · via Bookeo</p>
 						</div>
-						<div class="flex shrink-0 items-center gap-4 md:gap-6">
-							<div class="text-center">
-								<div class="mb-1 text-[22px] font-bold leading-none" style="color: var(--m-green);">
-									6
-								</div>
-								<div class="text-[10px] uppercase tracking-wide" style="color: var(--m-text-3);">
-									Signed
-								</div>
+					<div
+						class="flex w-full shrink-0 items-center justify-between gap-2 sm:w-auto sm:justify-start sm:gap-3 md:gap-6"
+					>
+						<div class="text-center">
+							<div
+								class="mb-1 text-[18px] font-bold leading-none sm:text-[22px]"
+								style="color: var(--m-green);"
+							>
+								6
 							</div>
-							<div class="text-center">
-								<div class="mb-1 text-[22px] font-bold leading-none" style="color: var(--m-text);">
-									8
-								</div>
-								<div class="text-[10px] uppercase tracking-wide" style="color: var(--m-text-3);">
-									Expected
-								</div>
-							</div>
-							<div class="text-center">
-								<div class="mb-1 text-[22px] font-bold leading-none" style="color: var(--m-amber);">
-									2
-								</div>
-								<div class="text-[10px] uppercase tracking-wide" style="color: var(--m-text-3);">
-									Pending
-								</div>
+							<div class="text-[10px] uppercase tracking-wide" style="color: var(--m-text-3);">
+								Signed
 							</div>
 						</div>
+						<div class="text-center">
+							<div
+								class="mb-1 text-[18px] font-bold leading-none sm:text-[22px]"
+								style="color: var(--m-text);"
+							>
+								8
+							</div>
+							<div class="text-[10px] uppercase tracking-wide" style="color: var(--m-text-3);">
+								Expected
+							</div>
+						</div>
+						<div class="text-center">
+							<div
+								class="mb-1 text-[18px] font-bold leading-none sm:text-[22px]"
+								style="color: var(--m-amber);"
+							>
+								2
+							</div>
+							<div class="text-[10px] uppercase tracking-wide" style="color: var(--m-text-3);">
+								Pending
+							</div>
+						</div>
+					</div>
 					</div>
 
 					<!-- Progress bar -->
@@ -376,9 +427,9 @@
 							aria-hidden="true"
 						/>
 						<p class="text-[12px] leading-relaxed" style="color: var(--m-text-2);">
-							<strong style="color: var(--m-text);">6 follow-up emails scheduled</strong> after the
-							experience — captured from waiver submissions, not just the 1 contact in your booking
-							system.
+							<strong style="color: var(--m-text);">6 follow-up emails scheduled</strong> — one per
+							guest who signed, not just the lead. Use them for thank-yous, feedback, and review
+							requests.
 						</p>
 					</div>
 				</div>
@@ -388,33 +439,37 @@
 
 	<!-- ======================================================= DIFFERENTIATOR -->
 	<section
-		class="border-b border-t py-20 md:py-24"
+		use:scrollReveal
+		class="scroll-reveal border-b border-t py-20 md:py-24"
 		style="background: var(--m-surface); border-color: var(--m-border);"
 	>
-		<div class="mx-auto max-w-6xl px-6">
-			<p
-				class="mb-3 text-[11px] font-semibold uppercase tracking-widest"
-				style="color: var(--m-accent);"
-			>
-				The Differentiator
-			</p>
-			<h2
-				class="mb-3 max-w-lg font-extrabold tracking-tight"
-				style="font-family: 'Bricolage Grotesque', sans-serif; font-size: clamp(28px, 4vw, 44px); letter-spacing: -0.02em; color: var(--m-text);"
-			>
-				One booking. Six email addresses.
-			</h2>
-			<p class="mb-10 mt-3 max-w-lg text-[16px] leading-relaxed" style="color: var(--m-text-2);">
-				Most booking systems record only the lead contact. When your guests sign their waivers with
-				Waiver Director, you capture every participant's email — and automatically enroll them in
-				follow-up campaigns.
-			</p>
+		<div class="mx-auto max-w-6xl px-4 sm:px-6">
+			<div class="mx-auto max-w-4xl">
+				<header class="mb-8 space-y-3 md:mb-10">
+					<p
+						class="text-[11px] font-semibold uppercase tracking-widest"
+						style="color: var(--m-accent);"
+					>
+						The Differentiator
+					</p>
+					<h2
+						class="font-extrabold tracking-tight text-balance"
+						style="font-family: 'Bricolage Grotesque', sans-serif; font-size: clamp(28px, 4vw, 44px); letter-spacing: -0.02em; color: var(--m-text);"
+					>
+						One booking. Six email addresses.
+					</h2>
+					<p class="max-w-2xl text-[16px] leading-relaxed text-pretty" style="color: var(--m-text-2);">
+						Most booking systems record only the lead contact. With Waiver Director, every guest who
+						signs is reachable for follow-ups — feedback, reviews, and more — not just the booker.
+						Optional Mailchimp or Constant Contact sync for the lists you already run.
+					</p>
+				</header>
 
 			<!-- Two-column visual -->
-			<div class="grid max-w-4xl grid-cols-1 gap-6 md:grid-cols-2">
+			<div class="grid grid-cols-1 gap-6 md:grid-cols-2 md:gap-8">
 				<!-- Left: booking system -->
 				<div
-					class="rounded-xl border p-5"
+					class="flex h-full min-h-0 flex-col rounded-xl border p-5"
 					style="border-color: var(--m-border-strong); background: var(--m-card);"
 				>
 					<p
@@ -461,14 +516,14 @@
 							></div>
 						</div>
 					{/each}
-					<p class="mt-4 text-[11px]" style="color: var(--m-text-3);">
+					<p class="mt-auto pt-4 text-[11px] leading-snug" style="color: var(--m-text-3);">
 						5 guests have no contact record in your booking system.
 					</p>
 				</div>
 
 				<!-- Right: after waiver signing -->
 				<div
-					class="rounded-xl border p-5"
+					class="flex h-full min-h-0 flex-col rounded-xl border p-5"
 					style="border-color: var(--m-accent); background: var(--m-card); box-shadow: 0 0 30px var(--m-accent-glow);"
 				>
 					<p
@@ -503,23 +558,24 @@
 							</span>
 						</div>
 					{/each}
-					<p class="mt-4 text-[11px] font-medium" style="color: var(--m-accent);">
-						6 guests captured → 6 automated follow-up emails queued.
+					<p class="mt-auto pt-4 text-[11px] font-medium leading-snug" style="color: var(--m-accent);">
+						6 guests captured → 6 follow-ups queued.
 					</p>
 				</div>
 			</div>
 
 			<!-- Callout -->
-			<p class="mt-8 max-w-4xl text-center text-[14px] font-medium" style="color: var(--m-text-2);">
+			<p class="mt-10 text-center text-[14px] font-medium leading-relaxed text-pretty" style="color: var(--m-text-2);">
 				Works for any group experience — tours, ziplines, axe throwing, escape rooms, rentals, and
 				more.
 			</p>
+			</div>
 		</div>
 	</section>
 
 	<!-- ======================================================= HOW IT WORKS -->
-	<section id="how-it-works" class="py-20 md:py-24">
-		<div class="mx-auto max-w-6xl px-6">
+	<section id="how-it-works" use:scrollReveal class="scroll-reveal py-20 md:py-24">
+		<div class="mx-auto max-w-6xl px-4 sm:px-6">
 			<div class="mb-16 text-center">
 				<p
 					class="mb-3 text-[11px] font-semibold uppercase tracking-widest"
@@ -535,12 +591,12 @@
 				</h2>
 			</div>
 
-			<div class="mx-auto flex max-w-4xl flex-col gap-16">
+			<div class="how-steps mx-auto flex max-w-4xl flex-col gap-16">
 				<!-- Step 1 -->
 				<div class="grid grid-cols-1 items-center gap-10 md:grid-cols-2">
-					<div>
+				<div>
 						<div
-							class="mb-3 text-[72px] font-black leading-none"
+							class="mb-3 font-black leading-none text-[clamp(2.25rem,11vw,3.25rem)] md:text-[4.5rem]"
 							style="font-family: 'Bricolage Grotesque', sans-serif; color: oklch(0.52 0.22 277 / 30%);"
 							aria-hidden="true"
 						>
@@ -607,9 +663,9 @@
 
 				<!-- Step 2 -->
 				<div class="grid grid-cols-1 items-center gap-10 md:grid-cols-2">
-					<div class="md:order-last">
+				<div class="md:order-last">
 						<div
-							class="mb-3 text-[72px] font-black leading-none"
+							class="mb-3 font-black leading-none text-[clamp(2.25rem,11vw,3.25rem)] md:text-[4.5rem]"
 							style="font-family: 'Bricolage Grotesque', sans-serif; color: oklch(0.52 0.22 277 / 30%);"
 							aria-hidden="true"
 						>
@@ -675,9 +731,9 @@
 
 				<!-- Step 3 -->
 				<div class="grid grid-cols-1 items-center gap-10 md:grid-cols-2">
-					<div>
+				<div>
 						<div
-							class="mb-3 text-[72px] font-black leading-none"
+							class="mb-3 font-black leading-none text-[clamp(2.25rem,11vw,3.25rem)] md:text-[4.5rem]"
 							style="font-family: 'Bricolage Grotesque', sans-serif; color: oklch(0.52 0.22 277 / 30%);"
 							aria-hidden="true"
 						>
@@ -739,10 +795,11 @@
 	<!-- ======================================================= FEATURES GRID -->
 	<section
 		id="features"
-		class="border-t py-20 md:py-24"
+		use:scrollReveal
+		class="scroll-reveal border-t py-20 md:py-24"
 		style="border-color: var(--m-border); background: var(--m-surface);"
 	>
-		<div class="mx-auto max-w-6xl px-6">
+		<div class="mx-auto max-w-6xl px-4 sm:px-6">
 			<div class="mb-12 text-center">
 				<p
 					class="mb-3 text-[11px] font-semibold uppercase tracking-widest"
@@ -758,34 +815,96 @@
 				</h2>
 			</div>
 
-			<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-				{#each features as feat (feat.title)}
-					{@const Icon = feat.icon}
-					<div
-						class="feat-card flex flex-col gap-3 rounded-xl border p-6"
-						style="background: var(--m-surface); border-color: var(--m-border);"
-					>
+		<div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-6">
+			{#each features as feat, i (feat.title)}
+				{@const Icon = feat.icon}
+				{@const cfg = featureConfig[i]}
+				<div
+					class="feat-card relative flex flex-col gap-4 overflow-hidden rounded-2xl border p-6 {cfg.md} {cfg.lg}"
+					style="{cfg.hero
+						? 'background: linear-gradient(135deg, oklch(0.52 0.22 277 / 8%) 0%, var(--m-surface) 65%); border-color: oklch(0.52 0.22 277 / 22%);'
+						: 'background: var(--m-surface); border-color: var(--m-border);'}"
+				>
+					{#if cfg.hero}
 						<div
-							class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
-							style="background: var(--m-accent-dim);"
+							class="pointer-events-none absolute inset-x-0 top-0 h-px"
+							style="background: linear-gradient(90deg, transparent, oklch(0.52 0.22 277 / 60%), transparent);"
+							aria-hidden="true"
+						></div>
+						<div
+							class="pointer-events-none absolute right-0 top-0 h-48 w-48 rounded-full blur-[80px]"
+							style="background: oklch(0.52 0.22 277 / 10%);"
+							aria-hidden="true"
+						></div>
+					{/if}
+
+					<div
+						class="relative flex shrink-0 items-center justify-center rounded-xl {cfg.hero
+							? 'h-12 w-12'
+							: 'h-9 w-9'}"
+						style="{cfg.hero
+							? 'background: oklch(0.52 0.22 277 / 16%); box-shadow: 0 0 16px oklch(0.52 0.22 277 / 18%);'
+							: 'background: var(--m-accent-dim);'}"
+						aria-hidden="true"
+					>
+						<Icon size={cfg.hero ? 22 : 18} style="color: var(--m-accent);" />
+					</div>
+
+					<div class="relative flex flex-1 flex-col gap-2">
+						<h3
+							class="{cfg.hero ? 'text-[18px]' : 'text-[15px]'} font-semibold"
+							style="color: var(--m-text);"
+						>{feat.title}</h3>
+						<p
+							class="{cfg.hero ? 'text-[14px]' : 'text-[13px]'} leading-relaxed"
+							style="color: var(--m-text-2);"
+						>{feat.desc}</p>
+					</div>
+
+					{#if feat.title === 'Waiver Builder'}
+						<div class="mt-auto flex items-center gap-2 opacity-60">
+							<span
+								class="rounded-md border px-2 py-0.5 font-mono text-[9px]"
+								style="border-color: var(--m-border-strong); color: var(--m-text-3);"
+								aria-hidden="true">v1 locked</span
+							>
+							<span class="text-[9px]" style="color: var(--m-text-3);" aria-hidden="true">→</span>
+							<span
+								class="rounded-md border px-2 py-0.5 font-mono text-[9px]"
+								style="border-color: oklch(0.52 0.22 277 / 40%); color: var(--m-accent);"
+								aria-hidden="true">v2 current</span
+							>
+							<span class="text-[9px]" style="color: var(--m-text-3);" aria-hidden="true"
+								>· 3 changes</span
+							>
+						</div>
+					{:else if feat.title === 'Completion Analytics'}
+						<div
+							class="mt-auto flex h-9 items-end gap-1 overflow-hidden rounded-lg px-2 py-1.5 opacity-50"
+							style="background: var(--m-elevated);"
 							aria-hidden="true"
 						>
-							<Icon size={18} style="color: var(--m-accent);" />
+							{#each chartBars as bar (bar.day)}
+								<div
+									class="flex-1 rounded-t-sm"
+									style="height: {bar.pct}%; background: var(--m-accent); min-height: 2px;"
+								></div>
+							{/each}
 						</div>
-						<h3 class="text-[15px] font-semibold" style="color: var(--m-text);">{feat.title}</h3>
-						<p class="text-[13px] leading-relaxed" style="color: var(--m-text-2);">{feat.desc}</p>
-					</div>
-				{/each}
-			</div>
+					{/if}
+				</div>
+			{/each}
+		</div>
 		</div>
 	</section>
 
 	<!-- ======================================================= ANALYTICS PREVIEW -->
 	<section
-		class="border-b border-t py-24"
+		use:scrollReveal
+		class="scroll-reveal border-b border-t py-24"
 		style="background: var(--m-surface); border-color: var(--m-border);"
 	>
-		<div class="mx-auto max-w-6xl px-6">
+		<div class="mx-auto max-w-6xl px-4 sm:px-6">
 			<p
 				class="mb-3 text-[11px] font-semibold uppercase tracking-widest"
 				style="color: var(--m-accent);"
@@ -799,8 +918,8 @@
 				Know your completion rate for every session.
 			</h2>
 			<p class="mb-10 max-w-xl text-[15px] leading-relaxed" style="color: var(--m-text-2);">
-				All metrics are backed by denormalized counters — fast reads, no heavy aggregations on every
-				page load.
+				See signed, expected, and completion stats at a glance — numbers update as waivers come in,
+				so you're not looking at a stale snapshot.
 			</p>
 
 			<!-- Analytics mockup -->
@@ -810,13 +929,13 @@
 			>
 				<!-- Header bar -->
 				<div
-					class="flex h-12 items-center justify-between border-b px-5"
+					class="flex min-h-12 flex-col gap-3 border-b px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5 sm:py-0"
 					style="background: var(--m-card); border-color: var(--m-border);"
 				>
 					<span class="text-[13px] font-semibold" style="color: var(--m-text);"
 						>Analytics Dashboard</span
 					>
-					<div class="flex items-center gap-3">
+					<div class="flex flex-wrap items-center gap-2 sm:gap-3">
 						<span
 							class="rounded-md border px-2.5 py-1 text-[11px]"
 							style="color: var(--m-text-2); border-color: var(--m-border-strong); background: var(--m-elevated);"
@@ -831,15 +950,10 @@
 					</div>
 				</div>
 
-				<!-- Stats row -->
-				<div class="grid grid-cols-2 md:grid-cols-4">
-					{#each analyticsStats as stat, i (stat.label)}
-						<div
-							class="p-5"
-							style="background: var(--m-card); {i < 3
-								? 'border-right: 1px solid var(--m-border);'
-								: ''}"
-						>
+			<!-- Stats row -->
+			<div class="grid grid-cols-2 md:grid-cols-4">
+				{#each analyticsStats as stat (stat.label)}
+					<div class="stat-cell min-w-0 p-4 sm:p-5">
 							<p
 								class="mb-2 text-[10px] uppercase tracking-wide"
 								style="color: var(--m-text-3);"
@@ -938,43 +1052,72 @@
 		</div>
 	</section>
 
-	<MarketingPricing />
+	<div use:scrollReveal class="scroll-reveal">
+		<MarketingPricing />
+	</div>
 
 	<!-- ======================================================= CTA BANNER -->
 	<section
-		class="relative overflow-hidden border-t py-28"
+		use:scrollReveal
+		class="scroll-reveal relative overflow-hidden border-t py-32"
 		style="background: var(--m-bg); border-color: var(--m-border);"
 	>
+		<!-- Gradient separator at top -->
+		<div class="pointer-events-none absolute inset-x-0 top-0 flex justify-center" aria-hidden="true">
+			<div
+				class="h-px w-3/4 max-w-2xl"
+				style="background: linear-gradient(90deg, transparent, oklch(0.52 0.22 277 / 50%), transparent);"
+			></div>
+		</div>
 		<div
-			class="blob-a pointer-events-none absolute left-[10%] top-[-20%] h-[400px] w-[400px] rounded-full blur-[100px]"
-			style="background: oklch(0.52 0.22 277 / 20%);"
+			class="blob-a pointer-events-none absolute left-[5%] top-[-10%] h-[500px] w-[500px] rounded-full blur-[130px]"
+			style="background: oklch(0.52 0.22 277 / 22%);"
 			aria-hidden="true"
 		></div>
 		<div
-			class="blob-b pointer-events-none absolute bottom-[-10%] right-[10%] h-[350px] w-[350px] rounded-full blur-[90px]"
-			style="background: oklch(0.65 0.22 155 / 12%);"
+			class="blob-b pointer-events-none absolute bottom-[-15%] right-[5%] h-[450px] w-[450px] rounded-full blur-[110px]"
+			style="background: oklch(0.65 0.22 155 / 10%);"
+			aria-hidden="true"
+		></div>
+		<!-- Center glow -->
+		<div
+			class="pointer-events-none absolute left-1/2 top-1/2 h-[300px] w-[600px] -translate-x-1/2 -translate-y-1/2 rounded-full blur-[100px]"
+			style="background: oklch(0.52 0.22 277 / 8%);"
 			aria-hidden="true"
 		></div>
 
-		<div class="relative z-10 flex flex-col items-center gap-5 px-6 text-center">
+		<div class="relative z-10 flex flex-col items-center gap-6 px-4 text-center sm:px-6">
+			<div
+				class="mb-2 inline-flex items-center gap-2 rounded-full border px-4 py-1.5 text-[11px] font-medium"
+				style="background: var(--m-surface); border-color: var(--m-border-strong); color: var(--m-text-2);"
+			>
+				<span
+					class="live-dot h-1.5 w-1.5 shrink-0 rounded-full"
+					style="background: var(--m-green);"
+					aria-hidden="true"
+				></span>
+				Now in early access
+			</div>
 			<h2
-				class="grad-text max-w-2xl font-extrabold tracking-tight"
-				style="font-family: 'Bricolage Grotesque', sans-serif; font-size: clamp(30px, 5vw, 56px); letter-spacing: -0.03em; line-height: 1.1;"
+				class="max-w-2xl font-extrabold tracking-tight"
+				style="font-family: 'Bricolage Grotesque', sans-serif; font-size: clamp(30px, 5vw, 60px); letter-spacing: -0.03em; line-height: 1.06; color: var(--m-text);"
 			>
-				Ready to stop losing half your group's emails?
+				Stop leaving half your<br />group's emails behind.
 			</h2>
-			<p class="max-w-[400px] text-[16px]" style="color: var(--m-text-2);">
-				Join the waitlist and get early access to Waiver Director.
+			<p class="max-w-[420px] text-[16px] leading-relaxed" style="color: var(--m-text-2);">
+				Every person who signs a waiver becomes a contact. Waiver Director turns your
+				compliance step into your best email list.
 			</p>
-			<Button
-			href={resolve('/sign-up')}
-			class="h-12 gap-2 rounded-xl border-0 px-10 text-sm font-semibold"
-				style="background: var(--m-accent); color: var(--m-accent-fg); box-shadow: 0 0 40px var(--m-accent-glow);"
-			>
-				Get early access
-				<ArrowRight size={16} aria-hidden="true" />
-			</Button>
-			<p class="text-[12px]" style="color: var(--m-text-3);">Free to start. No credit card required.</p>
+			<div class="flex flex-col items-center gap-3 sm:flex-row">
+				<Button
+					href={resolve('/sign-up')}
+					class="btn-mkt-accent h-12 gap-2 rounded-xl px-10 text-sm font-semibold"
+				>
+					Get early access
+					<ArrowRight size={16} aria-hidden="true" />
+				</Button>
+			</div>
+			<p class="text-[12px]" style="color: var(--m-text-3);">Free to start · No credit card required</p>
 		</div>
 	</section>
 
@@ -1082,10 +1225,10 @@
 
 	.grad-text {
 		background: linear-gradient(
-			135deg,
+			160deg,
 			oklch(0.97 0 0) 0%,
-			oklch(0.72 0.012 286) 60%,
-			oklch(0.52 0.22 277) 100%
+			oklch(0.88 0.06 277) 45%,
+			oklch(0.70 0.22 277) 100%
 		);
 		-webkit-background-clip: text;
 		background-clip: text;
@@ -1095,12 +1238,100 @@
 
 	.feat-card {
 		transition:
-			transform 0.2s ease,
-			box-shadow 0.2s ease;
+			transform 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+			box-shadow 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+			border-color 0.22s ease;
 	}
 	.feat-card:hover {
-		transform: translateY(-3px);
-		box-shadow: 0 12px 40px oklch(0.52 0.22 277 / 16%);
+		transform: translateY(-4px);
+		box-shadow:
+			0 0 0 1px oklch(1 0 0 / 10%),
+			0 16px 48px oklch(0 0 0 / 50%),
+			0 0 60px oklch(0.52 0.22 277 / 12%);
+	}
+
+	/* ── Accent headline: solid accent + rare soft glint ─────────── */
+	@keyframes hero-text-glint {
+		0%,
+		85%,
+		92%,
+		100% {
+			background-position: 0% 50%;
+		}
+		88.5% {
+			background-position: 100% 50%;
+		}
+	}
+	.accent-shimmer {
+		background: linear-gradient(
+			95deg,
+			oklch(0.51 0.21 277) 0%,
+			oklch(0.52 0.22 277) 42%,
+			oklch(0.60 0.16 277) 50%,
+			oklch(0.52 0.22 277) 58%,
+			oklch(0.51 0.21 277) 100%
+		);
+		background-size: 220% 100%;
+		background-position: 0% 50%;
+		-webkit-background-clip: text;
+		background-clip: text;
+		-webkit-text-fill-color: transparent;
+		animation: hero-text-glint 11s ease-in-out infinite;
+	}
+
+	/* ── Scroll-reveal ───────────────────────────────────────────── */
+	.scroll-reveal {
+		opacity: 0;
+		transform: translateY(22px);
+		transition:
+			opacity 0.75s cubic-bezier(0.16, 1, 0.3, 1),
+			transform 0.75s cubic-bezier(0.16, 1, 0.3, 1);
+	}
+	.scroll-reveal.is-revealed {
+		opacity: 1;
+		transform: translateY(0);
+	}
+
+	/* ── Analytics stats grid dividers ─────────────────────────── */
+	/* Mobile 2-col: right border on col 1, bottom border on row 1  */
+	/* Desktop 4-col: right border on cols 1-3, no bottom border    */
+	.stat-cell {
+		background: var(--m-card);
+	}
+	.stat-cell:nth-child(odd) {
+		border-right: 1px solid var(--m-border);
+	}
+	.stat-cell:nth-child(-n + 2) {
+		border-bottom: 1px solid var(--m-border);
+	}
+	@media (min-width: 768px) {
+		.stat-cell:nth-child(odd) {
+			border-right: none;
+		}
+		.stat-cell:nth-child(-n + 2) {
+			border-bottom: none;
+		}
+		.stat-cell:nth-child(-n + 3) {
+			border-right: 1px solid var(--m-border);
+		}
+	}
+
+	/* ── How-it-works step connectors ───────────────────────────── */
+	.how-steps > div {
+		position: relative;
+	}
+	.how-steps > div:not(:last-child)::after {
+		content: '';
+		position: absolute;
+		bottom: -4rem;
+		left: 2.5rem;
+		width: 1px;
+		height: 4rem;
+		background: linear-gradient(
+			to bottom,
+			oklch(0.52 0.22 277 / 28%),
+			oklch(0.52 0.22 277 / 6%)
+		);
 	}
 
 	@media (prefers-reduced-motion: reduce) {
@@ -1116,6 +1347,18 @@
 		.progress-fill {
 			animation: none !important;
 			width: 75%;
+		}
+		.accent-shimmer {
+			animation: none;
+			background: none;
+			background-size: auto;
+			-webkit-text-fill-color: var(--m-accent);
+			color: var(--m-accent);
+		}
+		.scroll-reveal {
+			opacity: 1 !important;
+			transform: none !important;
+			transition: none !important;
 		}
 	}
 </style>

@@ -1,0 +1,97 @@
+/**
+ * Marketing route group — tokens + `.btn-mkt-*` helpers for shadcn `data-slot="button"`.
+ * Scoped under `.mkt`; imported only from `(marketing)/+layout.svelte`.
+ */
+
+.mkt {
+	overflow-x: hidden;
+	--m-bg: oklch(0.09 0.006 286);
+	--m-surface: oklch(0.13 0.008 286);
+	--m-elevated: oklch(0.17 0.01 286);
+	--m-card: oklch(0.15 0.009 286);
+	--m-border: oklch(1 0 0 / 8%);
+	--m-border-strong: oklch(1 0 0 / 14%);
+	--m-accent: oklch(0.52 0.22 277);
+	--m-accent-fg: oklch(0.97 0.01 277);
+	--m-accent-glow: oklch(0.52 0.22 277 / 28%);
+	--m-accent-dim: oklch(0.52 0.22 277 / 12%);
+	--m-green: oklch(0.65 0.22 155);
+	--m-green-dim: oklch(0.65 0.22 155 / 15%);
+	--m-amber: oklch(0.78 0.18 75);
+	--m-amber-dim: oklch(0.78 0.18 75 / 15%);
+	--m-text: oklch(0.97 0 0);
+	--m-text-2: oklch(0.72 0.012 286);
+	--m-text-3: oklch(0.48 0.016 286);
+	background: var(--m-bg);
+	color: var(--m-text);
+}
+
+.mkt [data-slot='button'].btn-mkt-accent {
+	background: var(--m-accent);
+	color: var(--m-accent-fg);
+	border: none;
+	box-shadow:
+		0 0 0 1px oklch(0.52 0.22 277 / 32%),
+		0 0 24px var(--m-accent-glow),
+		inset 0 1px 0 oklch(1 0 0 / 12%);
+	transition:
+		background 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+		box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+		transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.mkt [data-slot='button'].btn-mkt-accent:hover {
+	background: oklch(0.58 0.21 277);
+	box-shadow:
+		0 0 0 1px oklch(0.52 0.22 277 / 45%),
+		0 0 36px oklch(0.52 0.22 277 / 38%),
+		inset 0 1px 0 oklch(1 0 0 / 16%);
+	transform: translateY(-1px);
+}
+.mkt [data-slot='button'].btn-mkt-accent:active {
+	transform: translateY(0) scale(0.98);
+	box-shadow:
+		0 0 0 1px oklch(0.52 0.22 277 / 35%),
+		0 0 16px var(--m-accent-glow),
+		inset 0 1px 0 oklch(1 0 0 / 8%);
+}
+
+.mkt [data-slot='button'].btn-mkt-outline {
+	border: 1px solid var(--m-border-strong);
+	color: var(--m-text-2);
+	background: transparent;
+	box-shadow: none;
+	transition:
+		background 0.2s ease,
+		border-color 0.2s ease,
+		color 0.2s ease,
+		transform 0.2s ease;
+}
+.mkt [data-slot='button'].btn-mkt-outline:hover {
+	background: oklch(0.52 0.22 277 / 10%);
+	border-color: oklch(0.52 0.22 277 / 42%);
+	color: var(--m-text);
+	transform: translateY(-1px);
+}
+.mkt [data-slot='button'].btn-mkt-outline:active {
+	transform: translateY(0) scale(0.99);
+	background: oklch(0.52 0.22 277 / 6%);
+	border-color: oklch(0.52 0.22 277 / 32%);
+}
+
+.mkt [data-slot='button'].btn-mkt-ghost,
+.mkt [data-slot='button'].mkt-nav-menu-trigger {
+	background: transparent;
+	border: none;
+	color: var(--m-text-2);
+	box-shadow: none;
+	transition: background 0.2s ease, color 0.2s ease;
+}
+.mkt [data-slot='button'].btn-mkt-ghost:hover,
+.mkt [data-slot='button'].mkt-nav-menu-trigger:hover {
+	background: oklch(1 0 0 / 6%);
+	color: var(--m-text);
+}
+.mkt [data-slot='button'].btn-mkt-ghost:active,
+.mkt [data-slot='button'].mkt-nav-menu-trigger:active {
+	background: oklch(1 0 0 / 4%);
+}
