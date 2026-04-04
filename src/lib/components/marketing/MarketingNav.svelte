@@ -27,7 +27,7 @@
 	}
 </script>
 
-<svelte:window bind:scrollY={scrollY} onkeydown={onNavKeydown} />
+<svelte:window bind:scrollY onkeydown={onNavKeydown} />
 
 {#if mobileNavOpen}
 	<div
@@ -40,17 +40,19 @@
 	></div>
 {/if}
 
-<div
-	class="marketing-nav-shell flex flex-col"
-	class:is-scrolled={scrolled}
->
+<div class="marketing-nav-shell flex flex-col" class:is-scrolled={scrolled}>
 	<nav class="marketing-nav-bar mx-auto w-full max-w-6xl" aria-label="Main navigation">
-		<div class="flex h-14 items-center justify-between gap-3 sm:gap-4 md:grid md:grid-cols-[1fr_auto_1fr] md:gap-6">
+		<div
+			class="flex h-14 items-center justify-between gap-3 sm:gap-4 md:grid md:grid-cols-[1fr_auto_1fr] md:gap-6"
+		>
 			<div class="flex min-w-0 items-center gap-3 sm:gap-4 md:justify-self-start">
-				<a href={resolve('/')} class="mkt-brand-link flex min-w-0 items-center gap-2.5 no-underline">
+				<a
+					href={resolve('/')}
+					class="mkt-brand-link flex min-w-0 items-center gap-2.5 no-underline"
+				>
 					<div
 						class="mkt-brand-mark flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[11px] font-black"
-						style="background: var(--m-accent); color: var(--m-accent-fg); font-family: 'Bricolage Grotesque', sans-serif;"
+						style="background: var(--primary); color: var(--primary-foreground); font-family: 'Bricolage Grotesque', sans-serif;"
 						aria-hidden="true"
 					>
 						WD
@@ -60,23 +62,27 @@
 			</div>
 
 			<div class="hidden items-center gap-1 md:flex md:justify-self-center">
-				<a href={resolve('/#features')} class="nav-link text-[13px] font-medium no-underline">Features</a>
+				<a href={resolve('/#features')} class="nav-link text-[13px] font-medium no-underline"
+					>Features</a
+				>
 				<a href={resolve('/#how-it-works')} class="nav-link text-[13px] font-medium no-underline"
 					>How it works</a
 				>
-				<a href={resolve('/#pricing')} class="nav-link text-[13px] font-medium no-underline">Pricing</a>
+				<a href={resolve('/#pricing')} class="nav-link text-[13px] font-medium no-underline"
+					>Pricing</a
+				>
 			</div>
 
 			<div class="hidden items-center gap-2 md:flex md:justify-self-end">
 				<Button
 					href={resolve('/sign-in')}
 					variant="ghost"
-					class="btn-mkt-ghost h-8 rounded-lg px-4 text-xs font-semibold"
-				>Sign in</Button>
+					class="btn-mkt-ghost h-8 rounded-lg px-4 text-xs font-semibold">Sign in</Button
+				>
 				<Button
 					href={resolve('/sign-up')}
-					class="btn-mkt-accent h-8 rounded-lg px-4 text-xs font-semibold"
-				>Get early access</Button>
+					class="btn-mkt-accent h-8 rounded-lg px-4 text-xs font-semibold">Get early access</Button
+				>
 			</div>
 
 			<div class="flex shrink-0 justify-end md:hidden">
@@ -158,7 +164,6 @@
 	.mkt-brand-wordmark {
 		font-family: 'Bricolage Grotesque', sans-serif;
 		font-size: 15px;
-		color: var(--m-text);
 	}
 
 	@media (hover: hover) and (pointer: fine) {
@@ -170,14 +175,16 @@
 	.mkt-brand-link:focus-visible {
 		outline: none;
 		border-radius: 0.6rem;
-		box-shadow: 0 0 0 2px oklch(0.09 0.006 286), 0 0 0 4px oklch(0.52 0.22 277 / 45%);
+		box-shadow:
+			0 0 0 2px oklch(0.09 0.006 286),
+			0 0 0 4px oklch(0.52 0.22 277 / 45%);
 	}
 
 	.nav-link {
 		display: inline-flex;
 		align-items: center;
 		min-height: 2rem;
-		color: var(--m-text-2);
+		color: var(--muted-foreground);
 		padding: 0.4rem 0.8rem;
 		border-radius: 0.5rem;
 		letter-spacing: -0.01em;
@@ -190,15 +197,17 @@
 
 	@media (hover: hover) and (pointer: fine) {
 		.nav-link:hover {
-			color: var(--m-text);
+			color: inherit;
 			background: oklch(1 0 0 / 6%);
 		}
 	}
 
 	.nav-link:focus-visible {
 		outline: none;
-		color: var(--m-text);
-		box-shadow: 0 0 0 2px oklch(0.09 0.006 286), 0 0 0 4px oklch(0.52 0.22 277 / 40%);
+		color: inherit;
+		box-shadow:
+			0 0 0 2px oklch(0.09 0.006 286),
+			0 0 0 4px oklch(0.52 0.22 277 / 40%);
 	}
 
 	.mkt-mobile-panel-wrap {
@@ -245,7 +254,6 @@
 		font-weight: 700;
 		letter-spacing: -0.015em;
 		line-height: 1.2;
-		color: var(--m-text);
 		text-decoration: none;
 		transition:
 			background 0.15s ease,
@@ -263,7 +271,9 @@
 	.mkt-mobile-link:focus-visible {
 		outline: none;
 		background: oklch(0.52 0.22 277 / 12%);
-		box-shadow: 0 0 0 2px oklch(0.09 0.006 286), 0 0 0 4px oklch(0.52 0.22 277 / 35%);
+		box-shadow:
+			0 0 0 2px oklch(0.09 0.006 286),
+			0 0 0 4px oklch(0.52 0.22 277 / 35%);
 	}
 
 	.mkt-mobile-expand-actions {

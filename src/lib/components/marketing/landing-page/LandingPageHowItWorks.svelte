@@ -25,45 +25,45 @@
 				<div>
 					<div class="landing-how-it-works__step-number" aria-hidden="true">01</div>
 					<h3 class="landing-how-it-works__step-title">Build your waiver template once.</h3>
-					<p class="mkt-text-2 text-[15px] leading-relaxed">
+					<p class="text-[15px] leading-relaxed text-muted-foreground">
 						Create structured waivers with custom fields, signature blocks, and your branding.
 						Publish a version and it&apos;s locked, so past submissions are never altered when you
 						make edits.
 					</p>
 				</div>
 
-				<div class="mkt-panel rounded-xl border p-4">
+				<div class="rounded-xl border border-(--m-border-strong) bg-(--m-surface) p-4">
 					<div class="mb-4 flex items-center justify-between">
-						<p class="mkt-text text-[13px] font-semibold">Adventure Waiver — v2</p>
-						<span class="mkt-chip-warning rounded-full px-2 py-0.5 text-[10px] font-semibold">
+						<p class="text-[13px] font-semibold">Adventure Waiver — v2</p>
+						<span class="rounded-full bg-(--m-amber-dim) px-2 py-0.5 text-[10px] font-semibold text-(--m-amber)">
 							Draft
 						</span>
 					</div>
 
 					{#each waiverFields as field (field)}
-						<div class="mkt-card-panel mb-2 rounded-lg border px-3 py-2.5">
-							<p class="mkt-text-3 mb-1 text-[9px] tracking-widest uppercase">
+						<div class="mb-2 rounded-lg border border-(--m-border-soft) bg-(--m-card) px-3 py-2.5">
+							<p class="mb-1 text-[9px] tracking-widest text-(--m-text-3) uppercase">
 								{field}
 							</p>
-							<div class="h-3 w-3/4 rounded bg-[var(--m-border-strong)]" aria-hidden="true"></div>
+							<div class="h-3 w-3/4 rounded bg-(--m-border-strong)" aria-hidden="true"></div>
 						</div>
 					{/each}
 
 					<div
-						class="mkt-border-strong mb-4 rounded-lg border-2 border-dashed px-3 py-4 text-center"
+						class="mb-4 rounded-lg border-2 border-(--m-border-strong) border-dashed px-3 py-4 text-center"
 					>
-						<p class="mkt-text-2 mb-1 text-[11px] font-semibold">Signature</p>
-						<p class="mkt-text-3 text-[10px]">Draw or type below</p>
+						<p class="mb-1 text-[11px] font-semibold text-muted-foreground">Signature</p>
+						<p class="text-[10px] text-(--m-text-3)">Draw or type below</p>
 					</div>
 
 					<div class="flex items-center gap-3">
 						<span
-							class="rounded-lg bg-[var(--m-accent)] px-3 py-1.5 text-[12px] font-semibold text-[var(--m-accent-fg)]"
+							class="rounded-lg bg-primary px-3 py-1.5 text-[12px] font-semibold text-primary-foreground"
 							aria-hidden="true"
 						>
 							Publish v2
 						</span>
-						<span class="mkt-text-3 text-[11px]">3 changes since v1</span>
+						<span class="text-[11px] text-(--m-text-3)">3 changes since v1</span>
 					</div>
 				</div>
 			</div>
@@ -72,37 +72,37 @@
 				<div class="md:order-last">
 					<div class="landing-how-it-works__step-number" aria-hidden="true">02</div>
 					<h3 class="landing-how-it-works__step-title">Connect your booking system.</h3>
-					<p class="mkt-text-2 text-[15px] leading-relaxed">
+					<p class="text-[15px] leading-relaxed text-muted-foreground">
 						Link Bookeo, Resova, or Xola. Sessions and expected participant counts sync
 						automatically. Waivers are matched to the right group with no manual setup per session.
 					</p>
 				</div>
 
-				<div class="mkt-panel rounded-xl border p-4">
-					<p class="mkt-text-3 mb-4 text-[10px] font-semibold tracking-widest uppercase">
+				<div class="rounded-xl border border-(--m-border-strong) bg-(--m-surface) p-4">
+					<p class="mb-4 text-[10px] font-semibold tracking-widest text-(--m-text-3) uppercase">
 						Booking Integrations
 					</p>
 
 					<div class="mb-4 grid grid-cols-3 gap-3">
 						{#each providers as provider (provider.name)}
-							<div class="mkt-card-panel rounded-lg border p-3 text-center">
+							<div class="rounded-lg border border-(--m-border-soft) bg-(--m-card) p-3 text-center">
 								<div
-									class="mkt-chip-accent mx-auto mb-2 h-6 w-6 rounded-md"
+									class="mx-auto mb-2 h-6 w-6 rounded-md bg-(--m-accent-dim)"
 									aria-hidden="true"
 								></div>
-								<p class="mkt-text mb-1 text-[11px] font-semibold">
+								<p class="mb-1 text-[11px] font-semibold">
 									{provider.name}
 								</p>
 								{#if provider.connected}
-									<span class="mkt-success text-[9px] font-semibold">Connected ✓</span>
+									<span class="text-[9px] font-semibold text-(--m-green)">Connected ✓</span>
 								{:else}
-									<span class="mkt-warning text-[9px] font-medium">Coming soon</span>
+									<span class="text-[9px] font-medium text-(--m-amber)">Coming soon</span>
 								{/if}
 							</div>
 						{/each}
 					</div>
 
-					<p class="mkt-text-3 text-[11px]">
+					<p class="text-[11px] text-(--m-text-3)">
 						<span aria-hidden="true">↻</span> Last synced 3 minutes ago · 4 upcoming sessions
 					</p>
 				</div>
@@ -112,23 +112,23 @@
 				<div>
 					<div class="landing-how-it-works__step-number" aria-hidden="true">03</div>
 					<h3 class="landing-how-it-works__step-title">Guests sign before they arrive.</h3>
-					<p class="mkt-text-2 text-[15px] leading-relaxed">
+					<p class="text-[15px] leading-relaxed text-muted-foreground">
 						Share a link by email, SMS, or booking confirmation. Anyone in the group can sign from
 						their phone. You see real-time completion in your session dashboard.
 					</p>
 				</div>
 
-				<div class="mkt-panel rounded-xl border p-4">
-					<p class="mkt-text-3 mb-4 text-[10px] font-semibold tracking-widest uppercase">
+				<div class="rounded-xl border border-(--m-border-strong) bg-(--m-surface) p-4">
+					<p class="mb-4 text-[10px] font-semibold tracking-widest text-(--m-text-3) uppercase">
 						Campaign Link
 					</p>
 
-					<div class="mkt-card-panel mb-4 flex items-center gap-2 rounded-lg border px-3 py-2.5">
-						<span class="mkt-text-2 min-w-0 flex-1 truncate text-[12px]">
+					<div class="mb-4 flex items-center gap-2 rounded-lg border border-(--m-border-soft) bg-(--m-card) px-3 py-2.5">
+						<span class="min-w-0 flex-1 truncate text-[12px] text-muted-foreground">
 							waivers.yourvenue.com/adventure-tour
 						</span>
 						<span
-							class="mkt-chip-accent shrink-0 rounded-md px-2.5 py-1 text-[11px] font-semibold"
+							class="shrink-0 rounded-md bg-(--m-accent-dim) px-2.5 py-1 text-[11px] font-semibold text-primary"
 							aria-hidden="true"
 						>
 							Copy
@@ -138,14 +138,14 @@
 					<div class="mb-4 flex flex-wrap items-center gap-2">
 						{#each shareMethods as method (method)}
 							<span
-								class="mkt-card mkt-border-strong mkt-text-2 rounded-full border px-3 py-1 text-[11px] font-medium"
+								class="rounded-full border border-(--m-border-strong) bg-(--m-card) px-3 py-1 text-[11px] font-medium text-muted-foreground"
 							>
 								{method}
 							</span>
 						{/each}
 					</div>
 
-					<p class="mkt-text-3 text-[11px]">
+					<p class="text-[11px] text-(--m-text-3)">
 						Or share a shortlink · embed in your booking confirmation emails.
 					</p>
 				</div>
@@ -183,7 +183,6 @@
 		font-family: 'Bricolage Grotesque', sans-serif;
 		font-size: 26px;
 		font-weight: 700;
-		color: var(--m-text);
 	}
 
 	@media (min-width: 768px) {

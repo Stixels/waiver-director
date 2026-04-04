@@ -42,7 +42,7 @@
 		font-weight: 600;
 		letter-spacing: 0.2em;
 		text-transform: uppercase;
-		color: var(--m-accent);
+		color: var(--primary);
 	}
 
 	.landing-section-heading__title {
@@ -51,7 +51,6 @@
 		font-weight: 800;
 		letter-spacing: -0.02em;
 		line-height: 1.05;
-		color: var(--m-text);
 		text-wrap: balance;
 	}
 
@@ -59,7 +58,7 @@
 		max-width: 42rem;
 		font-size: 15px;
 		line-height: 1.7;
-		color: var(--m-text-2);
+		color: var(--muted-foreground);
 		text-wrap: pretty;
 	}
 

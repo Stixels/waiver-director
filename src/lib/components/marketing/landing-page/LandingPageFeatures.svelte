@@ -95,7 +95,7 @@
 <section
 	id="features"
 	class="landing-reveal border-t py-20 md:py-24"
-	style="border-color: var(--m-border); background: var(--m-surface);"
+	style="border-color: var(--border); background: var(--m-surface);"
 	{@attach scrollReveal}
 >
 	<div class="mx-auto max-w-6xl px-4 sm:px-6">
@@ -117,7 +117,7 @@
 					]}
 					style={feature.hero
 						? 'background: linear-gradient(135deg, var(--m-accent-soft) 0%, var(--m-surface) 65%); border-color: var(--m-accent-border-soft);'
-						: 'background: var(--m-surface); border-color: var(--m-border);'}
+						: 'background: var(--m-surface); border-color: var(--border);'}
 				>
 					{#if feature.hero}
 						<div
@@ -142,16 +142,16 @@
 							: 'background: var(--m-accent-dim);'}
 						aria-hidden="true"
 					>
-						<Icon size={feature.hero ? 22 : 18} style="color: var(--m-accent);" />
+						<Icon size={feature.hero ? 22 : 18} style="color: var(--primary);" />
 					</div>
 
 					<div class="relative flex flex-1 flex-col gap-2">
-						<h3 class={['mkt-text', feature.hero ? 'text-[18px]' : 'text-[15px]', 'font-semibold']}>
+						<h3 class={[feature.hero ? 'text-[18px]' : 'text-[15px]', 'font-semibold']}>
 							{feature.title}
 						</h3>
 						<p
 							class={[
-								'mkt-text-2',
+								'text-muted-foreground',
 								feature.hero ? 'text-[14px]' : 'text-[13px]',
 								'leading-relaxed'
 							]}
@@ -163,30 +163,30 @@
 					{#if feature.footer === 'version'}
 						<div class="mt-auto flex items-center gap-2 opacity-60">
 							<span
-								class="mkt-border-strong mkt-text-3 rounded-md border px-2 py-0.5 font-mono text-[9px]"
+								class="rounded-md border border-(--m-border-strong) px-2 py-0.5 font-mono text-[9px] text-(--m-text-3)"
 								aria-hidden="true"
 							>
 								v1 locked
 							</span>
-							<span class="mkt-text-3 text-[9px]" aria-hidden="true">→</span>
+							<span class="text-[9px] text-(--m-text-3)" aria-hidden="true">→</span>
 							<span
-								class="mkt-accent rounded-md border px-2 py-0.5 font-mono text-[9px]"
+								class="rounded-md border px-2 py-0.5 font-mono text-[9px] text-primary"
 								style="border-color: var(--m-accent-border);"
 								aria-hidden="true"
 							>
 								v2 current
 							</span>
-							<span class="mkt-text-3 text-[9px]" aria-hidden="true">· 3 changes</span>
+							<span class="text-[9px] text-(--m-text-3)" aria-hidden="true">· 3 changes</span>
 						</div>
 					{:else if feature.footer === 'chart'}
 						<div
-							class="mkt-elevated mt-auto flex h-9 items-end gap-1 overflow-hidden rounded-lg px-2 py-1.5 opacity-50"
+							class="mt-auto flex h-9 items-end gap-1 overflow-hidden rounded-lg bg-(--m-elevated) px-2 py-1.5 opacity-50"
 							aria-hidden="true"
 						>
 							{#each chartBars as bar (bar.day)}
 								<div
 									class="flex-1 rounded-t-sm"
-									style={`height: ${bar.pct}%; background: var(--m-accent); min-height: 2px;`}
+									style={`height: ${bar.pct}%; background: var(--primary); min-height: 2px;`}
 								></div>
 							{/each}
 						</div>

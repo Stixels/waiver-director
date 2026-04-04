@@ -40,13 +40,10 @@
 
 <footer
 	class="relative border-t px-4 py-12 sm:px-6"
-	style="background: var(--m-surface); border-color: var(--m-border);"
+	style="background: var(--m-surface); border-color: var(--border);"
 >
 	<!-- Gradient accent line at top -->
-	<div
-		class="pointer-events-none absolute inset-x-0 top-0 flex justify-center"
-		aria-hidden="true"
-	>
+	<div class="pointer-events-none absolute inset-x-0 top-0 flex justify-center" aria-hidden="true">
 		<div
 			class="h-px w-1/2 max-w-lg"
 			style="background: linear-gradient(90deg, transparent, oklch(0.52 0.22 277 / 35%), transparent);"
@@ -58,15 +55,14 @@
 				<a href={resolve('/')} class="mb-3 flex items-center gap-2 no-underline">
 					<div
 						class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[11px] font-black"
-						style="background: var(--m-accent); color: var(--m-accent-fg); font-family: 'Bricolage Grotesque', sans-serif;"
+						style="background: var(--primary); color: var(--primary-foreground); font-family: 'Bricolage Grotesque', sans-serif;"
 						aria-hidden="true"
 					>
 						WD
 					</div>
 					<span
 						class="text-[15px] font-bold"
-						style="font-family: 'Bricolage Grotesque', sans-serif; color: var(--m-text);"
-						>Waiver Director</span
+						style="font-family: 'Bricolage Grotesque', sans-serif;">Waiver Director</span
 					>
 				</a>
 				<p class="text-[13px]" style="color: var(--m-text-3);">
@@ -77,7 +73,7 @@
 			{#each footerColumns as column (column.title)}
 				<div>
 					<p
-						class="mb-3 text-[11px] font-semibold uppercase tracking-widest"
+						class="mb-3 text-[11px] font-semibold tracking-widest uppercase"
 						style="color: var(--m-text-3);"
 					>
 						{column.title}
@@ -88,7 +84,7 @@
 								{#if 'comingSoon' in entry}
 									<span
 										class="mb-2 block text-[13px]"
-										style="color: var(--m-text-2); opacity: 0.8;"
+										style="color: var(--muted-foreground); opacity: 0.8;"
 									>
 										{entry.label}
 										<span class="ml-1 text-[11px] font-normal" style="color: var(--m-text-3);"
@@ -99,7 +95,7 @@
 									<a
 										href={resolve(entry.href)}
 										class="mb-2 block text-[13px] no-underline transition-opacity hover:opacity-100"
-										style="color: var(--m-text-2); opacity: 0.8;"
+										style="color: var(--muted-foreground); opacity: 0.8;"
 									>
 										{entry.label}
 									</a>
@@ -113,7 +109,7 @@
 
 		<div
 			class="flex flex-wrap items-center justify-between gap-4 border-t pt-6"
-			style="border-color: var(--m-border);"
+			style="border-color: var(--border);"
 		>
 			<p class="text-[12px]" style="color: var(--m-text-3);">
 				&copy; 2026 Waiver Director. All rights reserved.

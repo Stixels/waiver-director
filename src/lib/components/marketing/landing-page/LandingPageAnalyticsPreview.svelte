@@ -47,22 +47,22 @@
 	] as const;
 
 	const statToneClasses: Record<Tone, string> = {
-		positive: 'mkt-success',
-		muted: 'mkt-text-3',
-		warning: 'mkt-warning',
-		neutral: 'mkt-text-3'
+		positive: 'text-(--m-green)',
+		muted: 'text-(--m-text-3)',
+		warning: 'text-(--m-amber)',
+		neutral: 'text-(--m-text-3)'
 	};
 
 	const sessionToneClasses: Record<SessionTone, string> = {
-		positive: 'mkt-chip-success',
-		warning: 'mkt-chip-warning',
-		neutral: 'mkt-elevated mkt-text-3'
+		positive: 'bg-(--m-green-dim) text-(--m-green)',
+		warning: 'bg-(--m-amber-dim) text-(--m-amber)',
+		neutral: 'bg-(--m-elevated) text-(--m-text-3)'
 	};
 </script>
 
 <section
 	class="landing-reveal border-t border-b py-24"
-	style="background: var(--m-surface); border-color: var(--m-border);"
+	style="background: var(--m-surface); border-color: var(--border);"
 	{@attach scrollReveal}
 >
 	<div class="mx-auto max-w-6xl px-4 sm:px-6">
@@ -73,35 +73,35 @@
 			class="mb-10"
 		/>
 
-		<div class="mkt-panel mt-10 overflow-hidden rounded-xl border">
+		<div class="mt-10 overflow-hidden rounded-xl border border-(--m-border-strong) bg-(--m-surface)">
 			<div
-				class="mkt-card mkt-border flex min-h-12 flex-col gap-3 border-b px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5 sm:py-0"
+				class="flex min-h-12 flex-col gap-3 border-b border-(--m-border-soft) bg-(--m-card) px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5 sm:py-0"
 			>
-				<span class="mkt-text text-[13px] font-semibold">Analytics Dashboard</span>
+				<span class="text-[13px] font-semibold">Analytics Dashboard</span>
 				<div class="flex flex-wrap items-center gap-2 sm:gap-3">
 					<span
-						class="mkt-elevated mkt-border-strong mkt-text-2 rounded-md border px-2.5 py-1 text-[11px]"
+						class="rounded-md border border-(--m-border-strong) bg-(--m-elevated) px-2.5 py-1 text-[11px] text-muted-foreground"
 					>
 						Last 7 days
 					</span>
-					<span class="mkt-accent text-[11px] font-medium" aria-hidden="true">Export CSV</span>
+					<span class="text-[11px] font-medium text-primary" aria-hidden="true">Export CSV</span>
 				</div>
 			</div>
 
 			<div class="grid grid-cols-2 md:grid-cols-4">
 				{#each analyticsStats as stat (stat.label)}
 					<div class="landing-analytics__stat-cell min-w-0 p-4 sm:p-5">
-						<p class="mkt-text-3 mb-2 text-[10px] tracking-wide uppercase">
+						<p class="mb-2 text-[10px] tracking-wide text-(--m-text-3) uppercase">
 							{stat.label}
 						</p>
-						<p class="mkt-text mb-1 text-[26px] leading-none font-bold">{stat.value}</p>
+						<p class="mb-1 text-[26px] leading-none font-bold">{stat.value}</p>
 						<p class={[statToneClasses[stat.tone], 'text-[11px]']}>{stat.subtitle}</p>
 					</div>
 				{/each}
 			</div>
 
 			<div class="p-5">
-				<p class="mkt-text-2 mb-4 text-[11px] font-semibold">Submissions — Last 7 Days</p>
+				<p class="mb-4 text-[11px] font-semibold text-muted-foreground">Submissions — Last 7 Days</p>
 				<div
 					class="flex h-28 items-end gap-2"
 					role="img"
@@ -111,21 +111,21 @@
 						<div class="flex flex-1 flex-col items-center gap-1.5">
 							<div
 								class="w-full rounded-t-sm"
-								style={`height: ${bar.pct}%; background: var(--m-accent); opacity: 0.85;`}
+								style={`height: ${bar.pct}%; background: var(--primary); opacity: 0.85;`}
 								aria-hidden="true"
 							></div>
-							<span class="mkt-text-3 text-[10px] uppercase">{bar.day}</span>
+							<span class="text-[10px] text-(--m-text-3) uppercase">{bar.day}</span>
 						</div>
 					{/each}
 				</div>
 
-				<div class="mkt-border mt-5 overflow-x-auto rounded-lg border">
-					<table class="w-full min-w-[44rem] border-collapse text-left text-[12px]">
+				<div class="mt-5 overflow-x-auto rounded-lg border border-(--m-border-soft)">
+					<table class="w-full min-w-176 border-collapse text-left text-[12px]">
 						<caption class="sr-only">
 							Sample sessions with expected signers, signed counts, completion rate, and status
 						</caption>
 						<thead>
-							<tr class="mkt-elevated mkt-text-3 text-[10px] tracking-wide uppercase">
+							<tr class="bg-(--m-elevated) text-[10px] tracking-wide text-(--m-text-3) uppercase">
 								<th scope="col" class="px-4 py-2.5 font-semibold">Session</th>
 								<th scope="col" class="px-4 py-2.5 font-semibold">Date</th>
 								<th scope="col" class="px-4 py-2.5 font-semibold">Provider</th>
@@ -137,13 +137,13 @@
 						</thead>
 						<tbody>
 							{#each sessionRows as row (row.session)}
-								<tr class="mkt-border border-t">
-									<td class="mkt-text max-w-48 truncate px-4 py-3 font-medium">{row.session}</td>
-									<td class="mkt-text-2 px-4 py-3 whitespace-nowrap">{row.date}</td>
-									<td class="mkt-text-2 px-4 py-3 whitespace-nowrap">{row.provider}</td>
-									<td class="mkt-text-2 px-4 py-3 whitespace-nowrap">{row.expected}</td>
-									<td class="mkt-text-2 px-4 py-3 whitespace-nowrap">{row.signed}</td>
-									<td class="mkt-text-2 px-4 py-3 whitespace-nowrap">{row.rate}</td>
+								<tr class="border-t border-(--m-border-soft)">
+									<td class="max-w-48 truncate px-4 py-3 font-medium">{row.session}</td>
+									<td class="px-4 py-3 whitespace-nowrap text-muted-foreground">{row.date}</td>
+									<td class="px-4 py-3 whitespace-nowrap text-muted-foreground">{row.provider}</td>
+									<td class="px-4 py-3 whitespace-nowrap text-muted-foreground">{row.expected}</td>
+									<td class="px-4 py-3 whitespace-nowrap text-muted-foreground">{row.signed}</td>
+									<td class="px-4 py-3 whitespace-nowrap text-muted-foreground">{row.rate}</td>
 									<td class="px-4 py-3">
 										<span
 											class={[
@@ -170,11 +170,11 @@
 	}
 
 	.landing-analytics__stat-cell:nth-child(odd) {
-		border-right: 1px solid var(--m-border);
+		border-right: 1px solid var(--border);
 	}
 
 	.landing-analytics__stat-cell:nth-child(-n + 2) {
-		border-bottom: 1px solid var(--m-border);
+		border-bottom: 1px solid var(--border);
 	}
 
 	@media (min-width: 768px) {
@@ -187,7 +187,7 @@
 		}
 
 		.landing-analytics__stat-cell:nth-child(-n + 3) {
-			border-right: 1px solid var(--m-border);
+			border-right: 1px solid var(--border);
 		}
 	}
 </style>

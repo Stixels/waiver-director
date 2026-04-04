@@ -41,7 +41,7 @@
 		</h1>
 
 		<p
-			class="landing-hero__animate landing-hero__delay-2 mkt-text-2 mx-auto mb-10 max-w-[520px] text-[16px] leading-relaxed sm:text-[18px]"
+			class="landing-hero__animate landing-hero__delay-2 mx-auto mb-10 max-w-[520px] text-[16px] leading-relaxed text-muted-foreground sm:text-[18px]"
 		>
 			Waiver Director captures every participant&apos;s email when they sign, not just the lead
 			booker. Automated follow-ups help you gather feedback and reviews after each visit.
@@ -71,29 +71,29 @@
 		class="landing-hero__animate landing-hero__delay-4 relative z-10 mx-auto mt-24 w-full max-w-5xl"
 	>
 		<div
-			class="mkt-panel overflow-hidden rounded-xl border"
+			class="overflow-hidden rounded-xl border border-(--m-border-strong) bg-(--m-surface)"
 			style="box-shadow: 0 40px 80px oklch(0 0 0 / 60%);"
 		>
-			<div
-				class="mkt-card mkt-border flex min-h-9 flex-wrap items-center justify-between gap-2 border-b px-3 py-2 sm:h-9 sm:flex-nowrap sm:px-4 sm:py-0"
-			>
+				<div
+					class="flex min-h-9 flex-wrap items-center justify-between gap-2 border-b border-(--m-border-soft) bg-(--m-card) px-3 py-2 sm:h-9 sm:flex-nowrap sm:px-4 sm:py-0"
+				>
 				<div class="order-1 flex shrink-0 items-center gap-1.5" aria-hidden="true">
 					<div class="h-2.5 w-2.5 rounded-full" style="background: #ff5f57;"></div>
 					<div class="h-2.5 w-2.5 rounded-full" style="background: #febc2e;"></div>
 					<div class="h-2.5 w-2.5 rounded-full" style="background: #28c840;"></div>
 				</div>
 				<div
-					class="mkt-elevated mkt-border mkt-text-3 order-3 max-w-full min-w-0 basis-full truncate rounded-md border px-2 py-1 text-center text-[10px] sm:order-2 sm:max-w-[min(100%,14rem)] sm:basis-auto sm:px-3 sm:text-[11px]"
+					class="order-3 max-w-full min-w-0 basis-full truncate rounded-md border border-(--m-border-soft) bg-(--m-elevated) px-2 py-1 text-center text-[10px] text-(--m-text-3) sm:order-2 sm:max-w-[min(100%,14rem)] sm:basis-auto sm:px-3 sm:text-[11px]"
 					aria-hidden="true"
 				>
 					/sessions (preview)
 				</div>
 				<div class="order-2 flex shrink-0 items-center gap-1.5 sm:order-3">
 					<span
-						class="landing-hero__live-dot mkt-success h-1.5 w-1.5 rounded-full bg-current"
+						class="landing-hero__live-dot h-1.5 w-1.5 rounded-full bg-(--m-green)"
 						aria-hidden="true"
 					></span>
-					<span class="mkt-success text-[11px] font-semibold">LIVE</span>
+					<span class="text-[11px] font-semibold text-(--m-green)">LIVE</span>
 				</div>
 			</div>
 
@@ -102,45 +102,43 @@
 					class="mb-5 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4"
 				>
 					<div class="min-w-0">
-						<p class="mkt-text-3 mb-1 text-[10px] tracking-widest uppercase">Active Session</p>
-						<h3
-							class="mkt-text landing-hero__session-title mb-0.5 text-[15px] font-bold sm:text-[18px]"
-						>
+						<p class="mb-1 text-[10px] tracking-widest text-(--m-text-3) uppercase">Active Session</p>
+						<h3 class="landing-hero__session-title mb-0.5 text-[15px] font-bold sm:text-[18px]">
 							Wilderness Zipline Tour
 						</h3>
-						<p class="mkt-text-3 text-[12px]">Today · 2:00 PM · via Bookeo</p>
+						<p class="text-[12px] text-(--m-text-3)">Today · 2:00 PM · via Bookeo</p>
 					</div>
 					<div
 						class="flex w-full shrink-0 items-center justify-between gap-2 sm:w-auto sm:justify-start sm:gap-3 md:gap-6"
 					>
 						<div class="text-center">
-							<div class="mkt-success mb-1 text-[18px] leading-none font-bold sm:text-[22px]">
+							<div class="mb-1 text-[18px] leading-none font-bold text-(--m-green) sm:text-[22px]">
 								6
 							</div>
-							<div class="mkt-text-3 text-[10px] tracking-wide uppercase">Signed</div>
+							<div class="text-[10px] tracking-wide text-(--m-text-3) uppercase">Signed</div>
 						</div>
 						<div class="text-center">
-							<div class="mkt-text mb-1 text-[18px] leading-none font-bold sm:text-[22px]">8</div>
-							<div class="mkt-text-3 text-[10px] tracking-wide uppercase">Expected</div>
+							<div class="mb-1 text-[18px] leading-none font-bold sm:text-[22px]">8</div>
+							<div class="text-[10px] tracking-wide text-(--m-text-3) uppercase">Expected</div>
 						</div>
 						<div class="text-center">
-							<div class="mkt-warning mb-1 text-[18px] leading-none font-bold sm:text-[22px]">
+							<div class="mb-1 text-[18px] leading-none font-bold text-(--m-amber) sm:text-[22px]">
 								2
 							</div>
-							<div class="mkt-text-3 text-[10px] tracking-wide uppercase">Pending</div>
+							<div class="text-[10px] tracking-wide text-(--m-text-3) uppercase">Pending</div>
 						</div>
 					</div>
 				</div>
 
 				<div
-					class="mb-5 h-1.5 overflow-hidden rounded-full bg-[var(--m-border)]"
+					class="mb-5 h-1.5 overflow-hidden rounded-full bg-border"
 					role="progressbar"
 					aria-valuenow={completionPercent}
 					aria-valuemin={0}
 					aria-valuemax={100}
 					aria-label={`Waiver completion: ${completionPercent}%`}
 				>
-					<div class="landing-hero__progress-fill mkt-success h-full rounded-full bg-current"></div>
+					<div class="landing-hero__progress-fill h-full rounded-full bg-(--m-green)"></div>
 				</div>
 
 				<div class="flex flex-col">
@@ -148,39 +146,41 @@
 						<div
 							class={[
 								'mb-1.5 flex items-center gap-3 rounded-lg border px-3 py-2',
-								participant.status === 'signed' ? 'mkt-status-row-signed' : 'mkt-status-row-pending'
+								participant.status === 'signed'
+									? 'border-(--m-green-border) bg-(--m-green-soft)'
+									: 'border-(--m-amber-border) bg-(--m-amber-soft)'
 							]}
 						>
 							<div
-								class="mkt-elevated mkt-text-2 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold"
+								class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-(--m-elevated) text-[10px] font-bold text-muted-foreground"
 								aria-hidden="true"
 							>
 								{participant.name[0]}
 							</div>
-							<span class="mkt-text min-w-0 flex-1 truncate text-[13px] font-medium">
+							<span class="min-w-0 flex-1 truncate text-[13px] font-medium">
 								{participant.name}
 							</span>
-							<span class="mkt-text-3 hidden text-[11px] sm:block">
+							<span class="hidden text-[11px] text-(--m-text-3) sm:block">
 								{participant.email}
 							</span>
 							{#if participant.status === 'signed'}
 								<span
-									class="mkt-chip-success flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold"
+									class="flex shrink-0 items-center gap-1 rounded-full bg-(--m-green-dim) px-2 py-0.5 text-[10px] font-semibold text-(--m-green)"
 								>
 									<Check class="size-2.5" aria-hidden="true" />
 									Signed
 								</span>
-								<span class="mkt-text-3 hidden shrink-0 text-[11px] md:block">
+								<span class="hidden shrink-0 text-[11px] text-(--m-text-3) md:block">
 									2 emails queued
 								</span>
 							{:else}
 								<span
-									class="mkt-chip-warning shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium"
+									class="shrink-0 rounded-full bg-(--m-amber-dim) px-2 py-0.5 text-[10px] font-medium text-(--m-amber)"
 								>
 									Pending
 								</span>
 								<span
-									class="mkt-accent inline-flex shrink-0 items-center gap-0.5 text-[11px] font-medium"
+									class="inline-flex shrink-0 items-center gap-0.5 text-[11px] font-medium text-primary"
 									aria-hidden="true"
 								>
 									Send reminder
@@ -190,11 +190,11 @@
 					{/each}
 				</div>
 
-				<div class="mkt-elevated-panel mt-4 flex items-start gap-2.5 rounded-lg border px-4 py-3">
-					<Mail size={14} class="mkt-accent mt-0.5 shrink-0" aria-hidden="true" />
-					<p class="mkt-text-2 text-[12px] leading-relaxed">
-						<strong class="mkt-text">6 follow-up emails scheduled</strong> one per guest who signed, not
-						just the lead. Use them for thank-yous, feedback, and review requests.
+				<div class="mt-4 flex items-start gap-2.5 rounded-lg border border-(--m-border-strong) bg-(--m-elevated) px-4 py-3">
+					<Mail size={14} class="mt-0.5 shrink-0 text-primary" aria-hidden="true" />
+					<p class="text-[12px] leading-relaxed text-muted-foreground">
+						<strong>6 follow-up emails scheduled</strong> one per guest who signed, not just the lead.
+						Use them for thank-yous, feedback, and review requests.
 					</p>
 				</div>
 			</div>
@@ -328,8 +328,8 @@
 			animation: none;
 			background: none;
 			background-size: auto;
-			-webkit-text-fill-color: var(--m-accent);
-			color: var(--m-accent);
+			-webkit-text-fill-color: var(--primary);
+			color: var(--primary);
 		}
 	}
 </style>

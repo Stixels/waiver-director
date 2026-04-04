@@ -9,7 +9,7 @@
 
 <section
 	class="landing-reveal relative overflow-hidden border-t py-32"
-	style="background: var(--m-bg); border-color: var(--m-border);"
+	style="background: var(--m-bg); border-color: var(--m-border-soft);"
 	{@attach scrollReveal}
 >
 	<div class="pointer-events-none absolute inset-x-0 top-0 flex justify-center" aria-hidden="true">
@@ -39,7 +39,7 @@
 		<h2 class="landing-cta__title max-w-2xl font-extrabold tracking-tight">
 			Stop leaving half your<br />group&apos;s emails behind.
 		</h2>
-		<p class="mkt-text-2 max-w-[420px] text-[16px] leading-relaxed">
+		<p class="max-w-[420px] text-[16px] leading-relaxed text-muted-foreground">
 			Every person who signs a waiver becomes a contact. Waiver Director turns your compliance step
 			into your best email list.
 		</p>
@@ -52,7 +52,7 @@
 				<ArrowRight size={16} aria-hidden="true" />
 			</Button>
 		</div>
-		<p class="mkt-text-3 text-[12px]">Free to start · No credit card required</p>
+		<p class="text-[12px] text-(--m-text-3)">Free to start · No credit card required</p>
 	</div>
 </section>
 
@@ -62,6 +62,5 @@
 		font-size: clamp(30px, 5vw, 60px);
 		letter-spacing: -0.03em;
 		line-height: 1.06;
-		color: var(--m-text);
 	}
 </style>
