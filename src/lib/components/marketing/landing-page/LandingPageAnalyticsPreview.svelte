@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { chartBars } from './content';
 	import MarketingSectionHeading from './MarketingSectionHeading.svelte';
-	import { scrollReveal } from './scrollReveal';
 
 	type Tone = 'positive' | 'muted' | 'warning' | 'neutral';
 	type SessionTone = 'positive' | 'warning' | 'neutral';
@@ -61,9 +60,8 @@
 </script>
 
 <section
-	class="landing-reveal border-t border-b py-24"
+	class="border-t border-b py-24"
 	style="background: var(--m-surface); border-color: var(--border);"
-	{@attach scrollReveal}
 >
 	<div class="mx-auto max-w-6xl px-4 sm:px-6">
 		<MarketingSectionHeading

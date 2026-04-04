@@ -8,7 +8,6 @@
 	import LandingPageFeatures from '$lib/components/marketing/landing-page/LandingPageFeatures.svelte';
 	import LandingPageHero from '$lib/components/marketing/landing-page/LandingPageHero.svelte';
 	import LandingPageHowItWorks from '$lib/components/marketing/landing-page/LandingPageHowItWorks.svelte';
-	import { scrollReveal } from '$lib/components/marketing/landing-page/scrollReveal';
 
 	const pageTitle = 'Waiver Director — Digital Waivers for Any Booking Experience';
 	const pageDescription =
@@ -38,9 +37,6 @@
 <LandingPageHowItWorks />
 <LandingPageFeatures />
 <LandingPageAnalyticsPreview />
-
-<div class="landing-reveal" {@attach scrollReveal}>
-	<MarketingPricing />
-</div>
+<MarketingPricing />
 
 <LandingPageCta />

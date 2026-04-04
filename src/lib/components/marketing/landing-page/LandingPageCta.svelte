@@ -3,14 +3,11 @@
 	import { ArrowRight } from '@lucide/svelte';
 
 	import { Button } from '$lib/components/ui/button';
-
-	import { scrollReveal } from './scrollReveal';
 </script>
 
 <section
-	class="landing-reveal relative overflow-hidden border-t py-32"
+	class="relative overflow-hidden border-t py-32"
 	style="background: var(--m-bg); border-color: var(--m-border-soft);"
-	{@attach scrollReveal}
 >
 	<div class="pointer-events-none absolute inset-x-0 top-0 flex justify-center" aria-hidden="true">
 		<div

@@ -4,15 +4,13 @@
 	import { capturedGuests } from './content';
 	import type { CapturedGuest } from './content';
 	import MarketingSectionHeading from './MarketingSectionHeading.svelte';
-	import { scrollReveal } from './scrollReveal';
 
 	const missingContactRows = [1, 2, 3, 4, 5];
 </script>
 
 <section
-	class="landing-reveal border-t border-b py-20 md:py-24"
+	class="border-t border-b py-20 md:py-24"
 	style="background: var(--m-surface); border-color: var(--border);"
-	{@attach scrollReveal}
 >
 	<div class="mx-auto max-w-6xl px-4 sm:px-6">
 		<div class="mx-auto max-w-4xl">

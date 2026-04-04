@@ -1,6 +1,5 @@
 <script lang="ts">
 	import MarketingSectionHeading from './MarketingSectionHeading.svelte';
-	import { scrollReveal } from './scrollReveal';
 
 	const waiverFields = ['Full Name', 'Date of Birth', 'Emergency Contact'];
 	const providers = [
@@ -11,7 +10,7 @@
 	const shareMethods = ['Email', 'SMS', 'Booking confirmation'];
 </script>
 
-<section id="how-it-works" class="landing-reveal py-20 md:py-24" {@attach scrollReveal}>
+<section id="how-it-works" class="py-20 md:py-24">
 	<div class="mx-auto max-w-6xl px-4 sm:px-6">
 		<MarketingSectionHeading
 			eyebrow="How It Works"

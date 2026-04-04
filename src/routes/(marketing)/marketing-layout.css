@@ -152,12 +152,6 @@
 	border-bottom-color: var(--m-border-soft);
 }
 
-@media (max-width: 1023px) {
-	.mkt .landing-reveal {
-		transition: opacity 0.25s ease;
-	}
-}
-
 .mkt .marketing-nav-bar {
 	box-sizing: border-box;
 	min-height: 3.5rem;
@@ -165,20 +159,4 @@
 	padding-bottom: 0;
 	padding-left: max(var(--mkt-nav-inline), env(safe-area-inset-left, 0px));
 	padding-right: max(var(--mkt-nav-inline), env(safe-area-inset-right, 0px));
-}
-
-.mkt .landing-reveal {
-	opacity: 0;
-	transition: opacity 0.3s ease;
-}
-
-.mkt .landing-reveal.is-revealed {
-	opacity: 1;
-}
-
-@media (prefers-reduced-motion: reduce) {
-	.mkt .landing-reveal {
-		opacity: 1 !important;
-		transition: none !important;
-	}
 }

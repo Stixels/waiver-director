@@ -3,7 +3,6 @@
 
 	import MarketingSectionHeading from './MarketingSectionHeading.svelte';
 	import { chartBars } from './content';
-	import { scrollReveal } from './scrollReveal';
 
 	type Feature = {
 		id: string;
@@ -94,9 +93,8 @@
 
 <section
 	id="features"
-	class="landing-reveal border-t py-20 md:py-24"
+	class="border-t py-20 md:py-24"
 	style="border-color: var(--border); background: var(--m-surface);"
-	{@attach scrollReveal}
 >
 	<div class="mx-auto max-w-6xl px-4 sm:px-6">
 		<MarketingSectionHeading
