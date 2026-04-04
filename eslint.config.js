@@ -35,5 +35,12 @@ export default defineConfig(
 				svelteConfig
 			}
 		}
+	},
+	// `svelte/no-navigation-without-resolve` only matches literal `href={resolve(...)}`; forwarded `href` props do not qualify.
+	{
+		files: ['src/lib/components/ui/button/button.svelte'],
+		rules: {
+			'svelte/no-navigation-without-resolve': ['error', { ignoreLinks: true }]
+		}
 	}
 );

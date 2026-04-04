@@ -8,18 +8,33 @@ import {
 	RESEND_API_KEY
 } from '$env/static/private';
 
+function requiredEnv(name: string, value: string | undefined): string {
+	if (value === undefined || value.trim() === '') {
+		throw new Error(`Missing or empty required environment variable: ${name}`);
+	}
+	return value;
+}
+
+const clerkPublishableKey = requiredEnv('CLERK_PUBLISHABLE_KEY', CLERK_PUBLISHABLE_KEY);
+const clerkSecretKey = requiredEnv('CLERK_SECRET_KEY', CLERK_SECRET_KEY);
+const clerkIssuerUrl = requiredEnv('CLERK_ISSUER_URL', CLERK_ISSUER_URL);
+const clerkJwtAudience = requiredEnv('CLERK_JWT_AUDIENCE', CLERK_JWT_AUDIENCE);
+const resendApiKey = requiredEnv('RESEND_API_KEY', RESEND_API_KEY);
+const bookeoApiKey = requiredEnv('BOOKEO_API_KEY', BOOKEO_API_KEY);
+const bookeoSecretKey = requiredEnv('BOOKEO_SECRET_KEY', BOOKEO_SECRET_KEY);
+
 export const serverEnv = {
 	clerk: {
-		publishableKey: CLERK_PUBLISHABLE_KEY,
-		secretKey: CLERK_SECRET_KEY,
-		issuerUrl: CLERK_ISSUER_URL,
-		jwtAudience: CLERK_JWT_AUDIENCE
+		publishableKey: clerkPublishableKey,
+		secretKey: clerkSecretKey,
+		issuerUrl: clerkIssuerUrl,
+		jwtAudience: clerkJwtAudience
 	},
 	email: {
-		resendApiKey: RESEND_API_KEY
+		resendApiKey
 	},
 	bookeo: {
-		apiKey: BOOKEO_API_KEY,
-		secretKey: BOOKEO_SECRET_KEY
+		apiKey: bookeoApiKey,
+		secretKey: bookeoSecretKey
 	}
 } as const;

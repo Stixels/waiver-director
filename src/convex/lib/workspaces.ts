@@ -7,7 +7,7 @@ export async function listWorkspaceMembershipsForUser(ctx: FunctionCtx, userId: 
 	return await ctx.db
 		.query('workspace_memberships')
 		.withIndex('by_userId', (query) => query.eq('userId', userId))
-		.take(50);
+		.collect();
 }
 
 export async function getWorkspaceMembership(

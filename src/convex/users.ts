@@ -1,6 +1,6 @@
 import { v } from 'convex/values';
 import { query } from './_generated/server';
-import { getAuthenticatedIdentity, getCurrentAuthIdentity, getCurrentUser } from './lib/auth';
+import { getCurrentAuthIdentity } from './lib/auth';
 
 export const currentUser = query({
 	args: {},
@@ -15,13 +15,13 @@ export const currentUser = query({
 		})
 	),
 	handler: async (ctx) => {
-		const [identity, authIdentity, user] = await Promise.all([
-			getAuthenticatedIdentity(ctx),
-			getCurrentAuthIdentity(ctx),
-			getCurrentUser(ctx)
-		]);
+		const authIdentity = await getCurrentAuthIdentity(ctx);
+		if (!authIdentity) {
+			return null;
+		}
 
-		if (!identity || !authIdentity || !user) {
+		const user = await ctx.db.get(authIdentity.userId);
+		if (!user) {
 			return null;
 		}
 

@@ -3,30 +3,53 @@
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
+
+	function handleSubmit(event: SubmitEvent) {
+		event.preventDefault();
+		// TODO: call sign-up mutation / auth client (e.g. Convex + Clerk or Better Auth) with form values
+	}
 </script>
 
 <div class="p-6">
 	<h1>Sign up</h1>
 	<p>Create the operator account first. Workspace setup is a separate step.</p>
 
-	<div class="mt-4 max-w-sm space-y-4">
+	<form class="mt-4 max-w-sm space-y-4" onsubmit={handleSubmit}>
 		<div class="space-y-2">
 			<Label for="name">Name</Label>
-			<Input id="name" placeholder="Alex Rivera" />
+			<Input
+				id="name"
+				name="name"
+				type="text"
+				autocomplete="name"
+				placeholder="Alex Rivera"
+			/>
 		</div>
 
 		<div class="space-y-2">
 			<Label for="email">Email</Label>
-			<Input id="email" type="email" placeholder="owner@venue.com" />
+			<Input
+				id="email"
+				name="email"
+				type="email"
+				autocomplete="email"
+				placeholder="owner@venue.com"
+			/>
 		</div>
 
 		<div class="space-y-2">
 			<Label for="password">Password</Label>
-			<Input id="password" type="password" placeholder="••••••••" />
+			<Input
+				id="password"
+				name="password"
+				type="password"
+				autocomplete="new-password"
+				placeholder="••••••••"
+			/>
 		</div>
 
-		<Button disabled>Account creation coming in phase 2</Button>
-	</div>
+		<Button type="submit">Create account</Button>
+	</form>
 
 	<p class="mt-4 text-sm text-muted-foreground">
 		After sign-up, the user will create or join a workspace.
