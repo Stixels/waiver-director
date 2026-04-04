@@ -87,13 +87,11 @@
 						{#each column.entries as entry (entry.label)}
 							<li>
 								{#if 'comingSoon' in entry}
-									<span
-										class="mb-2 block text-[13px]"
-										style="color: var(--m-text-3);"
-									>
+									<span class="mb-2 block text-[13px]" style="color: var(--m-text-3);">
 										{entry.label}
-										<span class="ml-1 text-[11px] font-normal" style="color: var(--m-text-3);"
-											>(coming soon)</span
+										<span
+											class="ml-1 text-[11px] font-normal"
+											style="color: var(--m-text-3); opacity: 0.82;">(coming soon)</span
 										>
 									</span>
 								{:else}
