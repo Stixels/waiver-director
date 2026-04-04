@@ -149,7 +149,7 @@
 				</div>
 
 				<div class="flex flex-col">
-					{#each sessionParticipants as participant (participant.name)}
+					{#each sessionParticipants as participant (participant.id)}
 						<div
 							class={[
 								'mb-1.5 flex items-center gap-3 rounded-lg border px-3 py-2',
@@ -199,7 +199,8 @@
 				>
 					<Mail size={14} class="mt-0.5 shrink-0 text-primary" aria-hidden="true" />
 					<p class="text-[12px] leading-relaxed text-muted-foreground">
-						<strong>6 follow-up emails scheduled</strong> one per guest who signed, not just the lead.
+						<strong>{totalSigned ?? 0} follow-up emails scheduled</strong> one per guest who
+						signed, not just the lead.
 						Use them for thank-yous, feedback, and review requests.
 					</p>
 				</div>

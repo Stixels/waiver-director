@@ -4,6 +4,7 @@ export type CapturedGuest = {
 };
 
 export type SessionParticipant = CapturedGuest & {
+	id: string;
 	status: 'signed' | 'pending';
 };
 
@@ -22,9 +23,9 @@ export const capturedGuests: CapturedGuest[] = [
 ];
 
 export const sessionParticipants: SessionParticipant[] = [
-	...capturedGuests.map((guest) => ({ ...guest, status: 'signed' as const })),
-	{ name: 'Casey Patel', email: '—', status: 'pending' },
-	{ name: 'Jordan Lee', email: '—', status: 'pending' }
+	...capturedGuests.map((guest) => ({ ...guest, id: guest.email, status: 'signed' as const })),
+	{ id: 'pending-casey-patel', name: 'Casey Patel', email: '—', status: 'pending' },
+	{ id: 'pending-jordan-lee', name: 'Jordan Lee', email: '—', status: 'pending' }
 ];
 
 export const chartBars: ChartBar[] = [

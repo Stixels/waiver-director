@@ -29,6 +29,14 @@ export const listCurrentUserWorkspaces = query({
 		const workspaces = memberships.map((membership, index) => {
 			const workspace = workspaceDocs[index];
 			if (!workspace) {
+				console.warn('[workspaces.listCurrentUserWorkspaces] Missing workspace for membership', {
+					membershipId: membership._id,
+					workspaceId: membership.workspaceId
+				});
+				console.log('[metric] membership_missing_workspace', {
+					membershipId: membership._id,
+					workspaceId: membership.workspaceId
+				});
 				return null;
 			}
 

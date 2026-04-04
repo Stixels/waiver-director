@@ -39,7 +39,7 @@
 		try {
 			// TODO: replace with auth mutation/client call when signup is wired.
 			await showSignUpNotReady({ name, email });
-		} catch (_error) {
+		} catch {
 			submitError = 'Sign-up is temporarily unavailable. Please try again.';
 		} finally {
 			isSubmitting = false;
@@ -83,12 +83,13 @@
 			{isSubmitting ? 'Creating account...' : 'Create account'}
 		</Button>
 
-		{#if submitMessage}
-			<p class="text-sm text-muted-foreground">{submitMessage}</p>
-		{/if}
-		{#if submitError}
-			<p class="text-sm text-destructive">{submitError}</p>
-		{/if}
+		<div aria-live="polite" aria-atomic="true">
+			{#if submitMessage}
+				<p class="text-sm text-muted-foreground" role="status">{submitMessage}</p>
+			{:else if submitError}
+				<p class="text-sm text-destructive" role="status">{submitError}</p>
+			{/if}
+		</div>
 	</form>
 
 	<p class="mt-4 text-sm text-muted-foreground">
