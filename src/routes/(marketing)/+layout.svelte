@@ -19,7 +19,7 @@
 <div class="mkt flex min-h-screen flex-col">
 	<a
 		href="#marketing-main"
-		class="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-100 focus:rounded-lg focus:px-4 focus:py-2.5 focus:text-sm focus:font-semibold focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[oklch(0.09_0.006_286)]"
+		class="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-100 focus:rounded-lg focus:px-4 focus:py-2.5 focus:text-sm focus:font-semibold focus:ring-2 focus:ring-offset-2 focus:ring-offset-[oklch(0.09_0.006_286)] focus:outline-none"
 		style="--tw-ring-color: var(--primary); background: var(--primary); color: var(--primary-foreground);"
 	>
 		Skip to main content

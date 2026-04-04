@@ -48,11 +48,15 @@
 			{/snippet}
 
 			<div class="grid grid-cols-1 gap-6 md:grid-cols-2 md:gap-8">
-				<div class="flex h-full min-h-0 flex-col rounded-xl border border-(--m-border-soft) bg-(--m-card) p-5">
+				<div
+					class="flex h-full min-h-0 flex-col rounded-xl border border-(--m-border-soft) bg-(--m-card) p-5"
+				>
 					<p class="mb-4 text-[10px] font-semibold tracking-widest text-(--m-text-3) uppercase">
 						Bookeo Booking
 					</p>
-					<div class="mb-2 flex items-center gap-3 rounded-lg border border-(--m-border-strong) bg-(--m-elevated) px-3 py-2">
+					<div
+						class="mb-2 flex items-center gap-3 rounded-lg border border-(--m-border-strong) bg-(--m-elevated) px-3 py-2"
+					>
 						<div
 							class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-(--m-accent-dim) text-[10px] font-bold text-primary"
 							aria-hidden="true"
@@ -86,7 +90,7 @@
 					class="flex h-full min-h-0 flex-col rounded-xl border p-5"
 					style="border-color: var(--primary); background: var(--m-card); box-shadow: 0 0 30px var(--m-accent-glow);"
 				>
-					<p class="mb-4 text-[10px] font-semibold tracking-widest uppercase text-primary">
+					<p class="mb-4 text-[10px] font-semibold tracking-widest text-primary uppercase">
 						Waiver Director
 					</p>
 
@@ -100,7 +104,9 @@
 				</div>
 			</div>
 
-			<p class="mt-10 text-center text-[14px] leading-relaxed font-medium text-muted-foreground text-pretty">
+			<p
+				class="mt-10 text-center text-[14px] leading-relaxed font-medium text-pretty text-muted-foreground"
+			>
 				Works for any group experience: tours, ziplines, axe throwing, escape rooms, rentals, and
 				more.
 			</p>

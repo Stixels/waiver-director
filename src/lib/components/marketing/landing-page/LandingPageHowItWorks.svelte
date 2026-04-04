@@ -35,7 +35,9 @@
 				<div class="rounded-xl border border-(--m-border-strong) bg-(--m-surface) p-4">
 					<div class="mb-4 flex items-center justify-between">
 						<p class="text-[13px] font-semibold">Adventure Waiver — v2</p>
-						<span class="rounded-full bg-(--m-amber-dim) px-2 py-0.5 text-[10px] font-semibold text-(--m-amber)">
+						<span
+							class="rounded-full bg-(--m-amber-dim) px-2 py-0.5 text-[10px] font-semibold text-(--m-amber)"
+						>
 							Draft
 						</span>
 					</div>
@@ -50,7 +52,7 @@
 					{/each}
 
 					<div
-						class="mb-4 rounded-lg border-2 border-(--m-border-strong) border-dashed px-3 py-4 text-center"
+						class="mb-4 rounded-lg border-2 border-dashed border-(--m-border-strong) px-3 py-4 text-center"
 					>
 						<p class="mb-1 text-[11px] font-semibold text-muted-foreground">Signature</p>
 						<p class="text-[10px] text-(--m-text-3)">Draw or type below</p>
@@ -123,7 +125,9 @@
 						Campaign Link
 					</p>
 
-					<div class="mb-4 flex items-center gap-2 rounded-lg border border-(--m-border-soft) bg-(--m-card) px-3 py-2.5">
+					<div
+						class="mb-4 flex items-center gap-2 rounded-lg border border-(--m-border-soft) bg-(--m-card) px-3 py-2.5"
+					>
 						<span class="min-w-0 flex-1 truncate text-[12px] text-muted-foreground">
 							waivers.yourvenue.com/adventure-tour
 						</span>

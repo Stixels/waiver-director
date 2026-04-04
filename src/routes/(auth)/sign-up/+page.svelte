@@ -17,13 +17,7 @@
 	<form class="mt-4 max-w-sm space-y-4" onsubmit={handleSubmit}>
 		<div class="space-y-2">
 			<Label for="name">Name</Label>
-			<Input
-				id="name"
-				name="name"
-				type="text"
-				autocomplete="name"
-				placeholder="Alex Rivera"
-			/>
+			<Input id="name" name="name" type="text" autocomplete="name" placeholder="Alex Rivera" />
 		</div>
 
 		<div class="space-y-2">

@@ -73,7 +73,9 @@
 			class="mb-10"
 		/>
 
-		<div class="mt-10 overflow-hidden rounded-xl border border-(--m-border-strong) bg-(--m-surface)">
+		<div
+			class="mt-10 overflow-hidden rounded-xl border border-(--m-border-strong) bg-(--m-surface)"
+		>
 			<div
 				class="flex min-h-12 flex-col gap-3 border-b border-(--m-border-soft) bg-(--m-card) px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5 sm:py-0"
 			>
@@ -101,7 +103,9 @@
 			</div>
 
 			<div class="p-5">
-				<p class="mb-4 text-[11px] font-semibold text-muted-foreground">Submissions — Last 7 Days</p>
+				<p class="mb-4 text-[11px] font-semibold text-muted-foreground">
+					Submissions — Last 7 Days
+				</p>
 				<div
 					class="flex h-28 items-end gap-2"
 					role="img"

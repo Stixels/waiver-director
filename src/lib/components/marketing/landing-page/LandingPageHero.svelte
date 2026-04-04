@@ -74,9 +74,9 @@
 			class="overflow-hidden rounded-xl border border-(--m-border-strong) bg-(--m-surface)"
 			style="box-shadow: 0 40px 80px oklch(0 0 0 / 60%);"
 		>
-				<div
-					class="flex min-h-9 flex-wrap items-center justify-between gap-2 border-b border-(--m-border-soft) bg-(--m-card) px-3 py-2 sm:h-9 sm:flex-nowrap sm:px-4 sm:py-0"
-				>
+			<div
+				class="flex min-h-9 flex-wrap items-center justify-between gap-2 border-b border-(--m-border-soft) bg-(--m-card) px-3 py-2 sm:h-9 sm:flex-nowrap sm:px-4 sm:py-0"
+			>
 				<div class="order-1 flex shrink-0 items-center gap-1.5" aria-hidden="true">
 					<div class="h-2.5 w-2.5 rounded-full" style="background: #ff5f57;"></div>
 					<div class="h-2.5 w-2.5 rounded-full" style="background: #febc2e;"></div>
@@ -102,7 +102,9 @@
 					class="mb-5 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4"
 				>
 					<div class="min-w-0">
-						<p class="mb-1 text-[10px] tracking-widest text-(--m-text-3) uppercase">Active Session</p>
+						<p class="mb-1 text-[10px] tracking-widest text-(--m-text-3) uppercase">
+							Active Session
+						</p>
 						<h3 class="landing-hero__session-title mb-0.5 text-[15px] font-bold sm:text-[18px]">
 							Wilderness Zipline Tour
 						</h3>
@@ -190,7 +192,9 @@
 					{/each}
 				</div>
 
-				<div class="mt-4 flex items-start gap-2.5 rounded-lg border border-(--m-border-strong) bg-(--m-elevated) px-4 py-3">
+				<div
+					class="mt-4 flex items-start gap-2.5 rounded-lg border border-(--m-border-strong) bg-(--m-elevated) px-4 py-3"
+				>
 					<Mail size={14} class="mt-0.5 shrink-0 text-primary" aria-hidden="true" />
 					<p class="text-[12px] leading-relaxed text-muted-foreground">
 						<strong>6 follow-up emails scheduled</strong> one per guest who signed, not just the lead.

@@ -23,7 +23,9 @@
 			>
 				Simple pricing for every venue.
 			</h2>
-			<p class="text-[16px]" style="color: var(--muted-foreground);">Start free. Upgrade as you grow.</p>
+			<p class="text-[16px]" style="color: var(--muted-foreground);">
+				Start free. Upgrade as you grow.
+			</p>
 		</div>
 
 		<div class="relative mx-auto grid max-w-5xl grid-cols-1 gap-5 md:grid-cols-3">
@@ -45,7 +47,9 @@
 					>
 						$0 <span class="text-[15px] font-medium" style="color: var(--m-text-3);">/ mo</span>
 					</p>
-					<p class="mt-2 text-[13px]" style="color: var(--muted-foreground);">For getting started.</p>
+					<p class="mt-2 text-[13px]" style="color: var(--muted-foreground);">
+						For getting started.
+					</p>
 				</div>
 				<ul class="flex flex-1 flex-col gap-2.5">
 					{#each ['1 workspace', '25 waivers / month', '1 waiver template', 'Basic dashboard', 'Email support'] as item (item)}
@@ -87,7 +91,9 @@
 					>
 						$29 <span class="text-[15px] font-medium" style="color: var(--m-text-3);">/ mo</span>
 					</p>
-					<p class="mt-2 text-[13px]" style="color: var(--muted-foreground);">For serious operators.</p>
+					<p class="mt-2 text-[13px]" style="color: var(--muted-foreground);">
+						For serious operators.
+					</p>
 				</div>
 				<ul class="flex flex-1 flex-col gap-2.5">
 					{#each ['Unlimited waivers', 'Unlimited templates', 'Bookeo · Resova · Xola sync', 'Follow-up email automation', 'Full analytics', 'Team access', 'PDF export', 'Audit trail'] as item (item)}
