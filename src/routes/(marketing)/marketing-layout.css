@@ -12,10 +12,19 @@
 	--m-accent-fg: oklch(0.97 0.01 277);
 	--m-accent-glow: oklch(0.52 0.22 277 / 28%);
 	--m-accent-dim: oklch(0.52 0.22 277 / 12%);
+	--m-accent-soft: oklch(0.52 0.22 277 / 8%);
+	--m-accent-medium: oklch(0.52 0.22 277 / 16%);
+	--m-accent-border-soft: oklch(0.52 0.22 277 / 22%);
+	--m-accent-border: oklch(0.52 0.22 277 / 40%);
+	--m-accent-line: oklch(0.52 0.22 277 / 60%);
 	--m-green: oklch(0.65 0.22 155);
 	--m-green-dim: oklch(0.65 0.22 155 / 15%);
+	--m-green-soft: oklch(0.65 0.22 155 / 7%);
+	--m-green-border: oklch(0.65 0.22 155 / 20%);
 	--m-amber: oklch(0.78 0.18 75);
 	--m-amber-dim: oklch(0.78 0.18 75 / 15%);
+	--m-amber-soft: oklch(0.78 0.18 75 / 7%);
+	--m-amber-border: oklch(0.78 0.18 75 / 20%);
 	--m-text: oklch(0.97 0 0);
 	--m-text-2: oklch(0.72 0.012 286);
 	--m-text-3: oklch(0.48 0.016 286);
@@ -52,7 +61,7 @@
 	color: var(--m-accent-fg);
 	border: none;
 	box-shadow:
-		0 0 0 1px oklch(0.52 0.22 277 / 32%),
+		0 0 0 1px var(--m-accent-border),
 		0 0 24px var(--m-accent-glow),
 		inset 0 1px 0 oklch(1 0 0 / 12%);
 	transition:
@@ -88,14 +97,14 @@
 		transform 0.2s ease;
 }
 .mkt [data-slot='button'].btn-mkt-outline:hover {
-	background: oklch(0.52 0.22 277 / 10%);
+	background: var(--m-accent-dim);
 	border-color: oklch(0.52 0.22 277 / 42%);
 	color: var(--m-text);
 	transform: translateY(-1px);
 }
 .mkt [data-slot='button'].btn-mkt-outline:active {
 	transform: translateY(0) scale(0.99);
-	background: oklch(0.52 0.22 277 / 6%);
+	background: var(--m-accent-soft);
 	border-color: oklch(0.52 0.22 277 / 32%);
 }
 
@@ -161,6 +170,143 @@ html:has(.mkt) {
 	padding-right: max(var(--mkt-nav-inline), env(safe-area-inset-right, 0px));
 }
 
+.mkt .mkt-text {
+	color: var(--m-text);
+}
+
+.mkt .mkt-text-2 {
+	color: var(--m-text-2);
+}
+
+.mkt .mkt-text-3 {
+	color: var(--m-text-3);
+}
+
+.mkt .mkt-accent {
+	color: var(--m-accent);
+}
+
+.mkt .mkt-success {
+	color: var(--m-green);
+}
+
+.mkt .mkt-warning {
+	color: var(--m-amber);
+}
+
+.mkt .mkt-surface {
+	background: var(--m-surface);
+}
+
+.mkt .mkt-card {
+	background: var(--m-card);
+}
+
+.mkt .mkt-elevated {
+	background: var(--m-elevated);
+}
+
+.mkt .mkt-border {
+	border-color: var(--m-border);
+}
+
+.mkt .mkt-border-strong {
+	border-color: var(--m-border-strong);
+}
+
+.mkt .mkt-panel {
+	background: var(--m-surface);
+	border-color: var(--m-border-strong);
+}
+
+.mkt .mkt-card-panel {
+	background: var(--m-card);
+	border-color: var(--m-border);
+}
+
+.mkt .mkt-elevated-panel {
+	background: var(--m-elevated);
+	border-color: var(--m-border-strong);
+}
+
+.mkt .mkt-chip-accent {
+	background: var(--m-accent-dim);
+	color: var(--m-accent);
+}
+
+.mkt .mkt-chip-success {
+	background: var(--m-green-dim);
+	color: var(--m-green);
+}
+
+.mkt .mkt-chip-warning {
+	background: var(--m-amber-dim);
+	color: var(--m-amber);
+}
+
+.mkt .mkt-status-row-signed {
+	background: var(--m-green-soft);
+	border-color: var(--m-green-border);
+}
+
+.mkt .mkt-status-row-pending {
+	background: var(--m-amber-soft);
+	border-color: var(--m-amber-border);
+}
+
+@keyframes mkt-blob-float-a {
+	0%,
+	100% {
+		transform: translate(0, 0) scale(1);
+	}
+
+	33% {
+		transform: translate(30px, -40px) scale(1.05);
+	}
+
+	66% {
+		transform: translate(-20px, 20px) scale(0.97);
+	}
+}
+
+@keyframes mkt-blob-float-b {
+	0%,
+	100% {
+		transform: translate(0, 0) scale(1);
+	}
+
+	33% {
+		transform: translate(-40px, 30px) scale(1.04);
+	}
+
+	66% {
+		transform: translate(25px, -25px) scale(0.98);
+	}
+}
+
+@keyframes mkt-blob-float-c {
+	0%,
+	100% {
+		transform: translate(0, 0) scale(1);
+	}
+
+	50% {
+		transform: translate(20px, 40px) scale(1.06);
+	}
+}
+
+.mkt .mkt-blob-float-a {
+	animation: mkt-blob-float-a 18s ease-in-out infinite;
+}
+
+.mkt .mkt-blob-float-b {
+	animation: mkt-blob-float-b 22s ease-in-out infinite;
+}
+
+.mkt .mkt-blob-float-c {
+	animation: mkt-blob-float-c 16s ease-in-out infinite;
+}
+
 .mkt .landing-reveal {
 	opacity: 0;
 	transform: translateY(22px);
@@ -175,6 +321,12 @@ html:has(.mkt) {
 }
 
 @media (prefers-reduced-motion: reduce) {
+	.mkt .mkt-blob-float-a,
+	.mkt .mkt-blob-float-b,
+	.mkt .mkt-blob-float-c {
+		animation: none !important;
+	}
+
 	.mkt .landing-reveal {
 		opacity: 1 !important;
 		transform: none !important;

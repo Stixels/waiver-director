@@ -116,18 +116,18 @@
 						feature.lgClass
 					]}
 					style={feature.hero
-						? 'background: linear-gradient(135deg, oklch(0.52 0.22 277 / 8%) 0%, var(--m-surface) 65%); border-color: oklch(0.52 0.22 277 / 22%);'
+						? 'background: linear-gradient(135deg, var(--m-accent-soft) 0%, var(--m-surface) 65%); border-color: var(--m-accent-border-soft);'
 						: 'background: var(--m-surface); border-color: var(--m-border);'}
 				>
 					{#if feature.hero}
 						<div
 							class="pointer-events-none absolute inset-x-0 top-0 h-px"
-							style="background: linear-gradient(90deg, transparent, oklch(0.52 0.22 277 / 60%), transparent);"
+							style="background: linear-gradient(90deg, transparent, var(--m-accent-line), transparent);"
 							aria-hidden="true"
 						></div>
 						<div
 							class="pointer-events-none absolute top-0 right-0 h-48 w-48 rounded-full blur-[80px]"
-							style="background: oklch(0.52 0.22 277 / 10%);"
+							style="background: var(--m-accent-dim);"
 							aria-hidden="true"
 						></div>
 					{/if}
@@ -138,7 +138,7 @@
 							feature.hero ? 'h-12 w-12' : 'h-9 w-9'
 						]}
 						style={feature.hero
-							? 'background: oklch(0.52 0.22 277 / 16%); box-shadow: 0 0 16px oklch(0.52 0.22 277 / 18%);'
+							? 'background: var(--m-accent-medium); box-shadow: 0 0 16px oklch(0.52 0.22 277 / 18%);'
 							: 'background: var(--m-accent-dim);'}
 						aria-hidden="true"
 					>
@@ -146,15 +146,15 @@
 					</div>
 
 					<div class="relative flex flex-1 flex-col gap-2">
-						<h3
-							class={[feature.hero ? 'text-[18px]' : 'text-[15px]', 'font-semibold']}
-							style="color: var(--m-text);"
-						>
+						<h3 class={['mkt-text', feature.hero ? 'text-[18px]' : 'text-[15px]', 'font-semibold']}>
 							{feature.title}
 						</h3>
 						<p
-							class={[feature.hero ? 'text-[14px]' : 'text-[13px]', 'leading-relaxed']}
-							style="color: var(--m-text-2);"
+							class={[
+								'mkt-text-2',
+								feature.hero ? 'text-[14px]' : 'text-[13px]',
+								'leading-relaxed'
+							]}
 						>
 							{feature.description}
 						</p>
@@ -163,28 +163,24 @@
 					{#if feature.footer === 'version'}
 						<div class="mt-auto flex items-center gap-2 opacity-60">
 							<span
-								class="rounded-md border px-2 py-0.5 font-mono text-[9px]"
-								style="border-color: var(--m-border-strong); color: var(--m-text-3);"
+								class="mkt-border-strong mkt-text-3 rounded-md border px-2 py-0.5 font-mono text-[9px]"
 								aria-hidden="true"
 							>
 								v1 locked
 							</span>
-							<span class="text-[9px]" style="color: var(--m-text-3);" aria-hidden="true">→</span>
+							<span class="mkt-text-3 text-[9px]" aria-hidden="true">→</span>
 							<span
-								class="rounded-md border px-2 py-0.5 font-mono text-[9px]"
-								style="border-color: oklch(0.52 0.22 277 / 40%); color: var(--m-accent);"
+								class="mkt-accent rounded-md border px-2 py-0.5 font-mono text-[9px]"
+								style="border-color: var(--m-accent-border);"
 								aria-hidden="true"
 							>
 								v2 current
 							</span>
-							<span class="text-[9px]" style="color: var(--m-text-3);" aria-hidden="true"
-								>· 3 changes</span
-							>
+							<span class="mkt-text-3 text-[9px]" aria-hidden="true">· 3 changes</span>
 						</div>
 					{:else if feature.footer === 'chart'}
 						<div
-							class="mt-auto flex h-9 items-end gap-1 overflow-hidden rounded-lg px-2 py-1.5 opacity-50"
-							style="background: var(--m-elevated);"
+							class="mkt-elevated mt-auto flex h-9 items-end gap-1 overflow-hidden rounded-lg px-2 py-1.5 opacity-50"
 							aria-hidden="true"
 						>
 							{#each chartBars as bar (bar.day)}
@@ -214,7 +210,7 @@
 		box-shadow:
 			0 0 0 1px oklch(1 0 0 / 10%),
 			0 16px 48px oklch(0 0 0 / 50%),
-			0 0 60px oklch(0.52 0.22 277 / 12%);
+			0 0 60px var(--m-accent-dim);
 	}
 
 	@media (prefers-reduced-motion: reduce) {

@@ -4,6 +4,7 @@
 	import { scrollReveal } from './scrollReveal';
 
 	type Tone = 'positive' | 'muted' | 'warning' | 'neutral';
+	type SessionTone = 'positive' | 'warning' | 'neutral';
 
 	const analyticsStats = [
 		{ label: 'Total Submissions', value: '1,247', subtitle: '↑ 12% this week', tone: 'positive' },
@@ -45,23 +46,17 @@
 		}
 	] as const;
 
-	const toneColors: Record<Tone, string> = {
-		positive: 'var(--m-green)',
-		muted: 'var(--m-text-3)',
-		warning: 'var(--m-amber)',
-		neutral: 'var(--m-text-3)'
+	const statToneClasses: Record<Tone, string> = {
+		positive: 'mkt-success',
+		muted: 'mkt-text-3',
+		warning: 'mkt-warning',
+		neutral: 'mkt-text-3'
 	};
 
-	const toneBackgrounds: Record<Exclude<Tone, 'muted'>, string> = {
-		positive: 'var(--m-green-dim)',
-		warning: 'var(--m-amber-dim)',
-		neutral: 'var(--m-elevated)'
-	};
-
-	const sessionToneBackgrounds: Record<(typeof sessionRows)[number]['tone'], string> = {
-		positive: toneBackgrounds.positive,
-		warning: toneBackgrounds.warning,
-		neutral: toneBackgrounds.neutral
+	const sessionToneClasses: Record<SessionTone, string> = {
+		positive: 'mkt-chip-success',
+		warning: 'mkt-chip-warning',
+		neutral: 'mkt-elevated mkt-text-3'
 	};
 </script>
 
@@ -78,48 +73,35 @@
 			class="mb-10"
 		/>
 
-		<div
-			class="mt-10 overflow-hidden rounded-xl border"
-			style="background: var(--m-surface); border-color: var(--m-border-strong);"
-		>
+		<div class="mkt-panel mt-10 overflow-hidden rounded-xl border">
 			<div
-				class="flex min-h-12 flex-col gap-3 border-b px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5 sm:py-0"
-				style="background: var(--m-card); border-color: var(--m-border);"
+				class="mkt-card mkt-border flex min-h-12 flex-col gap-3 border-b px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5 sm:py-0"
 			>
-				<span class="text-[13px] font-semibold" style="color: var(--m-text);"
-					>Analytics Dashboard</span
-				>
+				<span class="mkt-text text-[13px] font-semibold">Analytics Dashboard</span>
 				<div class="flex flex-wrap items-center gap-2 sm:gap-3">
 					<span
-						class="rounded-md border px-2.5 py-1 text-[11px]"
-						style="color: var(--m-text-2); border-color: var(--m-border-strong); background: var(--m-elevated);"
+						class="mkt-elevated mkt-border-strong mkt-text-2 rounded-md border px-2.5 py-1 text-[11px]"
 					>
 						Last 7 days
 					</span>
-					<span class="text-[11px] font-medium" style="color: var(--m-accent);" aria-hidden="true"
-						>Export CSV</span
-					>
+					<span class="mkt-accent text-[11px] font-medium" aria-hidden="true">Export CSV</span>
 				</div>
 			</div>
 
 			<div class="grid grid-cols-2 md:grid-cols-4">
 				{#each analyticsStats as stat (stat.label)}
 					<div class="landing-analytics__stat-cell min-w-0 p-4 sm:p-5">
-						<p class="mb-2 text-[10px] tracking-wide uppercase" style="color: var(--m-text-3);">
+						<p class="mkt-text-3 mb-2 text-[10px] tracking-wide uppercase">
 							{stat.label}
 						</p>
-						<p class="mb-1 text-[26px] leading-none font-bold" style="color: var(--m-text);">
-							{stat.value}
-						</p>
-						<p class="text-[11px]" style={`color: ${toneColors[stat.tone]};`}>{stat.subtitle}</p>
+						<p class="mkt-text mb-1 text-[26px] leading-none font-bold">{stat.value}</p>
+						<p class={[statToneClasses[stat.tone], 'text-[11px]']}>{stat.subtitle}</p>
 					</div>
 				{/each}
 			</div>
 
 			<div class="p-5">
-				<p class="mb-4 text-[11px] font-semibold" style="color: var(--m-text-2);">
-					Submissions — Last 7 Days
-				</p>
+				<p class="mkt-text-2 mb-4 text-[11px] font-semibold">Submissions — Last 7 Days</p>
 				<div
 					class="flex h-28 items-end gap-2"
 					role="img"
@@ -132,24 +114,18 @@
 								style={`height: ${bar.pct}%; background: var(--m-accent); opacity: 0.85;`}
 								aria-hidden="true"
 							></div>
-							<span class="text-[10px] uppercase" style="color: var(--m-text-3);">{bar.day}</span>
+							<span class="mkt-text-3 text-[10px] uppercase">{bar.day}</span>
 						</div>
 					{/each}
 				</div>
 
-				<div class="mt-5 overflow-x-auto rounded-lg border" style="border-color: var(--m-border);">
-					<table
-						class="w-full min-w-[44rem] border-collapse text-left text-[12px]"
-						style="border-color: var(--m-border);"
-					>
+				<div class="mkt-border mt-5 overflow-x-auto rounded-lg border">
+					<table class="w-full min-w-[44rem] border-collapse text-left text-[12px]">
 						<caption class="sr-only">
 							Sample sessions with expected signers, signed counts, completion rate, and status
 						</caption>
 						<thead>
-							<tr
-								class="text-[10px] tracking-wide uppercase"
-								style="background: var(--m-elevated); color: var(--m-text-3);"
-							>
+							<tr class="mkt-elevated mkt-text-3 text-[10px] tracking-wide uppercase">
 								<th scope="col" class="px-4 py-2.5 font-semibold">Session</th>
 								<th scope="col" class="px-4 py-2.5 font-semibold">Date</th>
 								<th scope="col" class="px-4 py-2.5 font-semibold">Provider</th>
@@ -161,29 +137,19 @@
 						</thead>
 						<tbody>
 							{#each sessionRows as row (row.session)}
-								<tr class="border-t" style="border-color: var(--m-border);">
-									<td class="max-w-48 truncate px-4 py-3 font-medium" style="color: var(--m-text);"
-										>{row.session}</td
-									>
-									<td class="px-4 py-3 whitespace-nowrap" style="color: var(--m-text-2);"
-										>{row.date}</td
-									>
-									<td class="px-4 py-3 whitespace-nowrap" style="color: var(--m-text-2);"
-										>{row.provider}</td
-									>
-									<td class="px-4 py-3 whitespace-nowrap" style="color: var(--m-text-2);"
-										>{row.expected}</td
-									>
-									<td class="px-4 py-3 whitespace-nowrap" style="color: var(--m-text-2);"
-										>{row.signed}</td
-									>
-									<td class="px-4 py-3 whitespace-nowrap" style="color: var(--m-text-2);"
-										>{row.rate}</td
-									>
+								<tr class="mkt-border border-t">
+									<td class="mkt-text max-w-48 truncate px-4 py-3 font-medium">{row.session}</td>
+									<td class="mkt-text-2 px-4 py-3 whitespace-nowrap">{row.date}</td>
+									<td class="mkt-text-2 px-4 py-3 whitespace-nowrap">{row.provider}</td>
+									<td class="mkt-text-2 px-4 py-3 whitespace-nowrap">{row.expected}</td>
+									<td class="mkt-text-2 px-4 py-3 whitespace-nowrap">{row.signed}</td>
+									<td class="mkt-text-2 px-4 py-3 whitespace-nowrap">{row.rate}</td>
 									<td class="px-4 py-3">
 										<span
-											class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold"
-											style={`color: ${toneColors[row.tone]}; background: ${sessionToneBackgrounds[row.tone]};`}
+											class={[
+												sessionToneClasses[row.tone],
+												'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold'
+											]}
 										>
 											{row.status}
 										</span>
