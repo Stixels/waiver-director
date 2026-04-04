@@ -1,11 +1,13 @@
 # AGENTS.md
 
 <!-- convex-ai-start -->
+
 This project uses [Convex](https://convex.dev) as its backend.
 
 When working on Convex code, **always read `src/convex/_generated/ai/guidelines.md` first** for important guidelines on how to correctly use Convex APIs and patterns. The file contains rules that override what you may have learned about Convex from training data.
 
 Convex agent skills for common tasks can be installed by running `npx convex ai-files install`.
+
 <!-- convex-ai-end -->
 
 ## Mission
@@ -18,6 +20,14 @@ Build and maintain Waiver Director as a multi-tenant SaaS for waiver operations,
 - Use server-side identity and membership checks for authorization decisions.
 - Preserve immutable signed-record behavior for waiver submissions and related auditability.
 - Keep external booking providers as integration boundaries, not sources of internal authorization truth.
+
+## Authentication (Clerk)
+
+- Use [Clerk](https://clerk.com) as the identity provider for the SvelteKit app.
+- Wire Convex authentication through Clerk JWTs in `auth.config.ts`.
+- Treat Clerk as "who is signed in" only; enforce workspace access and roles in trusted Convex server code via membership checks.
+- Keep local app users keyed by `identity.tokenIdentifier`; do not trust client-passed user ids for authorization decisions.
+- Reference implementation guide: [Convex + Clerk auth docs](https://docs.convex.dev/auth/clerk).
 
 ## Svelte 5 and SvelteKit Guardrails
 
