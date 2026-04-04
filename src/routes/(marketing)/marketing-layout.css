@@ -137,8 +137,8 @@
 	background: oklch(1 0 0 / 4%);
 }
 
-html:has(.mkt) {
-	scroll-padding-top: calc(var(--mkt-nav-offset) + 0.5rem);
+.mkt :is(#features, #how-it-works, #pricing) {
+	scroll-margin-top: calc(var(--mkt-nav-offset) + 0.5rem);
 }
 
 .mkt .marketing-nav-shell {
@@ -164,6 +164,18 @@ html:has(.mkt) {
 	border-bottom-color: var(--m-border-soft);
 	-webkit-backdrop-filter: blur(16px) saturate(160%);
 	backdrop-filter: blur(16px) saturate(160%);
+}
+
+@media (max-width: 767px) {
+	.mkt .marketing-nav-shell,
+	.mkt .marketing-nav-shell.is-scrolled {
+		-webkit-backdrop-filter: none;
+		backdrop-filter: none;
+	}
+
+	.mkt .marketing-nav-shell.is-scrolled {
+		background: color-mix(in oklch, var(--m-surface) 96%, var(--m-bg) 4%);
+	}
 }
 
 .mkt .marketing-nav-bar {

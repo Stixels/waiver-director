@@ -247,6 +247,13 @@
 		backdrop-filter: blur(16px) saturate(160%);
 	}
 
+	@media (max-width: 767px), (pointer: coarse) {
+		.mkt-mobile-panel {
+			-webkit-backdrop-filter: none;
+			backdrop-filter: none;
+		}
+	}
+
 	.mkt-mobile-nav-list {
 		position: relative;
 		list-style: none;

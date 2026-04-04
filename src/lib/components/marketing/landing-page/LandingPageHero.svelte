@@ -19,21 +19,15 @@
 	<div class="landing-hero__grid absolute inset-0 opacity-40" aria-hidden="true"></div>
 
 	<div
-		class="landing-hero__blob mkt-blob-float-a pointer-events-none absolute top-[-10%] left-[-5%] h-[600px] w-[600px] rounded-full blur-[120px]"
+		class="landing-hero__blob mkt-blob-float-a pointer-events-none absolute top-[-10%] left-[-5%] h-[420px] w-[420px] rounded-full blur-[84px] md:h-[520px] md:w-[520px] md:blur-[100px]"
 		style="background: oklch(0.52 0.22 277 / 18%);"
 		aria-hidden="true"
 	></div>
 	<div
-		class="landing-hero__blob mkt-blob-float-b pointer-events-none absolute right-[-10%] bottom-[10%] h-[500px] w-[500px] rounded-full blur-[100px]"
+		class="landing-hero__blob mkt-blob-float-b pointer-events-none absolute right-[-10%] bottom-[10%] h-[380px] w-[380px] rounded-full blur-[72px] md:h-[460px] md:w-[460px] md:blur-[92px]"
 		style="background: oklch(0.52 0.22 277 / 12%);"
 		aria-hidden="true"
 	></div>
-	<div
-		class="landing-hero__blob mkt-blob-float-c pointer-events-none absolute top-[40%] right-[15%] h-[400px] w-[400px] rounded-full blur-[90px]"
-		style="background: oklch(0.78 0.18 75 / 8%);"
-		aria-hidden="true"
-	></div>
-
 	<div
 		class="relative z-10 mx-auto flex w-full max-w-[680px] min-w-0 flex-col items-center text-center"
 	>
