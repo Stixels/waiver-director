@@ -1,0 +1,162 @@
+:root {
+	--mkt-nav-offset: calc(env(safe-area-inset-top, 0px) + 3.5rem);
+}
+
+.mkt {
+	--mkt-nav-inline: 1rem;
+	--mkt-hero-top: 4.75rem;
+	--m-bg: oklch(0.09 0.006 286);
+	--m-surface: oklch(0.13 0.008 286);
+	--m-card: oklch(0.15 0.009 286);
+	--m-elevated: oklch(0.17 0.01 286);
+	--m-border-soft: oklch(1 0 0 / 8%);
+	--m-border-strong: oklch(1 0 0 / 14%);
+	--m-accent-glow: oklch(0.52 0.22 277 / 28%);
+	--m-accent-dim: oklch(0.52 0.22 277 / 12%);
+	--m-accent-soft: oklch(0.52 0.22 277 / 8%);
+	--m-accent-medium: oklch(0.52 0.22 277 / 16%);
+	--m-accent-border-soft: oklch(0.52 0.22 277 / 22%);
+	--m-accent-border: oklch(0.52 0.22 277 / 40%);
+	--m-accent-line: oklch(0.52 0.22 277 / 60%);
+	--m-green: oklch(0.65 0.22 155);
+	--m-green-dim: oklch(0.65 0.22 155 / 15%);
+	--m-green-soft: oklch(0.65 0.22 155 / 7%);
+	--m-green-border: oklch(0.65 0.22 155 / 20%);
+	--m-amber: oklch(0.78 0.18 75);
+	--m-amber-dim: oklch(0.78 0.18 75 / 15%);
+	--m-amber-soft: oklch(0.78 0.18 75 / 7%);
+	--m-amber-border: oklch(0.78 0.18 75 / 20%);
+	--m-text-3: oklch(0.72 0.012 286);
+
+	background: var(--m-bg);
+	color: oklch(0.97 0 0);
+}
+
+@media (min-width: 768px) {
+	.mkt {
+		--mkt-hero-top: 6rem;
+	}
+}
+
+@media (min-width: 640px) {
+	.mkt {
+		--mkt-nav-inline: 1.5rem;
+	}
+}
+
+@media (min-width: 1024px) {
+	.mkt {
+		--mkt-hero-top: 7.5rem;
+	}
+}
+
+.mkt .mkt-hero {
+	min-height: calc(100svh - var(--mkt-nav-offset));
+	padding-top: var(--mkt-hero-top);
+	scroll-margin-top: var(--mkt-nav-offset);
+}
+
+.mkt [data-slot='button'].btn-mkt-accent {
+	background: var(--primary);
+	color: var(--primary-foreground);
+	border: none;
+	box-shadow:
+		0 0 0 1px var(--m-accent-border),
+		0 0 24px var(--m-accent-glow),
+		inset 0 1px 0 oklch(1 0 0 / 12%);
+	transition:
+		background 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+		box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+		transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.mkt [data-slot='button'].btn-mkt-accent:hover {
+	background: oklch(0.58 0.21 277);
+	box-shadow:
+		0 0 0 1px oklch(0.52 0.22 277 / 45%),
+		0 0 36px oklch(0.52 0.22 277 / 38%),
+		inset 0 1px 0 oklch(1 0 0 / 16%);
+	transform: translateY(-1px);
+}
+.mkt [data-slot='button'].btn-mkt-accent:active {
+	transform: translateY(0) scale(0.98);
+	box-shadow:
+		0 0 0 1px oklch(0.52 0.22 277 / 35%),
+		0 0 16px var(--m-accent-glow),
+		inset 0 1px 0 oklch(1 0 0 / 8%);
+}
+
+.mkt [data-slot='button'].btn-mkt-outline {
+	border: 1px solid var(--m-border-strong);
+	color: var(--muted-foreground);
+	background: transparent;
+	box-shadow: none;
+	transition:
+		background 0.2s ease,
+		border-color 0.2s ease,
+		color 0.2s ease,
+		transform 0.2s ease;
+}
+.mkt [data-slot='button'].btn-mkt-outline:hover {
+	background: var(--m-accent-dim);
+	border-color: oklch(0.52 0.22 277 / 42%);
+	color: inherit;
+	transform: translateY(-1px);
+}
+.mkt [data-slot='button'].btn-mkt-outline:active {
+	transform: translateY(0) scale(0.99);
+	background: var(--m-accent-soft);
+	border-color: oklch(0.52 0.22 277 / 32%);
+}
+
+.mkt [data-slot='button'].btn-mkt-ghost,
+.mkt [data-slot='button'].mkt-nav-menu-trigger {
+	background: transparent;
+	border: none;
+	color: var(--muted-foreground);
+	box-shadow: none;
+	transition:
+		background 0.2s ease,
+		color 0.2s ease;
+}
+.mkt [data-slot='button'].btn-mkt-ghost:hover,
+.mkt [data-slot='button'].mkt-nav-menu-trigger:hover {
+	background: oklch(1 0 0 / 6%);
+	color: inherit;
+}
+.mkt [data-slot='button'].btn-mkt-ghost:active,
+.mkt [data-slot='button'].mkt-nav-menu-trigger:active {
+	background: oklch(1 0 0 / 4%);
+}
+
+.mkt :is(#features, #how-it-works, #pricing) {
+	scroll-margin-top: calc(var(--mkt-nav-offset) + 0.5rem);
+}
+
+.mkt .marketing-nav-shell {
+	position: fixed;
+	top: 0;
+	left: 0;
+	right: 0;
+	z-index: 50;
+	box-sizing: border-box;
+	padding-top: env(safe-area-inset-top, 0px);
+	transition:
+		background 0.2s ease,
+		border-color 0.2s ease;
+	background: transparent;
+	border-bottom: 1px solid transparent;
+}
+
+.mkt .marketing-nav-shell.is-scrolled {
+	background: var(--m-surface);
+	border-bottom-color: var(--m-border-soft);
+}
+
+.mkt .marketing-nav-bar {
+	box-sizing: border-box;
+	min-height: 3.5rem;
+	padding-top: 0;
+	padding-bottom: 0;
+	padding-left: max(var(--mkt-nav-inline), env(safe-area-inset-left, 0px));
+	padding-right: max(var(--mkt-nav-inline), env(safe-area-inset-right, 0px));
+}
