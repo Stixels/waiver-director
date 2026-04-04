@@ -70,7 +70,7 @@
 	>
 		<div
 			class="overflow-hidden rounded-xl border border-(--m-border-strong) bg-(--m-surface)"
-			style="box-shadow: 0 40px 80px oklch(0 0 0 / 60%);"
+			style="box-shadow: 0 18px 40px oklch(0 0 0 / 42%);"
 		>
 			<div
 				class="flex min-h-9 flex-wrap items-center justify-between gap-2 border-b border-(--m-border-soft) bg-(--m-card) px-3 py-2 sm:h-9 sm:flex-nowrap sm:px-4 sm:py-0"
