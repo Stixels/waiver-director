@@ -1,7 +1,7 @@
 .mkt {
 	--mkt-nav-offset: calc(env(safe-area-inset-top, 0px) + 3.5rem);
 	--mkt-nav-inline: 1rem;
-	--mkt-hero-top: clamp(1.5rem, 5vi, 3rem);
+	--mkt-hero-top: clamp(4rem, 10vi, 5.5rem);
 	--m-bg: oklch(0.09 0.006 286);
 	--m-surface: oklch(0.13 0.008 286);
 	--m-elevated: oklch(0.17 0.01 286);
@@ -25,7 +25,7 @@
 
 @media (min-width: 768px) {
 	.mkt {
-		--mkt-hero-top: clamp(2.25rem, 6vi, 4.5rem);
+		--mkt-hero-top: clamp(5rem, 9vi, 7.5rem);
 	}
 }
 
@@ -37,7 +37,7 @@
 
 @media (min-width: 1024px) {
 	.mkt {
-		--mkt-hero-top: clamp(3rem, 7vi, 5.5rem);
+		--mkt-hero-top: clamp(6rem, 10vi, 9.5rem);
 	}
 }
 

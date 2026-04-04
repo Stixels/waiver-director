@@ -183,7 +183,7 @@
 
 <!-- ======================================================= HERO -->
 <section
-	class="mkt-hero relative flex flex-col items-center justify-start overflow-hidden px-4 pb-24 sm:px-6"
+	class="mkt-hero relative flex flex-col items-center justify-start overflow-hidden px-4 pb-32 sm:px-6"
 >
 	<!-- Dot grid background -->
 	<div class="dot-grid absolute inset-0 opacity-40" aria-hidden="true"></div>
@@ -211,8 +211,8 @@
 	>
 		<!-- Headline -->
 		<h1
-			class="ani-up d1 mb-6 max-w-full font-black tracking-tight text-balance"
-			style="font-family: 'Bricolage Grotesque', sans-serif; font-size: clamp(32px, 7vw, 80px); letter-spacing: -0.03em; line-height: 1.04;"
+			class="ani-up d1 mb-8 max-w-full font-black tracking-tight text-balance"
+			style="font-family: 'Bricolage Grotesque', sans-serif; font-size: clamp(46px, 7vw, 80px); letter-spacing: -0.03em; line-height: 1.06;"
 		>
 			<span style="color: var(--m-text);">Your waiver is your</span><br />
 			<span class="accent-shimmer">best customer list.</span>
@@ -220,7 +220,7 @@
 
 		<!-- Subheadline -->
 		<p
-			class="ani-up d2 mx-auto mb-8 max-w-[520px] text-[15px] leading-relaxed sm:text-[17px]"
+			class="ani-up d2 mx-auto mb-10 max-w-[520px] text-[16px] leading-relaxed sm:text-[18px]"
 			style="color: var(--m-text-2);"
 		>
 			Waiver Director captures every participant's email when they sign — not just the lead booker.
@@ -247,7 +247,7 @@
 	</div>
 
 	<!-- Hero mockup -->
-	<div class="ani-up d4 relative z-10 mx-auto mt-12 w-full max-w-5xl">
+	<div class="ani-up d4 relative z-10 mx-auto mt-24 w-full max-w-5xl">
 		<div
 			class="overflow-hidden rounded-xl border"
 			style="border-color: var(--m-border-strong); background: var(--m-surface); box-shadow: 0 40px 80px oklch(0 0 0 / 60%);"
