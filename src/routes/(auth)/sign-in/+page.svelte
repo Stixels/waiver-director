@@ -20,7 +20,7 @@
 			<Input id="password" type="password" placeholder="••••••••" />
 		</div>
 
-		<Button disabled>Sign in — TODO: wire auth</Button>
+		<Button disabled>Sign in (coming soon)</Button>
 	</div>
 
 	<p class="mt-4 text-sm text-muted-foreground">

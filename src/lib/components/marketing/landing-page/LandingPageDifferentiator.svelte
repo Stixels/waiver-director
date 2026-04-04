@@ -94,7 +94,7 @@
 						Waiver Director
 					</p>
 
-					{#each capturedGuests as person (person.name)}
+					{#each capturedGuests as person (person.email)}
 						{@render signedGuestRow(person)}
 					{/each}
 

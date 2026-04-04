@@ -4,9 +4,46 @@
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
 
-	function handleSubmit(event: SubmitEvent) {
+	let isSubmitting = $state(false);
+	let submitMessage = $state<string | null>(null);
+	let submitError = $state<string | null>(null);
+
+	async function showSignUpNotReady(formValues: { name: string; email: string }) {
+		submitMessage = `Thanks, ${formValues.name || formValues.email}. Sign-up is coming soon.`;
+	}
+
+	async function handleSubmit(event: SubmitEvent) {
 		event.preventDefault();
-		// TODO: call sign-up mutation / auth client (e.g. Convex + Clerk or Better Auth) with form values
+
+		const form = event.currentTarget;
+		if (!(form instanceof HTMLFormElement)) {
+			submitError = 'Unable to submit right now. Please try again.';
+			return;
+		}
+
+		const formData = new FormData(form);
+		const name = String(formData.get('name') ?? '').trim();
+		const email = String(formData.get('email') ?? '').trim();
+		const password = String(formData.get('password') ?? '').trim();
+
+		if (!name || !email || !password) {
+			submitError = 'Please complete all fields.';
+			submitMessage = null;
+			return;
+		}
+
+		isSubmitting = true;
+		submitError = null;
+		submitMessage = null;
+
+		try {
+			// TODO: replace with auth mutation/client call when signup is wired.
+			await showSignUpNotReady({ name, email });
+		} catch (_error) {
+			submitError = 'Sign-up is temporarily unavailable. Please try again.';
+		} finally {
+			isSubmitting = false;
+		}
 	}
 </script>
 
@@ -42,7 +79,16 @@
 			/>
 		</div>
 
-		<Button type="submit">Create account</Button>
+		<Button type="submit" disabled={isSubmitting}>
+			{isSubmitting ? 'Creating account...' : 'Create account'}
+		</Button>
+
+		{#if submitMessage}
+			<p class="text-sm text-muted-foreground">{submitMessage}</p>
+		{/if}
+		{#if submitError}
+			<p class="text-sm text-destructive">{submitError}</p>
+		{/if}
 	</form>
 
 	<p class="mt-4 text-sm text-muted-foreground">

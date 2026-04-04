@@ -20,7 +20,7 @@
 			<Input id="workspace-slug" placeholder="atlas-escape" />
 		</div>
 
-		<Button disabled>Continue — TODO: workspace create/join API</Button>
+		<Button disabled>Continue (coming soon)</Button>
 	</div>
 
 	<p class="mt-4 text-sm text-muted-foreground">

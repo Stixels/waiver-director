@@ -140,15 +140,16 @@
 						</li>
 					{/each}
 				</ul>
-				<!-- No dedicated sales route yet; non-interactive CTA -->
-				<div
+				<button
+					type="button"
+					disabled
 					class="flex min-h-10 w-full flex-col items-center justify-center rounded-lg border px-2 py-2 text-center leading-tight"
 					style="border-color: var(--m-border-strong); color: var(--muted-foreground);"
 					aria-label="Contact sales, coming soon"
 				>
 					<span class="text-sm font-semibold">Contact sales</span>
 					<span class="text-[11px] font-medium" style="color: var(--m-text-3);">Coming soon</span>
-				</div>
+				</button>
 			</div>
 		</div>
 	</div>

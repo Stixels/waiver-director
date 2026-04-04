@@ -1,8 +1,11 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
+	import { onMount } from 'svelte';
 	import { fade, fly } from 'svelte/transition';
 	import { Button } from '$lib/components/ui/button';
 	import { Menu, X } from '@lucide/svelte';
+
+	const DESKTOP_BREAKPOINT_QUERY = '(min-width: 768px)';
 
 	let mobileNavOpen = $state(false);
 	let scrollY = $state(0);
@@ -25,6 +28,22 @@
 	function onNavKeydown(e: KeyboardEvent) {
 		if (e.key === 'Escape' && mobileNavOpen) closeMobileNav();
 	}
+
+	onMount(() => {
+		const desktopMediaQuery = window.matchMedia(DESKTOP_BREAKPOINT_QUERY);
+		const syncWithViewport = () => {
+			if (desktopMediaQuery.matches) {
+				mobileNavOpen = false;
+			}
+		};
+
+		desktopMediaQuery.addEventListener('change', syncWithViewport);
+		syncWithViewport();
+
+		return () => {
+			desktopMediaQuery.removeEventListener('change', syncWithViewport);
+		};
+	});
 </script>
 
 <svelte:window bind:scrollY onkeydown={onNavKeydown} />

@@ -2,8 +2,13 @@
 	import { resolve } from '$app/paths';
 
 	type FooterEntry =
-		| { label: string; href: '/#features' | '/#how-it-works' | '/#pricing' }
+		| {
+				label: string;
+				href: '/#features' | '/#how-it-works' | '/#pricing' | '/privacy' | '/terms';
+		  }
 		| { label: string; comingSoon: true };
+
+	const currentYear = new Date().getFullYear();
 
 	const footerColumns: { title: string; entries: readonly FooterEntry[] }[] = [
 		{
@@ -31,8 +36,8 @@
 			entries: [
 				{ label: 'About', comingSoon: true },
 				{ label: 'Blog', comingSoon: true },
-				{ label: 'Privacy Policy', comingSoon: true },
-				{ label: 'Terms of Service', comingSoon: true }
+				{ label: 'Privacy Policy', href: '/privacy' },
+				{ label: 'Terms of Service', href: '/terms' }
 			] as const
 		}
 	];
@@ -112,7 +117,7 @@
 			style="border-color: var(--border);"
 		>
 			<p class="text-[12px]" style="color: var(--m-text-3);">
-				&copy; 2026 Waiver Director. All rights reserved.
+				&copy; {currentYear} Waiver Director. All rights reserved.
 			</p>
 			<p class="text-[12px]" style="color: var(--m-text-3);">Built for every booking experience.</p>
 		</div>

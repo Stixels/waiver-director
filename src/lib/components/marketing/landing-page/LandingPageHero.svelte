@@ -6,7 +6,11 @@
 
 	import { sessionParticipants } from './content';
 
-	const completionPercent = 75;
+	const totalExpected = sessionParticipants.length;
+	const totalSigned = sessionParticipants.filter((participant) => participant.status === 'signed').length;
+	const totalPending = totalExpected - totalSigned;
+	const completionPercent =
+		totalExpected === 0 ? 0 : Math.round((totalSigned / totalExpected) * 100);
 </script>
 
 <section
@@ -115,17 +119,19 @@
 					>
 						<div class="text-center">
 							<div class="mb-1 text-[18px] leading-none font-bold text-(--m-green) sm:text-[22px]">
-								6
+								{totalSigned}
 							</div>
 							<div class="text-[10px] tracking-wide text-(--m-text-3) uppercase">Signed</div>
 						</div>
 						<div class="text-center">
-							<div class="mb-1 text-[18px] leading-none font-bold sm:text-[22px]">8</div>
+							<div class="mb-1 text-[18px] leading-none font-bold sm:text-[22px]">
+								{totalExpected}
+							</div>
 							<div class="text-[10px] tracking-wide text-(--m-text-3) uppercase">Expected</div>
 						</div>
 						<div class="text-center">
 							<div class="mb-1 text-[18px] leading-none font-bold text-(--m-amber) sm:text-[22px]">
-								2
+								{totalPending}
 							</div>
 							<div class="text-[10px] tracking-wide text-(--m-text-3) uppercase">Pending</div>
 						</div>
@@ -140,7 +146,10 @@
 					aria-valuemax={100}
 					aria-label={`Waiver completion: ${completionPercent}%`}
 				>
-					<div class="landing-hero__progress-fill h-full rounded-full bg-(--m-green)"></div>
+					<div
+						class="landing-hero__progress-fill h-full rounded-full bg-(--m-green)"
+						style={`--landing-hero-completion: ${completionPercent}%;`}
+					></div>
 				</div>
 
 				<div class="flex flex-col">
@@ -238,7 +247,7 @@
 		}
 
 		to {
-			width: 75%;
+			width: var(--landing-hero-completion);
 		}
 	}
 
@@ -314,6 +323,8 @@
 
 	.landing-hero__progress-fill {
 		animation: landing-hero-progress 1.2s 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+		--landing-hero-completion: 0%;
+		width: var(--landing-hero-completion);
 	}
 
 	@media (prefers-reduced-motion: reduce) {
@@ -325,7 +336,7 @@
 
 		.landing-hero__progress-fill {
 			animation: none !important;
-			width: 75%;
+			width: var(--landing-hero-completion);
 		}
 
 		.landing-hero__accent {

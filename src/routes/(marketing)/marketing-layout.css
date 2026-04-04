@@ -1,5 +1,8 @@
-.mkt {
+:root {
 	--mkt-nav-offset: calc(env(safe-area-inset-top, 0px) + 3.5rem);
+}
+
+.mkt {
 	--mkt-nav-inline: 1rem;
 	--mkt-hero-top: clamp(4rem, 10vi, 5.5rem);
 	--m-bg: var(--background);
@@ -24,6 +27,7 @@
 	--m-amber-soft: oklch(0.78 0.18 75 / 7%);
 	--m-amber-border: oklch(0.78 0.18 75 / 20%);
 	--m-text-3: color-mix(in oklch, var(--muted-foreground) 78%, var(--background) 22%);
+
 	background: var(--m-bg);
 	color: var(--foreground);
 }
