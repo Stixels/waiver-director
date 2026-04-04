@@ -183,7 +183,7 @@
 
 <!-- ======================================================= HERO -->
 <section
-	class="relative flex min-h-screen flex-col items-center justify-center overflow-hidden px-4 pt-14 pb-24 sm:px-6 sm:pt-16"
+	class="mkt-hero relative flex flex-col items-center justify-start overflow-hidden px-4 pb-24 sm:px-6"
 >
 	<!-- Dot grid background -->
 	<div class="dot-grid absolute inset-0 opacity-40" aria-hidden="true"></div>

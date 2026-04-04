@@ -1,10 +1,7 @@
-/**
- * Marketing route group — tokens + `.btn-mkt-*` helpers for shadcn `data-slot="button"`.
- * Scoped under `.mkt`; imported only from `(marketing)/+layout.svelte`.
- */
-
 .mkt {
-	overflow-x: hidden;
+	--mkt-nav-offset: calc(env(safe-area-inset-top, 0px) + 3.5rem);
+	--mkt-nav-inline: 1rem;
+	--mkt-hero-top: clamp(1.5rem, 5vi, 3rem);
 	--m-bg: oklch(0.09 0.006 286);
 	--m-surface: oklch(0.13 0.008 286);
 	--m-elevated: oklch(0.17 0.01 286);
@@ -24,6 +21,30 @@
 	--m-text-3: oklch(0.48 0.016 286);
 	background: var(--m-bg);
 	color: var(--m-text);
+}
+
+@media (min-width: 768px) {
+	.mkt {
+		--mkt-hero-top: clamp(2.25rem, 6vi, 4.5rem);
+	}
+}
+
+@media (min-width: 640px) {
+	.mkt {
+		--mkt-nav-inline: 1.5rem;
+	}
+}
+
+@media (min-width: 1024px) {
+	.mkt {
+		--mkt-hero-top: clamp(3rem, 7vi, 5.5rem);
+	}
+}
+
+.mkt .mkt-hero {
+	min-height: calc(100svh - var(--mkt-nav-offset));
+	padding-top: var(--mkt-hero-top);
+	scroll-margin-top: var(--mkt-nav-offset);
 }
 
 .mkt [data-slot='button'].btn-mkt-accent {
@@ -84,7 +105,9 @@
 	border: none;
 	color: var(--m-text-2);
 	box-shadow: none;
-	transition: background 0.2s ease, color 0.2s ease;
+	transition:
+		background 0.2s ease,
+		color 0.2s ease;
 }
 .mkt [data-slot='button'].btn-mkt-ghost:hover,
 .mkt [data-slot='button'].mkt-nav-menu-trigger:hover {
@@ -94,4 +117,46 @@
 .mkt [data-slot='button'].btn-mkt-ghost:active,
 .mkt [data-slot='button'].mkt-nav-menu-trigger:active {
 	background: oklch(1 0 0 / 4%);
+}
+
+.mkt .mkt-main-pad {
+	padding-top: var(--mkt-nav-offset);
+}
+
+html:has(.mkt) {
+	scroll-padding-top: calc(var(--mkt-nav-offset) + 0.5rem);
+}
+
+.mkt .marketing-nav-shell {
+	position: fixed;
+	top: 0;
+	left: 0;
+	right: 0;
+	z-index: 50;
+	box-sizing: border-box;
+	padding-top: env(safe-area-inset-top, 0px);
+	transition:
+		background 0.2s ease,
+		border-color 0.2s ease,
+		backdrop-filter 0.2s ease;
+	background: transparent;
+	border-bottom: 1px solid transparent;
+	-webkit-backdrop-filter: blur(0px);
+	backdrop-filter: blur(0px);
+}
+
+.mkt .marketing-nav-shell.is-scrolled {
+	background: oklch(0.12 0.009 286 / 88%);
+	border-bottom-color: var(--m-border);
+	-webkit-backdrop-filter: blur(16px) saturate(160%);
+	backdrop-filter: blur(16px) saturate(160%);
+}
+
+.mkt .marketing-nav-bar {
+	box-sizing: border-box;
+	min-height: 3.5rem;
+	padding-top: 0;
+	padding-bottom: 0;
+	padding-left: max(var(--mkt-nav-inline), env(safe-area-inset-left, 0px));
+	padding-right: max(var(--mkt-nav-inline), env(safe-area-inset-right, 0px));
 }

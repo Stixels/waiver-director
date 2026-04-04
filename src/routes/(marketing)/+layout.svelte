@@ -25,8 +25,10 @@
 		Skip to main content
 	</a>
 	<MarketingNav />
-	<main id="marketing-main" class="flex flex-1 flex-col" tabindex="-1">
-		{@render children()}
-	</main>
-	<MarketingFooter />
+	<div class="flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden">
+		<main id="marketing-main" class="mkt-main-pad flex flex-1 flex-col" tabindex="-1">
+			{@render children()}
+		</main>
+		<MarketingFooter />
+	</div>
 </div>
