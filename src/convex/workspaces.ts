@@ -21,22 +21,33 @@ export const listCurrentUserWorkspaces = query({
 		}
 
 		const memberships = await listWorkspaceMembershipsForUser(ctx, user._id);
-		const workspaces = await Promise.all(
-			memberships.map(async (membership) => {
-				const workspace = await ctx.db.get(membership.workspaceId);
-				if (!workspace) {
-					return null;
-				}
-
-				return {
-					workspaceId: workspace._id,
-					name: workspace.name,
-					slug: workspace.slug,
-					role: membership.role,
-					status: membership.status
-				};
-			})
+		const workspaceIds = memberships.map((membership) => membership.workspaceId);
+		const workspaceDocs = await Promise.all(
+			workspaceIds.map((workspaceId) => ctx.db.get(workspaceId))
 		);
+
+		const workspaces = memberships.map((membership, index) => {
+			const workspace = workspaceDocs[index];
+			if (!workspace) {
+				console.warn('[workspaces.listCurrentUserWorkspaces] Missing workspace for membership', {
+					membershipId: membership._id,
+					workspaceId: membership.workspaceId
+				});
+				console.log('[metric] membership_missing_workspace', {
+					membershipId: membership._id,
+					workspaceId: membership.workspaceId
+				});
+				return null;
+			}
+
+			return {
+				workspaceId: workspace._id,
+				name: workspace.name,
+				slug: workspace.slug,
+				role: membership.role,
+				status: membership.status
+			};
+		});
 
 		return workspaces.filter((workspace) => workspace !== null);
 	}

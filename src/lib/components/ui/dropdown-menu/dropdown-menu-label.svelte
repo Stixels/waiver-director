@@ -16,11 +16,8 @@
 <div
 	bind:this={ref}
 	data-slot="dropdown-menu-label"
-	data-inset={inset}
-	class={cn(
-		'px-2 py-1.5 text-xs text-muted-foreground data-inset:pl-7.5 data-[inset]:pl-8',
-		className
-	)}
+	data-inset={inset ? '' : undefined}
+	class={cn('px-2 py-1.5 text-xs text-muted-foreground data-[inset]:pl-8', className)}
 	{...restProps}
 >
 	{@render children?.()}

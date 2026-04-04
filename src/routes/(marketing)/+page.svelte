@@ -1,16 +1,46 @@
 <script lang="ts">
-	import { resolve } from '$app/paths';
-	import { Button } from '$lib/components/ui/button';
+	import { PUBLIC_APP_URL } from '$env/static/public';
+
+	import MarketingPricing from '$lib/components/marketing/MarketingPricing.svelte';
+	import LandingPageAnalyticsPreview from '$lib/components/marketing/landing-page/LandingPageAnalyticsPreview.svelte';
+	import LandingPageCta from '$lib/components/marketing/landing-page/LandingPageCta.svelte';
+	import LandingPageDifferentiator from '$lib/components/marketing/landing-page/LandingPageDifferentiator.svelte';
+	import LandingPageFeatures from '$lib/components/marketing/landing-page/LandingPageFeatures.svelte';
+	import LandingPageHero from '$lib/components/marketing/landing-page/LandingPageHero.svelte';
+	import LandingPageHowItWorks from '$lib/components/marketing/landing-page/LandingPageHowItWorks.svelte';
+	import { scrollReveal } from '$lib/components/marketing/landing-page/scrollReveal';
+
+	const pageTitle = 'Waiver Director — Digital Waivers for Any Booking Experience';
+	const pageDescription =
+		"Digital waivers for tours & activities: capture every guest's email, sync Bookeo/Resova/Xola, and automate follow-ups for customer feedback, review requests & reminders. Optional Mailchimp & Constant Contact.";
+
+	const siteBase = (PUBLIC_APP_URL ?? '').replace(/\/$/, '');
+	const canonicalUrl = siteBase ? `${siteBase}/` : '';
 </script>
 
-<div class="p-6">
-	<h1>Waiver Director</h1>
-	<p>Foundation placeholder page.</p>
-	<p>The app now has route groups, Convex schema scaffolding, and placeholder flows.</p>
+<svelte:head>
+	<title>{pageTitle}</title>
+	<meta name="description" content={pageDescription} />
+	<meta property="og:title" content={pageTitle} />
+	<meta property="og:description" content={pageDescription} />
+	<meta property="og:type" content="website" />
+	{#if canonicalUrl}
+		<link rel="canonical" href={canonicalUrl} />
+		<meta property="og:url" content={canonicalUrl} />
+	{/if}
+	<meta name="twitter:card" content="summary" />
+	<meta name="twitter:title" content={pageTitle} />
+	<meta name="twitter:description" content={pageDescription} />
+</svelte:head>
 
-	<div class="mt-4 flex gap-2">
-		<Button href={resolve('/sign-up')}>Sign up</Button>
-		<Button href={resolve('/sign-in')} variant="outline">Sign in</Button>
-		<Button href={resolve('/app')} variant="outline">Open app shell</Button>
-	</div>
+<LandingPageHero />
+<LandingPageDifferentiator />
+<LandingPageHowItWorks />
+<LandingPageFeatures />
+<LandingPageAnalyticsPreview />
+
+<div class="landing-reveal" {@attach scrollReveal}>
+	<MarketingPricing />
 </div>
+
+<LandingPageCta />

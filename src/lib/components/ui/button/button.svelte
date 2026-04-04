@@ -47,6 +47,14 @@
 </script>
 
 <script lang="ts">
+	import { resolve } from '$app/paths';
+	import type { Pathname } from '$app/types';
+
+	/** Root-relative path for this app — not `https:…` / `mailto:…`, and not `//…` (protocol-relative). */
+	function isAppPathname(path: string): boolean {
+		return path.startsWith('/') && !path.startsWith('//');
+	}
+
 	let {
 		class: className,
 		variant = 'default',
@@ -65,7 +73,7 @@
 		bind:this={ref}
 		data-slot="button"
 		class={cn(buttonVariants({ variant, size }), className)}
-		href={disabled ? undefined : href}
+		href={disabled ? undefined : isAppPathname(href) ? resolve(href as Pathname) : href}
 		aria-disabled={disabled}
 		role={disabled ? 'link' : undefined}
 		tabindex={disabled ? -1 : undefined}

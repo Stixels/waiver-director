@@ -13,7 +13,7 @@
 
 <svelte:head><link rel="icon" href={favicon} /></svelte:head>
 
-<ModeWatcher />
+<ModeWatcher defaultMode="dark" />
 <div class="min-h-screen bg-background text-foreground antialiased">
 	{@render children()}
 	<Toaster richColors position="top-right" />

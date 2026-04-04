@@ -13,25 +13,25 @@ export const appNavigation = [
 	},
 	{
 		label: 'Campaigns',
-		href: '/app',
+		href: '/app/campaigns',
 		icon: FileSignatureIcon,
 		description: 'Publishable waiver packets and public links.'
 	},
 	{
 		label: 'Sessions',
-		href: '/app',
+		href: '/app/sessions',
 		icon: CalendarRangeIcon,
 		description: 'Manual and provider-backed event groups.'
 	},
 	{
 		label: 'Emails',
-		href: '/app',
+		href: '/app/emails',
 		icon: MailIcon,
 		description: 'Reminder rules, queues, and follow-up templates.'
 	},
 	{
 		label: 'Integrations',
-		href: '/app',
+		href: '/app/integrations',
 		icon: PlugZapIcon,
 		description: 'Booking sources, outbound email, and contact sync.'
 	}

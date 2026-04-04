@@ -1,6 +1,17 @@
 import { v } from 'convex/values';
 import { query } from './_generated/server';
-import { getAuthenticatedIdentity, getCurrentAuthIdentity, getCurrentUser } from './lib/auth';
+import { getCurrentAuthIdentity } from './lib/auth';
+
+function reportDanglingAuthIdentity(authIdentity: { userId: string; provider: string }) {
+	console.warn('[users.currentUser] Dangling auth identity: missing linked user record', {
+		userId: authIdentity.userId,
+		provider: authIdentity.provider
+	});
+	console.log('[metric] auth.dangling_identity', {
+		userId: authIdentity.userId,
+		provider: authIdentity.provider
+	});
+}
 
 export const currentUser = query({
 	args: {},
@@ -15,13 +26,17 @@ export const currentUser = query({
 		})
 	),
 	handler: async (ctx) => {
-		const [identity, authIdentity, user] = await Promise.all([
-			getAuthenticatedIdentity(ctx),
-			getCurrentAuthIdentity(ctx),
-			getCurrentUser(ctx)
-		]);
+		const authIdentity = await getCurrentAuthIdentity(ctx);
+		if (!authIdentity) {
+			return null;
+		}
 
-		if (!identity || !authIdentity || !user) {
+		const user = await ctx.db.get(authIdentity.userId);
+		if (!user) {
+			reportDanglingAuthIdentity({
+				userId: authIdentity.userId,
+				provider: authIdentity.provider
+			});
 			return null;
 		}
 
