@@ -7,7 +7,9 @@
 	import { sessionParticipants } from './content';
 
 	const totalExpected = sessionParticipants.length;
-	const totalSigned = sessionParticipants.filter((participant) => participant.status === 'signed').length;
+	const totalSigned = sessionParticipants.filter(
+		(participant) => participant.status === 'signed'
+	).length;
 	const totalPending = totalExpected - totalSigned;
 	const completionPercent =
 		totalExpected === 0 ? 0 : Math.round((totalSigned / totalExpected) * 100);
@@ -34,7 +36,7 @@
 		<h1
 			class="landing-hero__animate landing-hero__delay-1 mb-8 max-w-full font-black tracking-tight text-balance"
 		>
-			<span>Your waiver is your</span><br />
+			Your waiver is your
 			<span class="landing-hero__accent">best customer list.</span>
 		</h1>
 
@@ -103,9 +105,9 @@
 						<p class="mb-1 text-[10px] tracking-widest text-(--m-text-3) uppercase">
 							Active Session
 						</p>
-						<h3 class="landing-hero__session-title mb-0.5 text-[15px] font-bold sm:text-[18px]">
+						<h2 class="landing-hero__session-title mb-0.5 text-[15px] font-bold sm:text-[18px]">
 							Wilderness Zipline Tour
-						</h3>
+						</h2>
 						<p class="text-[12px] text-(--m-text-3)">Today · 2:00 PM · via Bookeo</p>
 					</div>
 					<div
@@ -184,10 +186,7 @@
 								>
 									Pending
 								</span>
-								<span
-									class="inline-flex shrink-0 items-center gap-0.5 text-[11px] font-medium text-primary"
-									aria-hidden="true"
-								>
+								<span class="inline-flex shrink-0 items-center gap-0.5 text-[11px] font-semibold">
 									Send reminder
 								</span>
 							{/if}

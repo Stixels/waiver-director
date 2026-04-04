@@ -26,7 +26,7 @@
 	--m-amber-dim: oklch(0.78 0.18 75 / 15%);
 	--m-amber-soft: oklch(0.78 0.18 75 / 7%);
 	--m-amber-border: oklch(0.78 0.18 75 / 20%);
-	--m-text-3: oklch(0.48 0.016 286);
+	--m-text-3: oklch(0.72 0.012 286);
 
 	background: var(--m-bg);
 	color: oklch(0.97 0 0);

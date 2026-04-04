@@ -89,7 +89,7 @@
 								{#if 'comingSoon' in entry}
 									<span
 										class="mb-2 block text-[13px]"
-										style="color: var(--muted-foreground); opacity: 0.8;"
+										style="color: var(--m-text-3);"
 									>
 										{entry.label}
 										<span class="ml-1 text-[11px] font-normal" style="color: var(--m-text-3);"
@@ -99,8 +99,8 @@
 								{:else}
 									<a
 										href={resolve(entry.href)}
-										class="mb-2 block text-[13px] no-underline transition-opacity hover:opacity-100"
-										style="color: var(--muted-foreground); opacity: 0.8;"
+										class="mb-2 block text-[13px] no-underline transition-opacity hover:opacity-90"
+										style="color: var(--m-text-3);"
 									>
 										{entry.label}
 									</a>

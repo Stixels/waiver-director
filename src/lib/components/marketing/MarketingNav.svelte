@@ -67,6 +67,7 @@
 			<div class="flex min-w-0 items-center gap-3 sm:gap-4 md:justify-self-start">
 				<a
 					href={resolve('/')}
+					aria-label="Waiver Director home"
 					class="mkt-brand-link flex min-w-0 items-center gap-2.5 no-underline"
 				>
 					<div
@@ -76,6 +77,7 @@
 					>
 						WD
 					</div>
+					<span class="sr-only">Waiver Director</span>
 					<span class="mkt-brand-wordmark hidden font-bold sm:block">Waiver Director</span>
 				</a>
 			</div>
