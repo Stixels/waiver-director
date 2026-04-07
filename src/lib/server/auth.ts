@@ -4,8 +4,8 @@ export async function ensureCurrentAppUser(locals: App.Locals) {
 	let currentUser = await locals.convex.query(api.users.currentUser, {});
 
 	if (!currentUser) {
-		await locals.convex.mutation(api.users.ensureCurrentUser, {});
-		currentUser = await locals.convex.query(api.users.currentUser, {});
+		const ensuredUser = await locals.convex.mutation(api.users.ensureCurrentUser, {});
+		currentUser = ensuredUser.currentUser;
 	}
 
 	return currentUser;

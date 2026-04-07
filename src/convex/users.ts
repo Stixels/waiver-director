@@ -1,5 +1,6 @@
 import { v } from 'convex/values';
 import { mutation, query } from './_generated/server';
+import type { Id } from './_generated/dataModel';
 import { getAuthenticatedIdentity, getCurrentAuthIdentity } from './lib/auth';
 
 function getDisplayName(identity: {
@@ -84,18 +85,33 @@ function reportDanglingAuthIdentity(authIdentity: { userId: string; provider: st
 	});
 }
 
+const currentUserValue = v.object({
+	userId: v.id('users'),
+	displayName: v.union(v.string(), v.null()),
+	primaryEmail: v.union(v.string(), v.null()),
+	authProvider: v.union(v.literal('clerk'), v.literal('better-auth')),
+	tokenIdentifier: v.string()
+});
+
+function buildCurrentUserResult(args: {
+	userId: Id<'users'>;
+	displayName?: string;
+	primaryEmail?: string;
+	authProvider: 'clerk' | 'better-auth';
+	tokenIdentifier: string;
+}) {
+	return {
+		userId: args.userId,
+		displayName: args.displayName ?? null,
+		primaryEmail: args.primaryEmail ?? null,
+		authProvider: args.authProvider,
+		tokenIdentifier: args.tokenIdentifier
+	};
+}
+
 export const currentUser = query({
 	args: {},
-	returns: v.union(
-		v.null(),
-		v.object({
-			userId: v.id('users'),
-			displayName: v.union(v.string(), v.null()),
-			primaryEmail: v.union(v.string(), v.null()),
-			authProvider: v.union(v.literal('clerk'), v.literal('better-auth')),
-			tokenIdentifier: v.string()
-		})
-	),
+	returns: v.union(v.null(), currentUserValue),
 	handler: async (ctx) => {
 		const authIdentity = await getCurrentAuthIdentity(ctx);
 		if (!authIdentity) {
@@ -111,13 +127,13 @@ export const currentUser = query({
 			return null;
 		}
 
-		return {
+		return buildCurrentUserResult({
 			userId: user._id,
-			displayName: user.displayName ?? null,
-			primaryEmail: user.primaryEmail ?? null,
+			displayName: user.displayName,
+			primaryEmail: user.primaryEmail,
 			authProvider: authIdentity.provider,
 			tokenIdentifier: authIdentity.tokenIdentifier
-		};
+		});
 	}
 });
 
@@ -125,7 +141,8 @@ export const ensureCurrentUser = mutation({
 	args: {},
 	returns: v.object({
 		userId: v.id('users'),
-		created: v.boolean()
+		created: v.boolean(),
+		currentUser: currentUserValue
 	}),
 	handler: async (ctx) => {
 		const identity = await getAuthenticatedIdentity(ctx);
@@ -160,7 +177,14 @@ export const ensureCurrentUser = mutation({
 
 			return {
 				userId,
-				created: false
+				created: false,
+				currentUser: buildCurrentUserResult({
+					userId,
+					displayName: userFields.updatePayload.displayName,
+					primaryEmail: userFields.updatePayload.primaryEmail,
+					authProvider: existingAuthIdentity.provider,
+					tokenIdentifier: identity.tokenIdentifier
+				})
 			};
 		}
 
@@ -175,7 +199,14 @@ export const ensureCurrentUser = mutation({
 
 		return {
 			userId,
-			created: true
+			created: true,
+			currentUser: buildCurrentUserResult({
+				userId,
+				displayName: userFields.updatePayload.displayName,
+				primaryEmail: userFields.updatePayload.primaryEmail,
+				authProvider: 'clerk',
+				tokenIdentifier: identity.tokenIdentifier
+			})
 		};
 	}
 });

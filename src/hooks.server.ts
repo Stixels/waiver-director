@@ -11,11 +11,13 @@ import { withClerkHandler } from 'svelte-clerk/server';
 // Example you can call debug: dev to see the Auth object in the console for debugging purposes.
 const setupConvexClient: Handle = async ({ event, resolve }) => {
 	const auth = event.locals.auth();
-	const token = await auth.getToken({ template: 'convex' });
 	const client = new ConvexHttpClient(publicEnv.convexUrl);
+	if (auth.userId) {
+		const token = await auth.getToken({ template: 'convex' });
 
-	if (token) {
-		client.setAuth(token);
+		if (token) {
+			client.setAuth(token);
+		}
 	}
 
 	event.locals.convex = client;
