@@ -25,6 +25,6 @@
 
 	<p class="mt-4 text-sm text-muted-foreground">
 		Back to
-		<a href={resolve('/sign-up')} class="underline underline-offset-4">sign up</a>
+		<a href={resolve('/app')} class="underline underline-offset-4">the app</a>
 	</p>
 </div>
