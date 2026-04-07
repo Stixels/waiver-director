@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { browser } from '$app/environment';
 	import { onDestroy } from 'svelte';
 	import { useConvexClient } from 'convex-svelte';
 	import { useClerkContext } from 'svelte-clerk';
@@ -57,6 +58,10 @@
 	}
 
 	$effect(() => {
+		if (!browser || convex.disabled) {
+			return;
+		}
+
 		const convexClient = convex.client;
 		const isLoaded = clerk.isLoaded;
 		const userId = clerk.auth.userId;
@@ -137,6 +142,10 @@
 	});
 
 	onDestroy(() => {
+		if (!browser || convex.disabled) {
+			return;
+		}
+
 		inflightTokenPromise = null;
 		convex.client.clearAuth();
 		lastRegisteredSessionId = null;

@@ -1,5 +1,4 @@
 <script lang="ts">
-	import type { SignInResource } from '@clerk/shared/types';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import type { Pathname } from '$app/types';
@@ -42,11 +41,13 @@
 	let backupCodeAvailable = $state(false);
 	const dashboardUrl = resolve('/app');
 
-	function getSignInResource(): SignInResource | null {
+	function getSignInResource() {
 		return clerk.client?.signIn ?? null;
 	}
 
-	function getSupportedSecondFactors(signInAttempt: SignInResource): SupportedSecondFactor[] {
+	function getSupportedSecondFactors(
+		signInAttempt: NonNullable<ReturnType<typeof getSignInResource>>
+	) {
 		return Array.isArray(signInAttempt.supportedSecondFactors)
 			? (signInAttempt.supportedSecondFactors as SupportedSecondFactor[])
 			: [];
@@ -63,7 +64,10 @@
 		backupCodeAvailable = false;
 	}
 
-	async function prepareSecondFactor(signIn: SignInResource, strategy: SecondFactorStrategy) {
+	async function prepareSecondFactor(
+		signIn: NonNullable<ReturnType<typeof getSignInResource>>,
+		strategy: SecondFactorStrategy
+	) {
 		switch (strategy) {
 			case 'email_code':
 				await signIn.prepareSecondFactor({
@@ -94,7 +98,10 @@
 		submitMessage = null;
 	}
 
-	async function startSecondFactorFlow(signIn: SignInResource, signInAttempt: SignInResource) {
+	async function startSecondFactorFlow(
+		signIn: NonNullable<ReturnType<typeof getSignInResource>>,
+		signInAttempt: NonNullable<ReturnType<typeof getSignInResource>>
+	) {
 		const supportedSecondFactors = getSupportedSecondFactors(signInAttempt);
 		const emailCodeFactor = supportedSecondFactors.find(
 			(factor): factor is SupportedSecondFactor & { strategy: 'email_code' } =>

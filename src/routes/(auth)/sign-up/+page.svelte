@@ -1,12 +1,11 @@
 <script lang="ts">
-	import type { SignUpResource } from '@clerk/shared/types';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import type { Pathname } from '$app/types';
 	import { ChartLine, FileText, Link2, Mail, ShieldCheck } from '@lucide/svelte';
 	import { useClerkContext } from 'svelte-clerk';
 
-	import { getClerkErrorMessage, splitFullName } from '$lib/auth/clerk-helpers';
+	import { getClerkErrorMessage } from '$lib/auth/clerk-helpers';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 
@@ -42,7 +41,6 @@
 
 	const clerk = useClerkContext();
 
-	let fullName = $state('');
 	let email = $state('');
 	let password = $state('');
 	let passwordConfirm = $state('');
@@ -55,7 +53,7 @@
 
 	const canSubmitEmailSignUp = $derived(Boolean(email.trim() && password && passwordConfirm));
 
-	function getSignUpResource(): SignUpResource | null {
+	function getSignUpResource() {
 		return clerk.client?.signUp ?? null;
 	}
 
@@ -117,7 +115,7 @@
 			return;
 		}
 
-		if (!fullName.trim() || !email.trim() || !password || !passwordConfirm) {
+		if (!email.trim() || !password || !passwordConfirm) {
 			submitError = 'Please complete all fields.';
 			submitMessage = null;
 			return;
@@ -129,21 +127,12 @@
 			return;
 		}
 
-		const { firstName, lastName } = splitFullName(fullName);
-		if (!firstName) {
-			submitError = 'Please enter your full name.';
-			submitMessage = null;
-			return;
-		}
-
 		isSubmitting = true;
 		submitError = null;
 		submitMessage = null;
 
 		try {
 			await signUp.create({
-				firstName,
-				lastName,
 				emailAddress: email.trim(),
 				password
 			});
@@ -369,17 +358,6 @@
 					</form>
 				{:else}
 					<form class="space-y-4" onsubmit={handleSubmit}>
-						<Input
-							id="sign-up-name"
-							name="name"
-							type="text"
-							autocomplete="name"
-							placeholder="Full Name"
-							aria-label="Name"
-							class={inputClass}
-							bind:value={fullName}
-						/>
-
 						<Input
 							id="sign-up-email"
 							name="email"

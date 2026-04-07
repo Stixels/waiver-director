@@ -23,12 +23,3 @@ export function getClerkErrorMessage(error: unknown, fallback: string): string {
 
 	return fallback;
 }
-
-export function splitFullName(fullName: string) {
-	const parts = fullName.trim().split(/\s+/).filter(Boolean);
-
-	return {
-		firstName: parts[0] ?? '',
-		lastName: parts.slice(1).join(' ') || undefined
-	};
-}

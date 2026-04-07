@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { browser } from '$app/environment';
 	import { api } from '../../../convex/_generated/api';
 	import { useConvexClient, useQuery } from 'convex-svelte';
 	import { useClerkContext } from 'svelte-clerk';
@@ -11,6 +12,10 @@
 	let syncInFlight = $state(false);
 
 	$effect(() => {
+		if (!browser || convex.disabled) {
+			return;
+		}
+
 		const isLoaded = clerk.isLoaded;
 		const userId = clerk.auth.userId;
 		const sessionId = clerk.auth.sessionId;

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { browser } from '$app/environment';
 	import { resolve } from '$app/paths';
 	import { setupConvex } from 'convex-svelte';
 	import { appNavigation } from '$lib/domain/navigation';
@@ -28,8 +29,10 @@
 </script>
 
 <div class="p-6">
-	<ConvexClerkBridge />
-	<ConvexUserSync />
+	{#if browser}
+		<ConvexClerkBridge />
+		<ConvexUserSync />
+	{/if}
 	<header class="flex justify-between gap-4">
 		<div class="ml-auto flex items-end gap-2">
 			<Button variant="outline" onclick={handleSignOut} disabled={isSigningOut}>

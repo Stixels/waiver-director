@@ -1,5 +1,4 @@
 <script lang="ts">
-	import type { SignInResource } from '@clerk/shared/types';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import type { Pathname } from '$app/types';
@@ -28,7 +27,7 @@
 	let submitError = $state<string | null>(null);
 	const dashboardUrl = resolve('/app');
 
-	function getSignInResource(): SignInResource | null {
+	function getSignInResource() {
 		return clerk.client?.signIn ?? null;
 	}
 
