@@ -7,8 +7,8 @@
 
 	import {
 		getClerkErrorMessage,
-		getResolvedClerkNavigationPath,
-		getSafePostAuthRedirectHref
+		getSafePostAuthRedirectHref,
+		normalizeClerkNavigateTarget
 	} from '$lib/auth/clerk-helpers';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
@@ -74,7 +74,7 @@
 					return;
 				}
 
-				await goto(resolve(getResolvedClerkNavigationPath(decorateUrl(postAuthRedirectUrl))));
+				await goto(resolve(normalizeClerkNavigateTarget(decorateUrl(postAuthRedirectUrl))));
 			}
 		});
 	}

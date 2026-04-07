@@ -5,8 +5,8 @@
 	import { useClerkContext } from 'svelte-clerk';
 	import {
 		getClerkErrorMessage,
-		getResolvedClerkNavigationPath,
-		getSafePostAuthRedirectHref
+		getSafePostAuthRedirectHref,
+		normalizeClerkNavigateTarget
 	} from '$lib/auth/clerk-helpers';
 	import AuthPageShell from '$lib/components/marketing/auth/AuthPageShell.svelte';
 	import { Button } from '$lib/components/ui/button';
@@ -48,7 +48,7 @@
 					return;
 				}
 
-				await goto(resolve(getResolvedClerkNavigationPath(decorateUrl(postAuthRedirectUrl))));
+				await goto(resolve(normalizeClerkNavigateTarget(decorateUrl(postAuthRedirectUrl))));
 			}
 		});
 	}
