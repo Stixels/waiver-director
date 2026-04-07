@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
 	import { useQuery } from 'convex-svelte';
@@ -30,29 +31,74 @@
 	interface Props {
 		collapsed?: boolean;
 		mode?: 'sidebar' | 'drawer';
+		onNavigate?: () => void;
 	}
 
-	let { collapsed = $bindable(false), mode = 'sidebar' }: Props = $props();
+	type AppRouteHref =
+		| '/app/[workspaceSlug]'
+		| (typeof appMainNavItems)[number]['href']
+		| (typeof appConfigNavItems)[number]['href'];
+
+	let { collapsed = $bindable(false), mode = 'sidebar', onNavigate }: Props = $props();
 
 	const workspacesQuery = useQuery(api.workspaces.listCurrentUserWorkspaces, {});
-	let activeWorkspaceId = $state<string | null>(null);
-
-	$effect(() => {
-		const ws = workspacesQuery.data;
-		if (!activeWorkspaceId && ws && ws.length > 0) {
-			activeWorkspaceId = ws[0].workspaceId;
+	const workspaces = $derived(workspacesQuery.data ?? []);
+	const currentWorkspaceSlug = $derived(page.params.workspaceSlug ?? null);
+	const activeWorkspace = $derived.by(() => {
+		if (currentWorkspaceSlug) {
+			const matchingWorkspace = workspaces.find(
+				(workspace) => workspace.slug === currentWorkspaceSlug
+			);
+			if (matchingWorkspace) {
+				return matchingWorkspace;
+			}
 		}
+
+		return workspaces[0] ?? null;
+	});
+	const activeWorkspaceSlug = $derived(activeWorkspace?.slug ?? null);
+	const currentPath = $derived(page.url.pathname);
+	const currentWorkspaceSubpath = $derived.by(() => {
+		const match = currentPath.match(/^\/app\/[^/]+(\/.*)?$/);
+		return match?.[1] ?? '';
 	});
 
-	const activeWorkspace = $derived(
-		workspacesQuery.data?.find((w) => w.workspaceId === activeWorkspaceId) ?? null
-	);
-	const workspaces = $derived(workspacesQuery.data ?? []);
-	const currentPath = $derived(page.url.pathname);
+	$effect(() => {
+		if (typeof window === 'undefined') return;
+		if (workspacesQuery.isLoading || !activeWorkspaceSlug) return;
+		if (currentWorkspaceSlug === activeWorkspaceSlug) return;
+
+		void goto(resolve(workspacePathnameFor(activeWorkspaceSlug)), {
+			replaceState: true,
+			noScroll: true,
+			keepFocus: true
+		});
+	});
 	const isCollapsed = $derived(collapsed && mode === 'sidebar');
 
-	function isActive(href: string): boolean {
-		return href === '/app' ? currentPath === '/app' : currentPath.startsWith(href);
+	function appPathname(href: AppRouteHref): '/app' | `/app/${string}` {
+		if (!activeWorkspaceSlug) {
+			return '/app';
+		}
+
+		return routePathnameFor(href, activeWorkspaceSlug);
+	}
+
+	function routePathnameFor(href: AppRouteHref, workspaceSlug: string): `/app/${string}` {
+		return href.replace('[workspaceSlug]', workspaceSlug) as `/app/${string}`;
+	}
+
+	function workspacePathnameFor(workspaceSlug: string): `/app/${string}` {
+		return `/app/${workspaceSlug}${currentWorkspaceSubpath}` as `/app/${string}`;
+	}
+
+	function isActive(href: AppRouteHref): boolean {
+		if (!activeWorkspaceSlug) return false;
+
+		const resolvedHref = resolve(appPathname(href));
+		return href === '/app/[workspaceSlug]'
+			? currentPath === resolvedHref
+			: currentPath.startsWith(resolvedHref);
 	}
 
 	function getInitials(name: string): string {
@@ -66,6 +112,20 @@
 	function toggleThemeMode(): void {
 		setMode(themeMode.current === 'dark' ? 'light' : 'dark');
 	}
+
+	function handleNavigation(): void {
+		onNavigate?.();
+	}
+
+	async function selectWorkspace(workspaceSlug: string): Promise<void> {
+		handleNavigation();
+		if (workspaceSlug === activeWorkspaceSlug) return;
+
+		await goto(resolve(workspacePathnameFor(workspaceSlug)), {
+			noScroll: true,
+			keepFocus: true
+		});
+	}
 </script>
 
 <div
@@ -75,7 +135,8 @@
 	<!-- ─── Header ─── -->
 	<div class="sidebar-header flex h-14 shrink-0 items-center border-b border-sidebar-border px-4">
 		<a
-			href={resolve('/app')}
+			href={resolve(appPathname('/app/[workspaceSlug]'))}
+			onclick={handleNavigation}
 			aria-label="Waiver Director dashboard"
 			class="sidebar-brand-link flex w-full min-w-0 items-center gap-2.5 no-underline"
 		>
@@ -148,7 +209,7 @@
 						</DropdownMenuItem>
 					{:else}
 						{#each workspaces as ws (ws.workspaceId)}
-							<DropdownMenuItem onclick={() => (activeWorkspaceId = ws.workspaceId)}>
+							<DropdownMenuItem onclick={() => void selectWorkspace(ws.slug)}>
 								<div class="flex w-full items-center gap-2.5">
 									<div
 										class="flex h-5 w-5 shrink-0 items-center justify-center rounded text-[9px] font-bold"
@@ -161,7 +222,7 @@
 										<div class="truncate text-[12px] font-medium">{ws.name}</div>
 										<div class="text-[10px] text-muted-foreground capitalize">{ws.role}</div>
 									</div>
-									{#if ws.workspaceId === activeWorkspaceId}
+									{#if ws.slug === activeWorkspaceSlug}
 										<div
 											class="h-1.5 w-1.5 shrink-0 rounded-full bg-primary"
 											aria-label="Active workspace"
@@ -174,7 +235,11 @@
 				</DropdownMenuGroup>
 				<DropdownMenuSeparator />
 				<DropdownMenuItem>
-					<a href={resolve('/workspaces/new')} class="flex w-full items-center gap-2 no-underline">
+					<a
+						href={resolve('/workspaces/new')}
+						class="flex w-full items-center gap-2 no-underline"
+						onclick={handleNavigation}
+					>
 						<PlusIcon class="size-3.5" aria-hidden="true" />
 						Create workspace
 					</a>
@@ -191,12 +256,13 @@
 				{@const active = isActive(item.href)}
 				{@const NavIcon = item.icon}
 				<a
-					href={resolve(item.href)}
+					href={resolve(appPathname(item.href))}
 					class="nav-item group flex items-center gap-3 rounded-lg px-2.5 py-2 no-underline transition-colors"
 					class:is-active={active}
 					title={isCollapsed ? item.label : undefined}
 					aria-current={active ? 'page' : undefined}
 					aria-label={isCollapsed ? item.label : undefined}
+					onclick={handleNavigation}
 				>
 					<NavIcon
 						class="size-[17px] shrink-0 transition-colors {active
@@ -229,12 +295,13 @@
 				{@const active = isActive(item.href)}
 				{@const NavIcon = item.icon}
 				<a
-					href={resolve(item.href)}
+					href={resolve(appPathname(item.href))}
 					class="nav-item group flex items-center gap-3 rounded-lg px-2.5 py-2 no-underline transition-colors"
 					class:is-active={active}
 					title={isCollapsed ? item.label : undefined}
 					aria-current={active ? 'page' : undefined}
 					aria-label={isCollapsed ? item.label : undefined}
+					onclick={handleNavigation}
 				>
 					<NavIcon
 						class="size-[17px] shrink-0 transition-colors {active
@@ -326,7 +393,11 @@
 				</DropdownMenuItem>
 				<DropdownMenuSeparator />
 				<DropdownMenuItem>
-					<a href={resolve('/sign-in')} class="flex w-full items-center gap-2 no-underline">
+					<a
+						href={resolve('/sign-in')}
+						class="flex w-full items-center gap-2 no-underline"
+						onclick={handleNavigation}
+					>
 						<LogOutIcon class="size-3.5 shrink-0" aria-hidden="true" />
 						Sign out
 					</a>

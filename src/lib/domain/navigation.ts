@@ -11,31 +11,31 @@ import PlugZapIcon from '@lucide/svelte/icons/plug-zap';
 export const appMainNavItems = [
 	{
 		label: 'Dashboard',
-		href: '/app',
+		href: '/app/[workspaceSlug]',
 		icon: LayoutDashboardIcon,
 		description: 'Operational overview and live waiver status.'
 	},
 	{
 		label: 'Bookings',
-		href: '/app/bookings',
+		href: '/app/[workspaceSlug]/bookings',
 		icon: CalendarCheckIcon,
 		description: 'Provider-synced and manual session groups.'
 	},
 	{
 		label: 'Waivers',
-		href: '/app/waivers',
+		href: '/app/[workspaceSlug]/waivers',
 		icon: ScrollTextIcon,
 		description: 'Submissions, signatures, and signing campaigns.'
 	},
 	{
 		label: 'Templates',
-		href: '/app/templates',
+		href: '/app/[workspaceSlug]/templates',
 		icon: LayersIcon,
 		description: 'Reusable waiver template builder.'
 	},
 	{
 		label: 'Email follow-ups',
-		href: '/app/emails',
+		href: '/app/[workspaceSlug]/emails',
 		icon: MailIcon,
 		description: 'Reminder rules, queues, and follow-up sequences.'
 	}
@@ -48,7 +48,7 @@ export const appMainNavItems = [
 export const appConfigNavItems = [
 	{
 		label: 'Integrations',
-		href: '/app/integrations',
+		href: '/app/[workspaceSlug]/integrations',
 		icon: PlugZapIcon,
 		description: 'Booking providers and email service connections.'
 	}

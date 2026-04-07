@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
+	import { page } from '$app/state';
 	import AppSidebar from '$lib/components/app/AppSidebar.svelte';
 	import {
 		Sheet,
@@ -18,6 +19,10 @@
 
 	const DESKTOP_BREAKPOINT_QUERY = '(min-width: 1024px)';
 
+	function closeMobileNav(): void {
+		mobileNavOpen = false;
+	}
+
 	onMount(() => {
 		const mql = window.matchMedia(DESKTOP_BREAKPOINT_QUERY);
 		const sync = () => {
@@ -29,7 +34,6 @@
 </script>
 
 <div class="app-shell flex h-screen overflow-hidden bg-background">
-	<!-- Desktop sidebar -->
 	<aside
 		class="app-sidebar hidden lg:flex lg:shrink-0 lg:flex-col"
 		class:is-collapsed={sidebarCollapsed}
@@ -38,9 +42,7 @@
 		<AppSidebar bind:collapsed={sidebarCollapsed} mode="sidebar" />
 	</aside>
 
-	<!-- Right pane: mobile topbar + page content -->
 	<div class="flex min-w-0 flex-1 flex-col overflow-hidden">
-		<!-- Mobile top bar -->
 		<header
 			class="app-topbar flex h-14 shrink-0 items-center gap-3 border-b border-border bg-background px-4 lg:hidden"
 		>
@@ -56,7 +58,8 @@
 			</Button>
 
 			<a
-				href={resolve('/app')}
+				href={resolve(`/app/${page.params.workspaceSlug}` as `/app/${string}`)}
+				onclick={closeMobileNav}
 				aria-label="Waiver Director dashboard"
 				class="flex min-w-0 items-center gap-2 no-underline"
 			>
@@ -76,16 +79,14 @@
 			</a>
 		</header>
 
-		<!-- Mobile nav sheet -->
 		<Sheet bind:open={mobileNavOpen}>
 			<SheetContent side="left" class="p-0">
 				<SheetTitle class="sr-only">Navigation</SheetTitle>
 				<SheetDescription class="sr-only">App navigation and workspace switcher</SheetDescription>
-				<AppSidebar mode="drawer" />
+				<AppSidebar mode="drawer" onNavigate={closeMobileNav} />
 			</SheetContent>
 		</Sheet>
 
-		<!-- Scrollable page content -->
 		<main class="flex-1 overflow-y-auto">
 			{@render children()}
 		</main>
