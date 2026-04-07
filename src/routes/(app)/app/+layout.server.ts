@@ -1,5 +1,5 @@
 import { redirect } from '@sveltejs/kit';
-import { api } from '../../../convex/_generated/api';
+import { loadCurrentUserWorkspaces, requireCurrentAppUser } from '$lib/server/auth';
 import type { LayoutServerLoad } from './$types';
 
 export const load: LayoutServerLoad = async ({ locals, url }) => {
@@ -11,14 +11,15 @@ export const load: LayoutServerLoad = async ({ locals, url }) => {
 		throw redirect(303, `/sign-in?redirectTo=${encodeURIComponent(next)}`);
 	}
 
-	let currentUser = await locals.convex.query(api.users.currentUser, {});
+	const currentUser = await requireCurrentAppUser(locals);
+	const workspaces = await loadCurrentUserWorkspaces(locals);
 
-	if (!currentUser) {
-		await locals.convex.mutation(api.users.ensureCurrentUser, {});
-		currentUser = await locals.convex.query(api.users.currentUser, {});
+	if (workspaces.length === 0 && url.pathname !== '/app/workspaces/new') {
+		throw redirect(303, '/app/workspaces/new');
 	}
 
 	return {
-		currentUser
+		currentUser,
+		workspaces
 	};
 };
