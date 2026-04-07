@@ -1,3 +1,6 @@
+import { resolve } from '$app/paths';
+import type { Pathname } from '$app/types';
+
 type ClerkErrorLike = {
 	errors?: Array<{
 		longMessage?: string;
@@ -22,4 +25,28 @@ export function getClerkErrorMessage(error: unknown, fallback: string): string {
 	}
 
 	return fallback;
+}
+
+function isAppPathname(path: string): path is Pathname {
+	return path.startsWith('/') && !path.startsWith('//');
+}
+
+export function getSafePostAuthRedirectHref(
+	redirectTo: string | null | undefined,
+	fallback: string = '/app'
+) {
+	const safePath = !redirectTo || !isAppPathname(redirectTo) ? fallback : redirectTo;
+	const url = new URL(safePath, 'http://waiver-director.local');
+	return `${resolve(url.pathname as Pathname)}${url.search}${url.hash}`;
+}
+
+export function getResolvedClerkNavigationPath(decoratedUrl: string): Pathname {
+	const appRoot = resolve('/');
+	const target = new URL(decoratedUrl, window.location.origin);
+	const appPath =
+		appRoot !== '/' && target.pathname.startsWith(appRoot)
+			? target.pathname.slice(appRoot.length) || '/'
+			: target.pathname;
+
+	return `${appPath}${target.search}${target.hash}` as Pathname;
 }

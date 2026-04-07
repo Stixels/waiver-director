@@ -9,7 +9,7 @@
 	const currentUser = useQuery(api.users.currentUser, () => (clerk.auth.userId ? {} : 'skip'));
 
 	let syncedSessionId = $state<string | null>(null);
-	let syncInFlight = $state(false);
+	let syncInFlight = false;
 
 	$effect(() => {
 		if (!browser || convex.disabled) {

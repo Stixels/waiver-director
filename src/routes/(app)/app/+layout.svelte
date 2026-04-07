@@ -7,6 +7,7 @@
 	import ConvexUserSync from '$lib/components/auth/ConvexUserSync.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { publicEnv } from '$lib/config/public';
+	import { toast } from 'svelte-sonner';
 	import { useClerkContext } from 'svelte-clerk';
 
 	setupConvex(publicEnv.convexUrl);
@@ -22,6 +23,9 @@
 			await clerk.clerk.signOut({
 				redirectUrl: resolve('/')
 			});
+		} catch (error) {
+			console.error('[auth/sign-out] failed', error);
+			toast.error('Unable to sign out right now. Please try again.');
 		} finally {
 			isSigningOut = false;
 		}

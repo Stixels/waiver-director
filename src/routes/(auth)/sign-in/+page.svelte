@@ -1,9 +1,13 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import type { Pathname } from '$app/types';
+	import { page } from '$app/state';
 	import { useClerkContext } from 'svelte-clerk';
-	import { getClerkErrorMessage } from '$lib/auth/clerk-helpers';
+	import {
+		getClerkErrorMessage,
+		getResolvedClerkNavigationPath,
+		getSafePostAuthRedirectHref
+	} from '$lib/auth/clerk-helpers';
 	import AuthPageShell from '$lib/components/marketing/auth/AuthPageShell.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
@@ -39,7 +43,8 @@
 	let secondFactorEmailAddressId = $state<string | null>(null);
 	let secondFactorPhoneNumberId = $state<string | null>(null);
 	let backupCodeAvailable = $state(false);
-	const dashboardUrl = resolve('/app');
+	const redirectTo = $derived(page.url.searchParams.get('redirectTo'));
+	const postAuthRedirectUrl = $derived(getSafePostAuthRedirectHref(redirectTo));
 
 	function getSignInResource() {
 		return clerk.client?.signIn ?? null;
@@ -154,17 +159,14 @@
 					return;
 				}
 
-				const target = new URL(decorateUrl(dashboardUrl), window.location.origin);
-				await goto(
-					resolve(`${target.pathname}${target.search}${target.hash}` as unknown as Pathname)
-				);
+				await goto(resolve(getResolvedClerkNavigationPath(decorateUrl(postAuthRedirectUrl))));
 			}
 		});
 	}
 
 	async function handleGoogleSignIn() {
 		if (clerk.auth.userId) {
-			await goto(dashboardUrl);
+			window.location.assign(postAuthRedirectUrl);
 			return;
 		}
 
@@ -181,8 +183,8 @@
 		try {
 			await signIn.authenticateWithRedirect({
 				strategy: 'oauth_google',
-				redirectUrl: '/sso-callback',
-				redirectUrlComplete: dashboardUrl
+				redirectUrl: resolve('/sso-callback'),
+				redirectUrlComplete: postAuthRedirectUrl
 			});
 		} catch (error) {
 			submitError = getClerkErrorMessage(error, 'Unable to start Google sign-in right now.');

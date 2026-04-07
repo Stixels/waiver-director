@@ -32,11 +32,20 @@ function buildUserFields(identity: {
 	preferredUsername?: string;
 }) {
 	const displayName = getDisplayName(identity);
+	const primaryEmail = identity.email?.trim() || undefined;
+	const imageUrl = identity.pictureUrl?.trim() || undefined;
 
 	return {
-		...(displayName ? { displayName } : {}),
-		...(identity.email ? { primaryEmail: identity.email } : {}),
-		...(identity.pictureUrl ? { imageUrl: identity.pictureUrl } : {})
+		insertPayload: {
+			...(displayName ? { displayName } : {}),
+			...(primaryEmail ? { primaryEmail } : {}),
+			...(imageUrl ? { imageUrl } : {})
+		},
+		updatePayload: {
+			displayName: displayName ?? undefined,
+			primaryEmail,
+			imageUrl
+		}
 	};
 }
 
@@ -45,12 +54,22 @@ function buildAuthIdentityFields(identity: {
 	email?: string;
 	emailVerified?: boolean;
 }) {
+	const email = identity.email?.trim() || undefined;
+
 	return {
-		tokenIdentifier: identity.tokenIdentifier,
-		...(identity.email ? { email: identity.email } : {}),
-		...(typeof identity.emailVerified === 'boolean'
-			? { emailVerified: identity.emailVerified }
-			: {})
+		insertPayload: {
+			tokenIdentifier: identity.tokenIdentifier,
+			...(email ? { email } : {}),
+			...(typeof identity.emailVerified === 'boolean'
+				? { emailVerified: identity.emailVerified }
+				: {})
+		},
+		updatePayload: {
+			tokenIdentifier: identity.tokenIdentifier,
+			email,
+			emailVerified:
+				typeof identity.emailVerified === 'boolean' ? identity.emailVerified : undefined
+		}
 	};
 }
 
@@ -83,7 +102,7 @@ export const currentUser = query({
 			return null;
 		}
 
-		const user = await ctx.db.get(authIdentity.userId);
+		const user = await ctx.db.get('users', authIdentity.userId);
 		if (!user) {
 			reportDanglingAuthIdentity({
 				userId: authIdentity.userId,
@@ -125,18 +144,18 @@ export const ensureCurrentUser = mutation({
 		const authIdentityFields = buildAuthIdentityFields(identity);
 
 		if (existingAuthIdentity) {
-			const existingUser = await ctx.db.get(existingAuthIdentity.userId);
+			const existingUser = await ctx.db.get('users', existingAuthIdentity.userId);
 			const userId = existingUser
 				? existingAuthIdentity.userId
-				: await ctx.db.insert('users', userFields);
+				: await ctx.db.insert('users', userFields.insertPayload);
 
-			await ctx.db.patch(existingAuthIdentity._id, {
+			await ctx.db.patch('auth_identities', existingAuthIdentity._id, {
 				userId,
-				...authIdentityFields
+				...authIdentityFields.updatePayload
 			});
 
 			if (existingUser) {
-				await ctx.db.patch(userId, userFields);
+				await ctx.db.patch('users', userId, userFields.updatePayload);
 			}
 
 			return {
@@ -145,13 +164,13 @@ export const ensureCurrentUser = mutation({
 			};
 		}
 
-		const userId = await ctx.db.insert('users', userFields);
+		const userId = await ctx.db.insert('users', userFields.insertPayload);
 
 		await ctx.db.insert('auth_identities', {
 			userId,
 			provider: 'clerk',
 			providerUserId: identity.subject,
-			...authIdentityFields
+			...authIdentityFields.insertPayload
 		});
 
 		return {

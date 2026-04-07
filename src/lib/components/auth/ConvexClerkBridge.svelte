@@ -87,6 +87,9 @@
 		}
 
 		lastRegisteredSessionId = sessionId;
+		cachedToken = null;
+		cachedTokenExpiresAtMs = null;
+		inflightTokenPromise = null;
 
 		// Set the Convex auth token for the current Clerk session
 		convexClient.setAuth(

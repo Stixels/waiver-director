@@ -1,11 +1,15 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import type { Pathname } from '$app/types';
+	import { page } from '$app/state';
 	import { ChartLine, FileText, Link2, Mail, ShieldCheck } from '@lucide/svelte';
 	import { useClerkContext } from 'svelte-clerk';
 
-	import { getClerkErrorMessage } from '$lib/auth/clerk-helpers';
+	import {
+		getClerkErrorMessage,
+		getResolvedClerkNavigationPath,
+		getSafePostAuthRedirectHref
+	} from '$lib/auth/clerk-helpers';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 
@@ -49,7 +53,8 @@
 	let submitMessage = $state<string | null>(null);
 	let submitError = $state<string | null>(null);
 	let isAwaitingVerification = $state(false);
-	const dashboardUrl = resolve('/app');
+	const redirectTo = $derived(page.url.searchParams.get('redirectTo'));
+	const postAuthRedirectUrl = $derived(getSafePostAuthRedirectHref(redirectTo));
 
 	const canSubmitEmailSignUp = $derived(Boolean(email.trim() && password && passwordConfirm));
 
@@ -69,17 +74,14 @@
 					return;
 				}
 
-				const target = new URL(decorateUrl(dashboardUrl), window.location.origin);
-				await goto(
-					resolve(`${target.pathname}${target.search}${target.hash}` as unknown as Pathname)
-				);
+				await goto(resolve(getResolvedClerkNavigationPath(decorateUrl(postAuthRedirectUrl))));
 			}
 		});
 	}
 
 	async function handleGoogleSignUp() {
 		if (clerk.auth.userId) {
-			await goto(dashboardUrl);
+			window.location.assign(postAuthRedirectUrl);
 			return;
 		}
 
@@ -96,8 +98,8 @@
 		try {
 			await signUp.authenticateWithRedirect({
 				strategy: 'oauth_google',
-				redirectUrl: '/sso-callback',
-				redirectUrlComplete: dashboardUrl
+				redirectUrl: resolve('/sso-callback'),
+				redirectUrlComplete: postAuthRedirectUrl
 			});
 		} catch (error) {
 			submitError = getClerkErrorMessage(error, 'Unable to start Google sign-up right now.');
