@@ -4,7 +4,6 @@
 	import { setupConvex } from 'convex-svelte';
 	import { appNavigation } from '$lib/domain/navigation';
 	import ConvexClerkBridge from '$lib/components/auth/ConvexClerkBridge.svelte';
-	import ConvexUserSync from '$lib/components/auth/ConvexUserSync.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { publicEnv } from '$lib/config/public';
 	import { toast } from 'svelte-sonner';
@@ -35,7 +34,6 @@
 <div class="p-6">
 	{#if browser}
 		<ConvexClerkBridge />
-		<ConvexUserSync />
 	{/if}
 	<header class="flex justify-between gap-4">
 		<div class="ml-auto flex items-end gap-2">
