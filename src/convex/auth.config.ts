@@ -1,4 +1,10 @@
+import type { AuthConfig } from 'convex/server';
+
 export default {
-	// Scaffold only. Clerk JWT provider wiring will replace this later.
-	providers: []
-};
+	providers: [
+		{
+			domain: process.env.CLERK_FRONTEND_API_URL!,
+			applicationID: 'convex'
+		}
+	]
+} satisfies AuthConfig;

@@ -1,7 +1,12 @@
 <script lang="ts">
+	import type { SignUpResource } from '@clerk/shared/types';
+	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
+	import type { Pathname } from '$app/types';
 	import { ChartLine, FileText, Link2, Mail, ShieldCheck } from '@lucide/svelte';
+	import { useClerkContext } from 'svelte-clerk';
 
+	import { getClerkErrorMessage, splitFullName } from '$lib/auth/clerk-helpers';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 
@@ -9,6 +14,8 @@
 		'h-14 rounded-xl border-(--m-border-strong) bg-(--m-elevated) px-4 text-sm text-foreground shadow-none transition-[border-color,box-shadow] placeholder:text-(--m-text-3) focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/25 sm:px-5 md:text-sm';
 	const submitButtonClass =
 		'btn-mkt-accent h-14 w-full rounded-xl text-base font-semibold shadow-none';
+	const googleButtonClass =
+		'h-14 w-full rounded-xl border-(--m-border-strong) bg-(--m-elevated) text-base font-semibold shadow-none transition-colors hover:bg-(--m-card)';
 
 	const features = [
 		{
@@ -33,30 +40,86 @@
 		}
 	];
 
+	const clerk = useClerkContext();
+
+	let fullName = $state('');
+	let email = $state('');
+	let password = $state('');
+	let passwordConfirm = $state('');
+	let verificationCode = $state('');
 	let isSubmitting = $state(false);
 	let submitMessage = $state<string | null>(null);
 	let submitError = $state<string | null>(null);
+	let isAwaitingVerification = $state(false);
+	const dashboardUrl = resolve('/app');
 
-	async function showSignUpNotReady(formValues: { name: string; email: string }) {
-		submitMessage = `Thanks, ${formValues.name || formValues.email}. Sign-up is coming soon.`;
+	const canSubmitEmailSignUp = $derived(
+		Boolean(email.trim() && password && passwordConfirm)
+	);
+
+	function getSignUpResource(): SignUpResource | null {
+		return clerk.client?.signUp ?? null;
+	}
+
+	async function activateCreatedSession(sessionId: string | null) {
+		if (!sessionId || !clerk.clerk) {
+			throw new Error('Your account was created, but no session was returned.');
+		}
+
+		await clerk.clerk.setActive({
+			session: sessionId,
+			navigate: async ({ session, decorateUrl }) => {
+				if (session?.currentTask) {
+					return;
+				}
+
+				const target = new URL(decorateUrl(dashboardUrl), window.location.origin);
+				await goto(
+					resolve(`${target.pathname}${target.search}${target.hash}` as unknown as Pathname)
+				);
+			}
+		});
+	}
+
+	async function handleGoogleSignUp() {
+		if (clerk.auth.userId) {
+			await goto(dashboardUrl);
+			return;
+		}
+
+		const signUp = getSignUpResource();
+		if (!clerk.isLoaded || !signUp) {
+			submitError = 'Authentication is still loading. Please try again.';
+			return;
+		}
+
+		isSubmitting = true;
+		submitError = null;
+		submitMessage = null;
+
+		try {
+			await signUp.authenticateWithRedirect({
+				strategy: 'oauth_google',
+				redirectUrl: '/sso-callback',
+				redirectUrlComplete: dashboardUrl
+			});
+		} catch (error) {
+			submitError = getClerkErrorMessage(error, 'Unable to start Google sign-up right now.');
+		} finally {
+			isSubmitting = false;
+		}
 	}
 
 	async function handleSubmit(event: SubmitEvent) {
 		event.preventDefault();
 
-		const form = event.currentTarget;
-		if (!(form instanceof HTMLFormElement)) {
-			submitError = 'Unable to submit right now. Please try again.';
+		const signUp = getSignUpResource();
+		if (!clerk.isLoaded || !signUp) {
+			submitError = 'Authentication is still loading. Please try again.';
 			return;
 		}
 
-		const formData = new FormData(form);
-		const name = String(formData.get('name') ?? '').trim();
-		const email = String(formData.get('email') ?? '').trim();
-		const password = String(formData.get('password') ?? '').trim();
-		const passwordConfirm = String(formData.get('password_confirm') ?? '').trim();
-
-		if (!name || !email || !password || !passwordConfirm) {
+		if (!fullName.trim() || !email.trim() || !password || !passwordConfirm) {
 			submitError = 'Please complete all fields.';
 			submitMessage = null;
 			return;
@@ -68,17 +131,78 @@
 			return;
 		}
 
+		const { firstName, lastName } = splitFullName(fullName);
+		if (!firstName) {
+			submitError = 'Please enter your full name.';
+			submitMessage = null;
+			return;
+		}
+
 		isSubmitting = true;
 		submitError = null;
 		submitMessage = null;
 
 		try {
-			await showSignUpNotReady({ name, email });
-		} catch {
-			submitError = 'Sign-up is temporarily unavailable. Please try again.';
+			await signUp.create({
+				firstName,
+				lastName,
+				emailAddress: email.trim(),
+				password
+			});
+
+			await signUp.prepareEmailAddressVerification({
+				strategy: 'email_code'
+			});
+
+			isAwaitingVerification = true;
+			submitMessage = `We sent a verification code to ${email.trim()}.`;
+		} catch (error) {
+			submitError = getClerkErrorMessage(error, 'Unable to create your account right now.');
 		} finally {
 			isSubmitting = false;
 		}
+	}
+
+	async function handleVerificationSubmit(event: SubmitEvent) {
+		event.preventDefault();
+
+		const signUp = getSignUpResource();
+		if (!clerk.isLoaded || !signUp) {
+			submitError = 'Authentication is still loading. Please try again.';
+			return;
+		}
+
+		if (!verificationCode.trim()) {
+			submitError = 'Enter the verification code from your email.';
+			return;
+		}
+
+		isSubmitting = true;
+		submitError = null;
+
+		try {
+			const signUpAttempt = await signUp.attemptEmailAddressVerification({
+				code: verificationCode.trim()
+			});
+
+			if (signUpAttempt.status === 'complete') {
+				await activateCreatedSession(signUpAttempt.createdSessionId);
+				return;
+			}
+
+			submitError = 'Verification is not complete yet. Please check the code and try again.';
+		} catch (error) {
+			submitError = getClerkErrorMessage(error, 'Unable to verify your email right now.');
+		} finally {
+			isSubmitting = false;
+		}
+	}
+
+	function restartSignUp() {
+		isAwaitingVerification = false;
+		verificationCode = '';
+		submitError = null;
+		submitMessage = null;
 	}
 </script>
 
@@ -135,10 +259,11 @@
 						class="signup-panel__heading mb-3 font-black tracking-tight text-balance"
 						style="font-family: 'Bricolage Grotesque', sans-serif; font-size: clamp(1.5rem, 3.5vw, 2rem); letter-spacing: -0.03em; line-height: 1.15;"
 					>
-						Everything you need to run your escape room.
+						Everything you need to run your business.
 					</h2>
 					<p class="text-sm leading-relaxed text-muted-foreground sm:text-base">
-						Waivers, bookings, and follow-ups — managed in one place so you can focus on the game.
+						Waivers, bookings, and follow-ups — managed in one place so you can focus on what
+						matters.
 					</p>
 				</div>
 
@@ -188,85 +313,184 @@
 					</p>
 				</div>
 
-				<form class="space-y-4" onsubmit={handleSubmit}>
-					<Input
-						id="sign-up-name"
-						name="name"
-						type="text"
-						autocomplete="name"
-						placeholder="Full Name"
-						aria-label="Name"
-						class={inputClass}
-					/>
+				{#if isAwaitingVerification}
+					<form class="space-y-4" onsubmit={handleVerificationSubmit}>
+						<div class="rounded-xl border border-(--m-border-soft) bg-(--m-elevated) px-4 py-3">
+							<p class="text-sm font-medium">Check your email</p>
+							<p class="mt-1 text-sm text-muted-foreground">
+								Enter the verification code sent to {email.trim()} to finish creating your account.
+							</p>
+						</div>
 
-					<Input
-						id="sign-up-email"
-						name="email"
-						type="email"
-						autocomplete="email"
-						placeholder="Email"
-						aria-label="Email"
-						class={inputClass}
-					/>
-
-					<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
 						<Input
-							id="sign-up-password"
-							name="password"
-							type="password"
-							autocomplete="new-password"
-							placeholder="Password"
-							aria-label="Password"
-							class={`${inputClass} min-w-0`}
+							id="sign-up-verification-code"
+							name="code"
+							type="text"
+							inputmode="numeric"
+							autocomplete="one-time-code"
+							placeholder="Verification code"
+							aria-label="Verification code"
+							class={inputClass}
+							bind:value={verificationCode}
 						/>
-						<Input
-							id="sign-up-password-confirm"
-							name="password_confirm"
-							type="password"
-							autocomplete="new-password"
-							placeholder="Confirm password"
-							aria-label="Confirm password"
-							class={`${inputClass} min-w-0`}
-						/>
-					</div>
 
-					<div class="space-y-3 pt-1">
-						<Button type="submit" class={submitButtonClass} disabled={isSubmitting}>
-							{isSubmitting ? 'Creating account...' : 'Create account'}
-						</Button>
+						<div class="space-y-3 pt-1">
+							<Button type="submit" class={submitButtonClass} disabled={isSubmitting}>
+								{isSubmitting ? 'Verifying...' : 'Verify email'}
+							</Button>
 
-						<div aria-live="polite" aria-atomic="true">
+							<Button
+								type="button"
+								variant="outline"
+								class="h-14 w-full rounded-xl border-(--m-border-strong) text-base font-semibold shadow-none"
+								onclick={restartSignUp}
+							>
+								Use a different email
+							</Button>
+
 							{#if submitMessage}
 								<p class="text-center text-sm text-muted-foreground" role="status">
 									{submitMessage}
 								</p>
-							{:else if submitError}
+							{/if}
+
+							{#if submitError}
 								<p class="text-center text-sm text-destructive" role="status">{submitError}</p>
 							{/if}
-						</div>
-						<div class="relative py-2">
-							<div class="absolute inset-0 flex items-center" aria-hidden="true">
-								<div class="w-full border-t border-(--m-border-soft)"></div>
-							</div>
-							<div class="relative flex justify-center">
-								<span
-									class="bg-(--m-surface) px-3 text-xs font-medium text-muted-foreground sm:text-sm"
+
+							<p class="text-center text-sm text-muted-foreground">
+								Already have an account?
+								<a
+									href={resolve('/sign-in')}
+									class="font-semibold text-primary transition-[filter] hover:brightness-125"
 								>
-								</span>
-							</div>
+									Sign in
+								</a>
+							</p>
+						</div>
+					</form>
+				{:else}
+					<form class="space-y-4" onsubmit={handleSubmit}>
+						<Input
+							id="sign-up-name"
+							name="name"
+							type="text"
+							autocomplete="name"
+							placeholder="Full Name"
+							aria-label="Name"
+							class={inputClass}
+							bind:value={fullName}
+						/>
+
+						<Input
+							id="sign-up-email"
+							name="email"
+							type="email"
+							autocomplete="email"
+							placeholder="Email"
+							aria-label="Email"
+							required
+							class={inputClass}
+							bind:value={email}
+						/>
+
+						<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
+							<Input
+								id="sign-up-password"
+								name="password"
+								type="password"
+								autocomplete="new-password"
+								placeholder="Password"
+								aria-label="Password"
+								required
+								class={`${inputClass} min-w-0`}
+								bind:value={password}
+							/>
+							<Input
+								id="sign-up-password-confirm"
+								name="password_confirm"
+								type="password"
+								autocomplete="new-password"
+								placeholder="Confirm password"
+								aria-label="Confirm password"
+								required
+								class={`${inputClass} min-w-0`}
+								bind:value={passwordConfirm}
+							/>
 						</div>
 
-						<p class="text-center text-sm text-muted-foreground">
-							Already have an account?
-							<a
-								href={resolve('/sign-in')}
-								class="font-semibold text-primary transition-[filter] hover:brightness-125"
+						<div class="space-y-3 pt-1">
+							<Button
+								type="submit"
+								class={submitButtonClass}
+								disabled={isSubmitting || !canSubmitEmailSignUp}
 							>
-								Sign in
-							</a>
-						</p>
-					</div>
-				</form>
+								{isSubmitting ? 'Creating account...' : 'Create account'}
+							</Button>
+
+							<div class="relative py-2">
+								<div class="absolute inset-0 flex items-center" aria-hidden="true">
+									<div class="w-full border-t border-(--m-border-soft)"></div>
+								</div>
+								<div class="relative flex justify-center">
+									<span
+										class="bg-(--m-surface) px-3 text-xs font-medium text-muted-foreground sm:text-sm"
+									>
+										or continue with
+									</span>
+								</div>
+							</div>
+
+							<Button
+								type="button"
+								variant="outline"
+								class={`${googleButtonClass} cursor-pointer`}
+								disabled={isSubmitting}
+								onclick={handleGoogleSignUp}
+							>
+								<svg viewBox="0 0 24 24" aria-hidden="true" class="h-5 w-5">
+									<path
+										fill="#4285F4"
+										d="M21.6 12.227c0-.818-.073-1.604-.209-2.364H12v4.473h5.382a4.602 4.602 0 0 1-1.995 3.018v2.507h3.236c1.894-1.744 2.977-4.314 2.977-7.634Z"
+									/>
+									<path
+										fill="#34A853"
+										d="M12 22c2.7 0 4.964-.895 6.618-2.427l-3.236-2.507c-.895.6-2.041.954-3.382.954-2.597 0-4.796-1.754-5.582-4.11H3.073v2.586A9.997 9.997 0 0 0 12 22Z"
+									/>
+									<path
+										fill="#FBBC04"
+										d="M6.418 13.91A5.997 5.997 0 0 1 6.105 12c0-.663.114-1.304.313-1.91V7.504H3.073A9.997 9.997 0 0 0 2 12c0 1.61.386 3.135 1.073 4.496l3.345-2.586Z"
+									/>
+									<path
+										fill="#EA4335"
+										d="M12 5.98c1.468 0 2.786.505 3.823 1.496l2.868-2.868C16.959 2.997 14.695 2 12 2A9.997 9.997 0 0 0 3.073 7.504L6.418 10.09C7.204 7.734 9.403 5.98 12 5.98Z"
+									/>
+								</svg>
+								Continue with Google
+							</Button>
+
+							{#if submitMessage}
+								<p class="text-center text-sm text-muted-foreground" role="status">
+									{submitMessage}
+								</p>
+							{/if}
+
+							{#if submitError}
+								<p class="text-center text-sm text-destructive" role="status">{submitError}</p>
+							{/if}
+
+							<p class="text-center text-sm text-muted-foreground">
+								Already have an account?
+								<a
+									href={resolve('/sign-in')}
+									class="font-semibold text-primary transition-[filter] hover:brightness-125"
+								>
+									Sign in
+								</a>
+							</p>
+						</div>
+					</form>
+				{/if}
 			</div>
 		</div>
 	</div>
