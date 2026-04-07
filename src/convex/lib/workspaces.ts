@@ -4,10 +4,7 @@ import type { MutationCtx, QueryCtx } from '../_generated/server';
 type FunctionCtx = QueryCtx | MutationCtx;
 const WORKSPACE_MEMBERSHIPS_PER_USER_LIMIT = 25;
 
-export async function listWorkspaceMembershipsForUser(
-	ctx: FunctionCtx,
-	userId: Id<'users'>
-) {
+export async function listWorkspaceMembershipsForUser(ctx: FunctionCtx, userId: Id<'users'>) {
 	return await ctx.db
 		.query('workspace_memberships')
 		.withIndex('by_userId', (query) => query.eq('userId', userId))

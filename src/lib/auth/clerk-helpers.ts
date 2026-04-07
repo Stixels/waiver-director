@@ -25,10 +25,7 @@ export function getClerkErrorMessage(error: unknown, fallback: string): string {
 }
 
 export function splitFullName(fullName: string) {
-	const parts = fullName
-		.trim()
-		.split(/\s+/)
-		.filter(Boolean);
+	const parts = fullName.trim().split(/\s+/).filter(Boolean);
 
 	return {
 		firstName: parts[0] ?? '',

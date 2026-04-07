@@ -198,12 +198,7 @@
 					{isSubmitting ? 'Updating password...' : 'Update password'}
 				</Button>
 
-				<Button
-					type="button"
-					variant="outline"
-					class={backButtonClass}
-					onclick={restartResetFlow}
-				>
+				<Button type="button" variant="outline" class={backButtonClass} onclick={restartResetFlow}>
 					Use a different email
 				</Button>
 

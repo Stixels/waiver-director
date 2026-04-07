@@ -40,10 +40,8 @@
 			class="overflow-hidden rounded-xl border border-(--m-border-strong) bg-(--m-surface) sm:rounded-2xl"
 			style="box-shadow: 0 18px 40px oklch(0 0 0 / 42%);"
 		>
-			<div
-				class="border-b border-(--m-border-soft) bg-(--m-card) px-9 py-8 sm:px-12 sm:py-10"
-			>
-				<h1 class="auth-page__title mb-3 text-balance font-black tracking-tight sm:mb-4">
+			<div class="border-b border-(--m-border-soft) bg-(--m-card) px-9 py-8 sm:px-12 sm:py-10">
+				<h1 class="auth-page__title mb-3 font-black tracking-tight text-balance sm:mb-4">
 					{title}
 				</h1>
 				{#if description}

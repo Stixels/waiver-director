@@ -53,9 +53,7 @@
 	let isAwaitingVerification = $state(false);
 	const dashboardUrl = resolve('/app');
 
-	const canSubmitEmailSignUp = $derived(
-		Boolean(email.trim() && password && passwordConfirm)
-	);
+	const canSubmitEmailSignUp = $derived(Boolean(email.trim() && password && passwordConfirm));
 
 	function getSignUpResource(): SignUpResource | null {
 		return clerk.client?.signUp ?? null;

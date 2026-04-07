@@ -7,10 +7,7 @@
 
 <svelte:head>
 	<title>Completing sign in | Waiver Director</title>
-	<meta
-		name="description"
-		content="Completing your secure sign-in to Waiver Director."
-	/>
+	<meta name="description" content="Completing your secure sign-in to Waiver Director." />
 </svelte:head>
 
 <AuthPageShell
@@ -29,11 +26,17 @@
 
 	<div class="mt-4 text-center text-sm text-muted-foreground">
 		If nothing happens, return to
-		<a href={resolve('/sign-in')} class="font-semibold text-primary transition-[filter] hover:brightness-125">
+		<a
+			href={resolve('/sign-in')}
+			class="font-semibold text-primary transition-[filter] hover:brightness-125"
+		>
 			sign in
 		</a>
 		or
-		<a href={resolve('/sign-up')} class="font-semibold text-primary transition-[filter] hover:brightness-125">
+		<a
+			href={resolve('/sign-up')}
+			class="font-semibold text-primary transition-[filter] hover:brightness-125"
+		>
 			sign up
 		</a>.
 	</div>

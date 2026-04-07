@@ -1,4 +1,4 @@
-// import { dev } from '$app/environment'; 
+// import { dev } from '$app/environment';
 // $app/environment is a SvelteKit-provided module that gives you information about the current runtime environment
 import { withClerkHandler } from 'svelte-clerk/server';
 
