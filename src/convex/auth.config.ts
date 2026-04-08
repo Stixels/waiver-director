@@ -1,4 +1,16 @@
+import type { AuthConfig } from 'convex/server';
+
+const clerkFrontendApiUrl = process.env.CLERK_FRONTEND_API_URL;
+
+if (!clerkFrontendApiUrl) {
+	throw new Error('Missing CLERK_FRONTEND_API_URL required for Convex Clerk authentication.');
+}
+
 export default {
-	// Scaffold only. Clerk JWT provider wiring will replace this later.
-	providers: []
-};
+	providers: [
+		{
+			domain: clerkFrontendApiUrl,
+			applicationID: 'convex'
+		}
+	]
+} satisfies AuthConfig;

@@ -3,6 +3,8 @@
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
 	import { useQuery } from 'convex-svelte';
+	import { useClerkContext } from 'svelte-clerk';
+	import { toast } from 'svelte-sonner';
 	import { api } from '$convex/_generated/api';
 	import { appMainNavItems, appConfigNavItems } from '$lib/domain/navigation';
 	import {
@@ -41,6 +43,7 @@
 
 	let { collapsed = $bindable(false), mode = 'sidebar', onNavigate }: Props = $props();
 
+	const clerk = useClerkContext();
 	const workspacesQuery = useQuery(api.workspaces.listCurrentUserWorkspaces, {});
 	const workspaces = $derived(workspacesQuery.data ?? []);
 	const currentWorkspaceSlug = $derived(page.params.workspaceSlug ?? null);
@@ -58,6 +61,7 @@
 	});
 	const activeWorkspaceSlug = $derived(activeWorkspace?.slug ?? null);
 	const currentPath = $derived(page.url.pathname);
+	let isSigningOut = $state(false);
 	const currentWorkspaceSubpath = $derived.by(() => {
 		const match = currentPath.match(/^\/app\/[^/]+(\/.*)?$/);
 		return match?.[1] ?? '';
@@ -125,6 +129,24 @@
 			noScroll: true,
 			keepFocus: true
 		});
+	}
+
+	async function handleSignOut(): Promise<void> {
+		if (!clerk.clerk || isSigningOut) return;
+
+		handleNavigation();
+		isSigningOut = true;
+
+		try {
+			await clerk.clerk.signOut({
+				redirectUrl: resolve('/')
+			});
+		} catch (error) {
+			console.error('[auth/sign-out] failed', error);
+			toast.error('Unable to sign out right now. Please try again.');
+		} finally {
+			isSigningOut = false;
+		}
 	}
 </script>
 
@@ -236,7 +258,7 @@
 				<DropdownMenuSeparator />
 				<DropdownMenuItem>
 					<a
-						href={resolve('/workspaces/new')}
+						href={resolve('/app/workspaces/new')}
 						class="flex w-full items-center gap-2 no-underline"
 						onclick={handleNavigation}
 					>
@@ -392,15 +414,9 @@
 					{/if}
 				</DropdownMenuItem>
 				<DropdownMenuSeparator />
-				<DropdownMenuItem>
-					<a
-						href={resolve('/sign-in')}
-						class="flex w-full items-center gap-2 no-underline"
-						onclick={handleNavigation}
-					>
-						<LogOutIcon class="size-3.5 shrink-0" aria-hidden="true" />
-						Sign out
-					</a>
+				<DropdownMenuItem onclick={() => void handleSignOut()} disabled={isSigningOut}>
+					<LogOutIcon class="size-3.5 shrink-0" aria-hidden="true" />
+					<span>{isSigningOut ? 'Signing out…' : 'Sign out'}</span>
 				</DropdownMenuItem>
 			</DropdownMenuContent>
 		</DropdownMenu>

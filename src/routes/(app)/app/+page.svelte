@@ -29,7 +29,9 @@
 			You do not have a workspace yet. Create one to access the app.
 		</p>
 		<p class="mt-4">
-			<a href={resolve('/workspaces/new')} class="underline underline-offset-4">Create workspace</a>
+			<a href={resolve('/app/workspaces/new')} class="underline underline-offset-4">
+				Create workspace
+			</a>
 		</p>
 	{/if}
 </div>
