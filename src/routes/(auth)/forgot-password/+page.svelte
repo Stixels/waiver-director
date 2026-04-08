@@ -1,11 +1,10 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { useClerkContext } from 'svelte-clerk';
 	import {
+		redirectToClerkDecoratedUrl,
 		getClerkErrorMessage,
-		getSafePostAuthRedirectHref,
-		normalizeClerkNavigateTarget
+		getSafePostAuthRedirectHref
 	} from '$lib/auth/clerk-helpers';
 	import AuthPageShell from '$lib/components/marketing/auth/AuthPageShell.svelte';
 	import { Button } from '$lib/components/ui/button';
@@ -47,8 +46,7 @@
 					return;
 				}
 
-				// eslint-disable-next-line svelte/no-navigation-without-resolve -- Clerk decorates a base-aware URL; this helper strips the base and preserves search/hash for SPA navigation.
-				await goto(normalizeClerkNavigateTarget(decorateUrl(postAuthRedirectUrl)));
+				redirectToClerkDecoratedUrl(decorateUrl(postAuthRedirectUrl));
 			}
 		});
 	}

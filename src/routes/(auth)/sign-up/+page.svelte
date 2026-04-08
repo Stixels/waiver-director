@@ -1,14 +1,13 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { ChartLine, FileText, Link2, Mail, ShieldCheck } from '@lucide/svelte';
 	import { useClerkContext } from 'svelte-clerk';
 
 	import {
+		redirectToClerkDecoratedUrl,
 		getClerkErrorMessage,
-		getSafePostAuthRedirectHref,
-		normalizeClerkNavigateTarget
+		getSafePostAuthRedirectHref
 	} from '$lib/auth/clerk-helpers';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
@@ -76,15 +75,14 @@
 					return;
 				}
 
-				// eslint-disable-next-line svelte/no-navigation-without-resolve -- Clerk decorates a base-aware URL; this helper strips the base and preserves search/hash for SPA navigation.
-				await goto(normalizeClerkNavigateTarget(decorateUrl(postAuthRedirectUrl)));
+				redirectToClerkDecoratedUrl(decorateUrl(postAuthRedirectUrl));
 			}
 		});
 	}
 
 	async function handleGoogleSignUp() {
 		if (clerk.auth.userId) {
-			window.location.assign(postAuthRedirectUrl);
+			window.location.replace(postAuthRedirectUrl);
 			return;
 		}
 
