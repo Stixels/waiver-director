@@ -1,7 +1,64 @@
 import { v } from 'convex/values';
-import { query } from './_generated/server';
+import { mutation, query } from './_generated/server';
 import { getCurrentUser } from './lib/auth';
 import { getWorkspaceMembership, listWorkspaceMembershipsForUser } from './lib/workspaces';
+
+const WORKSPACE_SLUG_REGEX = /^[a-z0-9](?:[a-z0-9-]{0,46}[a-z0-9])$/;
+
+export const createWorkspace = mutation({
+	args: {
+		name: v.string(),
+		slug: v.string()
+	},
+	returns: v.object({
+		workspaceId: v.id('workspaces'),
+		slug: v.string()
+	}),
+	handler: async (ctx, args) => {
+		const user = await getCurrentUser(ctx);
+		if (!user) throw new Error('Not authenticated');
+
+		const name = args.name.trim();
+		const slug = args.slug.trim().toLowerCase();
+
+		if (name.length < 2 || name.length > 80) {
+			throw new Error('Workspace name must be between 2 and 80 characters.');
+		}
+		if (!WORKSPACE_SLUG_REGEX.test(slug)) {
+			throw new Error(
+				'Workspace slug must be 2-48 characters: lowercase letters, numbers, and hyphens only. It must start and end with a letter or number.'
+			);
+		}
+
+		const existing = await ctx.db
+			.query('workspaces')
+			.withIndex('by_slug', (q) => q.eq('slug', slug))
+			.unique();
+		if (existing) throw new Error('This workspace slug is already taken. Please choose another.');
+
+		const workspaceId = await ctx.db.insert('workspaces', {
+			name,
+			slug,
+			status: 'active',
+			createdByUserId: user._id
+		});
+
+		await ctx.db.insert('workspace_memberships', {
+			workspaceId,
+			userId: user._id,
+			role: 'owner',
+			status: 'active'
+		});
+
+		if (!user.defaultWorkspaceId) {
+			await ctx.db.patch('users', user._id, {
+				defaultWorkspaceId: workspaceId
+			});
+		}
+
+		return { workspaceId, slug };
+	}
+});
 
 export const listCurrentUserWorkspaces = query({
 	args: {},

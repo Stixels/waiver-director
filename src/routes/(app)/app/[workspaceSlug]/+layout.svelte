@@ -65,17 +65,12 @@
 			>
 				<div
 					class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[11px] font-black"
-					style="background: var(--primary); color: var(--primary-foreground); font-family: 'Bricolage Grotesque', sans-serif;"
+					style="background: var(--primary); color: var(--primary-foreground);"
 					aria-hidden="true"
 				>
 					WD
 				</div>
-				<span
-					class="truncate text-[13px] font-semibold tracking-tight"
-					style="font-family: 'Bricolage Grotesque', sans-serif;"
-				>
-					Waiver Director
-				</span>
+				<span class="truncate text-[13px] font-semibold tracking-tight"> Waiver Director </span>
 			</a>
 		</header>
 

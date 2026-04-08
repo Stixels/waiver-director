@@ -7,6 +7,8 @@
 	import { toast } from 'svelte-sonner';
 	import { api } from '$convex/_generated/api';
 	import { appMainNavItems, appConfigNavItems } from '$lib/domain/navigation';
+	import CreateWorkspaceForm from '$lib/components/workspaces/CreateWorkspaceForm.svelte';
+	import { Skeleton } from '$lib/components/ui/skeleton';
 	import {
 		DropdownMenu,
 		DropdownMenuTrigger,
@@ -16,6 +18,13 @@
 		DropdownMenuGroup,
 		DropdownMenuGroupHeading
 	} from '$lib/components/ui/dropdown-menu/index.js';
+	import {
+		Dialog,
+		DialogContent,
+		DialogDescription,
+		DialogHeader,
+		DialogTitle
+	} from '$lib/components/ui/dialog/index.js';
 	import { mode as themeMode, setMode } from 'mode-watcher';
 
 	import ChevronsUpDownIcon from '@lucide/svelte/icons/chevrons-up-down';
@@ -44,13 +53,24 @@
 	let { collapsed = $bindable(false), mode = 'sidebar', onNavigate }: Props = $props();
 
 	const clerk = useClerkContext();
-	const workspacesQuery = useQuery(api.workspaces.listCurrentUserWorkspaces, {});
-	const workspaces = $derived(workspacesQuery.data ?? []);
+	const initialWorkspaces = $derived(page.data.workspaces ?? []);
+	const workspacesQuery = useQuery(api.workspaces.listCurrentUserWorkspaces, {}, () => ({
+		initialData: initialWorkspaces
+	}));
+	const workspaces = $derived.by(() => {
+		const liveWorkspaces = workspacesQuery.data;
+
+		if (initialWorkspaces.length > 0 && (!liveWorkspaces || liveWorkspaces.length === 0)) {
+			return initialWorkspaces;
+		}
+
+		return liveWorkspaces ?? [];
+	});
 	const currentWorkspaceSlug = $derived(page.params.workspaceSlug ?? null);
 	const activeWorkspace = $derived.by(() => {
 		if (currentWorkspaceSlug) {
 			const matchingWorkspace = workspaces.find(
-				(workspace) => workspace.slug === currentWorkspaceSlug
+				(workspace: { slug: string }) => workspace.slug === currentWorkspaceSlug
 			);
 			if (matchingWorkspace) {
 				return matchingWorkspace;
@@ -62,6 +82,8 @@
 	const activeWorkspaceSlug = $derived(activeWorkspace?.slug ?? null);
 	const currentPath = $derived(page.url.pathname);
 	let isSigningOut = $state(false);
+	let createWorkspaceDialogOpen = $state(false);
+	const isLoadingWorkspaces = $derived(workspacesQuery.isLoading && workspaces.length === 0);
 	const currentWorkspaceSubpath = $derived.by(() => {
 		const match = currentPath.match(/^\/app\/[^/]+(\/.*)?$/);
 		return match?.[1] ?? '';
@@ -131,6 +153,16 @@
 		});
 	}
 
+	async function handleWorkspaceCreated(workspace: { slug: string }): Promise<void> {
+		createWorkspaceDialogOpen = false;
+		handleNavigation();
+
+		await goto(resolve(`/app/${workspace.slug}` as `/app/${string}`), {
+			noScroll: true,
+			keepFocus: true
+		});
+	}
+
 	async function handleSignOut(): Promise<void> {
 		if (!clerk.clerk || isSigningOut) return;
 
@@ -164,14 +196,13 @@
 		>
 			<div
 				class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[11px] font-black"
-				style="background: var(--primary); color: var(--primary-foreground); font-family: 'Bricolage Grotesque', sans-serif;"
+				style="background: var(--primary); color: var(--primary-foreground);"
 				aria-hidden="true"
 			>
 				WD
 			</div>
 			<span
 				class="sidebar-copy sidebar-brand-copy truncate text-[13.5px] font-semibold tracking-tight"
-				style="font-family: 'Bricolage Grotesque', sans-serif;"
 			>
 				Waiver Director
 			</span>
@@ -182,7 +213,7 @@
 	<div class="shrink-0 px-2 pt-3 pb-2">
 		<DropdownMenu>
 			<DropdownMenuTrigger
-				class="sidebar-switcher group flex w-full items-center gap-2.5 rounded-lg bg-sidebar-accent/30 px-2.5 py-2 ring-1 ring-sidebar-border/60 transition-all ring-inset hover:bg-sidebar-accent hover:ring-sidebar-border focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none"
+				class="sidebar-switcher group flex min-h-10 w-full items-center gap-2.5 rounded-lg bg-sidebar-accent/30 px-2.5 py-2 ring-1 ring-sidebar-border/60 transition-all ring-inset hover:bg-sidebar-accent hover:ring-sidebar-border focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none"
 				title={isCollapsed ? (activeWorkspace?.name ?? 'Workspace') : undefined}
 				aria-label={isCollapsed
 					? `Switch workspace: ${activeWorkspace?.name ?? 'No workspace'}`
@@ -193,38 +224,55 @@
 					style="background: var(--sidebar-primary); color: var(--sidebar-primary-foreground);"
 					aria-hidden="true"
 				>
-					{#if workspacesQuery.isLoading}
+					{#if isLoadingWorkspaces}
 						<Building2Icon class="size-3.5" />
 					{:else}
 						{activeWorkspace ? getInitials(activeWorkspace.name) : '?'}
 					{/if}
 				</div>
-				<div class="sidebar-copy sidebar-meta min-w-0 flex-1 text-left">
-					<div class="truncate text-[12.5px] leading-tight font-semibold text-sidebar-foreground">
-						{#if workspacesQuery.isLoading}
-							<span class="text-muted-foreground">Loading…</span>
-						{:else if activeWorkspace}
-							{activeWorkspace.name}
-						{:else}
-							<span class="text-muted-foreground">No workspace</span>
-						{/if}
-					</div>
-					<div class="truncate text-[10px] leading-tight text-muted-foreground capitalize">
-						{activeWorkspace?.role ?? ''}
-					</div>
+				<div
+					class="sidebar-copy sidebar-meta flex min-h-7 min-w-0 flex-1 flex-col justify-center text-left"
+				>
+					{#if isLoadingWorkspaces}
+						<div class="flex flex-col gap-1">
+							<Skeleton class="h-[13px] w-24 bg-sidebar-foreground/10" />
+							<Skeleton class="h-[10px] w-12 bg-sidebar-foreground/8" />
+						</div>
+					{:else}
+						<div class="truncate text-[12.5px] leading-tight font-semibold text-sidebar-foreground">
+							{#if activeWorkspace}
+								{activeWorkspace.name}
+							{:else}
+								<span class="text-muted-foreground">No workspace</span>
+							{/if}
+						</div>
+						<div class="truncate text-[10px] leading-tight text-muted-foreground capitalize">
+							{activeWorkspace?.role ?? ''}
+						</div>
+					{/if}
 				</div>
 				<ChevronsUpDownIcon
-					class="sidebar-chrome size-3.5 shrink-0 text-muted-foreground/50 transition-opacity group-hover:opacity-100"
+					class={`sidebar-chrome size-3.5 shrink-0 text-muted-foreground/50 transition-opacity group-hover:opacity-100 ${
+						isLoadingWorkspaces ? 'opacity-0' : ''
+					}`}
 					aria-hidden="true"
 				/>
 			</DropdownMenuTrigger>
 			<DropdownMenuContent align="start" side="right" sideOffset={10} class="w-60">
 				<DropdownMenuGroup>
 					<DropdownMenuGroupHeading>Workspaces</DropdownMenuGroupHeading>
-					{#if workspacesQuery.isLoading}
-						<DropdownMenuItem disabled>
-							<span class="text-muted-foreground">Loading…</span>
-						</DropdownMenuItem>
+					{#if isLoadingWorkspaces}
+						<div class="space-y-1 px-2 py-1.5">
+							{#each [0, 1] as item (item)}
+								<div class="flex items-center gap-2.5 rounded-md px-2 py-1.5">
+									<Skeleton class="h-5 w-5 shrink-0 rounded" />
+									<div class="min-w-0 flex-1 space-y-1">
+										<Skeleton class="h-3 w-24" />
+										<Skeleton class="h-2.5 w-12" />
+									</div>
+								</div>
+							{/each}
+						</div>
 					{:else if workspaces.length === 0}
 						<DropdownMenuItem disabled>
 							<span class="text-muted-foreground">No workspaces yet</span>
@@ -256,19 +304,34 @@
 					{/if}
 				</DropdownMenuGroup>
 				<DropdownMenuSeparator />
-				<DropdownMenuItem>
-					<a
-						href={resolve('/app/workspaces/new')}
-						class="flex w-full items-center gap-2 no-underline"
-						onclick={handleNavigation}
-					>
+				<DropdownMenuItem onclick={() => (createWorkspaceDialogOpen = true)}>
+					<div class="flex w-full items-center gap-2">
 						<PlusIcon class="size-3.5" aria-hidden="true" />
 						Create workspace
-					</a>
+					</div>
 				</DropdownMenuItem>
 			</DropdownMenuContent>
 		</DropdownMenu>
 	</div>
+
+	<Dialog bind:open={createWorkspaceDialogOpen}>
+		<DialogContent class="max-w-md p-0">
+			<div class="border-b border-border px-5 py-4">
+				<DialogHeader>
+					<DialogTitle>Create workspace</DialogTitle>
+					<DialogDescription>
+						Set up a separate workspace with its own team and settings.
+					</DialogDescription>
+				</DialogHeader>
+			</div>
+			<div class="px-5 py-5">
+				<CreateWorkspaceForm
+					autoFocusName={createWorkspaceDialogOpen}
+					onCreated={handleWorkspaceCreated}
+				/>
+			</div>
+		</DialogContent>
+	</Dialog>
 
 	<!-- ─── Navigation ─── -->
 	<nav class="flex flex-1 flex-col overflow-y-auto px-2 pb-2" aria-label="Primary navigation">
