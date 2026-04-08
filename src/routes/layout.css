@@ -129,4 +129,8 @@
 	::selection {
 		background: color-mix(in oklch, var(--color-primary) 18%, white);
 	}
+	.dark ::selection {
+		background: color-mix(in oklch, var(--color-primary) 45%, transparent);
+		color: oklch(0.985 0 0);
+	}
 }

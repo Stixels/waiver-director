@@ -29,5 +29,5 @@ export async function getCurrentUser(ctx: FunctionCtx): Promise<Doc<'users'> | n
 		return null;
 	}
 
-	return await ctx.db.get(authIdentity.userId);
+	return await ctx.db.get('users', authIdentity.userId);
 }

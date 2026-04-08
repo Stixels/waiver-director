@@ -199,9 +199,8 @@
 				>
 					<Mail size={14} class="mt-0.5 shrink-0 text-primary" aria-hidden="true" />
 					<p class="text-[12px] leading-relaxed text-muted-foreground">
-						<strong>{totalSigned ?? 0} follow-up emails scheduled</strong> one per guest who
-						signed, not just the lead.
-						Use them for thank-yous, feedback, and review requests.
+						<strong>{totalSigned ?? 0} follow-up emails scheduled</strong> one per guest who signed, not
+						just the lead. Use them for thank-yous, feedback, and review requests.
 					</p>
 				</div>
 			</div>
