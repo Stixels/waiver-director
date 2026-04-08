@@ -12,7 +12,7 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import MenuIcon from '@lucide/svelte/icons/menu';
 
-	let { children } = $props();
+	let { children, data } = $props();
 
 	let sidebarCollapsed = $state(false);
 	let mobileNavOpen = $state(false);
@@ -46,7 +46,11 @@
 			class:is-collapsed={sidebarCollapsed}
 			aria-label="Sidebar navigation"
 		>
-			<AppSidebar bind:collapsed={sidebarCollapsed} mode="sidebar" />
+			<AppSidebar
+				bind:collapsed={sidebarCollapsed}
+				mode="sidebar"
+				initialWorkspaces={data.workspaces}
+			/>
 		</aside>
 	{/if}
 
@@ -88,7 +92,11 @@
 					<SheetTitle class="sr-only">Navigation</SheetTitle>
 					<SheetDescription class="sr-only">App navigation and workspace switcher</SheetDescription>
 					{#if hasResolvedViewport && mobileNavOpen}
-						<AppSidebar mode="drawer" onNavigate={closeMobileNav} />
+						<AppSidebar
+							mode="drawer"
+							onNavigate={closeMobileNav}
+							initialWorkspaces={data.workspaces}
+						/>
 					{/if}
 				</SheetContent>
 			</Sheet>

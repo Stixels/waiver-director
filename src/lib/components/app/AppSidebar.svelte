@@ -2,6 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
+	import type { FunctionReturnType } from 'convex/server';
 	import { useQuery } from 'convex-svelte';
 	import { useClerkContext } from 'svelte-clerk';
 	import { toast } from 'svelte-sonner';
@@ -42,32 +43,36 @@
 		collapsed?: boolean;
 		mode?: 'sidebar' | 'drawer';
 		onNavigate?: () => void;
+		initialWorkspaces?: WorkspaceSummary[];
 	}
+
+	type WorkspaceSummary = FunctionReturnType<
+		typeof api.workspaces.listCurrentUserWorkspaces
+	>[number];
 
 	type AppRouteHref =
 		| '/app/[workspaceSlug]'
 		| (typeof appMainNavItems)[number]['href']
 		| (typeof appConfigNavItems)[number]['href'];
 
-	let { collapsed = $bindable(false), mode = 'sidebar', onNavigate }: Props = $props();
+	let {
+		collapsed = $bindable(false),
+		mode = 'sidebar',
+		onNavigate,
+		initialWorkspaces = []
+	}: Props = $props();
 
 	const clerk = useClerkContext();
-	const initialWorkspaces = $derived(page.data.workspaces ?? []);
-	const workspacesQuery = useQuery(api.workspaces.listCurrentUserWorkspaces, {}, () => ({
-		initialData: initialWorkspaces
-	}));
-	const workspaces = $derived.by(() => {
-		const liveWorkspaces = workspacesQuery.data;
-
-		if (
-			initialWorkspaces.length > 0 &&
-			(liveWorkspaces === undefined || workspacesQuery.isLoading)
-		) {
-			return initialWorkspaces;
-		}
-
-		return liveWorkspaces ?? [];
-	});
+	const shouldSubscribeToWorkspaces = $derived(clerk.isLoaded && !!clerk.auth.userId);
+	const workspacesQuery = useQuery(
+		api.workspaces.listCurrentUserWorkspaces,
+		() => (shouldSubscribeToWorkspaces ? {} : 'skip'),
+		() => ({
+			initialData: initialWorkspaces,
+			keepPreviousData: true
+		})
+	);
+	const workspaces = $derived(workspacesQuery.data ?? initialWorkspaces);
 	const currentWorkspaceSlug = $derived(page.params.workspaceSlug ?? null);
 	const activeWorkspace = $derived.by(() => {
 		if (currentWorkspaceSlug) {
@@ -85,7 +90,10 @@
 	const currentPath = $derived(page.url.pathname);
 	let isSigningOut = $state(false);
 	let createWorkspaceDialogOpen = $state(false);
-	const isLoadingWorkspaces = $derived(workspacesQuery.isLoading && workspaces.length === 0);
+	const isLoadingWorkspaces = $derived(
+		initialWorkspaces.length === 0 &&
+			(!shouldSubscribeToWorkspaces || (workspacesQuery.isLoading && workspaces.length === 0))
+	);
 	const currentWorkspaceSubpath = $derived.by(() => {
 		const match = currentPath.match(/^\/app\/[^/]+(\/.*)?$/);
 		return match?.[1] ?? '';
