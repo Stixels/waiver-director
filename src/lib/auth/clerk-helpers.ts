@@ -38,7 +38,3 @@ export function getSafePostAuthRedirectHref(
 	const url = new URL(safePath, 'http://waiver-director.local');
 	return `${resolve(url.pathname as Pathname)}${url.search}${url.hash}`;
 }
-
-export function redirectToClerkDecoratedUrl(decoratedUrl: string): void {
-	window.location.replace(decoratedUrl);
-}

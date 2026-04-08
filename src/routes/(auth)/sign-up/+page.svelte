@@ -4,11 +4,7 @@
 	import { ChartLine, FileText, Link2, Mail, ShieldCheck } from '@lucide/svelte';
 	import { useClerkContext } from 'svelte-clerk';
 
-	import {
-		redirectToClerkDecoratedUrl,
-		getClerkErrorMessage,
-		getSafePostAuthRedirectHref
-	} from '$lib/auth/clerk-helpers';
+	import { getClerkErrorMessage, getSafePostAuthRedirectHref } from '$lib/auth/clerk-helpers';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 
@@ -75,7 +71,7 @@
 					return;
 				}
 
-				redirectToClerkDecoratedUrl(decorateUrl(postAuthRedirectUrl));
+				window.location.replace(decorateUrl(postAuthRedirectUrl));
 			}
 		});
 	}

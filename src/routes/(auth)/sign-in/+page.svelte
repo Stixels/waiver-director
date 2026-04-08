@@ -2,11 +2,7 @@
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { useClerkContext } from 'svelte-clerk';
-	import {
-		redirectToClerkDecoratedUrl,
-		getClerkErrorMessage,
-		getSafePostAuthRedirectHref
-	} from '$lib/auth/clerk-helpers';
+	import { getClerkErrorMessage, getSafePostAuthRedirectHref } from '$lib/auth/clerk-helpers';
 	import AuthPageShell from '$lib/components/marketing/auth/AuthPageShell.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
@@ -158,7 +154,7 @@
 					return;
 				}
 
-				redirectToClerkDecoratedUrl(decorateUrl(postAuthRedirectUrl));
+				window.location.replace(decorateUrl(postAuthRedirectUrl));
 			}
 		});
 	}
