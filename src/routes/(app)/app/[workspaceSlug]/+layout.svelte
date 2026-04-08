@@ -82,7 +82,7 @@
 			</a>
 		</header>
 
-		{#if !isDesktop}
+		{#if hasResolvedViewport && !isDesktop}
 			<Sheet bind:open={mobileNavOpen}>
 				<SheetContent side="left" class="p-0">
 					<SheetTitle class="sr-only">Navigation</SheetTitle>
