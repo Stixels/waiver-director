@@ -32,7 +32,6 @@
 	import PanelLeftOpenIcon from '@lucide/svelte/icons/panel-left-open';
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import SettingsIcon from '@lucide/svelte/icons/settings';
-	import CreditCardIcon from '@lucide/svelte/icons/credit-card';
 	import LogOutIcon from '@lucide/svelte/icons/log-out';
 	import EllipsisIcon from '@lucide/svelte/icons/ellipsis';
 	import Building2Icon from '@lucide/svelte/icons/building-2';
@@ -116,6 +115,14 @@
 
 	function workspacePathnameFor(workspaceSlug: string): `/app/${string}` {
 		return `/app/${workspaceSlug}${currentWorkspaceSubpath}` as `/app/${string}`;
+	}
+
+	function accountPathname(): `/app/${string}` | '/app' {
+		if (!activeWorkspaceSlug) {
+			return '/app';
+		}
+
+		return `/app/${activeWorkspaceSlug}/account` as `/app/${string}`;
 	}
 
 	function isActive(href: AppRouteHref): boolean {
@@ -455,15 +462,15 @@
 			<DropdownMenuContent align="start" side="right" sideOffset={10} class="w-56">
 				<DropdownMenuGroup>
 					<DropdownMenuGroupHeading>My account</DropdownMenuGroupHeading>
-					<DropdownMenuItem disabled>
-						<SettingsIcon class="mr-2 size-3.5 shrink-0" aria-hidden="true" />
-						<span class="flex-1">Settings</span>
-						<span class="text-[10px] text-muted-foreground">Soon</span>
-					</DropdownMenuItem>
-					<DropdownMenuItem disabled>
-						<CreditCardIcon class="mr-2 size-3.5 shrink-0" aria-hidden="true" />
-						<span class="flex-1">Billing</span>
-						<span class="text-[10px] text-muted-foreground">Soon</span>
+					<DropdownMenuItem>
+						<a
+							href={resolve(accountPathname())}
+							class="flex w-full items-center gap-2 no-underline"
+							onclick={handleNavigation}
+						>
+							<SettingsIcon class="size-3.5 shrink-0" aria-hidden="true" />
+							<span class="flex-1">Settings</span>
+						</a>
 					</DropdownMenuItem>
 				</DropdownMenuGroup>
 				<DropdownMenuSeparator />
