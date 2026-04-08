@@ -1,13 +1,8 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { useClerkContext } from 'svelte-clerk';
-	import {
-		getClerkErrorMessage,
-		getSafePostAuthRedirectHref,
-		normalizeClerkNavigateTarget
-	} from '$lib/auth/clerk-helpers';
+	import { getClerkErrorMessage, getSafePostAuthRedirectHref } from '$lib/auth/clerk-helpers';
 	import AuthPageShell from '$lib/components/marketing/auth/AuthPageShell.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
@@ -159,15 +154,14 @@
 					return;
 				}
 
-				// eslint-disable-next-line svelte/no-navigation-without-resolve -- Clerk decorates a base-aware URL; this helper strips the base and preserves search/hash for SPA navigation.
-				await goto(normalizeClerkNavigateTarget(decorateUrl(postAuthRedirectUrl)));
+				window.location.replace(decorateUrl(postAuthRedirectUrl));
 			}
 		});
 	}
 
 	async function handleGoogleSignIn() {
 		if (clerk.auth.userId) {
-			window.location.assign(postAuthRedirectUrl);
+			window.location.replace(postAuthRedirectUrl);
 			return;
 		}
 

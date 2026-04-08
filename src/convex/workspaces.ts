@@ -1,7 +1,86 @@
-import { v } from 'convex/values';
-import { query } from './_generated/server';
+import { ConvexError, v } from 'convex/values';
+import { mutation, query } from './_generated/server';
 import { getCurrentUser } from './lib/auth';
 import { getWorkspaceMembership, listWorkspaceMembershipsForUser } from './lib/workspaces';
+
+const WORKSPACE_SLUG_REGEX = /^[a-z0-9](?:[a-z0-9-]{0,46}[a-z0-9])$/;
+const RESERVED_SLUGS = ['workspaces'];
+
+export const createWorkspace = mutation({
+	args: {
+		name: v.string(),
+		slug: v.string()
+	},
+	returns: v.object({
+		workspaceId: v.id('workspaces'),
+		slug: v.string()
+	}),
+	handler: async (ctx, args) => {
+		const user = await getCurrentUser(ctx);
+		if (!user) {
+			throw new ConvexError({
+				code: 'unauthenticated',
+				message: 'Not authenticated'
+			});
+		}
+
+		const name = args.name.trim();
+		const slug = args.slug.trim().toLowerCase();
+
+		if (name.length < 2 || name.length > 80) {
+			throw new ConvexError({
+				code: 'invalid_argument',
+				message: 'Workspace name must be between 2 and 80 characters.'
+			});
+		}
+		if (!WORKSPACE_SLUG_REGEX.test(slug)) {
+			throw new ConvexError({
+				code: 'invalid_argument',
+				message:
+					'Workspace slug must be 2-48 characters: lowercase letters, numbers, and hyphens only. It must start and end with a letter or number.'
+			});
+		}
+		if (RESERVED_SLUGS.includes(slug)) {
+			throw new ConvexError({
+				code: 'invalid_argument',
+				message: `Workspace slug "${slug}" is reserved and cannot be used.`
+			});
+		}
+
+		const existing = await ctx.db
+			.query('workspaces')
+			.withIndex('by_slug', (q) => q.eq('slug', slug))
+			.unique();
+		if (existing) {
+			throw new ConvexError({
+				code: 'already_exists',
+				message: 'Workspace slug already in use'
+			});
+		}
+
+		const workspaceId = await ctx.db.insert('workspaces', {
+			name,
+			slug,
+			status: 'active',
+			createdByUserId: user._id
+		});
+
+		await ctx.db.insert('workspace_memberships', {
+			workspaceId,
+			userId: user._id,
+			role: 'owner',
+			status: 'active'
+		});
+
+		if (!user.defaultWorkspaceId) {
+			await ctx.db.patch('users', user._id, {
+				defaultWorkspaceId: workspaceId
+			});
+		}
+
+		return { workspaceId, slug };
+	}
+});
 
 export const listCurrentUserWorkspaces = query({
 	args: {},
