@@ -30,10 +30,20 @@
 	}
 
 	function hasUsableCachedToken() {
-		if (!cachedToken) return false;
-		if (!cachedTokenExpiresAtMs) return true;
+		return (
+			!!cachedToken &&
+			typeof cachedTokenExpiresAtMs === 'number' &&
+			Number.isFinite(cachedTokenExpiresAtMs) &&
+			cachedTokenExpiresAtMs > Date.now() + 30_000
+		);
+	}
 
-		return cachedTokenExpiresAtMs > Date.now() + 30_000;
+	function getCurrentSessionId() {
+		return clerk.clerk?.session?.id ?? clerk.session?.id ?? clerk.auth.sessionId ?? null;
+	}
+
+	function ownsCurrentTokenState(sessionId: string) {
+		return lastRegisteredSessionId === sessionId && getCurrentSessionId() === sessionId;
 	}
 
 	function isRateLimitError(error: unknown) {
@@ -94,11 +104,18 @@
 		// Set the Convex auth token for the current Clerk session
 		convexClient.setAuth(
 			async ({ forceRefreshToken }) => {
+				const registeredSessionId = sessionId;
 				const activeSession = clerk.clerk?.session ?? clerk.session;
-				if (!activeSession || activeSession.id !== sessionId) {
-					cachedToken = null;
-					cachedTokenExpiresAtMs = null;
-					inflightTokenPromise = null;
+				if (
+					!activeSession ||
+					activeSession.id !== registeredSessionId ||
+					!ownsCurrentTokenState(registeredSessionId)
+				) {
+					if (lastRegisteredSessionId === registeredSessionId) {
+						cachedToken = null;
+						cachedTokenExpiresAtMs = null;
+						inflightTokenPromise = null;
+					}
 					return null;
 				}
 
@@ -110,19 +127,27 @@
 					return cachedToken;
 				}
 
-				inflightTokenPromise = (async () => {
+				const tokenPromise = (async () => {
 					try {
 						const token = await activeSession.getToken({
 							template: 'convex',
 							skipCache: forceRefreshToken
 						});
 
+						if (!ownsCurrentTokenState(registeredSessionId)) {
+							return null;
+						}
+
 						cachedToken = token ?? null;
 						cachedTokenExpiresAtMs = token ? decodeJwtExpiry(token) : null;
 
 						return cachedToken;
 					} catch (error) {
-						if (isRateLimitError(error) && hasUsableCachedToken()) {
+						if (
+							isRateLimitError(error) &&
+							ownsCurrentTokenState(registeredSessionId) &&
+							hasUsableCachedToken()
+						) {
 							if (Date.now() - lastRateLimitLogAtMs > 5_000) {
 								lastRateLimitLogAtMs = Date.now();
 								console.warn('[auth/bridge] Clerk token rate-limited, reusing cached token');
@@ -134,10 +159,13 @@
 						console.error('[auth/bridge] token fetch failed', error);
 						return null;
 					} finally {
-						inflightTokenPromise = null;
+						if (lastRegisteredSessionId === registeredSessionId) {
+							inflightTokenPromise = null;
+						}
 					}
 				})();
 
+				inflightTokenPromise = tokenPromise;
 				return await inflightTokenPromise;
 			},
 			() => {}

@@ -39,7 +39,7 @@ export function getSafePostAuthRedirectHref(
 	return `${resolve(url.pathname as Pathname)}${url.search}${url.hash}`;
 }
 
-export function normalizeClerkNavigateTarget(decoratedUrl: string): Pathname {
+export function normalizeClerkNavigateTarget(decoratedUrl: string): string {
 	const appRoot = resolve('/');
 	const target = new URL(decoratedUrl, window.location.origin);
 	const appPath =
@@ -47,5 +47,5 @@ export function normalizeClerkNavigateTarget(decoratedUrl: string): Pathname {
 			? target.pathname.slice(appRoot.length) || '/'
 			: target.pathname;
 
-	return `${appPath}${target.search}${target.hash}` as Pathname;
+	return `${appPath}${target.search}${target.hash}`;
 }

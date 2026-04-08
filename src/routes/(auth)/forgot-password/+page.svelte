@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { useClerkContext } from 'svelte-clerk';
 	import {
@@ -48,7 +47,8 @@
 					return;
 				}
 
-				await goto(resolve(normalizeClerkNavigateTarget(decorateUrl(postAuthRedirectUrl))));
+				// eslint-disable-next-line svelte/no-navigation-without-resolve -- Clerk decorates a base-aware URL; this helper strips the base and preserves search/hash for SPA navigation.
+				await goto(normalizeClerkNavigateTarget(decorateUrl(postAuthRedirectUrl)));
 			}
 		});
 	}
