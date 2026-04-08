@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { ConvexError } from 'convex/values';
 	import { useConvexClient } from 'convex-svelte';
 	import { api } from '$convex/_generated/api';
 	import { Button } from '$lib/components/ui/button';
@@ -71,7 +72,7 @@
 
 	function getSlugHint(): string {
 		if (hasAttemptedSubmit && !slugValid) {
-			return 'Use 2-48 lowercase characters. Hyphens are allowed in the middle only.';
+			return 'Use 2-48 lowercase letters or numbers. Hyphens are allowed only in the middle.';
 		}
 
 		if (!slug) {
@@ -92,6 +93,25 @@
 		slug = nextSlug;
 	}
 
+	function getSubmitErrorMessage(error: unknown): string {
+		if (error instanceof ConvexError) {
+			if (typeof error.data === 'string') {
+				return error.data;
+			}
+
+			if (
+				typeof error.data === 'object' &&
+				error.data !== null &&
+				'message' in error.data &&
+				typeof error.data.message === 'string'
+			) {
+				return error.data.message;
+			}
+		}
+
+		return error instanceof Error ? error.message : 'Unable to create your workspace right now.';
+	}
+
 	async function handleSubmit(event: SubmitEvent) {
 		event.preventDefault();
 		hasAttemptedSubmit = true;
@@ -109,15 +129,16 @@
 				name: trimmedName,
 				slug
 			});
-			isSuccess = true;
 
 			if (onCreated) {
 				await new Promise((resolveDelay) => window.setTimeout(resolveDelay, 250));
 				await onCreated(result);
 			}
+
+			isSuccess = true;
+			isSubmitting = false;
 		} catch (err) {
-			submitError =
-				err instanceof Error ? err.message : 'Unable to create your workspace right now.';
+			submitError = getSubmitErrorMessage(err);
 			isSubmitting = false;
 		}
 	}

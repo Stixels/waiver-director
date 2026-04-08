@@ -59,7 +59,10 @@
 	const workspaces = $derived.by(() => {
 		const liveWorkspaces = workspacesQuery.data;
 
-		if (initialWorkspaces.length > 0 && (!liveWorkspaces || liveWorkspaces.length === 0)) {
+		if (
+			initialWorkspaces.length > 0 &&
+			(liveWorkspaces === undefined || workspacesQuery.isLoading)
+		) {
 			return initialWorkspaces;
 		}
 
@@ -87,6 +90,10 @@
 		const match = currentPath.match(/^\/app\/[^/]+(\/.*)?$/);
 		return match?.[1] ?? '';
 	});
+	const workspaceMenuSide = $derived(mode === 'drawer' ? 'bottom' : 'right');
+	const accountMenuSide = $derived(mode === 'drawer' ? 'top' : 'right');
+	const dropdownMenuAlign = $derived(mode === 'drawer' ? 'center' : 'start');
+	const dropdownMenuSideOffset = $derived(mode === 'drawer' ? 8 : 10);
 
 	$effect(() => {
 		if (typeof window === 'undefined') return;
@@ -95,8 +102,7 @@
 
 		void goto(resolve(workspacePathnameFor(activeWorkspaceSlug)), {
 			replaceState: true,
-			noScroll: true,
-			keepFocus: true
+			noScroll: true
 		});
 	});
 	const isCollapsed = $derived(collapsed && mode === 'sidebar');
@@ -155,8 +161,7 @@
 		if (workspaceSlug === activeWorkspaceSlug) return;
 
 		await goto(resolve(workspacePathnameFor(workspaceSlug)), {
-			noScroll: true,
-			keepFocus: true
+			noScroll: true
 		});
 	}
 
@@ -165,8 +170,7 @@
 		handleNavigation();
 
 		await goto(resolve(`/app/${workspace.slug}` as `/app/${string}`), {
-			noScroll: true,
-			keepFocus: true
+			noScroll: true
 		});
 	}
 
@@ -265,7 +269,12 @@
 					aria-hidden="true"
 				/>
 			</DropdownMenuTrigger>
-			<DropdownMenuContent align="start" side="right" sideOffset={10} class="w-60">
+			<DropdownMenuContent
+				align={dropdownMenuAlign}
+				side={workspaceMenuSide}
+				sideOffset={dropdownMenuSideOffset}
+				class="w-60 max-w-[calc(100vw-2rem)]"
+			>
 				<DropdownMenuGroup>
 					<DropdownMenuGroupHeading>Workspaces</DropdownMenuGroupHeading>
 					{#if isLoadingWorkspaces}
@@ -459,18 +468,22 @@
 					aria-hidden="true"
 				/>
 			</DropdownMenuTrigger>
-			<DropdownMenuContent align="start" side="right" sideOffset={10} class="w-56">
+			<DropdownMenuContent
+				align={dropdownMenuAlign}
+				side={accountMenuSide}
+				sideOffset={dropdownMenuSideOffset}
+				class="w-56 max-w-[calc(100vw-2rem)]"
+			>
 				<DropdownMenuGroup>
 					<DropdownMenuGroupHeading>My account</DropdownMenuGroupHeading>
-					<DropdownMenuItem>
-						<a
-							href={resolve(accountPathname())}
-							class="flex w-full items-center gap-2 no-underline"
-							onclick={handleNavigation}
-						>
-							<SettingsIcon class="size-3.5 shrink-0" aria-hidden="true" />
-							<span class="flex-1">Settings</span>
-						</a>
+					<DropdownMenuItem
+						onclick={() => {
+							handleNavigation();
+							void goto(resolve(accountPathname()));
+						}}
+					>
+						<SettingsIcon class="size-3.5 shrink-0" aria-hidden="true" />
+						<span class="flex-1">Settings</span>
 					</DropdownMenuItem>
 				</DropdownMenuGroup>
 				<DropdownMenuSeparator />

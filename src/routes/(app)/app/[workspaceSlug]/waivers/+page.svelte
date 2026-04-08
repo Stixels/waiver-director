@@ -1,6 +1,8 @@
-<div class="p-6">
-	<h2 class="text-base font-semibold">Waivers</h2>
-	<p class="mt-1 text-sm text-muted-foreground">
-		Submissions, signatures, and signing campaigns. Implementation coming soon.
-	</p>
-</div>
+<script lang="ts">
+	import ComingSoon from '$lib/components/app/ComingSoon.svelte';
+</script>
+
+<ComingSoon
+	title="Waivers"
+	copy="Submissions, signatures, and signing campaigns. Implementation coming soon."
+/>

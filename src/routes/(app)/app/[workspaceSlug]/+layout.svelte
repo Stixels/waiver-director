@@ -16,6 +16,8 @@
 
 	let sidebarCollapsed = $state(false);
 	let mobileNavOpen = $state(false);
+	let hasResolvedViewport = $state(false);
+	let isDesktop = $state(false);
 
 	const DESKTOP_BREAKPOINT_QUERY = '(min-width: 1024px)';
 
@@ -26,21 +28,27 @@
 	onMount(() => {
 		const mql = window.matchMedia(DESKTOP_BREAKPOINT_QUERY);
 		const sync = () => {
+			isDesktop = mql.matches;
+			hasResolvedViewport = true;
 			if (mql.matches) mobileNavOpen = false;
 		};
+
+		sync();
 		mql.addEventListener('change', sync);
 		return () => mql.removeEventListener('change', sync);
 	});
 </script>
 
 <div class="app-shell flex h-screen overflow-hidden bg-background">
-	<aside
-		class="app-sidebar hidden lg:flex lg:shrink-0 lg:flex-col"
-		class:is-collapsed={sidebarCollapsed}
-		aria-label="Sidebar navigation"
-	>
-		<AppSidebar bind:collapsed={sidebarCollapsed} mode="sidebar" />
-	</aside>
+	{#if hasResolvedViewport && isDesktop}
+		<aside
+			class="app-sidebar hidden lg:flex lg:shrink-0 lg:flex-col"
+			class:is-collapsed={sidebarCollapsed}
+			aria-label="Sidebar navigation"
+		>
+			<AppSidebar bind:collapsed={sidebarCollapsed} mode="sidebar" />
+		</aside>
+	{/if}
 
 	<div class="flex min-w-0 flex-1 flex-col overflow-hidden">
 		<header
@@ -74,13 +82,17 @@
 			</a>
 		</header>
 
-		<Sheet bind:open={mobileNavOpen}>
-			<SheetContent side="left" class="p-0">
-				<SheetTitle class="sr-only">Navigation</SheetTitle>
-				<SheetDescription class="sr-only">App navigation and workspace switcher</SheetDescription>
-				<AppSidebar mode="drawer" onNavigate={closeMobileNav} />
-			</SheetContent>
-		</Sheet>
+		{#if !isDesktop}
+			<Sheet bind:open={mobileNavOpen}>
+				<SheetContent side="left" class="p-0">
+					<SheetTitle class="sr-only">Navigation</SheetTitle>
+					<SheetDescription class="sr-only">App navigation and workspace switcher</SheetDescription>
+					{#if hasResolvedViewport && mobileNavOpen}
+						<AppSidebar mode="drawer" onNavigate={closeMobileNav} />
+					{/if}
+				</SheetContent>
+			</Sheet>
+		{/if}
 
 		<main class="flex-1 overflow-y-auto">
 			{@render children()}

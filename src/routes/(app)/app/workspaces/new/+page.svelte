@@ -6,8 +6,7 @@
 	async function handleCreated(workspace: { slug: string }) {
 		await goto(resolve(`/app/${workspace.slug}` as `/app/${string}`), {
 			replaceState: true,
-			noScroll: true,
-			keepFocus: true
+			noScroll: true
 		});
 	}
 </script>
