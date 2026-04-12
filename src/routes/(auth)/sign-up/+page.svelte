@@ -208,29 +208,6 @@
 		}
 	}
 
-	async function handleVerificationSubmit(event: SubmitEvent) {
-		event.preventDefault();
-		await attemptVerification();
-	}
-
-	async function handleResendCode() {
-		const signUp = getSignUpResource();
-		if (!clerk.isLoaded || !signUp) return;
-
-		isSubmitting = true;
-		submitError = null;
-		submitMessage = null;
-
-		try {
-			await signUp.prepareEmailAddressVerification({ strategy: 'email_code' });
-			submitMessage = 'Verification code resent.';
-		} catch (error) {
-			submitError = getClerkErrorMessage(error, 'Unable to resend code right now.');
-		} finally {
-			isSubmitting = false;
-		}
-	}
-
 	function restartSignUp() {
 		isAwaitingVerification = false;
 		verificationCode = '';
@@ -367,24 +344,24 @@
 								</Button>
 							</div>
 
-						<InputOTP
-							maxlength={6}
-							id="otp-verification"
-							bind:value={verificationCode}
-							pattern={REGEXP_ONLY_DIGITS}
-							onComplete={attemptVerification}
-							class="w-full"
-						>
-							{#snippet children({ cells })}
-								<InputOTPGroup
-									class="w-full *:data-[slot=input-otp-slot]:h-14 *:data-[slot=input-otp-slot]:flex-1 *:data-[slot=input-otp-slot]:text-xl"
-								>
-									{#each cells as cell, i (i)}
-										<InputOTPSlot {cell} />
-									{/each}
-								</InputOTPGroup>
-							{/snippet}
-						</InputOTP>
+							<InputOTP
+								maxlength={6}
+								id="otp-verification"
+								bind:value={verificationCode}
+								pattern={REGEXP_ONLY_DIGITS}
+								onComplete={attemptVerification}
+								class="w-full"
+							>
+								{#snippet children({ cells })}
+									<InputOTPGroup
+										class="w-full *:data-[slot=input-otp-slot]:h-14 *:data-[slot=input-otp-slot]:flex-1 *:data-[slot=input-otp-slot]:text-xl"
+									>
+										{#each cells as cell, i (i)}
+											<InputOTPSlot {cell} />
+										{/each}
+									</InputOTPGroup>
+								{/snippet}
+							</InputOTP>
 						</div>
 
 						<div class="space-y-3 pt-1">
