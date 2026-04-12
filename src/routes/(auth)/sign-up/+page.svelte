@@ -208,6 +208,29 @@
 		}
 	}
 
+	async function handleVerificationSubmit(event: SubmitEvent) {
+		event.preventDefault();
+		await attemptVerification();
+	}
+
+	async function handleResendCode() {
+		const signUp = getSignUpResource();
+		if (!clerk.isLoaded || !signUp) return;
+
+		isSubmitting = true;
+		submitError = null;
+		submitMessage = null;
+
+		try {
+			await signUp.prepareEmailAddressVerification({ strategy: 'email_code' });
+			submitMessage = 'Verification code resent.';
+		} catch (error) {
+			submitError = getClerkErrorMessage(error, 'Unable to resend code right now.');
+		} finally {
+			isSubmitting = false;
+		}
+	}
+
 	function restartSignUp() {
 		isAwaitingVerification = false;
 		verificationCode = '';
