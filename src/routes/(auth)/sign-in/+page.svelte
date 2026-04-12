@@ -1,11 +1,18 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
+	import { RefreshCw } from '@lucide/svelte';
 	import { useClerkContext } from 'svelte-clerk';
 	import { getClerkErrorMessage, getSafePostAuthRedirectHref } from '$lib/auth/clerk-helpers';
 	import AuthPageShell from '$lib/components/marketing/auth/AuthPageShell.svelte';
+	import { REGEXP_ONLY_DIGITS } from 'bits-ui';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
+	import {
+		InputOTP,
+		InputOTPGroup,
+		InputOTPSlot
+	} from '$lib/components/ui/input-otp';
 
 	const inputClass =
 		'h-14 rounded-xl border-(--m-border-strong) bg-(--m-elevated) px-4 text-sm text-foreground shadow-none transition-[border-color,box-shadow] placeholder:text-(--m-text-3) focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/25 sm:px-5 md:text-sm';
@@ -34,12 +41,26 @@
 	let primarySecondFactorStrategy = $state<Exclude<SecondFactorStrategy, 'backup_code'> | null>(
 		null
 	);
-	let secondFactorMessage = $state('');
 	let secondFactorEmailAddressId = $state<string | null>(null);
 	let secondFactorPhoneNumberId = $state<string | null>(null);
 	let backupCodeAvailable = $state(false);
 	const redirectTo = $derived(page.url.searchParams.get('redirectTo'));
 	const postAuthRedirectUrl = $derived(getSafePostAuthRedirectHref(redirectTo));
+
+	const authPageTitle = $derived(
+		isAwaitingSecondFactor && secondFactorStrategy
+			? secondFactorStrategy === 'email_code'
+				? 'Check your email'
+				: secondFactorStrategy === 'phone_code'
+					? 'Check your phone'
+					: secondFactorStrategy === 'totp'
+						? 'Two-step verification'
+						: 'Backup code'
+			: 'Welcome back'
+	);
+	const authPageDescription = $derived(
+		isAwaitingSecondFactor ? undefined : 'Sign in to your Waiver Director account.'
+	);
 
 	function getSignInResource() {
 		return clerk.client?.signIn ?? null;
@@ -58,7 +79,6 @@
 		isAwaitingSecondFactor = false;
 		secondFactorStrategy = null;
 		primarySecondFactorStrategy = null;
-		secondFactorMessage = '';
 		secondFactorEmailAddressId = null;
 		secondFactorPhoneNumberId = null;
 		backupCodeAvailable = false;
@@ -68,27 +88,16 @@
 		signIn: NonNullable<ReturnType<typeof getSignInResource>>,
 		strategy: SecondFactorStrategy
 	) {
-		switch (strategy) {
-			case 'email_code':
-				await signIn.prepareSecondFactor({
-					strategy,
-					...(secondFactorEmailAddressId ? { emailAddressId: secondFactorEmailAddressId } : {})
-				});
-				secondFactorMessage = 'We sent a verification code to your email.';
-				break;
-			case 'phone_code':
-				await signIn.prepareSecondFactor({
-					strategy,
-					...(secondFactorPhoneNumberId ? { phoneNumberId: secondFactorPhoneNumberId } : {})
-				});
-				secondFactorMessage = 'We sent a verification code to your phone.';
-				break;
-			case 'totp':
-				secondFactorMessage = 'Enter the code from your authenticator app to finish signing in.';
-				break;
-			case 'backup_code':
-				secondFactorMessage = 'Enter one of your backup codes to finish signing in.';
-				break;
+		if (strategy === 'email_code') {
+			await signIn.prepareSecondFactor({
+				strategy,
+				...(secondFactorEmailAddressId ? { emailAddressId: secondFactorEmailAddressId } : {})
+			});
+		} else if (strategy === 'phone_code') {
+			await signIn.prepareSecondFactor({
+				strategy,
+				...(secondFactorPhoneNumberId ? { phoneNumberId: secondFactorPhoneNumberId } : {})
+			});
 		}
 
 		secondFactorStrategy = strategy;
@@ -229,9 +238,7 @@
 		}
 	}
 
-	async function handleSecondFactorSubmit(event: SubmitEvent) {
-		event.preventDefault();
-
+	async function attemptSecondFactor() {
 		const signIn = getSignInResource();
 		if (!clerk.isLoaded || !signIn || !secondFactorStrategy) {
 			submitError = 'Authentication is still loading. Please try again.';
@@ -258,12 +265,19 @@
 				return;
 			}
 
+			verificationCode = '';
 			submitError = 'Verification is not complete yet. Please check the code and try again.';
 		} catch (error) {
 			submitError = getClerkErrorMessage(error, 'Unable to verify your sign-in right now.');
+			verificationCode = '';
 		} finally {
 			isSubmitting = false;
 		}
+	}
+
+	async function handleSecondFactorSubmit(event: SubmitEvent) {
+		event.preventDefault();
+		await attemptSecondFactor();
 	}
 
 	async function resendSecondFactorCode() {
@@ -337,46 +351,88 @@
 	<meta name="description" content="Sign in to Waiver Director account." />
 </svelte:head>
 
-<AuthPageShell
-	title="Welcome back"
-	description="Sign in to your Waiver Director account."
-	width="narrow"
->
+<AuthPageShell title={authPageTitle} description={authPageDescription} width="narrow">
 	{#if isAwaitingSecondFactor}
-		<form class="space-y-4" method="post" onsubmit={handleSecondFactorSubmit}>
-			<div class="rounded-xl border border-(--m-border-soft) bg-(--m-elevated) px-4 py-3">
-				<p class="text-sm font-medium">Verify your account</p>
-				<p class="mt-1 text-sm text-muted-foreground">{secondFactorMessage}</p>
-			</div>
+		<div class="mb-8">
+			{#if secondFactorStrategy === 'email_code'}
+				<p class="text-sm leading-relaxed text-muted-foreground sm:text-base">
+					Enter the 6-digit code sent to <strong class="font-semibold text-foreground"
+						>{email.trim()}</strong
+					>.
+				</p>
+			{:else if secondFactorStrategy === 'phone_code'}
+				<p class="text-sm leading-relaxed text-muted-foreground sm:text-base">
+					Enter the 6-digit code sent to your phone.
+				</p>
+			{:else if secondFactorStrategy === 'totp'}
+				<p class="text-sm leading-relaxed text-muted-foreground sm:text-base">
+					Enter the 6-digit code from your authenticator app.
+				</p>
+			{:else if secondFactorStrategy === 'backup_code'}
+				<p class="text-sm leading-relaxed text-muted-foreground sm:text-base">
+					Enter one of your backup codes to finish signing in.
+				</p>
+			{/if}
+		</div>
 
-			<Input
-				id="sign-in-verification-code"
-				name="code"
-				type="text"
-				inputmode="numeric"
-				autocomplete="one-time-code"
-				placeholder={secondFactorStrategy === 'backup_code' ? 'Backup code' : 'Verification code'}
-				aria-label={secondFactorStrategy === 'backup_code' ? 'Backup code' : 'Verification code'}
-				class={inputClass}
-				bind:value={verificationCode}
-			/>
+		<form class="space-y-4" method="post" onsubmit={handleSecondFactorSubmit}>
+			<div>
+				<div class="mb-3 flex items-center justify-between">
+					<label for="sign-in-verification-code" class="text-sm font-medium">
+						{secondFactorStrategy === 'backup_code' ? 'Backup code' : 'Verification code'}
+					</label>
+					{#if secondFactorStrategy === 'email_code' || secondFactorStrategy === 'phone_code'}
+						<Button
+							type="button"
+							variant="outline"
+							class="h-8 gap-1.5 rounded-lg border-(--m-border-strong) px-3 text-xs font-medium shadow-none"
+							disabled={isSubmitting}
+							onclick={resendSecondFactorCode}
+						>
+							<RefreshCw size={12} />
+							Resend code
+						</Button>
+					{/if}
+				</div>
+
+				{#if secondFactorStrategy !== 'backup_code'}
+					<InputOTP
+						maxlength={6}
+						id="sign-in-verification-code"
+						bind:value={verificationCode}
+						pattern={REGEXP_ONLY_DIGITS}
+						onComplete={attemptSecondFactor}
+						class="w-full"
+					>
+						{#snippet children({ cells })}
+							<InputOTPGroup
+								class="w-full *:data-[slot=input-otp-slot]:h-14 *:data-[slot=input-otp-slot]:flex-1 *:data-[slot=input-otp-slot]:text-xl"
+							>
+								{#each cells as cell, i (i)}
+									<InputOTPSlot {cell} />
+								{/each}
+							</InputOTPGroup>
+						{/snippet}
+					</InputOTP>
+				{:else}
+					<Input
+						id="sign-in-verification-code"
+						name="code"
+						type="text"
+						inputmode="numeric"
+						autocomplete="one-time-code"
+						placeholder="Backup code"
+						aria-label="Backup code"
+						class={inputClass}
+						bind:value={verificationCode}
+					/>
+				{/if}
+			</div>
 
 			<div class="space-y-3 pt-1">
 				<Button type="submit" class={submitButtonClass} disabled={isSubmitting}>
 					{isSubmitting ? 'Verifying...' : 'Verify and continue'}
 				</Button>
-
-				{#if secondFactorStrategy === 'email_code' || secondFactorStrategy === 'phone_code'}
-					<Button
-						type="button"
-						variant="outline"
-						class={secondaryButtonClass}
-						disabled={isSubmitting}
-						onclick={resendSecondFactorCode}
-					>
-						Resend code
-					</Button>
-				{/if}
 
 				{#if backupCodeAvailable && secondFactorStrategy !== 'backup_code'}
 					<Button
