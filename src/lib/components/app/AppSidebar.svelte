@@ -63,10 +63,9 @@
 	}: Props = $props();
 
 	const clerk = useClerkContext();
-	const shouldSubscribeToWorkspaces = $derived(clerk.isLoaded && !!clerk.auth.userId);
 	const workspacesQuery = useQuery(
 		api.workspaces.listCurrentUserWorkspaces,
-		() => (shouldSubscribeToWorkspaces ? {} : 'skip'),
+		() => ({}),
 		() => ({
 			initialData: initialWorkspaces,
 			keepPreviousData: true
@@ -91,8 +90,7 @@
 	let isSigningOut = $state(false);
 	let createWorkspaceDialogOpen = $state(false);
 	const isLoadingWorkspaces = $derived(
-		initialWorkspaces.length === 0 &&
-			(!shouldSubscribeToWorkspaces || (workspacesQuery.isLoading && workspaces.length === 0))
+		initialWorkspaces.length === 0 && workspacesQuery.isLoading && workspaces.length === 0
 	);
 	const currentWorkspaceSubpath = $derived.by(() => {
 		const match = currentPath.match(/^\/app\/[^/]+(\/.*)?$/);

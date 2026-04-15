@@ -67,6 +67,74 @@
 		return false;
 	}
 
+	async function getTokenForSession(
+		registeredSessionId: string,
+		forceRefreshToken: boolean
+	): Promise<string | null> {
+		const activeSession = clerk.clerk?.session ?? clerk.session;
+		if (
+			!activeSession ||
+			activeSession.id !== registeredSessionId ||
+			!ownsCurrentTokenState(registeredSessionId)
+		) {
+			if (lastRegisteredSessionId === registeredSessionId) {
+				cachedToken = null;
+				cachedTokenExpiresAtMs = null;
+				inflightTokenPromise = null;
+			}
+			return null;
+		}
+
+		if (inflightTokenPromise) {
+			return await inflightTokenPromise;
+		}
+
+		if (!forceRefreshToken && hasUsableCachedToken()) {
+			return cachedToken;
+		}
+
+		const tokenPromise = (async () => {
+			try {
+				const token = await activeSession.getToken({
+					template: 'convex',
+					skipCache: forceRefreshToken
+				});
+
+				if (!ownsCurrentTokenState(registeredSessionId)) {
+					return null;
+				}
+
+				cachedToken = token ?? null;
+				cachedTokenExpiresAtMs = token ? decodeJwtExpiry(token) : null;
+
+				return cachedToken;
+			} catch (error) {
+				if (
+					isRateLimitError(error) &&
+					ownsCurrentTokenState(registeredSessionId) &&
+					hasUsableCachedToken()
+				) {
+					if (Date.now() - lastRateLimitLogAtMs > 5_000) {
+						lastRateLimitLogAtMs = Date.now();
+						console.warn('[auth/bridge] Clerk token rate-limited, reusing cached token');
+					}
+
+					return cachedToken;
+				}
+
+				console.error('[auth/bridge] token fetch failed', error);
+				return null;
+			} finally {
+				if (lastRegisteredSessionId === registeredSessionId) {
+					inflightTokenPromise = null;
+				}
+			}
+		})();
+
+		inflightTokenPromise = tokenPromise;
+		return await inflightTokenPromise;
+	}
+
 	$effect(() => {
 		if (!browser || convex.disabled) {
 			return;
@@ -93,6 +161,7 @@
 		}
 
 		if (sessionId === lastRegisteredSessionId) {
+			void getTokenForSession(sessionId, false);
 			return;
 		}
 
@@ -103,73 +172,10 @@
 
 		// Set the Convex auth token for the current Clerk session
 		convexClient.setAuth(
-			async ({ forceRefreshToken }) => {
-				const registeredSessionId = sessionId;
-				const activeSession = clerk.clerk?.session ?? clerk.session;
-				if (
-					!activeSession ||
-					activeSession.id !== registeredSessionId ||
-					!ownsCurrentTokenState(registeredSessionId)
-				) {
-					if (lastRegisteredSessionId === registeredSessionId) {
-						cachedToken = null;
-						cachedTokenExpiresAtMs = null;
-						inflightTokenPromise = null;
-					}
-					return null;
-				}
-
-				if (inflightTokenPromise) {
-					return await inflightTokenPromise;
-				}
-
-				if (!forceRefreshToken && hasUsableCachedToken()) {
-					return cachedToken;
-				}
-
-				const tokenPromise = (async () => {
-					try {
-						const token = await activeSession.getToken({
-							template: 'convex',
-							skipCache: forceRefreshToken
-						});
-
-						if (!ownsCurrentTokenState(registeredSessionId)) {
-							return null;
-						}
-
-						cachedToken = token ?? null;
-						cachedTokenExpiresAtMs = token ? decodeJwtExpiry(token) : null;
-
-						return cachedToken;
-					} catch (error) {
-						if (
-							isRateLimitError(error) &&
-							ownsCurrentTokenState(registeredSessionId) &&
-							hasUsableCachedToken()
-						) {
-							if (Date.now() - lastRateLimitLogAtMs > 5_000) {
-								lastRateLimitLogAtMs = Date.now();
-								console.warn('[auth/bridge] Clerk token rate-limited, reusing cached token');
-							}
-
-							return cachedToken;
-						}
-
-						console.error('[auth/bridge] token fetch failed', error);
-						return null;
-					} finally {
-						if (lastRegisteredSessionId === registeredSessionId) {
-							inflightTokenPromise = null;
-						}
-					}
-				})();
-
-				inflightTokenPromise = tokenPromise;
-				return await inflightTokenPromise;
-			},
+			async ({ forceRefreshToken }) => await getTokenForSession(sessionId, forceRefreshToken),
 			() => {}
 		);
+		void getTokenForSession(sessionId, false);
 	});
 
 	onDestroy(() => {
