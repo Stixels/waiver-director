@@ -11,6 +11,7 @@
 
 	$effect(() => {
 		let cancelled = false;
+		dataUrl = null;
 
 		void QRCode.toDataURL(text, {
 			margin: 1,
@@ -19,11 +20,18 @@
 				dark: '#111827',
 				light: '#ffffff'
 			}
-		}).then((nextUrl: string) => {
-			if (!cancelled) {
-				dataUrl = nextUrl;
-			}
-		});
+		})
+			.then((nextUrl: string) => {
+				if (!cancelled) {
+					dataUrl = nextUrl;
+				}
+			})
+			.catch((error: unknown) => {
+				if (!cancelled) {
+					dataUrl = null;
+				}
+				console.error('[waivers/qr-preview] unable to generate QR code', error);
+			});
 
 		return () => {
 			cancelled = true;

@@ -30,9 +30,23 @@
 		isConfirming = false,
 		onConfirm
 	}: Props = $props();
+	let localConfirming = $state(false);
+	const isBusy = $derived(isConfirming || localConfirming);
+
+	function handleCancel() {
+		if (isBusy) return;
+		open = false;
+	}
 
 	async function handleConfirm() {
-		await onConfirm();
+		if (isBusy) return;
+
+		localConfirming = true;
+		try {
+			await onConfirm();
+		} finally {
+			localConfirming = false;
+		}
 	}
 </script>
 
@@ -43,16 +57,16 @@
 			<DialogDescription>{description}</DialogDescription>
 		</DialogHeader>
 		<DialogFooter>
-			<Button type="button" variant="outline" onclick={() => (open = false)}>
+			<Button type="button" variant="outline" onclick={handleCancel} disabled={isBusy}>
 				{cancelLabel}
 			</Button>
 			<Button
 				type="button"
 				variant={destructive ? 'destructive' : 'default'}
 				onclick={handleConfirm}
-				disabled={isConfirming}
+				disabled={isBusy}
 			>
-				{isConfirming ? 'Working…' : confirmLabel}
+				{isBusy ? 'Working…' : confirmLabel}
 			</Button>
 		</DialogFooter>
 	</DialogContent>

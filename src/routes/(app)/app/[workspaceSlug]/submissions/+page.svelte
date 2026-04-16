@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { FunctionReturnType } from 'convex/server';
 	import { useQuery } from 'convex-svelte';
+	import { useClerkContext } from 'svelte-clerk';
 	import { api } from '$convex/_generated/api';
 	import type { Id } from '$convex/_generated/dataModel';
 	import SubmissionDetailSheet from '$lib/components/waivers/SubmissionDetailSheet.svelte';
@@ -16,15 +17,19 @@
 	let { data } = $props();
 
 	type RecentSubmission = FunctionReturnType<typeof api.waivers.listRecentSubmissions>[number];
+	const clerk = useClerkContext();
+	const canLoadProtectedData = $derived(
+		clerk.isLoaded && Boolean(clerk.auth.userId) && Boolean(clerk.auth.sessionId)
+	);
 
 	const submissionsQuery = useQuery(
 		api.waivers.listRecentSubmissions,
-		() => ({ workspaceId: data.currentWorkspace.workspaceId }),
+		() => (canLoadProtectedData ? { workspaceId: data.currentWorkspace.workspaceId } : 'skip'),
 		() => ({ keepPreviousData: true })
 	);
 
 	const recentSubmissions = $derived((submissionsQuery.data ?? []) as RecentSubmission[]);
-	const isLoadingSubmissions = $derived(submissionsQuery.isLoading);
+	const isLoadingSubmissions = $derived(!canLoadProtectedData || submissionsQuery.isLoading);
 
 	// lastSubmissionId stays set after first open so the sheet stays mounted
 	// (preserves close animation and avoids re-mounting on subsequent opens).
@@ -34,6 +39,16 @@
 	function openSubmission(submissionId: Id<'waiver_submissions'>) {
 		lastSubmissionId = submissionId;
 		detailOpen = true;
+	}
+
+	function handleSubmissionRowKeydown(
+		event: KeyboardEvent,
+		submissionId: Id<'waiver_submissions'>
+	) {
+		if (event.key !== 'Enter' && event.key !== ' ') return;
+
+		event.preventDefault();
+		openSubmission(submissionId);
 	}
 
 	function formatTimestamp(timestamp: number) {
@@ -111,8 +126,11 @@
 					<TableBody>
 						{#each recentSubmissions as submission (submission.submissionId)}
 							<TableRow
-								class="cursor-pointer border-border transition-colors hover:bg-muted/40"
+								class="cursor-pointer border-border transition-colors hover:bg-muted/40 focus-visible:bg-muted/40 focus-visible:outline-none"
+								role="button"
+								tabindex={0}
 								onclick={() => openSubmission(submission.submissionId)}
+								onkeydown={(event) => handleSubmissionRowKeydown(event, submission.submissionId)}
 							>
 								<TableCell>
 									<p class="text-sm font-medium">{submission.signerName}</p>

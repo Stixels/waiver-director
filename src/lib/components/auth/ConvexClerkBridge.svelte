@@ -85,7 +85,7 @@
 			return null;
 		}
 
-		if (inflightTokenPromise) {
+		if (!forceRefreshToken && inflightTokenPromise) {
 			return await inflightTokenPromise;
 		}
 
@@ -93,6 +93,7 @@
 			return cachedToken;
 		}
 
+		let currentTokenPromise: Promise<string | null> | null = null;
 		const tokenPromise = (async () => {
 			try {
 				const token = await activeSession.getToken({
@@ -125,14 +126,21 @@
 				console.error('[auth/bridge] token fetch failed', error);
 				return null;
 			} finally {
-				if (lastRegisteredSessionId === registeredSessionId) {
+				if (
+					lastRegisteredSessionId === registeredSessionId &&
+					inflightTokenPromise === currentTokenPromise
+				) {
 					inflightTokenPromise = null;
 				}
 			}
 		})();
+		currentTokenPromise = tokenPromise;
 
-		inflightTokenPromise = tokenPromise;
-		return await inflightTokenPromise;
+		if (!forceRefreshToken) {
+			inflightTokenPromise = tokenPromise;
+		}
+
+		return await tokenPromise;
 	}
 
 	$effect(() => {

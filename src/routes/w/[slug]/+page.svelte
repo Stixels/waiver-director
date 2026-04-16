@@ -230,6 +230,7 @@
 												class={waiverUnderlineInputClass}
 												value={currentStringAnswer(field.id)}
 												placeholder={field.placeholder ?? ''}
+												required={field.required}
 												oninput={(event) =>
 													setFieldAnswer(field.id, (event.currentTarget as HTMLInputElement).value)}
 											/>
@@ -240,6 +241,7 @@
 												rows={3}
 												value={currentStringAnswer(field.id)}
 												placeholder={field.placeholder ?? ''}
+												required={field.required}
 												oninput={(event) =>
 													setFieldAnswer(
 														field.id,
@@ -272,6 +274,7 @@
 													type="checkbox"
 													class="sr-only"
 													checked={currentBooleanAnswer(field.id)}
+													required={field.required}
 													onchange={(event) =>
 														setFieldAnswer(
 															field.id,
@@ -285,6 +288,7 @@
 												id={field.id}
 												class={waiverUnderlineInputClass}
 												value={currentStringAnswer(field.id)}
+												required={field.required}
 												onchange={(event) =>
 													setFieldAnswer(
 														field.id,
@@ -302,6 +306,7 @@
 												type="date"
 												class={waiverUnderlineInputClass}
 												value={currentStringAnswer(field.id)}
+												required={field.required}
 												oninput={(event) =>
 													setFieldAnswer(field.id, (event.currentTarget as HTMLInputElement).value)}
 											/>

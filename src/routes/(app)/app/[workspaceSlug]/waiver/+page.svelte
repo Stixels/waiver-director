@@ -1,8 +1,10 @@
 <script lang="ts">
+	import { beforeNavigate } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { onMount } from 'svelte';
 	import type { FunctionReturnType } from 'convex/server';
 	import { useConvexClient, useQuery } from 'convex-svelte';
+	import { useClerkContext } from 'svelte-clerk';
 	import { toast } from 'svelte-sonner';
 	import { api } from '$convex/_generated/api';
 	import { publicEnv } from '$lib/config/public';
@@ -53,15 +55,19 @@
 	type ConfirmKind = 'create' | 'publish' | 'archive' | 'delete' | 'discard';
 
 	const convex = useConvexClient();
+	const clerk = useClerkContext();
+	const canLoadProtectedData = $derived(
+		clerk.isLoaded && Boolean(clerk.auth.userId) && Boolean(clerk.auth.sessionId)
+	);
 
 	const templatesQuery = useQuery(
 		api.waivers.listTemplates,
-		() => ({ workspaceId: data.currentWorkspace.workspaceId }),
+		() => (canLoadProtectedData ? { workspaceId: data.currentWorkspace.workspaceId } : 'skip'),
 		() => ({ keepPreviousData: true })
 	);
 	const publishingQuery = useQuery(
 		api.waivers.getPublishingOverview,
-		() => ({ workspaceId: data.currentWorkspace.workspaceId }),
+		() => (canLoadProtectedData ? { workspaceId: data.currentWorkspace.workspaceId } : 'skip'),
 		() => ({ keepPreviousData: true })
 	);
 
@@ -69,7 +75,9 @@
 	const publishingOverview = $derived(
 		(publishingQuery.data ?? { activeLink: null }) as PublishingOverview
 	);
-	const isLoadingProtectedData = $derived(templatesQuery.isLoading || publishingQuery.isLoading);
+	const isLoadingProtectedData = $derived(
+		!canLoadProtectedData || templatesQuery.isLoading || publishingQuery.isLoading
+	);
 
 	function activeTemplateRank(template: TemplateSummary) {
 		if (template.isActivePublic) return 0;
@@ -87,6 +95,7 @@
 	let baselineDraft = $state<WaiverDefinition | null>(null);
 	let hydratedTemplateId = $state<TemplateSummary['templateId'] | null>(null);
 	let hydratedFingerprint = $state<string | null>(null);
+	let recentCreatedTemplateId = $state<TemplateSummary['templateId'] | null>(null);
 	let previewOpen = $state(false);
 	let pastWaiversOpen = $state(false);
 	let copyingKey = $state<string | null>(null);
@@ -147,6 +156,11 @@
 			(selectedTemplate.isActivePublic && !selectedTemplate.hasUnpublishedChanges)
 	);
 
+	beforeNavigate((navigation) => {
+		if (!isDirty || navigation.willUnload) return;
+		navigation.cancel();
+	});
+
 	$effect(() => {
 		if (templates.length === 0) {
 			selectedTemplateId = null;
@@ -154,16 +168,31 @@
 			baselineDraft = null;
 			hydratedTemplateId = null;
 			hydratedFingerprint = null;
+			recentCreatedTemplateId = null;
 			return;
 		}
 
+		const hasSelectedTemplate = selectedTemplateId
+			? templates.some((template) => template.templateId === selectedTemplateId)
+			: false;
+
 		// No selection or selection removed from list → pick first active template
-		if (
-			!selectedTemplateId ||
-			!templates.some((template) => template.templateId === selectedTemplateId)
-		) {
+		if (!selectedTemplateId) {
 			selectedTemplateId = activeTemplates[0]?.templateId ?? null;
 			return;
+		}
+
+		if (!hasSelectedTemplate) {
+			if (recentCreatedTemplateId === selectedTemplateId) {
+				return;
+			}
+
+			selectedTemplateId = activeTemplates[0]?.templateId ?? null;
+			return;
+		}
+
+		if (recentCreatedTemplateId === selectedTemplateId) {
+			recentCreatedTemplateId = null;
 		}
 
 		// Selected template just became archived (e.g. user just archived it) → move to active
@@ -325,6 +354,10 @@
 		previewOpen = true;
 	}
 
+	function openPastWaivers() {
+		pastWaiversOpen = true;
+	}
+
 	async function copyText(key: string, text: string) {
 		try {
 			copyingKey = key;
@@ -351,6 +384,7 @@
 				title: `Waiver ${templates.length + 1}`
 			});
 
+			recentCreatedTemplateId = result.templateId;
 			selectedTemplateId = result.templateId;
 			confirmOpen = false;
 			confirmKind = null;
@@ -556,9 +590,14 @@
 				<p class="mt-1 text-sm text-muted-foreground">
 					Create a waiver to start collecting signed submissions.
 				</p>
-				<Button class="mt-5" onclick={requestCreateTemplate} disabled={busy}>
-					{isCreating ? 'Creating…' : 'Create waiver'}
-				</Button>
+				<div class="mt-5 flex flex-wrap items-center justify-center gap-3">
+					<Button onclick={requestCreateTemplate} disabled={busy}>
+						{isCreating ? 'Creating…' : 'Create waiver'}
+					</Button>
+					<Button variant="outline" onclick={openPastWaivers} disabled={busy}>
+						View past waivers
+					</Button>
+				</div>
 			</div>
 		{:else}
 			<!-- Live status bar -->
@@ -748,9 +787,7 @@
 									<DropdownMenuItem onclick={requestCreateTemplate}>
 										Create new waiver
 									</DropdownMenuItem>
-									<DropdownMenuItem onclick={() => (pastWaiversOpen = true)}>
-										View past waivers
-									</DropdownMenuItem>
+									<DropdownMenuItem onclick={openPastWaivers}>View past waivers</DropdownMenuItem>
 								</DropdownMenuContent>
 							</DropdownMenu>
 						</div>

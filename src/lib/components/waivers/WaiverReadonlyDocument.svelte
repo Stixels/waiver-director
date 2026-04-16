@@ -59,6 +59,9 @@
 		if (value === null || value === undefined || value === '') return '—';
 		if (field.type === 'checkbox') return value === true ? 'Yes' : 'No';
 		if (field.type === 'date' && typeof value === 'string') return formatDob(value);
+		if (field.type === 'select' && typeof value === 'string') {
+			return field.options.find((option) => option.id === value)?.label ?? String(value);
+		}
 		return String(value);
 	}
 

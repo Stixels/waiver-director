@@ -63,9 +63,12 @@
 	}: Props = $props();
 
 	const clerk = useClerkContext();
+	const canLoadWorkspaces = $derived(
+		clerk.isLoaded && Boolean(clerk.auth.userId) && Boolean(clerk.auth.sessionId)
+	);
 	const workspacesQuery = useQuery(
 		api.workspaces.listCurrentUserWorkspaces,
-		() => ({}),
+		() => (canLoadWorkspaces ? {} : 'skip'),
 		() => ({
 			initialData: initialWorkspaces,
 			keepPreviousData: true

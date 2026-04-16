@@ -14,25 +14,63 @@
 	let context = $state<CanvasRenderingContext2D | null>(null);
 	let drawing = $state(false);
 	let hasSignature = $state(false);
+	let canvasSetupVersion = 0;
 
 	const CANVAS_HEIGHT = 180;
 
-	function setupCanvas() {
+	function configureContext(nextContext: CanvasRenderingContext2D, pixelRatio: number) {
+		nextContext.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+		nextContext.lineWidth = 2.25;
+		nextContext.lineCap = 'round';
+		nextContext.lineJoin = 'round';
+		nextContext.strokeStyle = '#111827';
+	}
+
+	function loadSignatureImage(src: string): Promise<HTMLImageElement | null> {
+		return new Promise((resolve) => {
+			const image = new Image();
+			image.onload = () => resolve(image);
+			image.onerror = () => resolve(null);
+			image.src = src;
+		});
+	}
+
+	async function setupCanvas() {
 		if (!canvas) return;
 
+		const setupVersion = ++canvasSetupVersion;
 		const pixelRatio = window.devicePixelRatio || 1;
 		const width = canvas.clientWidth;
+		const preservedImage =
+			hasSignature && canvas.width > 0 && canvas.height > 0
+				? canvas.toDataURL('image/png')
+				: value || '';
+
 		canvas.width = width * pixelRatio;
 		canvas.height = CANVAS_HEIGHT * pixelRatio;
-		context = canvas.getContext('2d');
+		const nextContext = canvas.getContext('2d');
+		context = nextContext;
 
-		if (!context) return;
+		if (!nextContext) return;
 
-		context.scale(pixelRatio, pixelRatio);
-		context.lineWidth = 2.25;
-		context.lineCap = 'round';
-		context.lineJoin = 'round';
-		context.strokeStyle = '#111827';
+		configureContext(nextContext, pixelRatio);
+		nextContext.clearRect(0, 0, width, CANVAS_HEIGHT);
+
+		if (!preservedImage) {
+			hasSignature = false;
+			return;
+		}
+
+		const savedImage = await loadSignatureImage(preservedImage);
+		if (!canvas || !context || setupVersion !== canvasSetupVersion) return;
+		if (!savedImage) {
+			hasSignature = value.length > 0;
+			return;
+		}
+
+		context.drawImage(savedImage, 0, 0, width, CANVAS_HEIGHT);
+		value = canvas.toDataURL('image/png') ?? '';
+		hasSignature = value.length > 0;
 	}
 
 	function relativePoint(event: PointerEvent) {
@@ -64,31 +102,37 @@
 
 		context.lineTo(point.x, point.y);
 		context.stroke();
-		value = canvas?.toDataURL('image/png') ?? '';
-		hasSignature = value.length > 0;
 	}
 
 	function endStroke(event: PointerEvent) {
 		if (!canvas) return;
 		if (drawing) {
-			canvas.releasePointerCapture(event.pointerId);
+			if (canvas.hasPointerCapture(event.pointerId)) {
+				canvas.releasePointerCapture(event.pointerId);
+			}
+			value = canvas.toDataURL('image/png') ?? '';
+			hasSignature = value.length > 0;
 		}
 		drawing = false;
 	}
 
 	function clearSignature() {
 		if (!canvas || !context) return;
-		context.clearRect(0, 0, canvas.width, canvas.height);
+		context.clearRect(0, 0, canvas.clientWidth, CANVAS_HEIGHT);
 		value = '';
 		hasSignature = value.length > 0;
 	}
 
 	onMount(() => {
-		setupCanvas();
-		window.addEventListener('resize', setupCanvas);
+		const handleResize = () => {
+			void setupCanvas();
+		};
+
+		void setupCanvas();
+		window.addEventListener('resize', handleResize);
 
 		return () => {
-			window.removeEventListener('resize', setupCanvas);
+			window.removeEventListener('resize', handleResize);
 		};
 	});
 </script>

@@ -7,6 +7,7 @@
 	import { Toaster } from '$lib/components/ui/sonner';
 	import { publicEnv } from '$lib/config/public';
 
+	// Use one shared Convex client for the app. Protected routes attach auth later via ConvexClerkBridge.
 	setupConvex(publicEnv.convexUrl);
 	let { children } = $props();
 </script>

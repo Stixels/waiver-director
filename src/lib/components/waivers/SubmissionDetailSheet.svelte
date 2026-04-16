@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { FunctionReturnType } from 'convex/server';
 	import { useQuery } from 'convex-svelte';
+	import { useClerkContext } from 'svelte-clerk';
 	import { api } from '$convex/_generated/api';
 	import type { Id } from '$convex/_generated/dataModel';
 	import {
@@ -21,15 +22,19 @@
 	let { open = $bindable(), workspaceId, submissionId }: Props = $props();
 
 	type Submission = NonNullable<FunctionReturnType<typeof api.waivers.getSubmission>>;
+	const clerk = useClerkContext();
+	const canLoadProtectedData = $derived(
+		clerk.isLoaded && Boolean(clerk.auth.userId) && Boolean(clerk.auth.sessionId)
+	);
 
 	const submissionQuery = useQuery(
 		api.waivers.getSubmission,
-		() => ({ workspaceId, submissionId }),
+		() => (canLoadProtectedData ? { workspaceId, submissionId } : 'skip'),
 		() => ({ keepPreviousData: true })
 	);
 
 	const submission = $derived(submissionQuery.data as Submission | null);
-	const isLoadingSubmission = $derived(submissionQuery.isLoading);
+	const isLoadingSubmission = $derived(!canLoadProtectedData || submissionQuery.isLoading);
 
 	function formatTimestamp(ts: number) {
 		return new Intl.DateTimeFormat('en-US', { dateStyle: 'long', timeStyle: 'short' }).format(
@@ -71,6 +76,39 @@
 						signatureDataUrl={submission.signatureDataUrl}
 						submittedAt={submission.submittedAt}
 					/>
+				{:else}
+					<div class="mx-auto max-w-3xl p-4 sm:p-6">
+						<section class="rounded-2xl border border-border bg-background p-6 shadow-sm">
+							<p class="text-xs font-semibold tracking-[0.14em] text-muted-foreground uppercase">
+								Waiver version unavailable
+							</p>
+							<h3 class="mt-2 text-lg font-semibold tracking-tight">
+								This signed record is preserved, but its original waiver body is no longer
+								available.
+							</h3>
+							<p class="mt-2 text-sm text-muted-foreground">
+								Workspace: {submission.workspaceName}
+							</p>
+							<div class="mt-5 grid gap-4 text-sm text-muted-foreground sm:grid-cols-2">
+								<div>
+									<p class="text-xs font-semibold tracking-[0.12em] uppercase">Signer</p>
+									<p class="mt-1 text-foreground">{submission.signerName}</p>
+								</div>
+								<div>
+									<p class="text-xs font-semibold tracking-[0.12em] uppercase">Email</p>
+									<p class="mt-1 text-foreground">{submission.signerEmail}</p>
+								</div>
+								<div>
+									<p class="text-xs font-semibold tracking-[0.12em] uppercase">Date of birth</p>
+									<p class="mt-1 text-foreground">{submission.signerDateOfBirth}</p>
+								</div>
+								<div>
+									<p class="text-xs font-semibold tracking-[0.12em] uppercase">Submitted</p>
+									<p class="mt-1 text-foreground">{formatTimestamp(submission.submittedAt)}</p>
+								</div>
+							</div>
+						</section>
+					</div>
 				{/if}
 			</div>
 		{/if}

@@ -135,7 +135,7 @@
 					</p>
 					<p class="mt-0.5 text-xs text-muted-foreground/70">
 						Add questions that appear before the signature section. Full name, email, date of birth,
-						typed legal name, and signature are always collected. Drag the grip handle to reorder.
+						and signature are always collected. Drag the grip handle to reorder.
 					</p>
 				</div>
 
