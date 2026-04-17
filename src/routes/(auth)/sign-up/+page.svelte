@@ -1,12 +1,14 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
-	import { ChartLine, FileText, Link2, Mail, ShieldCheck } from '@lucide/svelte';
+	import { ChartLine, FileText, Link2, Mail, RefreshCw, ShieldCheck } from '@lucide/svelte';
+	import { REGEXP_ONLY_DIGITS } from 'bits-ui';
 	import { useClerkContext } from 'svelte-clerk';
 
 	import { getClerkErrorMessage, getSafePostAuthRedirectHref } from '$lib/auth/clerk-helpers';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
+	import { InputOTP, InputOTPGroup, InputOTPSlot } from '$lib/components/ui/input-otp';
 
 	const inputClass =
 		'h-14 rounded-xl border-(--m-border-strong) bg-(--m-elevated) px-4 text-sm text-foreground shadow-none transition-[border-color,box-shadow] placeholder:text-(--m-text-3) focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/25 sm:px-5 md:text-sm';
@@ -141,7 +143,6 @@
 			});
 
 			isAwaitingVerification = true;
-			submitMessage = `We sent a verification code to ${email.trim()}.`;
 		} catch (error) {
 			submitError = getClerkErrorMessage(error, 'Unable to create your account right now.');
 		} finally {
@@ -149,9 +150,7 @@
 		}
 	}
 
-	async function handleVerificationSubmit(event: SubmitEvent) {
-		event.preventDefault();
-
+	async function attemptVerification() {
 		const signUp = getSignUpResource();
 		if (!clerk.isLoaded || !signUp) {
 			submitError = 'Authentication is still loading. Please try again.';
@@ -176,9 +175,34 @@
 				return;
 			}
 
+			verificationCode = '';
 			submitError = 'Verification is not complete yet. Please check the code and try again.';
 		} catch (error) {
 			submitError = getClerkErrorMessage(error, 'Unable to verify your email right now.');
+			verificationCode = '';
+		} finally {
+			isSubmitting = false;
+		}
+	}
+
+	async function handleVerificationSubmit(event: SubmitEvent) {
+		event.preventDefault();
+		await attemptVerification();
+	}
+
+	async function handleResendCode() {
+		const signUp = getSignUpResource();
+		if (!clerk.isLoaded || !signUp) return;
+
+		isSubmitting = true;
+		submitError = null;
+		submitMessage = null;
+
+		try {
+			await signUp.prepareEmailAddressVerification({ strategy: 'email_code' });
+			submitMessage = 'Verification code resent.';
+		} catch (error) {
+			submitError = getClerkErrorMessage(error, 'Unable to resend code right now.');
 		} finally {
 			isSubmitting = false;
 		}
@@ -287,38 +311,58 @@
 
 			<!-- Right: Form -->
 			<div class="px-9 py-10 sm:px-12 sm:py-12">
-				<div class="mb-8">
-					<h1
-						class="mb-2 font-black tracking-tight"
-						style="font-family: 'Bricolage Grotesque', sans-serif; font-size: clamp(1.5rem, 4vw, 2rem); letter-spacing: -0.03em; line-height: 1.15;"
-					>
-						Create your account
-					</h1>
-					<p class="text-sm leading-relaxed text-muted-foreground sm:text-base">
-						The operator account comes first. Workspace setup is a separate step.
-					</p>
-				</div>
-
 				{#if isAwaitingVerification}
-					<form class="space-y-4" onsubmit={handleVerificationSubmit}>
-						<div class="rounded-xl border border-(--m-border-soft) bg-(--m-elevated) px-4 py-3">
-							<p class="text-sm font-medium">Check your email</p>
-							<p class="mt-1 text-sm text-muted-foreground">
-								Enter the verification code sent to {email.trim()} to finish creating your account.
-							</p>
-						</div>
+					<div class="mb-8">
+						<h1
+							class="mb-2 font-black tracking-tight"
+							style="font-family: 'Bricolage Grotesque', sans-serif; font-size: clamp(1.5rem, 4vw, 2rem); letter-spacing: -0.03em; line-height: 1.15;"
+						>
+							Check your email
+						</h1>
+						<p class="text-sm leading-relaxed text-muted-foreground sm:text-base">
+							Enter the 6-digit code sent to <strong class="font-semibold text-foreground"
+								>{email.trim()}</strong
+							>.
+						</p>
+					</div>
 
-						<Input
-							id="sign-up-verification-code"
-							name="code"
-							type="text"
-							inputmode="numeric"
-							autocomplete="one-time-code"
-							placeholder="Verification code"
-							aria-label="Verification code"
-							class={inputClass}
-							bind:value={verificationCode}
-						/>
+					<form class="space-y-4" onsubmit={handleVerificationSubmit}>
+						<div>
+							<div class="mb-3 flex items-center justify-between">
+								<label for="otp-verification" class="text-sm font-medium">
+									Verification code
+								</label>
+								<Button
+									type="button"
+									variant="outline"
+									class="h-8 gap-1.5 rounded-lg border-(--m-border-strong) px-3 text-xs font-medium shadow-none"
+									disabled={isSubmitting}
+									onclick={handleResendCode}
+								>
+									<RefreshCw size={12} />
+									Resend code
+								</Button>
+							</div>
+
+							<InputOTP
+								maxlength={6}
+								inputId="otp-verification"
+								bind:value={verificationCode}
+								pattern={REGEXP_ONLY_DIGITS}
+								onComplete={attemptVerification}
+								class="w-full"
+							>
+								{#snippet children({ cells })}
+									<InputOTPGroup
+										class="w-full *:data-[slot=input-otp-slot]:h-14 *:data-[slot=input-otp-slot]:flex-1 *:data-[slot=input-otp-slot]:text-xl"
+									>
+										{#each cells as cell, i (i)}
+											<InputOTPSlot {cell} />
+										{/each}
+									</InputOTPGroup>
+								{/snippet}
+							</InputOTP>
+						</div>
 
 						<div class="space-y-3 pt-1">
 							<Button type="submit" class={submitButtonClass} disabled={isSubmitting}>
@@ -356,6 +400,17 @@
 						</div>
 					</form>
 				{:else}
+					<div class="mb-8">
+						<h1
+							class="mb-2 font-black tracking-tight"
+							style="font-family: 'Bricolage Grotesque', sans-serif; font-size: clamp(1.5rem, 4vw, 2rem); letter-spacing: -0.03em; line-height: 1.15;"
+						>
+							Create your account
+						</h1>
+						<p class="text-sm leading-relaxed text-muted-foreground sm:text-base">
+							Get early access to Waiver Director.
+						</p>
+					</div>
 					<form class="space-y-4" onsubmit={handleSubmit}>
 						<Input
 							id="sign-up-email"
@@ -443,12 +498,6 @@
 								</svg>
 								Continue with Google
 							</Button>
-
-							{#if submitMessage}
-								<p class="text-center text-sm text-muted-foreground" role="status">
-									{submitMessage}
-								</p>
-							{/if}
 
 							{#if submitError}
 								<p class="text-center text-sm text-destructive" role="status">{submitError}</p>
