@@ -1,9 +1,8 @@
 <script lang="ts">
 	import type { FunctionReturnType } from 'convex/server';
-	import { useQuery } from 'convex-svelte';
-	import { useClerkContext } from 'svelte-clerk';
 	import { api } from '$convex/_generated/api';
 	import type { Id } from '$convex/_generated/dataModel';
+	import { useProtectedQuery } from '$lib/components/auth/convex-auth.svelte';
 	import SubmissionDetailSheet from '$lib/components/waivers/SubmissionDetailSheet.svelte';
 	import {
 		Table,
@@ -17,19 +16,15 @@
 	let { data } = $props();
 
 	type RecentSubmission = FunctionReturnType<typeof api.waivers.listRecentSubmissions>[number];
-	const clerk = useClerkContext();
-	const canLoadProtectedData = $derived(
-		clerk.isLoaded && Boolean(clerk.auth.userId) && Boolean(clerk.auth.sessionId)
-	);
 
-	const submissionsQuery = useQuery(
+	const submissionsQuery = useProtectedQuery(
 		api.waivers.listRecentSubmissions,
-		() => (canLoadProtectedData ? { workspaceId: data.currentWorkspace.workspaceId } : 'skip'),
+		() => ({ workspaceId: data.currentWorkspace.workspaceId }),
 		() => ({ keepPreviousData: true })
 	);
 
 	const recentSubmissions = $derived((submissionsQuery.data ?? []) as RecentSubmission[]);
-	const isLoadingSubmissions = $derived(!canLoadProtectedData || submissionsQuery.isLoading);
+	const isLoadingSubmissions = $derived(submissionsQuery.isLoading);
 
 	// lastSubmissionId stays set after first open so the sheet stays mounted
 	// (preserves close animation and avoids re-mounting on subsequent opens).

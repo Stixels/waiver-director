@@ -1,9 +1,8 @@
 <script lang="ts">
 	import type { FunctionReturnType } from 'convex/server';
-	import { useQuery } from 'convex-svelte';
-	import { useClerkContext } from 'svelte-clerk';
 	import { api } from '$convex/_generated/api';
 	import type { Id } from '$convex/_generated/dataModel';
+	import { useProtectedQuery } from '$lib/components/auth/convex-auth.svelte';
 	import {
 		Dialog,
 		DialogContent,
@@ -22,19 +21,15 @@
 	let { open = $bindable(), workspaceId, submissionId }: Props = $props();
 
 	type Submission = NonNullable<FunctionReturnType<typeof api.waivers.getSubmission>>;
-	const clerk = useClerkContext();
-	const canLoadProtectedData = $derived(
-		clerk.isLoaded && Boolean(clerk.auth.userId) && Boolean(clerk.auth.sessionId)
-	);
 
-	const submissionQuery = useQuery(
+	const submissionQuery = useProtectedQuery(
 		api.waivers.getSubmission,
-		() => (canLoadProtectedData ? { workspaceId, submissionId } : 'skip'),
+		() => ({ workspaceId, submissionId }),
 		() => ({ keepPreviousData: true })
 	);
 
 	const submission = $derived(submissionQuery.data as Submission | null);
-	const isLoadingSubmission = $derived(!canLoadProtectedData || submissionQuery.isLoading);
+	const isLoadingSubmission = $derived(submissionQuery.isLoading);
 
 	function formatTimestamp(ts: number) {
 		return new Intl.DateTimeFormat('en-US', { dateStyle: 'long', timeStyle: 'short' }).format(

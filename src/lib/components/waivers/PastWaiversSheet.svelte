@@ -1,9 +1,8 @@
 <script lang="ts">
 	import type { FunctionReturnType } from 'convex/server';
-	import { useQuery } from 'convex-svelte';
-	import { useClerkContext } from 'svelte-clerk';
 	import { api } from '$convex/_generated/api';
 	import type { Id } from '$convex/_generated/dataModel';
+	import { useProtectedQuery } from '$lib/components/auth/convex-auth.svelte';
 	import {
 		Sheet,
 		SheetContent,
@@ -26,14 +25,10 @@
 	let { open = $bindable(), workspaceId }: Props = $props();
 
 	type TemplateSummary = FunctionReturnType<typeof api.waivers.listTemplates>[number];
-	const clerk = useClerkContext();
-	const canLoadProtectedData = $derived(
-		clerk.isLoaded && Boolean(clerk.auth.userId) && Boolean(clerk.auth.sessionId)
-	);
 
-	const templatesQuery = useQuery(
+	const templatesQuery = useProtectedQuery(
 		api.waivers.listTemplates,
-		() => (canLoadProtectedData ? { workspaceId } : 'skip'),
+		() => ({ workspaceId }),
 		() => ({ keepPreviousData: true })
 	);
 
@@ -124,7 +119,7 @@
 			</SheetHeader>
 
 			<div class="min-h-0 flex-1 overflow-y-auto">
-				{#if !canLoadProtectedData || templatesQuery.isLoading}
+				{#if templatesQuery.isLoading}
 					<div class="px-6 py-12 text-center text-sm text-muted-foreground">Loading…</div>
 				{:else if archivedTemplates.length === 0}
 					<div class="px-6 py-12 text-center text-sm text-muted-foreground">

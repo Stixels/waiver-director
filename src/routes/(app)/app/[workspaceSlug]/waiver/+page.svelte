@@ -3,10 +3,10 @@
 	import { resolve } from '$app/paths';
 	import { onMount } from 'svelte';
 	import type { FunctionReturnType } from 'convex/server';
-	import { useConvexClient, useQuery } from 'convex-svelte';
-	import { useClerkContext } from 'svelte-clerk';
+	import { useConvexClient } from 'convex-svelte';
 	import { toast } from 'svelte-sonner';
 	import { api } from '$convex/_generated/api';
+	import { useProtectedQuery } from '$lib/components/auth/convex-auth.svelte';
 	import { publicEnv } from '$lib/config/public';
 	import ConfirmDialog from '$lib/components/ui/ConfirmDialog.svelte';
 	import QrCodePreview from '$lib/components/waivers/QrCodePreview.svelte';
@@ -55,19 +55,15 @@
 	type ConfirmKind = 'create' | 'publish' | 'archive' | 'delete' | 'discard';
 
 	const convex = useConvexClient();
-	const clerk = useClerkContext();
-	const canLoadProtectedData = $derived(
-		clerk.isLoaded && Boolean(clerk.auth.userId) && Boolean(clerk.auth.sessionId)
-	);
 
-	const templatesQuery = useQuery(
+	const templatesQuery = useProtectedQuery(
 		api.waivers.listTemplates,
-		() => (canLoadProtectedData ? { workspaceId: data.currentWorkspace.workspaceId } : 'skip'),
+		() => ({ workspaceId: data.currentWorkspace.workspaceId }),
 		() => ({ keepPreviousData: true })
 	);
-	const publishingQuery = useQuery(
+	const publishingQuery = useProtectedQuery(
 		api.waivers.getPublishingOverview,
-		() => (canLoadProtectedData ? { workspaceId: data.currentWorkspace.workspaceId } : 'skip'),
+		() => ({ workspaceId: data.currentWorkspace.workspaceId }),
 		() => ({ keepPreviousData: true })
 	);
 
@@ -75,9 +71,7 @@
 	const publishingOverview = $derived(
 		(publishingQuery.data ?? { activeLink: null }) as PublishingOverview
 	);
-	const isLoadingProtectedData = $derived(
-		!canLoadProtectedData || templatesQuery.isLoading || publishingQuery.isLoading
-	);
+	const isLoadingProtectedData = $derived(templatesQuery.isLoading || publishingQuery.isLoading);
 
 	function activeTemplateRank(template: TemplateSummary) {
 		if (template.isActivePublic) return 0;

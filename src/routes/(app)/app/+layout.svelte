@@ -1,7 +1,8 @@
 <script lang="ts">
 	import ConvexClerkBridge from '$lib/components/auth/ConvexClerkBridge.svelte';
-	let { children } = $props();
+	let { children, data } = $props();
 </script>
 
-<ConvexClerkBridge />
-{@render children()}
+<ConvexClerkBridge initialToken={data.convexToken}>
+	{@render children()}
+</ConvexClerkBridge>

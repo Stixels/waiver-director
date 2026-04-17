@@ -13,6 +13,7 @@ export const load: LayoutServerLoad = async ({ locals, url }) => {
 
 	const currentUser = await requireCurrentAppUser(locals);
 	const workspaces = await loadCurrentUserWorkspaces(locals);
+	const convexToken = await auth.getToken({ template: 'convex' });
 
 	if (workspaces.length === 0 && url.pathname !== '/app/workspaces/new') {
 		throw redirect(303, '/app/workspaces/new');
@@ -20,6 +21,7 @@ export const load: LayoutServerLoad = async ({ locals, url }) => {
 
 	return {
 		currentUser,
-		workspaces
+		workspaces,
+		convexToken
 	};
 };

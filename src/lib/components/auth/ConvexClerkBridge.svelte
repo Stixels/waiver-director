@@ -1,11 +1,28 @@
 <script lang="ts">
 	import { browser } from '$app/environment';
-	import { onDestroy } from 'svelte';
+	import { onDestroy, tick, type Snippet } from 'svelte';
 	import { useConvexClient } from 'convex-svelte';
 	import { useClerkContext } from 'svelte-clerk';
+	import {
+		setConvexAuthContext,
+		type ConvexAuthState
+	} from '$lib/components/auth/convex-auth.svelte';
+
+	interface Props {
+		initialToken?: string | null;
+		children?: Snippet;
+	}
+
+	let { initialToken = null, children }: Props = $props();
 
 	const clerk = useClerkContext();
 	const convex = useConvexClient();
+	const convexAuth = $state<ConvexAuthState>({
+		status: 'loading',
+		prepareForSignOut,
+		restoreAfterFailedSignOut
+	});
+	setConvexAuthContext(convexAuth);
 
 	let lastRegisteredSessionId: string | null = null;
 
@@ -13,6 +30,7 @@
 	let cachedTokenExpiresAtMs: number | null = $state(null);
 	let inflightTokenPromise: Promise<string | null> | null = null;
 	let lastRateLimitLogAtMs = 0;
+	let hasSeededInitialToken = false;
 
 	function decodeJwtExpiry(token: string): number | null {
 		try {
@@ -44,6 +62,56 @@
 
 	function ownsCurrentTokenState(sessionId: string) {
 		return lastRegisteredSessionId === sessionId && getCurrentSessionId() === sessionId;
+	}
+
+	function seedInitialToken() {
+		if (hasSeededInitialToken) return;
+		hasSeededInitialToken = true;
+
+		if (!initialToken) return;
+
+		cachedToken = initialToken;
+		cachedTokenExpiresAtMs = decodeJwtExpiry(initialToken);
+	}
+
+	async function prepareForSignOut() {
+		convexAuth.status = 'unauthenticated';
+		await tick();
+	}
+
+	function restoreAfterFailedSignOut() {
+		const sessionId = lastRegisteredSessionId;
+		if (!sessionId || getCurrentSessionId() !== sessionId) return;
+		convexAuth.status = 'authenticated';
+	}
+
+	function updateAuthStatusForSession(sessionId: string, isAuthenticated: boolean) {
+		if (!ownsCurrentTokenState(sessionId)) return;
+		convexAuth.status = isAuthenticated ? 'authenticated' : 'unauthenticated';
+	}
+
+	function beginUnauthenticatedTeardown() {
+		const previousSessionId = lastRegisteredSessionId;
+
+		cachedToken = null;
+		cachedTokenExpiresAtMs = null;
+		inflightTokenPromise = null;
+		convexAuth.status = 'unauthenticated';
+
+		if (previousSessionId) {
+			void clearConvexAuthAfterProtectedQueriesSkip(previousSessionId);
+		}
+	}
+
+	async function clearConvexAuthAfterProtectedQueriesSkip(sessionId: string) {
+		await tick();
+
+		if (lastRegisteredSessionId !== sessionId || getCurrentSessionId()) {
+			return;
+		}
+
+		convex.client.clearAuth();
+		lastRegisteredSessionId = null;
 	}
 
 	function isRateLimitError(error: unknown) {
@@ -154,22 +222,16 @@
 		const sessionId = clerk.auth.sessionId;
 
 		if (!isLoaded) {
+			convexAuth.status = 'loading';
 			return;
 		}
 
 		if (!userId || !sessionId) {
-			cachedToken = null;
-			cachedTokenExpiresAtMs = null;
-			inflightTokenPromise = null;
-			if (lastRegisteredSessionId !== null) {
-				convexClient.clearAuth();
-				lastRegisteredSessionId = null;
-			}
+			beginUnauthenticatedTeardown();
 			return;
 		}
 
 		if (sessionId === lastRegisteredSessionId) {
-			void getTokenForSession(sessionId, false);
 			return;
 		}
 
@@ -177,13 +239,14 @@
 		cachedToken = null;
 		cachedTokenExpiresAtMs = null;
 		inflightTokenPromise = null;
+		convexAuth.status = 'loading';
+		seedInitialToken();
 
 		// Set the Convex auth token for the current Clerk session
 		convexClient.setAuth(
 			async ({ forceRefreshToken }) => await getTokenForSession(sessionId, forceRefreshToken),
-			() => {}
+			(isAuthenticated) => updateAuthStatusForSession(sessionId, isAuthenticated)
 		);
-		void getTokenForSession(sessionId, false);
 	});
 
 	onDestroy(() => {
@@ -192,7 +255,10 @@
 		}
 
 		inflightTokenPromise = null;
+		convexAuth.status = 'unauthenticated';
 		convex.client.clearAuth();
 		lastRegisteredSessionId = null;
 	});
 </script>
+
+{@render children?.()}
