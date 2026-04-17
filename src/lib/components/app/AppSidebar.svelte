@@ -43,6 +43,7 @@
 		mode?: 'sidebar' | 'drawer';
 		onNavigate?: () => void;
 		initialWorkspaces?: WorkspaceSummary[];
+		isLoadingWorkspaces?: boolean;
 	}
 
 	type WorkspaceSummary = FunctionReturnType<typeof api.app.current>['workspaces'][number];
@@ -56,7 +57,8 @@
 		collapsed = $bindable(false),
 		mode = 'sidebar',
 		onNavigate,
-		initialWorkspaces = []
+		initialWorkspaces = [],
+		isLoadingWorkspaces = false
 	}: Props = $props();
 
 	const convexAuth = useConvexAuthState();
@@ -78,7 +80,6 @@
 	const currentPath = $derived(page.url.pathname);
 	let isSigningOut = $state(false);
 	let createWorkspaceDialogOpen = $state(false);
-	const isLoadingWorkspaces = false;
 	const currentWorkspaceSubpath = $derived.by(() => {
 		const match = currentPath.match(/^\/app\/[^/]+(\/.*)?$/);
 		return match?.[1] ?? '';
@@ -163,7 +164,7 @@
 		handleNavigation();
 
 		await goto(resolve(`/app/${workspace.slug}` as `/app/${string}`), {
-			invalidateAll: true,
+			invalidate: ['app:bootstrap'],
 			noScroll: true
 		});
 	}

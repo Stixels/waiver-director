@@ -2,6 +2,8 @@
 	import type { FunctionReturnType } from 'convex/server';
 	import { api } from '$convex/_generated/api';
 	import type { Id } from '$convex/_generated/dataModel';
+	import { page } from '$app/state';
+	import { useAppContext } from '$lib/components/app/app-context.svelte';
 	import { useProtectedQuery } from '$lib/components/auth/convex-auth.svelte';
 	import SubmissionDetailSheet from '$lib/components/waivers/SubmissionDetailSheet.svelte';
 	import {
@@ -12,19 +14,21 @@
 		TableHeader,
 		TableRow
 	} from '$lib/components/ui/table';
+	import { Skeleton } from '$lib/components/ui/skeleton';
 
-	let { data } = $props();
-
-	type RecentSubmission = FunctionReturnType<typeof api.waivers.listRecentSubmissions>[number];
-
+	const appContext = useAppContext();
+	const currentWorkspace = $derived(
+		appContext.workspaces.find((workspace) => workspace.slug === page.params.workspaceSlug) ?? null
+	);
 	const submissionsQuery = useProtectedQuery(
 		api.waivers.listRecentSubmissions,
-		() => ({ workspaceId: data.currentWorkspace.workspaceId }),
+		() => (currentWorkspace ? { workspaceId: currentWorkspace.workspaceId } : 'skip'),
 		() => ({ keepPreviousData: true })
 	);
 
+	type RecentSubmission = FunctionReturnType<typeof api.waivers.listRecentSubmissions>[number];
 	const recentSubmissions = $derived((submissionsQuery.data ?? []) as RecentSubmission[]);
-	const isLoadingSubmissions = $derived(submissionsQuery.isLoading);
+	const isLoadingSubmissions = $derived(submissionsQuery.isLoading || appContext.isLoading);
 
 	// lastSubmissionId stays set after first open so the sheet stays mounted
 	// (preserves close animation and avoids re-mounting on subsequent opens).
@@ -60,13 +64,13 @@
 </script>
 
 <svelte:head>
-	<title>{data.currentWorkspace.name} Submissions | Waiver Director</title>
+	<title>{currentWorkspace?.name ?? 'Workspace'} Submissions | Waiver Director</title>
 </svelte:head>
 
-{#if lastSubmissionId}
+{#if lastSubmissionId && currentWorkspace}
 	<SubmissionDetailSheet
 		bind:open={detailOpen}
-		workspaceId={data.currentWorkspace.workspaceId}
+		workspaceId={currentWorkspace.workspaceId}
 		submissionId={lastSubmissionId}
 	/>
 {/if}
@@ -80,10 +84,63 @@
 		</div>
 
 		{#if isLoadingSubmissions}
+			<div class="rounded-xl border border-border">
+				<Table class="table-fixed">
+					<colgroup>
+						<col class="w-[21.25%]" />
+						<col class="w-[38%]" />
+						<col class="w-[18.35%]" />
+						<col class="w-[22.4%]" />
+					</colgroup>
+					<TableHeader>
+						<TableRow class="border-border hover:bg-transparent">
+							<TableHead
+								class="text-xs font-semibold tracking-[0.1em] text-muted-foreground uppercase"
+							>
+								Name
+							</TableHead>
+							<TableHead
+								class="text-xs font-semibold tracking-[0.1em] text-muted-foreground uppercase"
+							>
+								Email
+							</TableHead>
+							<TableHead
+								class="text-xs font-semibold tracking-[0.1em] text-muted-foreground uppercase"
+							>
+								Date of birth
+							</TableHead>
+							<TableHead
+								class="text-xs font-semibold tracking-[0.1em] text-muted-foreground uppercase"
+							>
+								Submitted
+							</TableHead>
+						</TableRow>
+					</TableHeader>
+					<TableBody>
+						{#each [0, 1, 2, 3, 4, 5] as index (index)}
+							<TableRow class="border-border hover:bg-transparent">
+								<TableCell>
+									<Skeleton class="h-5 w-32" />
+								</TableCell>
+								<TableCell>
+									<Skeleton class="h-5 w-44" />
+								</TableCell>
+								<TableCell>
+									<Skeleton class="h-5 w-28" />
+								</TableCell>
+								<TableCell>
+									<Skeleton class="h-5 w-36" />
+								</TableCell>
+							</TableRow>
+						{/each}
+					</TableBody>
+				</Table>
+			</div>
+		{:else if !currentWorkspace}
 			<div
 				class="rounded-2xl border border-dashed border-border bg-muted/20 px-4 py-16 text-center text-sm text-muted-foreground"
 			>
-				Loading signed submissions…
+				Workspace not found.
 			</div>
 		{:else if recentSubmissions.length === 0}
 			<div
@@ -93,7 +150,13 @@
 			</div>
 		{:else}
 			<div class="rounded-xl border border-border">
-				<Table>
+				<Table class="table-fixed">
+					<colgroup>
+						<col class="w-[21.25%]" />
+						<col class="w-[38%]" />
+						<col class="w-[18.35%]" />
+						<col class="w-[22.4%]" />
+					</colgroup>
 					<TableHeader>
 						<TableRow class="border-border hover:bg-transparent">
 							<TableHead

@@ -31,7 +31,7 @@ export function useConvexAuthState(): ConvexAuthState {
 
 export function useProtectedQuery<Query extends FunctionReference<'query'>>(
 	query: Query,
-	args: FunctionArgs<Query> | (() => FunctionArgs<Query>),
+	args: FunctionArgs<Query> | 'skip' | (() => FunctionArgs<Query> | 'skip'),
 	options?: UseQueryOptions<Query> | (() => UseQueryOptions<Query>)
 ) {
 	const auth = useConvexAuthState();
@@ -60,7 +60,7 @@ export function useProtectedQuery<Query extends FunctionReference<'query'>>(
 }
 
 function resolveArgs<Query extends FunctionReference<'query'>>(
-	args: FunctionArgs<Query> | (() => FunctionArgs<Query>)
-): FunctionArgs<Query> {
-	return typeof args === 'function' ? (args as () => FunctionArgs<Query>)() : args;
+	args: FunctionArgs<Query> | 'skip' | (() => FunctionArgs<Query> | 'skip')
+): FunctionArgs<Query> | 'skip' {
+	return typeof args === 'function' ? (args as () => FunctionArgs<Query> | 'skip')() : args;
 }

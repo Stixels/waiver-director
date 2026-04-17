@@ -10,6 +10,7 @@
 		SheetTitle,
 		SheetDescription
 	} from '$lib/components/ui/sheet';
+	import { Skeleton } from '$lib/components/ui/skeleton';
 	import WaiverRichText from '$lib/components/waivers/WaiverRichText.svelte';
 	import {
 		waiverSectionCardClass,
@@ -116,7 +117,17 @@
 
 			<div class="min-h-0 flex-1 overflow-y-auto">
 				{#if templatesQuery.isLoading}
-					<div class="px-6 py-12 text-center text-sm text-muted-foreground">Loading…</div>
+					<ul class="divide-y divide-border">
+						{#each [0, 1, 2, 3, 4] as index (index)}
+							<li class="flex items-center justify-between gap-3 px-6 py-4">
+								<div class="min-w-0 flex-1 space-y-1.5">
+									<Skeleton class="h-4 w-44 max-w-full" />
+									<Skeleton class="h-3 w-24" />
+								</div>
+								<Skeleton class="h-3 w-10 shrink-0" />
+							</li>
+						{/each}
+					</ul>
 				{:else if archivedTemplates.length === 0}
 					<div class="px-6 py-12 text-center text-sm text-muted-foreground">
 						No archived waivers yet.

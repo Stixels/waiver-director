@@ -1,8 +1,11 @@
 <script lang="ts">
+	import AppBootstrap from '$lib/components/app/AppBootstrap.svelte';
 	import ConvexClerkBridge from '$lib/components/auth/ConvexClerkBridge.svelte';
-	let { children, data } = $props();
+	let { children } = $props();
 </script>
 
-<ConvexClerkBridge initialToken={data.convexToken}>
-	{@render children()}
+<ConvexClerkBridge>
+	<AppBootstrap>
+		{@render children()}
+	</AppBootstrap>
 </ConvexClerkBridge>

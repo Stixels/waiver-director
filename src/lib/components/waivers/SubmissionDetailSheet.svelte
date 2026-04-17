@@ -10,6 +10,7 @@
 		DialogHeader,
 		DialogTitle
 	} from '$lib/components/ui/dialog';
+	import { Skeleton } from '$lib/components/ui/skeleton';
 	import WaiverReadonlyDocument from '$lib/components/waivers/WaiverReadonlyDocument.svelte';
 
 	interface Props {
@@ -47,11 +48,48 @@
 	<DialogContent
 		class="h-[96vh] w-[calc(100vw-1rem)] max-w-none gap-0 overflow-hidden p-0 sm:w-[calc(100vw-2rem)] sm:max-w-[calc(100vw-2rem)] xl:max-w-[min(1500px,calc(100vw-4rem))]"
 	>
-		{#if !submission}
+		{#if isLoadingSubmission}
+			<DialogHeader class="shrink-0 border-b border-border px-6 py-5">
+				<DialogTitle><Skeleton class="h-5 w-48" /></DialogTitle>
+				<DialogDescription><Skeleton class="h-3.5 w-40" /></DialogDescription>
+			</DialogHeader>
+
+			<div class="min-h-0 flex-1 overflow-y-auto bg-muted/20">
+				<div class="mx-auto max-w-5xl p-4 sm:p-6">
+					<div class="rounded-2xl border border-border bg-background p-6 shadow-sm">
+						<div class="flex flex-col gap-6 lg:grid lg:grid-cols-[minmax(0,1fr)_18rem]">
+							<div class="space-y-6">
+								<section class="space-y-4">
+									<Skeleton class="h-8 w-72 max-w-full" />
+									<div class="space-y-2">
+										<Skeleton class="h-4 w-full" />
+										<Skeleton class="h-4 w-11/12" />
+										<Skeleton class="h-4 w-2/3" />
+									</div>
+								</section>
+								<section class="space-y-4">
+									<Skeleton class="h-4 w-32" />
+									{#each [0, 1, 2, 3] as index (index)}
+										<div class="rounded-lg border border-border p-4">
+											<Skeleton class="h-4 w-48" />
+											<Skeleton class="mt-3 h-9 w-full" />
+										</div>
+									{/each}
+								</section>
+							</div>
+							<aside class="space-y-4 rounded-xl border border-border bg-muted/20 p-4">
+								<Skeleton class="h-4 w-24" />
+								<Skeleton class="h-4 w-40" />
+								<Skeleton class="h-4 w-36" />
+								<Skeleton class="h-24 w-full" />
+							</aside>
+						</div>
+					</div>
+				</div>
+			</div>
+		{:else if !submission}
 			<div class="flex flex-1 items-center justify-center">
-				<p class="text-sm text-muted-foreground">
-					{isLoadingSubmission ? 'Loading…' : 'Submission not found.'}
-				</p>
+				<p class="text-sm text-muted-foreground">Submission not found.</p>
 			</div>
 		{:else}
 			<DialogHeader class="shrink-0 border-b border-border px-6 py-5">

@@ -1,11 +1,13 @@
 <script lang="ts">
 	import { beforeNavigate } from '$app/navigation';
 	import { resolve } from '$app/paths';
+	import { page } from '$app/state';
 	import { onMount } from 'svelte';
 	import type { FunctionReturnType } from 'convex/server';
 	import { useConvexClient } from 'convex-svelte';
 	import { toast } from 'svelte-sonner';
 	import { api } from '$convex/_generated/api';
+	import { useAppContext } from '$lib/components/app/app-context.svelte';
 	import { useProtectedQuery } from '$lib/components/auth/convex-auth.svelte';
 	import { publicEnv } from '$lib/config/public';
 	import ConfirmDialog from '$lib/components/ui/ConfirmDialog.svelte';
@@ -14,6 +16,7 @@
 	import WaiverReadonlyDocument from '$lib/components/waivers/WaiverReadonlyDocument.svelte';
 	import PastWaiversSheet from '$lib/components/waivers/PastWaiversSheet.svelte';
 	import { Button } from '$lib/components/ui/button';
+	import { Skeleton } from '$lib/components/ui/skeleton';
 	import {
 		Dialog,
 		DialogContent,
@@ -44,7 +47,10 @@
 	import CheckIcon from '@lucide/svelte/icons/check';
 	import QrCodeIcon from '@lucide/svelte/icons/qr-code';
 
-	let { data } = $props();
+	const appContext = useAppContext();
+	const currentWorkspace = $derived(
+		appContext.workspaces.find((workspace) => workspace.slug === page.params.workspaceSlug) ?? null
+	);
 
 	type TemplateSummary = FunctionReturnType<typeof api.waivers.listTemplates>[number];
 	type PublishingOverview = FunctionReturnType<typeof api.waivers.getPublishingOverview>;
@@ -58,12 +64,12 @@
 
 	const templatesQuery = useProtectedQuery(
 		api.waivers.listTemplates,
-		() => ({ workspaceId: data.currentWorkspace.workspaceId }),
+		() => (currentWorkspace ? { workspaceId: currentWorkspace.workspaceId } : 'skip'),
 		() => ({ keepPreviousData: true })
 	);
 	const publishingQuery = useProtectedQuery(
 		api.waivers.getPublishingOverview,
-		() => ({ workspaceId: data.currentWorkspace.workspaceId }),
+		() => (currentWorkspace ? { workspaceId: currentWorkspace.workspaceId } : 'skip'),
 		() => ({ keepPreviousData: true })
 	);
 
@@ -71,7 +77,9 @@
 	const publishingOverview = $derived(
 		(publishingQuery.data ?? { activeLink: null }) as PublishingOverview
 	);
-	const isLoadingProtectedData = $derived(templatesQuery.isLoading || publishingQuery.isLoading);
+	const isLoadingProtectedData = $derived(
+		appContext.isLoading || templatesQuery.isLoading || publishingQuery.isLoading
+	);
 
 	function activeTemplateRank(template: TemplateSummary) {
 		if (template.isActivePublic) return 0;
@@ -365,7 +373,7 @@
 	}
 
 	async function createTemplate() {
-		if (convex.disabled) {
+		if (convex.disabled || !currentWorkspace) {
 			toast.error('Waiver editor is still loading. Please try again.');
 			return;
 		}
@@ -374,7 +382,7 @@
 
 		try {
 			const result = await convex.mutation(api.waivers.createTemplate, {
-				workspaceId: data.currentWorkspace.workspaceId,
+				workspaceId: currentWorkspace.workspaceId,
 				title: `Waiver ${templates.length + 1}`
 			});
 
@@ -391,13 +399,13 @@
 	}
 
 	async function saveDraft() {
-		if (convex.disabled || !selectedTemplate || !draft) return;
+		if (convex.disabled || !currentWorkspace || !selectedTemplate || !draft) return;
 
 		isSaving = true;
 
 		try {
 			await convex.mutation(api.waivers.updateTemplate, {
-				workspaceId: data.currentWorkspace.workspaceId,
+				workspaceId: currentWorkspace.workspaceId,
 				templateId: selectedTemplate.templateId,
 				definition: draft
 			});
@@ -412,13 +420,13 @@
 	}
 
 	async function publishTemplate() {
-		if (convex.disabled || !selectedTemplate) return;
+		if (convex.disabled || !currentWorkspace || !selectedTemplate) return;
 
 		isPublishing = true;
 
 		try {
 			await convex.mutation(api.waivers.publishTemplate, {
-				workspaceId: data.currentWorkspace.workspaceId,
+				workspaceId: currentWorkspace.workspaceId,
 				templateId: selectedTemplate.templateId,
 				activate: true
 			});
@@ -434,13 +442,13 @@
 	}
 
 	async function archiveTemplate() {
-		if (convex.disabled || !selectedTemplate) return;
+		if (convex.disabled || !currentWorkspace || !selectedTemplate) return;
 
 		isArchiving = true;
 
 		try {
 			await convex.mutation(api.waivers.archiveTemplate, {
-				workspaceId: data.currentWorkspace.workspaceId,
+				workspaceId: currentWorkspace.workspaceId,
 				templateId: selectedTemplate.templateId
 			});
 
@@ -455,13 +463,13 @@
 	}
 
 	async function deleteTemplate() {
-		if (convex.disabled || !selectedTemplate) return;
+		if (convex.disabled || !currentWorkspace || !selectedTemplate) return;
 
 		isDeleting = true;
 
 		try {
 			await convex.mutation(api.waivers.deleteTemplate, {
-				workspaceId: data.currentWorkspace.workspaceId,
+				workspaceId: currentWorkspace.workspaceId,
 				templateId: selectedTemplate.templateId
 			});
 
@@ -499,7 +507,7 @@
 </script>
 
 <svelte:head>
-	<title>{data.currentWorkspace.name} Waiver | Waiver Director</title>
+	<title>{currentWorkspace?.name ?? 'Workspace'} Waiver | Waiver Director</title>
 </svelte:head>
 
 {#if confirmKind}
@@ -514,7 +522,9 @@
 	/>
 {/if}
 
-<PastWaiversSheet bind:open={pastWaiversOpen} workspaceId={data.currentWorkspace.workspaceId} />
+{#if currentWorkspace}
+	<PastWaiversSheet bind:open={pastWaiversOpen} workspaceId={currentWorkspace.workspaceId} />
+{/if}
 
 <Dialog bind:open={previewOpen}>
 	<DialogContent
@@ -529,7 +539,7 @@
 
 		<div class="min-h-0 flex-1 overflow-y-auto bg-muted/20 p-4 sm:p-6">
 			<WaiverReadonlyDocument
-				workspaceName={data.currentWorkspace.name}
+				workspaceName={currentWorkspace?.name}
 				title={currentDraft.title}
 				introCopy={currentDraft.introCopy}
 				fields={currentDraft.fields}
@@ -568,13 +578,108 @@
 		</div>
 
 		{#if isLoadingProtectedData}
-			<div
-				class="rounded-2xl border border-dashed border-border bg-muted/20 px-6 py-16 text-center"
-			>
-				<p class="text-base font-medium tracking-tight">Loading waiver workspace…</p>
-				<p class="mt-1 text-sm text-muted-foreground">
-					Connecting your signed-in session to live waiver data.
-				</p>
+			<div class="space-y-5">
+				<div class="flex items-stretch overflow-hidden rounded-xl border border-border bg-card">
+					<div class="flex min-w-0 flex-1 items-center gap-3 px-4 py-3">
+						<div class="flex shrink-0 items-center gap-2">
+							<Skeleton class="h-2 w-2 rounded-full" />
+							<Skeleton class="h-3 w-10" />
+						</div>
+						<div class="hidden h-3.5 w-px shrink-0 bg-border sm:block"></div>
+						<div class="hidden min-w-0 flex-1 space-y-1.5 sm:block">
+							<Skeleton class="h-4 w-52 max-w-full" />
+							<Skeleton class="h-3 w-full max-w-md" />
+						</div>
+					</div>
+					<div class="flex shrink-0 items-stretch divide-x divide-border border-l border-border">
+						<div class="flex items-center px-3">
+							<Skeleton class="h-4 w-28" />
+						</div>
+						<div class="flex items-center px-3">
+							<Skeleton class="h-4 w-12" />
+						</div>
+						<div class="flex items-center px-3">
+							<Skeleton class="h-4 w-16" />
+						</div>
+					</div>
+				</div>
+
+				<div class="space-y-4">
+					<div class="flex flex-wrap items-start justify-between gap-4">
+						<div class="space-y-2">
+							<div class="flex flex-wrap items-center gap-3">
+								<Skeleton class="h-7 w-56" />
+								<Skeleton class="h-3 w-24" />
+							</div>
+							<Skeleton class="h-4 w-36" />
+						</div>
+						<div class="flex flex-wrap items-center gap-2">
+							<Skeleton class="h-9 w-20" />
+							<Skeleton class="h-9 w-24" />
+							<Skeleton class="h-9 w-20" />
+							<Skeleton class="h-9 w-9" />
+						</div>
+					</div>
+
+					<div class="space-y-7">
+						<div class="space-y-4">
+							<div class="space-y-2">
+								<Skeleton class="h-3 w-24" />
+								<Skeleton class="h-10 w-full" />
+							</div>
+
+							<div class="space-y-2">
+								<Skeleton class="h-3 w-24" />
+								<Skeleton class="h-5 w-[28rem] max-w-full" />
+								<div class="overflow-hidden rounded-xl border border-border bg-background">
+									<div class="flex h-10 items-center gap-1 border-b border-border px-3">
+										<Skeleton class="h-7 w-7" />
+										<Skeleton class="h-7 w-7" />
+										<Skeleton class="h-7 w-7" />
+										<Skeleton class="h-7 w-16" />
+									</div>
+									<div class="min-h-[30rem] space-y-3 p-4">
+										<Skeleton class="h-4 w-full" />
+										<Skeleton class="h-4 w-11/12" />
+										<Skeleton class="h-4 w-2/3" />
+										<Skeleton class="h-4 w-5/6" />
+										<Skeleton class="h-4 w-full" />
+										<Skeleton class="h-4 w-3/4" />
+										<Skeleton class="mt-5 h-5 w-64 max-w-full" />
+										<Skeleton class="h-4 w-full" />
+										<Skeleton class="h-4 w-10/12" />
+										<Skeleton class="mt-5 h-5 w-56 max-w-full" />
+										<Skeleton class="h-4 w-full" />
+										<Skeleton class="h-4 w-11/12" />
+									</div>
+								</div>
+							</div>
+						</div>
+
+						<div class="space-y-4">
+							<div class="flex flex-wrap items-center justify-between gap-3">
+								<div class="space-y-1.5">
+									<Skeleton class="h-3 w-28" />
+									<Skeleton class="h-3 w-[34rem] max-w-full" />
+								</div>
+
+								<div class="flex flex-wrap gap-1.5">
+									<Skeleton class="h-9 w-16" />
+									<Skeleton class="h-9 w-16" />
+									<Skeleton class="h-9 w-20" />
+									<Skeleton class="h-9 w-20" />
+									<Skeleton class="h-9 w-16" />
+								</div>
+							</div>
+
+							<div
+								class="rounded-xl border border-dashed border-border bg-muted/20 px-4 py-8 text-center"
+							>
+								<Skeleton class="mx-auto h-3 w-80 max-w-full" />
+							</div>
+						</div>
+					</div>
+				</div>
 			</div>
 		{:else if activeTemplates.length === 0}
 			<div

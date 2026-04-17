@@ -1,8 +1,9 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
-	import { page } from '$app/state';
+	import { navigating, page } from '$app/state';
 	import AppSidebar from '$lib/components/app/AppSidebar.svelte';
+	import { useAppContext } from '$lib/components/app/app-context.svelte';
 	import {
 		Sheet,
 		SheetContent,
@@ -12,7 +13,8 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import MenuIcon from '@lucide/svelte/icons/menu';
 
-	let { children, data } = $props();
+	let { children } = $props();
+	const appContext = useAppContext();
 
 	let sidebarCollapsed = $state(false);
 	let mobileNavOpen = $state(false);
@@ -20,6 +22,9 @@
 	let isDesktop = $state(false);
 
 	const DESKTOP_BREAKPOINT_QUERY = '(min-width: 1024px)';
+	const isRouteNavigating = $derived(
+		Boolean(navigating.to?.url && navigating.to.url.pathname !== page.url.pathname)
+	);
 
 	function closeMobileNav(): void {
 		mobileNavOpen = false;
@@ -49,12 +54,17 @@
 			<AppSidebar
 				bind:collapsed={sidebarCollapsed}
 				mode="sidebar"
-				initialWorkspaces={data.workspaces}
+				initialWorkspaces={appContext.workspaces}
+				isLoadingWorkspaces={appContext.isLoading}
 			/>
 		</aside>
 	{/if}
 
-	<div class="flex min-w-0 flex-1 flex-col overflow-hidden">
+	<div class="relative flex min-w-0 flex-1 flex-col overflow-hidden">
+		<div class="app-navigation-progress" data-active={isRouteNavigating} aria-hidden="true">
+			<div></div>
+		</div>
+
 		<header
 			class="app-topbar flex h-14 shrink-0 items-center gap-3 border-b border-border bg-background px-4 lg:hidden"
 		>
@@ -95,7 +105,8 @@
 						<AppSidebar
 							mode="drawer"
 							onNavigate={closeMobileNav}
-							initialWorkspaces={data.workspaces}
+							initialWorkspaces={appContext.workspaces}
+							isLoadingWorkspaces={appContext.isLoading}
 						/>
 					{/if}
 				</SheetContent>
@@ -124,9 +135,53 @@
 		flex-basis: 3.5rem;
 	}
 
+	.app-navigation-progress {
+		position: absolute;
+		inset: 0 0 auto;
+		z-index: 40;
+		height: 2px;
+		overflow: hidden;
+		pointer-events: none;
+		opacity: 0;
+		transition: opacity 120ms ease;
+	}
+
+	.app-navigation-progress[data-active='true'] {
+		opacity: 1;
+	}
+
+	.app-navigation-progress > div {
+		width: 42%;
+		height: 100%;
+		background: var(--primary);
+		box-shadow: 0 0 18px color-mix(in oklch, var(--primary) 55%, transparent);
+		transform: translateX(-100%);
+		animation: app-navigation-progress 1s ease-in-out infinite;
+	}
+
+	@keyframes app-navigation-progress {
+		0% {
+			transform: translateX(-100%);
+		}
+
+		55% {
+			transform: translateX(120%);
+		}
+
+		100% {
+			transform: translateX(240%);
+		}
+	}
+
 	@media (prefers-reduced-motion: reduce) {
 		.app-sidebar {
 			transition: none;
+		}
+
+		.app-navigation-progress > div {
+			animation: none;
+			transform: none;
+			width: 100%;
 		}
 	}
 </style>
