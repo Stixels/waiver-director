@@ -23,3 +23,10 @@ export async function getWorkspaceMembership(
 		)
 		.unique();
 }
+
+export async function getWorkspaceBySlug(ctx: FunctionCtx, slug: string) {
+	return await ctx.db
+		.query('workspaces')
+		.withIndex('by_slug', (query) => query.eq('slug', slug))
+		.unique();
+}

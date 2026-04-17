@@ -7,16 +7,16 @@
 - HTTP endpoints are defined in `convex/http.ts` and require an `httpAction` decorator. For example:
 
 ```typescript
-import { httpRouter } from 'convex/server';
-import { httpAction } from './_generated/server';
+import { httpRouter } from "convex/server";
+import { httpAction } from "./_generated/server";
 const http = httpRouter();
 http.route({
-	path: '/echo',
-	method: 'POST',
-	handler: httpAction(async (ctx, req) => {
-		const body = await req.bytes();
-		return new Response(body, { status: 200 });
-	})
+  path: "/echo",
+  method: "POST",
+  handler: httpAction(async (ctx, req) => {
+    const body = await req.bytes();
+    return new Response(body, { status: 200 });
+  }),
 });
 ```
 
@@ -27,38 +27,38 @@ http.route({
 - Below is an example of an array validator:
 
 ```typescript
-import { mutation } from './_generated/server';
-import { v } from 'convex/values';
+import { mutation } from "./_generated/server";
+import { v } from "convex/values";
 
 export default mutation({
-	args: {
-		simpleArray: v.array(v.union(v.string(), v.number()))
-	},
-	handler: async (ctx, args) => {
-		//...
-	}
+  args: {
+    simpleArray: v.array(v.union(v.string(), v.number())),
+  },
+  handler: async (ctx, args) => {
+    //...
+  },
 });
 ```
 
 - Below is an example of a schema with validators that codify a discriminated union type:
 
 ```typescript
-import { defineSchema, defineTable } from 'convex/server';
-import { v } from 'convex/values';
+import { defineSchema, defineTable } from "convex/server";
+import { v } from "convex/values";
 
 export default defineSchema({
-	results: defineTable(
-		v.union(
-			v.object({
-				kind: v.literal('error'),
-				errorMessage: v.string()
-			}),
-			v.object({
-				kind: v.literal('success'),
-				value: v.number()
-			})
-		)
-	)
+  results: defineTable(
+    v.union(
+      v.object({
+        kind: v.literal("error"),
+        errorMessage: v.string(),
+      }),
+      v.object({
+        kind: v.literal("success"),
+        value: v.number(),
+      }),
+    ),
+  ),
 });
 ```
 
@@ -123,18 +123,18 @@ export const g = query({
 - Define pagination using the following syntax:
 
 ```ts
-import { v } from 'convex/values';
-import { query, mutation } from './_generated/server';
-import { paginationOptsValidator } from 'convex/server';
+import { v } from "convex/values";
+import { query, mutation } from "./_generated/server";
+import { paginationOptsValidator } from "convex/server";
 export const listWithExtraArg = query({
-	args: { paginationOpts: paginationOptsValidator, author: v.string() },
-	handler: async (ctx, args) => {
-		return await ctx.db
-			.query('messages')
-			.withIndex('by_author', (q) => q.eq('author', args.author))
-			.order('desc')
-			.paginate(args.paginationOpts);
-	}
+  args: { paginationOpts: paginationOptsValidator, author: v.string() },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("messages")
+      .withIndex("by_author", (q) => q.eq("author", args.author))
+      .order("desc")
+      .paginate(args.paginationOpts);
+  },
 });
 ```
 
@@ -164,12 +164,12 @@ Note: `paginationOpts` is an object with the following properties:
 
 ```typescript
 export default {
-	providers: [
-		{
-			domain: 'https://your-auth-provider.com',
-			applicationID: 'convex'
-		}
-	]
+  providers: [
+    {
+      domain: "https://your-auth-provider.com",
+      applicationID: "convex",
+    },
+  ],
 };
 ```
 
@@ -181,16 +181,16 @@ The `domain` must be the issuer URL of the JWT provider. Convex fetches `{domain
 - When using an external auth provider with Convex on the client, use `ConvexProviderWithAuth` instead of `ConvexProvider`:
 
 ```tsx
-import { ConvexProviderWithAuth, ConvexReactClient } from 'convex/react';
+import { ConvexProviderWithAuth, ConvexReactClient } from "convex/react";
 
 const convex = new ConvexReactClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
 function App({ children }: { children: React.ReactNode }) {
-	return (
-		<ConvexProviderWithAuth client={convex} useAuth={useYourAuthHook}>
-			{children}
-		</ConvexProviderWithAuth>
-	);
+  return (
+    <ConvexProviderWithAuth client={convex} useAuth={useYourAuthHook}>
+      {children}
+    </ConvexProviderWithAuth>
+  );
 }
 ```
 
@@ -204,22 +204,22 @@ The `useAuth` prop must return `{ isLoading, isAuthenticated, fetchAccessToken }
 - If you need to define a `Record` make sure that you correctly provide the type of the key and value in the type. For example a validator `v.record(v.id('users'), v.string())` would have the type `Record<Id<'users'>, string>`. Below is an example of using `Record` with an `Id` type in a query:
 
 ```ts
-import { query } from './_generated/server';
-import { Doc, Id } from './_generated/dataModel';
+import { query } from "./_generated/server";
+import { Doc, Id } from "./_generated/dataModel";
 
 export const exampleQuery = query({
-	args: { userIds: v.array(v.id('users')) },
-	handler: async (ctx, args) => {
-		const idToUsername: Record<Id<'users'>, string> = {};
-		for (const userId of args.userIds) {
-			const user = await ctx.db.get('users', userId);
-			if (user) {
-				idToUsername[user._id] = user.username;
-			}
-		}
+  args: { userIds: v.array(v.id("users")) },
+  handler: async (ctx, args) => {
+    const idToUsername: Record<Id<"users">, string> = {};
+    for (const userId of args.userIds) {
+      const user = await ctx.db.get("users", userId);
+      if (user) {
+        idToUsername[user._id] = user.username;
+      }
+    }
 
-		return idToUsername;
-	}
+    return idToUsername;
+  },
 });
 ```
 
@@ -266,14 +266,14 @@ q.search("body", "hello hi").eq("channel", "#general"),
 - Below is an example of the syntax for an action:
 
 ```ts
-import { action } from './_generated/server';
+import { action } from "./_generated/server";
 
 export const exampleAction = action({
-	args: {},
-	handler: async (ctx, args) => {
-		console.log('This action does not return anything');
-		return null;
-	}
+  args: {},
+  handler: async (ctx, args) => {
+    console.log("This action does not return anything");
+    return null;
+  },
 });
 ```
 
@@ -286,21 +286,21 @@ export const exampleAction = action({
 - Define crons by declaring the top-level `crons` object, calling some methods on it, and then exporting it as default. For example,
 
 ```ts
-import { cronJobs } from 'convex/server';
-import { internal } from './_generated/api';
-import { internalAction } from './_generated/server';
+import { cronJobs } from "convex/server";
+import { internal } from "./_generated/api";
+import { internalAction } from "./_generated/server";
 
 const empty = internalAction({
-	args: {},
-	handler: async (ctx, args) => {
-		console.log('empty');
-	}
+  args: {},
+  handler: async (ctx, args) => {
+    console.log("empty");
+  },
 });
 
 const crons = cronJobs();
 
 // Run `internal.crons.empty` every two hours.
-crons.interval('delete inactive users', { hours: 2 }, internal.crons.empty, {});
+crons.interval("delete inactive users", { hours: 2 }, internal.crons.empty, {});
 
 export default crons;
 ```
@@ -316,18 +316,18 @@ Test files go inside the `convex/` directory. You must pass a module map from `i
 
 ```typescript
 /// <reference types="vite/client" />
-import { convexTest } from 'convex-test';
-import { expect, test } from 'vitest';
-import { api } from './_generated/api';
-import schema from './schema';
+import { convexTest } from "convex-test";
+import { expect, test } from "vitest";
+import { api } from "./_generated/api";
+import schema from "./schema";
 
-const modules = import.meta.glob('./**/*.ts');
+const modules = import.meta.glob("./**/*.ts");
 
-test('some behavior', async () => {
-	const t = convexTest(schema, modules);
-	await t.mutation(api.messages.send, { body: 'Hi!', author: 'Sarah' });
-	const messages = await t.query(api.messages.list);
-	expect(messages).toMatchObject([{ body: 'Hi!', author: 'Sarah' }]);
+test("some behavior", async () => {
+  const t = convexTest(schema, modules);
+  await t.mutation(api.messages.send, { body: "Hi!", author: "Sarah" });
+  const messages = await t.query(api.messages.list);
+  expect(messages).toMatchObject([{ body: "Hi!", author: "Sarah" }]);
 });
 ```
 

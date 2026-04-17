@@ -3,10 +3,9 @@
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
 	import type { FunctionReturnType } from 'convex/server';
-	import { useQuery } from 'convex-svelte';
-	import { useClerkContext } from 'svelte-clerk';
 	import { toast } from 'svelte-sonner';
 	import { api } from '$convex/_generated/api';
+	import { useConvexAuthState, useProtectedQuery } from '$lib/components/auth/convex-auth.svelte';
 	import { appMainNavItems, appConfigNavItems } from '$lib/domain/navigation';
 	import CreateWorkspaceForm from '$lib/components/workspaces/CreateWorkspaceForm.svelte';
 	import { Skeleton } from '$lib/components/ui/skeleton';
@@ -62,11 +61,10 @@
 		initialWorkspaces = []
 	}: Props = $props();
 
-	const clerk = useClerkContext();
-	const shouldSubscribeToWorkspaces = $derived(clerk.isLoaded && !!clerk.auth.userId);
-	const workspacesQuery = useQuery(
+	const convexAuth = useConvexAuthState();
+	const workspacesQuery = useProtectedQuery(
 		api.workspaces.listCurrentUserWorkspaces,
-		() => (shouldSubscribeToWorkspaces ? {} : 'skip'),
+		() => ({}),
 		() => ({
 			initialData: initialWorkspaces,
 			keepPreviousData: true
@@ -91,8 +89,7 @@
 	let isSigningOut = $state(false);
 	let createWorkspaceDialogOpen = $state(false);
 	const isLoadingWorkspaces = $derived(
-		initialWorkspaces.length === 0 &&
-			(!shouldSubscribeToWorkspaces || (workspacesQuery.isLoading && workspaces.length === 0))
+		initialWorkspaces.length === 0 && workspacesQuery.isLoading && workspaces.length === 0
 	);
 	const currentWorkspaceSubpath = $derived.by(() => {
 		const match = currentPath.match(/^\/app\/[^/]+(\/.*)?$/);
@@ -183,15 +180,13 @@
 	}
 
 	async function handleSignOut(): Promise<void> {
-		if (!clerk.clerk || isSigningOut) return;
+		if (isSigningOut) return;
 
 		handleNavigation();
 		isSigningOut = true;
 
 		try {
-			await clerk.clerk.signOut({
-				redirectUrl: resolve('/')
-			});
+			await convexAuth.signOut(resolve('/'));
 		} catch (error) {
 			console.error('[auth/sign-out] failed', error);
 			toast.error('Unable to sign out right now. Please try again.');

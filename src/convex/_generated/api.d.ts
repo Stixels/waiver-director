@@ -9,8 +9,10 @@
  */
 
 import type * as lib_auth from "../lib/auth.js";
+import type * as lib_waivers from "../lib/waivers.js";
 import type * as lib_workspaces from "../lib/workspaces.js";
 import type * as users from "../users.js";
+import type * as waivers from "../waivers.js";
 import type * as workspaces from "../workspaces.js";
 
 import type {
@@ -21,8 +23,10 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   "lib/auth": typeof lib_auth;
+  "lib/waivers": typeof lib_waivers;
   "lib/workspaces": typeof lib_workspaces;
   users: typeof users;
+  waivers: typeof waivers;
   workspaces: typeof workspaces;
 }>;
 
