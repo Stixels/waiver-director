@@ -5,7 +5,7 @@
 	import type { FunctionReturnType } from 'convex/server';
 	import { toast } from 'svelte-sonner';
 	import { api } from '$convex/_generated/api';
-	import { useConvexAuthState, useProtectedQuery } from '$lib/components/auth/convex-auth.svelte';
+	import { useConvexAuthState } from '$lib/components/auth/convex-auth.svelte';
 	import { appMainNavItems, appConfigNavItems } from '$lib/domain/navigation';
 	import CreateWorkspaceForm from '$lib/components/workspaces/CreateWorkspaceForm.svelte';
 	import { Skeleton } from '$lib/components/ui/skeleton';
@@ -45,9 +45,7 @@
 		initialWorkspaces?: WorkspaceSummary[];
 	}
 
-	type WorkspaceSummary = FunctionReturnType<
-		typeof api.workspaces.listCurrentUserWorkspaces
-	>[number];
+	type WorkspaceSummary = FunctionReturnType<typeof api.app.current>['workspaces'][number];
 
 	type AppRouteHref =
 		| '/app/[workspaceSlug]'
@@ -62,15 +60,7 @@
 	}: Props = $props();
 
 	const convexAuth = useConvexAuthState();
-	const workspacesQuery = useProtectedQuery(
-		api.workspaces.listCurrentUserWorkspaces,
-		() => ({}),
-		() => ({
-			initialData: initialWorkspaces,
-			keepPreviousData: true
-		})
-	);
-	const workspaces = $derived(workspacesQuery.data ?? initialWorkspaces);
+	const workspaces = $derived(initialWorkspaces);
 	const currentWorkspaceSlug = $derived(page.params.workspaceSlug ?? null);
 	const activeWorkspace = $derived.by(() => {
 		if (currentWorkspaceSlug) {
@@ -88,9 +78,7 @@
 	const currentPath = $derived(page.url.pathname);
 	let isSigningOut = $state(false);
 	let createWorkspaceDialogOpen = $state(false);
-	const isLoadingWorkspaces = $derived(
-		initialWorkspaces.length === 0 && workspacesQuery.isLoading && workspaces.length === 0
-	);
+	const isLoadingWorkspaces = false;
 	const currentWorkspaceSubpath = $derived.by(() => {
 		const match = currentPath.match(/^\/app\/[^/]+(\/.*)?$/);
 		return match?.[1] ?? '';
@@ -102,7 +90,7 @@
 
 	$effect(() => {
 		if (typeof window === 'undefined') return;
-		if (workspacesQuery.isLoading || !activeWorkspaceSlug) return;
+		if (!activeWorkspaceSlug) return;
 		if (currentWorkspaceSlug === activeWorkspaceSlug) return;
 
 		void goto(resolve(workspacePathnameFor(activeWorkspaceSlug)), {
@@ -175,6 +163,7 @@
 		handleNavigation();
 
 		await goto(resolve(`/app/${workspace.slug}` as `/app/${string}`), {
+			invalidateAll: true,
 			noScroll: true
 		});
 	}

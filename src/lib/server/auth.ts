@@ -1,18 +1,21 @@
 import { api } from '../../convex/_generated/api';
 
-export async function ensureCurrentAppUser(locals: App.Locals) {
-	let currentUser = await locals.convex.query(api.users.currentUser, {});
+export async function loadCurrentAppContext(locals: App.Locals) {
+	const appContext = await locals.convex.query(api.app.current, {});
 
-	if (!currentUser) {
+	if (!appContext.currentUser) {
 		const ensuredUser = await locals.convex.mutation(api.users.ensureCurrentUser, {});
-		currentUser = ensuredUser.currentUser;
+		return {
+			currentUser: ensuredUser.currentUser,
+			workspaces: []
+		};
 	}
 
-	return currentUser;
+	return appContext;
 }
 
 export async function requireCurrentAppUser(locals: App.Locals) {
-	const currentUser = await ensureCurrentAppUser(locals);
+	const { currentUser } = await loadCurrentAppContext(locals);
 
 	if (!currentUser) {
 		throw new Error('Authenticated Clerk session is missing a corresponding Convex user.');
@@ -21,13 +24,12 @@ export async function requireCurrentAppUser(locals: App.Locals) {
 	return currentUser;
 }
 
-export async function loadCurrentUserWorkspaces(locals: App.Locals) {
-	return await locals.convex.query(api.workspaces.listCurrentUserWorkspaces, {});
-}
-
 export async function getSignedInAppRedirectPath(locals: App.Locals) {
-	await requireCurrentAppUser(locals);
-	const workspaces = await loadCurrentUserWorkspaces(locals);
+	const { currentUser, workspaces } = await loadCurrentAppContext(locals);
 
-	return workspaces.length === 0 ? '/app/workspaces/new' : '/app';
+	if (!currentUser) {
+		throw new Error('Authenticated Clerk session is missing a corresponding Convex user.');
+	}
+
+	return workspaces.length === 0 ? '/app/workspaces/new' : `/app/${workspaces[0].slug}`;
 }

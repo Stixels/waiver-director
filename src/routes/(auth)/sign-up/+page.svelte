@@ -51,9 +51,7 @@
 	let submitError = $state<string | null>(null);
 	let isAwaitingVerification = $state(false);
 	const redirectTo = $derived(page.url.searchParams.get('redirectTo'));
-	const postAuthRedirectUrl = $derived(
-		getSafePostAuthRedirectHref(redirectTo, '/app/workspaces/new')
-	);
+	const postAuthRedirectUrl = $derived(getSafePostAuthRedirectHref(redirectTo, '/post-auth'));
 
 	const canSubmitEmailSignUp = $derived(Boolean(email.trim() && password && passwordConfirm));
 

@@ -5,6 +5,7 @@
 
 	async function handleCreated(workspace: { slug: string }) {
 		await goto(resolve(`/app/${workspace.slug}` as `/app/${string}`), {
+			invalidateAll: true,
 			replaceState: true,
 			noScroll: true
 		});

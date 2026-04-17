@@ -41,7 +41,7 @@
 	let secondFactorPhoneNumberId = $state<string | null>(null);
 	let backupCodeAvailable = $state(false);
 	const redirectTo = $derived(page.url.searchParams.get('redirectTo'));
-	const postAuthRedirectUrl = $derived(getSafePostAuthRedirectHref(redirectTo));
+	const postAuthRedirectUrl = $derived(getSafePostAuthRedirectHref(redirectTo, '/post-auth'));
 
 	const authPageTitle = $derived(
 		isAwaitingSecondFactor && secondFactorStrategy

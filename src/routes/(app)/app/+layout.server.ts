@@ -1,5 +1,5 @@
 import { redirect } from '@sveltejs/kit';
-import { loadCurrentUserWorkspaces, requireCurrentAppUser } from '$lib/server/auth';
+import { loadCurrentAppContext } from '$lib/server/auth';
 import type { LayoutServerLoad } from './$types';
 
 export const load: LayoutServerLoad = async ({ locals, url }) => {
@@ -11,9 +11,12 @@ export const load: LayoutServerLoad = async ({ locals, url }) => {
 		throw redirect(303, `/sign-in?redirectTo=${encodeURIComponent(next)}`);
 	}
 
-	const currentUser = await requireCurrentAppUser(locals);
-	const workspaces = await loadCurrentUserWorkspaces(locals);
+	const { currentUser, workspaces } = await loadCurrentAppContext(locals);
 	let convexToken: string | null = null;
+
+	if (!currentUser) {
+		throw new Error('Authenticated Clerk session is missing a corresponding Convex user.');
+	}
 
 	try {
 		convexToken = await auth.getToken({ template: 'convex' });
