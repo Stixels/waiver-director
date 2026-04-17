@@ -19,42 +19,13 @@
 	const convex = useConvexClient();
 	const convexAuth = $state<ConvexAuthState>({
 		status: 'loading',
-		prepareForSignOut,
-		restoreAfterFailedSignOut
+		signOut
 	});
 	setConvexAuthContext(convexAuth);
 
 	let lastRegisteredSessionId: string | null = null;
 
-	let cachedToken: string | null = $state(null);
-	let cachedTokenExpiresAtMs: number | null = $state(null);
-	let inflightTokenPromise: Promise<string | null> | null = null;
-	let lastRateLimitLogAtMs = 0;
 	let hasSeededInitialToken = false;
-
-	function decodeJwtExpiry(token: string): number | null {
-		try {
-			const [, payload] = token.split('.');
-			if (!payload) return null;
-
-			const normalized = payload.replace(/-/g, '+').replace(/_/g, '/');
-			const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=');
-			const decoded = JSON.parse(atob(padded)) as { exp?: number };
-
-			return decoded.exp ? decoded.exp * 1000 : null;
-		} catch {
-			return null;
-		}
-	}
-
-	function hasUsableCachedToken() {
-		return (
-			!!cachedToken &&
-			typeof cachedTokenExpiresAtMs === 'number' &&
-			Number.isFinite(cachedTokenExpiresAtMs) &&
-			cachedTokenExpiresAtMs > Date.now() + 30_000
-		);
-	}
 
 	function getCurrentSessionId() {
 		return clerk.clerk?.session?.id ?? clerk.session?.id ?? clerk.auth.sessionId ?? null;
@@ -64,25 +35,28 @@
 		return lastRegisteredSessionId === sessionId && getCurrentSessionId() === sessionId;
 	}
 
-	function seedInitialToken() {
+	function takeInitialToken() {
 		if (hasSeededInitialToken) return;
 		hasSeededInitialToken = true;
 
-		if (!initialToken) return;
-
-		cachedToken = initialToken;
-		cachedTokenExpiresAtMs = decodeJwtExpiry(initialToken);
+		return initialToken;
 	}
 
-	async function prepareForSignOut() {
+	async function signOut(redirectUrl: string) {
+		if (!clerk.clerk) return;
+
+		const previousStatus = convexAuth.status;
 		convexAuth.status = 'unauthenticated';
 		await tick();
-	}
 
-	function restoreAfterFailedSignOut() {
-		const sessionId = lastRegisteredSessionId;
-		if (!sessionId || getCurrentSessionId() !== sessionId) return;
-		convexAuth.status = 'authenticated';
+		try {
+			await clerk.clerk.signOut({ redirectUrl });
+		} catch (error) {
+			if (getCurrentSessionId() === lastRegisteredSessionId) {
+				convexAuth.status = previousStatus;
+			}
+			throw error;
+		}
 	}
 
 	function updateAuthStatusForSession(sessionId: string, isAuthenticated: boolean) {
@@ -93,9 +67,6 @@
 	function beginUnauthenticatedTeardown() {
 		const previousSessionId = lastRegisteredSessionId;
 
-		cachedToken = null;
-		cachedTokenExpiresAtMs = null;
-		inflightTokenPromise = null;
 		convexAuth.status = 'unauthenticated';
 
 		if (previousSessionId) {
@@ -114,27 +85,6 @@
 		lastRegisteredSessionId = null;
 	}
 
-	function isRateLimitError(error: unknown) {
-		if (typeof error !== 'object' || !error) return false;
-
-		if ('status' in error && error.status === 429) {
-			return true;
-		}
-
-		if ('errors' in error && Array.isArray(error.errors)) {
-			return error.errors.some(
-				(issue) =>
-					typeof issue === 'object' &&
-					issue !== null &&
-					('code' in issue || 'message' in issue) &&
-					(issue.code === 'too_many_requests' ||
-						(typeof issue.message === 'string' && issue.message.includes('Too Many Requests')))
-			);
-		}
-
-		return false;
-	}
-
 	async function getTokenForSession(
 		registeredSessionId: string,
 		forceRefreshToken: boolean
@@ -145,70 +95,25 @@
 			activeSession.id !== registeredSessionId ||
 			!ownsCurrentTokenState(registeredSessionId)
 		) {
-			if (lastRegisteredSessionId === registeredSessionId) {
-				cachedToken = null;
-				cachedTokenExpiresAtMs = null;
-				inflightTokenPromise = null;
-			}
 			return null;
 		}
 
-		if (!forceRefreshToken && inflightTokenPromise) {
-			return await inflightTokenPromise;
-		}
-
-		if (!forceRefreshToken && hasUsableCachedToken()) {
-			return cachedToken;
-		}
-
-		let currentTokenPromise: Promise<string | null> | null = null;
-		const tokenPromise = (async () => {
-			try {
-				const token = await activeSession.getToken({
-					template: 'convex',
-					skipCache: forceRefreshToken
-				});
-
-				if (!ownsCurrentTokenState(registeredSessionId)) {
-					return null;
-				}
-
-				cachedToken = token ?? null;
-				cachedTokenExpiresAtMs = token ? decodeJwtExpiry(token) : null;
-
-				return cachedToken;
-			} catch (error) {
-				if (
-					isRateLimitError(error) &&
-					ownsCurrentTokenState(registeredSessionId) &&
-					hasUsableCachedToken()
-				) {
-					if (Date.now() - lastRateLimitLogAtMs > 5_000) {
-						lastRateLimitLogAtMs = Date.now();
-						console.warn('[auth/bridge] Clerk token rate-limited, reusing cached token');
-					}
-
-					return cachedToken;
-				}
-
-				console.error('[auth/bridge] token fetch failed', error);
-				return null;
-			} finally {
-				if (
-					lastRegisteredSessionId === registeredSessionId &&
-					inflightTokenPromise === currentTokenPromise
-				) {
-					inflightTokenPromise = null;
-				}
-			}
-		})();
-		currentTokenPromise = tokenPromise;
-
 		if (!forceRefreshToken) {
-			inflightTokenPromise = tokenPromise;
+			const seededToken = takeInitialToken();
+			if (seededToken) {
+				return seededToken;
+			}
 		}
 
-		return await tokenPromise;
+		try {
+			return await activeSession.getToken({
+				template: 'convex',
+				skipCache: forceRefreshToken
+			});
+		} catch (error) {
+			console.error('[auth/bridge] token fetch failed', error);
+			return null;
+		}
 	}
 
 	$effect(() => {
@@ -236,11 +141,7 @@
 		}
 
 		lastRegisteredSessionId = sessionId;
-		cachedToken = null;
-		cachedTokenExpiresAtMs = null;
-		inflightTokenPromise = null;
 		convexAuth.status = 'loading';
-		seedInitialToken();
 
 		// Set the Convex auth token for the current Clerk session
 		convexClient.setAuth(
@@ -254,7 +155,6 @@
 			return;
 		}
 
-		inflightTokenPromise = null;
 		convexAuth.status = 'unauthenticated';
 		convex.client.clearAuth();
 		lastRegisteredSessionId = null;

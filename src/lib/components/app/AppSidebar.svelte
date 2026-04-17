@@ -3,7 +3,6 @@
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
 	import type { FunctionReturnType } from 'convex/server';
-	import { useClerkContext } from 'svelte-clerk';
 	import { toast } from 'svelte-sonner';
 	import { api } from '$convex/_generated/api';
 	import { useConvexAuthState, useProtectedQuery } from '$lib/components/auth/convex-auth.svelte';
@@ -62,7 +61,6 @@
 		initialWorkspaces = []
 	}: Props = $props();
 
-	const clerk = useClerkContext();
 	const convexAuth = useConvexAuthState();
 	const workspacesQuery = useProtectedQuery(
 		api.workspaces.listCurrentUserWorkspaces,
@@ -182,18 +180,14 @@
 	}
 
 	async function handleSignOut(): Promise<void> {
-		if (!clerk.clerk || isSigningOut) return;
+		if (isSigningOut) return;
 
 		handleNavigation();
 		isSigningOut = true;
 
 		try {
-			await convexAuth.prepareForSignOut();
-			await clerk.clerk.signOut({
-				redirectUrl: resolve('/')
-			});
+			await convexAuth.signOut(resolve('/'));
 		} catch (error) {
-			convexAuth.restoreAfterFailedSignOut();
 			console.error('[auth/sign-out] failed', error);
 			toast.error('Unable to sign out right now. Please try again.');
 		} finally {

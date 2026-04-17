@@ -6,8 +6,7 @@ type ConvexAuthStatus = 'loading' | 'authenticated' | 'unauthenticated';
 
 export type ConvexAuthState = {
 	status: ConvexAuthStatus;
-	prepareForSignOut: () => Promise<void>;
-	restoreAfterFailedSignOut: () => void;
+	signOut: (redirectUrl: string) => Promise<void>;
 };
 
 type UseQueryOptions<Query extends FunctionReference<'query'>> = {
@@ -25,8 +24,7 @@ export function useConvexAuthState(): ConvexAuthState {
 	return (
 		getContext<ConvexAuthState>(CONVEX_AUTH_CONTEXT) ?? {
 			status: 'unauthenticated',
-			prepareForSignOut: async () => {},
-			restoreAfterFailedSignOut: () => {}
+			signOut: async () => {}
 		}
 	);
 }
