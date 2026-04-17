@@ -92,7 +92,7 @@
 	<title>{waiver.title} | {waiver.workspaceName}</title>
 </svelte:head>
 
-<div class={`min-h-screen bg-background ${data.embed ? '' : ''}`}>
+<div class="min-h-screen bg-background">
 	<!-- Workspace header -->
 	<header class="border-b border-border/40 px-6 py-4">
 		<p class="text-center text-xs font-bold tracking-[0.2em] text-muted-foreground uppercase">

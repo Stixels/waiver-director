@@ -36,6 +36,11 @@
 			new Date(ts)
 		);
 	}
+
+	function formatDob(dob: string) {
+		const [y, m, d] = dob.split('-').map(Number);
+		return new Intl.DateTimeFormat('en-US', { dateStyle: 'long' }).format(new Date(y, m - 1, d));
+	}
 </script>
 
 <Dialog bind:open>
@@ -95,7 +100,7 @@
 								</div>
 								<div>
 									<p class="text-xs font-semibold tracking-[0.12em] uppercase">Date of birth</p>
-									<p class="mt-1 text-foreground">{submission.signerDateOfBirth}</p>
+									<p class="mt-1 text-foreground">{formatDob(submission.signerDateOfBirth)}</p>
 								</div>
 								<div>
 									<p class="text-xs font-semibold tracking-[0.12em] uppercase">Submitted</p>

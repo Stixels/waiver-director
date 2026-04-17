@@ -15,6 +15,7 @@
 		waiverSectionCardClass,
 		waiverFieldLabelClass
 	} from '$lib/components/waivers/waiver-public-form-classes';
+	import { formatFieldTypeLabel } from '$lib/domain/waivers';
 	import ArrowLeftIcon from '@lucide/svelte/icons/arrow-left';
 
 	interface Props {
@@ -92,15 +93,10 @@
 											{#if field.required}<span class="text-foreground/40">*</span>{/if}
 										</div>
 										<div class="mt-1 text-xs text-muted-foreground/60 capitalize italic">
-											{field.type === 'shortText'
-												? 'Short text'
-												: field.type === 'longText'
-													? 'Long text'
-													: field.type === 'checkbox'
-														? 'Checkbox'
-														: field.type === 'select'
-															? `Select (${(field as { options: { id: string; label: string }[] }).options.map((o) => o.label).join(', ')})`
-															: 'Date'}
+											{formatFieldTypeLabel(field.type)}
+											{#if field.type === 'select'}
+												({field.options.map((option) => option.label).join(', ')})
+											{/if}
 										</div>
 									</div>
 								{/each}

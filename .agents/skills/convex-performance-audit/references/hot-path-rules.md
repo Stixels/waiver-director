@@ -250,7 +250,8 @@ Move high-churn fields like `lastSeen`, counters, presence, or ephemeral status 
 Apply this across sibling writers too. Splitting one write path does not help much if three other mutations still update the same widely-read document.
 
 ```ts
-// Bad: every presence heartbeat invalidates subscribers to the whole profile
+// Bad: heartbeat writes that change documents subscribed to by queries trigger
+// invalidation and associated work, whereas unchanged/no-op writes are ignored.
 await ctx.db.patch(user._id, {
   name: args.name,
   avatarUrl: args.avatarUrl,

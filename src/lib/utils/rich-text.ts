@@ -128,7 +128,7 @@ export function sanitizeRichTextHtml(input: string): string {
 	}
 
 	let sanitized = sanitizeHtml(source, SANITIZE_OPTIONS).trim();
-	sanitized = sanitized.replace(/<p>\s*<\/p>/g, '');
+	sanitized = sanitized.replace(/<p\b[^>]*>\s*<\/p>/g, '');
 
 	if (!sanitized.trim()) {
 		return '';
