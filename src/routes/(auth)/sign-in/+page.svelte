@@ -8,11 +8,7 @@
 	import { REGEXP_ONLY_DIGITS } from 'bits-ui';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
-	import {
-		InputOTP,
-		InputOTPGroup,
-		InputOTPSlot
-	} from '$lib/components/ui/input-otp';
+	import { InputOTP, InputOTPGroup, InputOTPSlot } from '$lib/components/ui/input-otp';
 
 	const inputClass =
 		'h-14 rounded-xl border-(--m-border-strong) bg-(--m-elevated) px-4 text-sm text-foreground shadow-none transition-[border-color,box-shadow] placeholder:text-(--m-text-3) focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/25 sm:px-5 md:text-sm';
