@@ -22,16 +22,16 @@ export const appMainNavItems = [
 		description: 'Provider-synced and manual session groups.'
 	},
 	{
-		label: 'Waivers',
-		href: '/app/[workspaceSlug]/waivers',
+		label: 'Submissions',
+		href: '/app/[workspaceSlug]/submissions',
 		icon: ScrollTextIcon,
-		description: 'Submissions, signatures, and signing campaigns.'
+		description: 'Signed waiver records and submission activity.'
 	},
 	{
-		label: 'Templates',
-		href: '/app/[workspaceSlug]/templates',
+		label: 'Waiver',
+		href: '/app/[workspaceSlug]/waiver',
 		icon: LayersIcon,
-		description: 'Reusable waiver template builder.'
+		description: 'Edit, publish, and share the workspace waiver.'
 	},
 	{
 		label: 'Email follow-ups',

@@ -102,7 +102,7 @@
 			</Sheet>
 		{/if}
 
-		<main class="flex-1 overflow-y-auto">
+		<main class="min-w-0 flex-1 overflow-x-hidden overflow-y-auto">
 			{@render children()}
 		</main>
 	</div>
