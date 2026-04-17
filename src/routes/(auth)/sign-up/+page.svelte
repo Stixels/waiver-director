@@ -346,7 +346,7 @@
 
 							<InputOTP
 								maxlength={6}
-								id="otp-verification"
+								inputId="otp-verification"
 								bind:value={verificationCode}
 								pattern={REGEXP_ONLY_DIGITS}
 								onComplete={attemptVerification}

@@ -394,7 +394,7 @@
 				{#if secondFactorStrategy !== 'backup_code'}
 					<InputOTP
 						maxlength={6}
-						id="sign-in-verification-code"
+						inputId="sign-in-verification-code"
 						bind:value={verificationCode}
 						pattern={REGEXP_ONLY_DIGITS}
 						onComplete={attemptSecondFactor}
