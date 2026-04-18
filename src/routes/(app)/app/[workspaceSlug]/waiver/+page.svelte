@@ -2,7 +2,7 @@
 	import { beforeNavigate } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
-	import { onMount } from 'svelte';
+	import { onMount, untrack } from 'svelte';
 	import type { FunctionReturnType } from 'convex/server';
 	import { useConvexClient } from 'convex-svelte';
 	import { toast } from 'svelte-sonner';
@@ -12,9 +12,11 @@
 	import { publicEnv } from '$lib/config/public';
 	import ConfirmDialog from '$lib/components/ui/ConfirmDialog.svelte';
 	import QrCodePreview from '$lib/components/waivers/QrCodePreview.svelte';
-	import WaiverTemplateEditor from '$lib/components/waivers/WaiverTemplateEditor.svelte';
-	import WaiverReadonlyDocument from '$lib/components/waivers/WaiverReadonlyDocument.svelte';
 	import PastWaiversSheet from '$lib/components/waivers/PastWaiversSheet.svelte';
+	import WaiverBuilderCanvas, {
+		type SaveState
+	} from '$lib/components/waivers/WaiverBuilderCanvas.svelte';
+	import WaiverBuilderPanel from '$lib/components/waivers/WaiverBuilderPanel.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import {
@@ -32,6 +34,12 @@
 		DropdownMenuTrigger
 	} from '$lib/components/ui/dropdown-menu';
 	import {
+		Tooltip,
+		TooltipContent,
+		TooltipProvider,
+		TooltipTrigger
+	} from '$lib/components/ui/tooltip';
+	import {
 		cloneDefinition,
 		createBlankDefinition,
 		definitionsEqual,
@@ -46,6 +54,9 @@
 	import ExternalLinkIcon from '@lucide/svelte/icons/external-link';
 	import CheckIcon from '@lucide/svelte/icons/check';
 	import QrCodeIcon from '@lucide/svelte/icons/qr-code';
+	import UploadCloudIcon from '@lucide/svelte/icons/upload-cloud';
+	import Pencil from '@lucide/svelte/icons/pencil';
+	import XIcon from '@lucide/svelte/icons/x';
 
 	const appContext = useAppContext();
 	const currentWorkspace = $derived(
@@ -92,19 +103,30 @@
 			.filter((template) => template.status !== 'archived')
 			.sort((a, b) => activeTemplateRank(a) - activeTemplateRank(b))
 	);
+
 	let selectedTemplateId = $state<TemplateSummary['templateId'] | null>(null);
 	let draft = $state<WaiverDefinition | null>(null);
 	let baselineDraft = $state<WaiverDefinition | null>(null);
 	let hydratedTemplateId = $state<TemplateSummary['templateId'] | null>(null);
 	let hydratedFingerprint = $state<string | null>(null);
 	let recentCreatedTemplateId = $state<TemplateSummary['templateId'] | null>(null);
-	let previewOpen = $state(false);
 	let pastWaiversOpen = $state(false);
 	let copyingKey = $state<string | null>(null);
 	let qrDialogOpen = $state(false);
 	let pendingDiscardAction = $state<PendingDiscardAction>(null);
 
+	// Inline title editing (header pencil)
+	let isEditingTitle = $state(false);
+	let titleDraft = $state('');
+	let titleInputEl = $state<HTMLInputElement | null>(null);
+
+	// Save state machine for debounced autosave
 	let isSaving = $state(false);
+	let lastSavedAt = $state<number | null>(null);
+	let lastSaveError = $state(false);
+	let autosaveTimer: ReturnType<typeof setTimeout> | null = null;
+	const AUTOSAVE_DELAY_MS = 800;
+
 	let isPublishing = $state(false);
 	let isArchiving = $state(false);
 	let isDeleting = $state(false);
@@ -119,7 +141,6 @@
 	const activePublicHref = $derived.by(() => {
 		const slug = publishingOverview.activeLink?.slug;
 		if (!slug) return null;
-
 		return resolve(`/w/${slug}` as `/w/${string}`);
 	});
 	const activePublicUrl = $derived.by(() => {
@@ -149,18 +170,37 @@
 	);
 	const currentDraft = $derived(draft ?? createBlankDefinition());
 	const isDirty = $derived(!definitionsEqual(draft, baselineDraft));
+	// Fingerprint that changes on every deep mutation of the draft. We read it
+	// inside the autosave effect so each keystroke resets the debounce timer.
+	const draftFingerprint = $derived(
+		draft ? JSON.stringify(normalizeDefinitionForCompare(draft)) : ''
+	);
 	const isReadOnly = $derived(selectedTemplate?.isReadOnly ?? false);
-	const busy = $derived(isSaving || isPublishing || isArchiving || isDeleting || isCreating);
+	const busy = $derived(isPublishing || isArchiving || isDeleting || isCreating);
 	const publishDisabled = $derived(
 		busy ||
 			isDirty ||
+			isSaving ||
 			!selectedTemplate ||
 			(selectedTemplate.isActivePublic && !selectedTemplate.hasUnpublishedChanges)
 	);
 
+	const saveState = $derived<SaveState>(
+		(() => {
+			if (isReadOnly) return 'idle';
+			if (lastSaveError) return 'error';
+			if (isSaving) return 'saving';
+			if (isDirty) return 'dirty';
+			if (lastSavedAt) return 'saved';
+			return 'idle';
+		})()
+	);
+
 	beforeNavigate((navigation) => {
-		if (!isDirty || navigation.willUnload) return;
+		if (!isDirty && !isSaving) return;
+		if (navigation.willUnload) return;
 		navigation.cancel();
+		toast.message('Still saving your latest changes. Give it a moment and try again.');
 	});
 
 	$effect(() => {
@@ -178,17 +218,13 @@
 			? templates.some((template) => template.templateId === selectedTemplateId)
 			: false;
 
-		// No selection or selection removed from list → pick first active template
 		if (!selectedTemplateId) {
 			selectedTemplateId = activeTemplates[0]?.templateId ?? null;
 			return;
 		}
 
 		if (!hasSelectedTemplate) {
-			if (recentCreatedTemplateId === selectedTemplateId) {
-				return;
-			}
-
+			if (recentCreatedTemplateId === selectedTemplateId) return;
 			selectedTemplateId = activeTemplates[0]?.templateId ?? null;
 			return;
 		}
@@ -197,7 +233,6 @@
 			recentCreatedTemplateId = null;
 		}
 
-		// Selected template just became archived (e.g. user just archived it) → move to active
 		const current = templates.find((t) => t.templateId === selectedTemplateId);
 		if (current?.status === 'archived' && activeTemplates.length > 0) {
 			selectedTemplateId = activeTemplates[0].templateId;
@@ -222,12 +257,50 @@
 			baselineDraft = cloneDefinition(nextDraft);
 			hydratedTemplateId = selectedTemplate.templateId;
 			hydratedFingerprint = selectedFingerprint;
+			lastSavedAt = null;
+			lastSaveError = false;
 		}
+	});
+
+	// Debounced autosave: whenever the draft diverges from baseline (and not read-only),
+	// schedule a save. Re-triggers on every deep change via `draftFingerprint`; only
+	// the trailing call runs.
+	$effect(() => {
+		// Subscribe to every deep mutation of the draft AND to the save cycle, so that
+		// if the user keeps editing while a save is in flight, we re-schedule an
+		// autosave the moment the in-flight save completes.
+		void draftFingerprint;
+		void isSaving;
+
+		if (autosaveTimer) {
+			clearTimeout(autosaveTimer);
+			autosaveTimer = null;
+		}
+
+		// Gate the save scheduling outside of reactive tracking so we don't subscribe
+		// to unrelated state like selectedTemplate metadata or the convex client flag.
+		untrack(() => {
+			if (isReadOnly || !selectedTemplate || !currentWorkspace) return;
+			if (!isDirty) return;
+			if (isSaving) return;
+			if (convex.disabled) return;
+
+			autosaveTimer = setTimeout(() => {
+				void runAutosave();
+			}, AUTOSAVE_DELAY_MS);
+		});
+
+		return () => {
+			if (autosaveTimer) {
+				clearTimeout(autosaveTimer);
+				autosaveTimer = null;
+			}
+		};
 	});
 
 	onMount(() => {
 		const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-			if (!isDirty) return;
+			if (!isDirty && !isSaving) return;
 			event.preventDefault();
 			event.returnValue = '';
 		};
@@ -240,24 +313,95 @@
 
 	function syncBaseline(definition: WaiverDefinition) {
 		baselineDraft = cloneDefinition(definition);
-		draft = cloneDefinition(definition);
 		hydratedFingerprint = JSON.stringify(normalizeDefinitionForCompare(definition));
 	}
 
-	function statusLine(template: TemplateSummary) {
-		if (template.isActivePublic) return 'Live';
-		if (template.status === 'archived') return 'Archived';
-		if (template.usageState === 'used') return 'Signed history';
-		if (template.lastPublishedVersionId) return 'Published';
-		return 'Draft';
+	async function runAutosave() {
+		if (!draft || !selectedTemplate || !currentWorkspace || convex.disabled) return;
+		if (isReadOnly) return;
+		if (isSaving) return;
+		if (definitionsEqual(draft, baselineDraft)) return;
+
+		const snapshot = cloneDefinition(draft);
+		const targetTemplateId = selectedTemplate.templateId;
+		const workspaceId = currentWorkspace.workspaceId;
+
+		isSaving = true;
+		lastSaveError = false;
+
+		try {
+			await convex.mutation(api.waivers.updateTemplate, {
+				workspaceId,
+				templateId: targetTemplateId,
+				definition: snapshot
+			});
+
+			// If the user continued editing while we saved, the current draft may
+			// have moved on. Re-baseline to the snapshot we just persisted so the
+			// new diff only covers the post-save edits.
+			if (selectedTemplate && selectedTemplate.templateId === targetTemplateId) {
+				syncBaseline(snapshot);
+				lastSavedAt = Date.now();
+			}
+		} catch (error) {
+			lastSaveError = true;
+			toast.error(getConvexErrorMessage(error, 'We could not save your latest changes.'));
+		} finally {
+			isSaving = false;
+		}
+	}
+
+	async function flushAutosave() {
+		if (autosaveTimer) {
+			clearTimeout(autosaveTimer);
+			autosaveTimer = null;
+		}
+		await runAutosave();
+	}
+
+	function startTitleEdit() {
+		if (!draft || isReadOnly) return;
+		titleDraft = draft.title;
+		isEditingTitle = true;
+		queueMicrotask(() => {
+			titleInputEl?.focus();
+			titleInputEl?.select();
+		});
+	}
+
+	function commitTitleEdit() {
+		if (!draft) {
+			isEditingTitle = false;
+			return;
+		}
+		const next = titleDraft.trim();
+		if (next.length > 0) {
+			draft.title = next;
+		}
+		isEditingTitle = false;
+	}
+
+	function cancelTitleEdit() {
+		isEditingTitle = false;
+		titleDraft = '';
+	}
+
+	function handleTitleKeydown(event: KeyboardEvent) {
+		if (event.key === 'Enter') {
+			event.preventDefault();
+			commitTitleEdit();
+		} else if (event.key === 'Escape') {
+			event.preventDefault();
+			cancelTitleEdit();
+		}
 	}
 
 	function publishButtonLabel(template: TemplateSummary | null) {
-		if (!template) return 'Publish & activate';
-		if (template.isActivePublic && !template.hasUnpublishedChanges) return 'Already live';
+		if (!template) return 'Publish';
+		if (template.isActivePublic && !template.hasUnpublishedChanges) return 'Live';
 		if (template.lastPublishedVersionId && template.hasUnpublishedChanges) return 'Publish changes';
-		if (template.lastPublishedVersionId) return 'Republish & activate';
-		return 'Publish & activate';
+		if (template.lastPublishedVersionId) return 'Republish';
+		return 'Publish';
 	}
 
 	function openConfirm(kind: ConfirmKind) {
@@ -301,7 +445,7 @@
 			case 'discard':
 				return {
 					title: 'Discard unsaved changes?',
-					description: 'You have unsaved edits. Continuing will discard them.',
+					description: 'Your latest edits have not been saved yet. Continuing will discard them.',
 					confirmLabel: 'Discard changes',
 					destructive: true
 				};
@@ -311,7 +455,7 @@
 	function requestTemplateSelection(templateId: TemplateSummary['templateId']) {
 		if (templateId === selectedTemplateId) return;
 
-		if (isDirty) {
+		if (isDirty || isSaving) {
 			pendingDiscardAction = { type: 'switch-template', templateId };
 			openConfirm('discard');
 			return;
@@ -321,7 +465,7 @@
 	}
 
 	function requestCreateTemplate() {
-		if (isDirty) {
+		if (isDirty || isSaving) {
 			pendingDiscardAction = { type: 'open-create-confirm' };
 			openConfirm('discard');
 			return;
@@ -340,6 +484,11 @@
 			draft = cloneDefinition(baselineDraft);
 		}
 
+		if (autosaveTimer) {
+			clearTimeout(autosaveTimer);
+			autosaveTimer = null;
+		}
+
 		if (!action) return;
 
 		if (action.type === 'switch-template') {
@@ -350,10 +499,6 @@
 		if (action.type === 'open-create-confirm') {
 			openConfirm('create');
 		}
-	}
-
-	function openPreview() {
-		previewOpen = true;
 	}
 
 	function openPastWaivers() {
@@ -398,29 +543,12 @@
 		}
 	}
 
-	async function saveDraft() {
-		if (convex.disabled || !currentWorkspace || !selectedTemplate || !draft) return;
-
-		isSaving = true;
-
-		try {
-			await convex.mutation(api.waivers.updateTemplate, {
-				workspaceId: currentWorkspace.workspaceId,
-				templateId: selectedTemplate.templateId,
-				definition: draft
-			});
-
-			syncBaseline(draft);
-			toast.success('Waiver saved.');
-		} catch (error) {
-			toast.error(getConvexErrorMessage(error, 'Unable to save this waiver.'));
-		} finally {
-			isSaving = false;
-		}
-	}
-
 	async function publishTemplate() {
 		if (convex.disabled || !currentWorkspace || !selectedTemplate) return;
+
+		// Ensure any pending edits are persisted before publishing.
+		await flushAutosave();
+		if (lastSaveError) return;
 
 		isPublishing = true;
 
@@ -526,29 +654,6 @@
 	<PastWaiversSheet bind:open={pastWaiversOpen} workspaceId={currentWorkspace.workspaceId} />
 {/if}
 
-<Dialog bind:open={previewOpen}>
-	<DialogContent
-		class="h-[96vh] w-[calc(100vw-1rem)] max-w-none gap-0 overflow-hidden p-0 sm:w-[calc(100vw-2rem)] sm:max-w-[calc(100vw-2rem)] xl:max-w-[min(1500px,calc(100vw-4rem))]"
-	>
-		<DialogHeader class="border-b border-border px-6 py-4">
-			<DialogTitle>Draft preview</DialogTitle>
-			<DialogDescription>
-				This preview includes the current draft, including unsaved changes.
-			</DialogDescription>
-		</DialogHeader>
-
-		<div class="min-h-0 flex-1 overflow-y-auto bg-muted/20 p-4 sm:p-6">
-			<WaiverReadonlyDocument
-				workspaceName={currentWorkspace?.name}
-				title={currentDraft.title}
-				introCopy={currentDraft.introCopy}
-				fields={currentDraft.fields}
-				preview
-			/>
-		</div>
-	</DialogContent>
-</Dialog>
-
 {#if activePublicUrl}
 	<Dialog bind:open={qrDialogOpen}>
 		<DialogContent class="max-w-xs gap-0 overflow-hidden p-0">
@@ -569,259 +674,316 @@
 	</Dialog>
 {/if}
 
-<div class="w-full min-w-0 p-6">
-	<div class="mx-auto w-full max-w-5xl min-w-0 space-y-5">
-		<!-- Page header -->
-		<div class="space-y-1">
-			<p class="text-xs font-bold tracking-[0.16em] text-primary uppercase">Waiver</p>
-			<h1 class="text-2xl font-semibold tracking-tight">Edit and share your workspace waiver</h1>
-		</div>
-
-		{#if isLoadingProtectedData}
-			<div class="space-y-5">
-				<div class="flex items-stretch overflow-hidden rounded-xl border border-border bg-card">
-					<div class="flex min-w-0 flex-1 items-center gap-3 px-4 py-3">
-						<div class="flex shrink-0 items-center gap-2">
-							<Skeleton class="h-2 w-2 rounded-full" />
-							<Skeleton class="h-3 w-10" />
-						</div>
-						<div class="hidden h-3.5 w-px shrink-0 bg-border sm:block"></div>
-						<div class="hidden min-w-0 flex-1 space-y-1.5 sm:block">
-							<Skeleton class="h-4 w-52 max-w-full" />
-							<Skeleton class="h-3 w-full max-w-md" />
-						</div>
-					</div>
-					<div class="flex shrink-0 items-stretch divide-x divide-border border-l border-border">
-						<div class="flex items-center px-3">
-							<Skeleton class="h-4 w-28" />
-						</div>
-						<div class="flex items-center px-3">
-							<Skeleton class="h-4 w-12" />
-						</div>
-						<div class="flex items-center px-3">
-							<Skeleton class="h-4 w-16" />
-						</div>
+<TooltipProvider delayDuration={200}>
+	<div class="builder-shell flex h-full min-h-0 w-full flex-col bg-background">
+		<!-- TOP BAR: share + publish -->
+		<header
+			class="builder-topbar flex shrink-0 items-stretch gap-0 border-b border-border/80 bg-card/30"
+		>
+			{#if isLoadingProtectedData}
+				<div class="flex flex-1 items-center gap-3 px-4 py-2.5">
+					<Skeleton class="h-5 w-24" />
+					<Skeleton class="h-4 w-64" />
+					<div class="ml-auto flex items-center gap-2">
+						<Skeleton class="h-8 w-20" />
+						<Skeleton class="h-8 w-24" />
 					</div>
 				</div>
-
-				<div class="space-y-4">
-					<div class="flex flex-wrap items-start justify-between gap-4">
-						<div class="space-y-2">
-							<div class="flex flex-wrap items-center gap-3">
-								<Skeleton class="h-7 w-56" />
-								<Skeleton class="h-3 w-24" />
-							</div>
-							<Skeleton class="h-4 w-36" />
-						</div>
-						<div class="flex flex-wrap items-center gap-2">
-							<Skeleton class="h-9 w-20" />
-							<Skeleton class="h-9 w-24" />
-							<Skeleton class="h-9 w-20" />
-							<Skeleton class="h-9 w-9" />
-						</div>
+			{:else if publishingOverview.activeLink && activePublicUrl}
+				<div class="flex min-w-0 flex-1 items-center gap-3 px-4 py-2.5">
+					<div class="flex shrink-0 items-center gap-1.5">
+						<span class="relative flex h-2 w-2">
+							<span
+								class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"
+							></span>
+							<span class="relative inline-flex h-2 w-2 rounded-full bg-emerald-500"></span>
+						</span>
+						<span class="text-[10px] font-bold tracking-[0.2em] text-emerald-600 uppercase">
+							Live
+						</span>
+					</div>
+					<div class="hidden h-4 w-px shrink-0 bg-border sm:block"></div>
+					<div class="hidden min-w-0 flex-1 sm:block">
+						<p class="truncate text-[13px] font-medium text-foreground">
+							{publishingOverview.activeLink.title}
+						</p>
+						<p class="truncate font-mono text-[11px] leading-tight text-muted-foreground/60">
+							{activePublicUrl}
+						</p>
 					</div>
 
-					<div class="space-y-7">
-						<div class="space-y-4">
-							<div class="space-y-2">
-								<Skeleton class="h-3 w-24" />
-								<Skeleton class="h-10 w-full" />
-							</div>
+					<div class="flex shrink-0 items-center gap-1">
+						<Tooltip>
+							<TooltipTrigger class="inline-flex">
+								<button
+									type="button"
+									class="topbar-icon-btn"
+									onclick={() => copyText('link', activePublicUrl)}
+									disabled={copyingKey === 'link'}
+									aria-label="Copy link"
+								>
+									{#if copyingKey === 'link'}
+										<CheckIcon class="size-3.5 text-emerald-500" />
+									{:else}
+										<ClipboardIcon class="size-3.5" />
+									{/if}
+								</button>
+							</TooltipTrigger>
+							<TooltipContent side="bottom" sideOffset={4}>
+								{copyingKey === 'link' ? 'Copied!' : 'Copy link'}
+							</TooltipContent>
+						</Tooltip>
 
-							<div class="space-y-2">
-								<Skeleton class="h-3 w-24" />
-								<Skeleton class="h-5 w-[28rem] max-w-full" />
-								<div class="overflow-hidden rounded-xl border border-border bg-background">
-									<div class="flex h-10 items-center gap-1 border-b border-border px-3">
-										<Skeleton class="h-7 w-7" />
-										<Skeleton class="h-7 w-7" />
-										<Skeleton class="h-7 w-7" />
-										<Skeleton class="h-7 w-16" />
-									</div>
-									<div class="min-h-[30rem] space-y-3 p-4">
-										<Skeleton class="h-4 w-full" />
-										<Skeleton class="h-4 w-11/12" />
-										<Skeleton class="h-4 w-2/3" />
-										<Skeleton class="h-4 w-5/6" />
-										<Skeleton class="h-4 w-full" />
-										<Skeleton class="h-4 w-3/4" />
-										<Skeleton class="mt-5 h-5 w-64 max-w-full" />
-										<Skeleton class="h-4 w-full" />
-										<Skeleton class="h-4 w-10/12" />
-										<Skeleton class="mt-5 h-5 w-56 max-w-full" />
-										<Skeleton class="h-4 w-full" />
-										<Skeleton class="h-4 w-11/12" />
-									</div>
-								</div>
-							</div>
-						</div>
+						<Tooltip>
+							<TooltipTrigger class="inline-flex">
+								<button
+									type="button"
+									class="topbar-icon-btn"
+									onclick={() => copyText('embed', activeEmbedSnippet)}
+									disabled={copyingKey === 'embed'}
+									aria-label="Copy embed code"
+								>
+									{#if copyingKey === 'embed'}
+										<CheckIcon class="size-3.5 text-emerald-500" />
+									{:else}
+										<Code2Icon class="size-3.5" />
+									{/if}
+								</button>
+							</TooltipTrigger>
+							<TooltipContent side="bottom" sideOffset={4}>
+								{copyingKey === 'embed' ? 'Copied!' : 'Copy embed code'}
+							</TooltipContent>
+						</Tooltip>
 
-						<div class="space-y-4">
-							<div class="flex flex-wrap items-center justify-between gap-3">
-								<div class="space-y-1.5">
-									<Skeleton class="h-3 w-28" />
-									<Skeleton class="h-3 w-[34rem] max-w-full" />
-								</div>
+						<Tooltip>
+							<TooltipTrigger class="inline-flex">
+								<a
+									href={resolve(`/w/${publishingOverview.activeLink.slug}` as `/w/${string}`)}
+									target="_blank"
+									rel="noopener noreferrer"
+									class="topbar-icon-btn"
+									aria-label="Open live waiver"
+								>
+									<ExternalLinkIcon class="size-3.5" />
+								</a>
+							</TooltipTrigger>
+							<TooltipContent side="bottom" sideOffset={4}>Open live waiver</TooltipContent>
+						</Tooltip>
 
-								<div class="flex flex-wrap gap-1.5">
-									<Skeleton class="h-9 w-16" />
-									<Skeleton class="h-9 w-16" />
-									<Skeleton class="h-9 w-20" />
-									<Skeleton class="h-9 w-20" />
-									<Skeleton class="h-9 w-16" />
-								</div>
-							</div>
-
-							<div
-								class="rounded-xl border border-dashed border-border bg-muted/20 px-4 py-8 text-center"
-							>
-								<Skeleton class="mx-auto h-3 w-80 max-w-full" />
-							</div>
-						</div>
-					</div>
-				</div>
-			</div>
-		{:else if activeTemplates.length === 0}
-			<div
-				class="rounded-2xl border border-dashed border-border bg-muted/20 px-6 py-16 text-center"
-			>
-				<p class="text-base font-medium tracking-tight">No waiver yet</p>
-				<p class="mt-1 text-sm text-muted-foreground">
-					Create a waiver to start collecting signed submissions.
-				</p>
-				<div class="mt-5 flex flex-wrap items-center justify-center gap-3">
-					<Button onclick={requestCreateTemplate} disabled={busy}>
-						{isCreating ? 'Creating…' : 'Create waiver'}
-					</Button>
-					<Button variant="outline" onclick={openPastWaivers} disabled={busy}>
-						View past waivers
-					</Button>
-				</div>
-			</div>
-		{:else}
-			<!-- Live status bar -->
-			{#if publishingOverview.activeLink && activePublicUrl}
-				<div class="flex items-stretch overflow-hidden rounded-xl border border-border bg-card">
-					<!-- Left: Live indicator + info -->
-					<div class="flex min-w-0 flex-1 items-center gap-3 px-4 py-3">
-						<div class="flex shrink-0 items-center gap-2">
-							<span class="relative flex h-2 w-2">
-								<span
-									class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"
-								></span>
-								<span class="relative inline-flex h-2 w-2 rounded-full bg-emerald-500"></span>
-							</span>
-							<span class="text-[10px] font-bold tracking-[0.2em] text-emerald-600 uppercase">
-								Live
-							</span>
-						</div>
-						<div class="hidden h-3.5 w-px shrink-0 bg-border sm:block"></div>
-						<div class="hidden min-w-0 flex-1 sm:flex sm:items-center sm:gap-2">
-							<div class="min-w-0 flex-1">
-								<p class="truncate text-sm font-medium text-foreground">
-									{publishingOverview.activeLink.title}
-								</p>
-								<p class="truncate font-mono text-[11px] leading-tight text-muted-foreground/60">
-									{activePublicUrl}
-								</p>
-							</div>
-							<button
-								type="button"
-								class="flex shrink-0 rounded p-1 text-muted-foreground/50 transition-colors hover:bg-muted hover:text-foreground disabled:opacity-40"
-								onclick={() => copyText('link', activePublicUrl)}
-								disabled={copyingKey === 'link'}
-								title="Copy link"
-							>
-								{#if copyingKey === 'link'}
-									<CheckIcon class="h-3.5 w-3.5 text-emerald-500" />
-								{:else}
-									<ClipboardIcon class="h-3.5 w-3.5" />
-								{/if}
-							</button>
-						</div>
-					</div>
-
-					<!-- Right: segmented action buttons -->
-					<div class="flex shrink-0 items-stretch divide-x divide-border border-l border-border">
-						<!-- Copy embed code -->
-						<button
-							type="button"
-							class="flex items-center gap-1.5 px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-40"
-							onclick={() => copyText('embed', activeEmbedSnippet)}
-							disabled={copyingKey === 'embed'}
-						>
-							{#if copyingKey === 'embed'}
-								<CheckIcon class="h-3.5 w-3.5 shrink-0 text-emerald-500" />
-								<span class="hidden text-emerald-600 sm:inline">Copied!</span>
-							{:else}
-								<Code2Icon class="h-3.5 w-3.5 shrink-0" />
-								<span class="hidden sm:inline">Copy embed code</span>
-							{/if}
-						</button>
-
-						<!-- Open in new tab -->
-						<a
-							href={resolve(`/w/${publishingOverview.activeLink.slug}` as `/w/${string}`)}
-							target="_blank"
-							rel="noopener noreferrer"
-							class="flex items-center gap-1.5 px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-						>
-							<ExternalLinkIcon class="h-3.5 w-3.5 shrink-0" />
-							<span class="hidden md:inline">Open</span>
-						</a>
-
-						<!-- QR Code button — opens dialog with a scannable size -->
-						<button
-							type="button"
-							onclick={() => (qrDialogOpen = true)}
-							class="flex items-center gap-1.5 px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-							title="View QR code"
-						>
-							<QrCodeIcon class="h-3.5 w-3.5 shrink-0" />
-							<span class="hidden md:inline">QR code</span>
-						</button>
+						<Tooltip>
+							<TooltipTrigger class="inline-flex">
+								<button
+									type="button"
+									class="topbar-icon-btn"
+									onclick={() => (qrDialogOpen = true)}
+									aria-label="Show QR code"
+								>
+									<QrCodeIcon class="size-3.5" />
+								</button>
+							</TooltipTrigger>
+							<TooltipContent side="bottom" sideOffset={4}>Show QR code</TooltipContent>
+						</Tooltip>
 					</div>
 				</div>
-			{:else if selectedTemplate}
-				<div
-					class="flex flex-wrap items-center gap-3 rounded-lg border border-dashed border-border px-4 py-3"
-				>
+			{:else}
+				<div class="flex min-w-0 flex-1 items-center gap-3 px-4 py-2.5">
 					<span
-						class="shrink-0 text-[10px] font-bold tracking-[0.18em] text-muted-foreground/50 uppercase"
+						class="shrink-0 text-[10px] font-bold tracking-[0.2em] text-muted-foreground/60 uppercase"
 					>
 						Not live
 					</span>
-					<p class="text-sm text-muted-foreground">
-						Publish this waiver to create the public form guests can sign.
+					<p class="truncate text-[13px] text-muted-foreground">
+						Publish this waiver to share a public signing link with your guests.
 					</p>
 				</div>
 			{/if}
 
-			<!-- Editor section -->
-			{#if selectedTemplate}
-				<div class="space-y-4">
-					<!-- Editor header -->
-					<div class="flex flex-wrap items-start justify-between gap-4">
-						<div class="space-y-1.5">
-							<div class="flex flex-wrap items-center gap-3">
-								<h2 class="text-xl font-semibold tracking-tight">{selectedTemplate.title}</h2>
-								<span
-									class="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase"
-								>
-									{statusLine(selectedTemplate)}
-								</span>
+			<!-- Right cluster: secondary menu + publish -->
+			<div class="flex shrink-0 items-center gap-1 border-l border-border/80 px-2">
+				{#if selectedTemplate || activeTemplates.length > 0}
+					<DropdownMenu>
+						<DropdownMenuTrigger class="inline-flex">
+							<button
+								type="button"
+								class="topbar-icon-btn"
+								aria-label="More actions"
+								title="More actions"
+							>
+								<EllipsisIcon class="size-4" />
+							</button>
+						</DropdownMenuTrigger>
+						<DropdownMenuContent align="end" class="w-56">
+							{#if activeTemplates.length > 1}
+								{#each activeTemplates as template (template.templateId)}
+									<DropdownMenuItem
+										onclick={() => requestTemplateSelection(template.templateId)}
+										class={template.templateId === selectedTemplateId ? 'font-medium' : ''}
+									>
+										<span class="flex-1 truncate">{template.title}</span>
+										{#if template.isActivePublic}
+											<span class="ml-2 text-[10px] font-semibold text-emerald-500 uppercase">
+												Live
+											</span>
+										{/if}
+									</DropdownMenuItem>
+								{/each}
+								<DropdownMenuSeparator />
+							{/if}
+							<DropdownMenuItem onclick={requestCreateTemplate}>Create new waiver</DropdownMenuItem>
+							<DropdownMenuItem onclick={openPastWaivers}>View past waivers</DropdownMenuItem>
+							{#if selectedTemplate?.canArchive && !selectedTemplate?.isReadOnly}
+								<DropdownMenuSeparator />
+								<DropdownMenuItem onclick={() => openConfirm('archive')}>
+									Archive waiver
+								</DropdownMenuItem>
+							{/if}
+							{#if selectedTemplate?.canDelete}
+								<DropdownMenuItem onclick={() => openConfirm('delete')}>
+									Delete permanently
+								</DropdownMenuItem>
+							{/if}
+						</DropdownMenuContent>
+					</DropdownMenu>
+				{/if}
+
+				{#if selectedTemplate && !isReadOnly}
+					<Button
+						type="button"
+						size="sm"
+						onclick={() => openConfirm('publish')}
+						disabled={publishDisabled}
+						class="publish-btn ml-1 h-8 gap-1.5"
+					>
+						<UploadCloudIcon class="size-3.5" />
+						<span>{isPublishing ? 'Publishing…' : publishButtonLabel(selectedTemplate)}</span>
+					</Button>
+				{/if}
+			</div>
+		</header>
+
+		<!-- WAIVER BUILDER BODY -->
+		{#if isLoadingProtectedData}
+			<div class="flex flex-1 flex-col lg:flex-row">
+				<aside
+					class="w-full shrink-0 border-b border-border/80 p-5 lg:w-96 lg:border-r lg:border-b-0"
+				>
+					<Skeleton class="mb-3 h-3 w-32" />
+					<Skeleton class="h-10 w-full" />
+					<div class="mt-6 space-y-2">
+						<Skeleton class="h-8 w-full" />
+						<Skeleton class="h-8 w-full" />
+						<Skeleton class="h-8 w-full" />
+					</div>
+				</aside>
+				<section class="min-h-0 flex-1 p-8">
+					<Skeleton class="mx-auto h-[70vh] w-full max-w-3xl rounded-[28px]" />
+				</section>
+			</div>
+		{:else if activeTemplates.length === 0}
+			<div class="flex flex-1 items-center justify-center p-6">
+				<div
+					class="w-full max-w-md rounded-2xl border border-dashed border-border bg-muted/10 px-6 py-14 text-center"
+				>
+					<p class="text-base font-semibold tracking-tight">No waiver yet</p>
+					<p class="mt-1 text-sm text-muted-foreground">
+						Create a waiver to start collecting signed submissions.
+					</p>
+					<div class="mt-5 flex flex-wrap items-center justify-center gap-3">
+						<Button onclick={requestCreateTemplate} disabled={busy}>
+							{isCreating ? 'Creating…' : 'Create waiver'}
+						</Button>
+						<Button variant="outline" onclick={openPastWaivers} disabled={busy}>
+							View past waivers
+						</Button>
+					</div>
+				</div>
+			</div>
+		{:else if selectedTemplate}
+			<div class="flex min-h-0 flex-1 flex-col lg:flex-row">
+				<!-- Left panel (edit) -->
+				<aside
+					class="builder-panel w-full shrink-0 border-b border-border/80 bg-card/20 lg:w-96 lg:border-r lg:border-b-0"
+				>
+					<div class="flex h-full min-h-0 flex-col">
+						<!-- Inline editable title row -->
+						<div
+							class="flex shrink-0 items-center gap-2 border-b border-border/80 bg-card/40 px-5 py-3"
+						>
+							<div class="title-row group min-w-0 flex-1">
+								{#if isEditingTitle}
+									<div class="flex items-center gap-1.5">
+										<input
+											bind:this={titleInputEl}
+											type="text"
+											bind:value={titleDraft}
+											maxlength={120}
+											placeholder="Untitled waiver"
+											class="title-input"
+											onkeydown={handleTitleKeydown}
+											onblur={commitTitleEdit}
+										/>
+										<button
+											type="button"
+											class="title-icon-btn is-confirm"
+											onmousedown={(e) => {
+												e.preventDefault();
+												commitTitleEdit();
+											}}
+											aria-label="Confirm title"
+										>
+											<CheckIcon class="size-3.5" />
+										</button>
+										<button
+											type="button"
+											class="title-icon-btn is-cancel"
+											onmousedown={(e) => {
+												e.preventDefault();
+												cancelTitleEdit();
+											}}
+											aria-label="Cancel edit"
+										>
+											<XIcon class="size-3.5" />
+										</button>
+									</div>
+								{:else}
+									<div class="flex items-center gap-1.5">
+										<h2
+											class="min-w-0 truncate text-sm font-semibold tracking-tight text-foreground"
+										>
+											{currentDraft.title || 'Untitled waiver'}
+										</h2>
+										{#if !isReadOnly}
+											<Tooltip>
+												<TooltipTrigger class="inline-flex">
+													<button
+														type="button"
+														class="title-icon-btn opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+														onclick={startTitleEdit}
+														aria-label="Edit waiver title"
+													>
+														<Pencil class="size-3" />
+													</button>
+												</TooltipTrigger>
+												<TooltipContent side="bottom" sideOffset={4}>Rename waiver</TooltipContent>
+											</Tooltip>
+										{/if}
+									</div>
+								{/if}
 							</div>
 
-							<!-- Multiple waivers switcher -->
-							{#if activeTemplates.length > 1}
+							{#if activeTemplates.length > 1 && !isEditingTitle}
 								<DropdownMenu>
-									<DropdownMenuTrigger
-										class="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-									>
-										{activeTemplates.length} waivers — switch
-										<ChevronDownIcon class="h-3 w-3" />
+									<DropdownMenuTrigger class="inline-flex">
+										<button
+											type="button"
+											class="template-switcher"
+											aria-label="Switch waiver"
+											title="Switch waiver"
+										>
+											<ChevronDownIcon class="size-3.5" />
+										</button>
 									</DropdownMenuTrigger>
-									<DropdownMenuContent align="start" class="w-56">
+									<DropdownMenuContent align="end" class="w-56">
 										{#each activeTemplates as template (template.templateId)}
 											<DropdownMenuItem
 												onclick={() => requestTemplateSelection(template.templateId)}
@@ -840,61 +1002,129 @@
 							{/if}
 						</div>
 
-						<!-- Actions -->
-						<div class="flex flex-wrap items-center gap-2">
-							<Button type="button" variant="outline" onclick={openPreview}>Preview</Button>
-
-							{#if !isReadOnly}
-								<Button
-									type="button"
-									variant="outline"
-									onclick={saveDraft}
-									disabled={busy || !isDirty}
-								>
-									{isSaving ? 'Saving…' : 'Save draft'}
-								</Button>
-								<Button
-									type="button"
-									onclick={() => openConfirm('publish')}
-									disabled={publishDisabled}
-								>
-									{isPublishing ? 'Publishing…' : publishButtonLabel(selectedTemplate)}
-								</Button>
-							{/if}
-
-							<DropdownMenu>
-								<DropdownMenuTrigger class="inline-flex">
-									<Button type="button" variant="outline" size="icon-sm">
-										<EllipsisIcon />
-										<span class="sr-only">More actions</span>
-									</Button>
-								</DropdownMenuTrigger>
-								<DropdownMenuContent align="end" class="w-48">
-									{#if selectedTemplate.canDelete}
-										<DropdownMenuItem onclick={() => openConfirm('delete')}>
-											Delete permanently
-										</DropdownMenuItem>
-									{/if}
-									{#if selectedTemplate.canArchive && !selectedTemplate.isReadOnly}
-										<DropdownMenuItem onclick={() => openConfirm('archive')}>
-											Archive waiver
-										</DropdownMenuItem>
-									{/if}
-									{#if selectedTemplate.canDelete || (selectedTemplate.canArchive && !selectedTemplate.isReadOnly)}
-										<DropdownMenuSeparator />
-									{/if}
-									<DropdownMenuItem onclick={requestCreateTemplate}>
-										Create new waiver
-									</DropdownMenuItem>
-									<DropdownMenuItem onclick={openPastWaivers}>View past waivers</DropdownMenuItem>
-								</DropdownMenuContent>
-							</DropdownMenu>
+						<div class="min-h-0 flex-1 overflow-hidden">
+							<WaiverBuilderPanel bind:draft readOnly={isReadOnly} />
 						</div>
 					</div>
+				</aside>
 
-					<WaiverTemplateEditor bind:draft readOnly={isReadOnly} />
+				<!-- Right canvas (document) -->
+				<div class="builder-canvas flex min-h-0 min-w-0 flex-1">
+					{#if draft}
+						<WaiverBuilderCanvas
+							bind:introCopy={draft.introCopy}
+							fields={currentDraft.fields}
+							workspaceName={currentWorkspace?.name}
+							readOnly={isReadOnly}
+							{saveState}
+							{lastSavedAt}
+						/>
+					{/if}
 				</div>
-			{/if}
+			</div>
 		{/if}
 	</div>
-</div>
+</TooltipProvider>
+
+<style>
+	.builder-shell {
+		height: 100%;
+	}
+
+	.topbar-icon-btn {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		height: 2rem;
+		width: 2rem;
+		border-radius: 0.5rem;
+		color: var(--muted-foreground);
+		transition:
+			background 150ms ease,
+			color 150ms ease;
+	}
+
+	.topbar-icon-btn:hover:not(:disabled) {
+		background: color-mix(in srgb, var(--muted) 70%, transparent);
+		color: var(--foreground);
+	}
+
+	.topbar-icon-btn:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+
+	.title-row {
+		min-width: 0;
+	}
+
+	.title-input {
+		flex: 1;
+		min-width: 0;
+		height: 1.85rem;
+		padding: 0 0.55rem;
+		border-radius: 0.4rem;
+		border: 1px solid color-mix(in srgb, var(--primary) 45%, var(--border));
+		background: var(--background);
+		font-size: 0.85rem;
+		font-weight: 600;
+		color: var(--foreground);
+		box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 14%, transparent);
+		outline: none;
+	}
+
+	.title-icon-btn {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		height: 1.4rem;
+		width: 1.4rem;
+		border-radius: 0.3rem;
+		color: color-mix(in srgb, var(--muted-foreground) 80%, transparent);
+		transition:
+			background 150ms ease,
+			color 150ms ease,
+			opacity 150ms ease;
+	}
+
+	.title-icon-btn:hover {
+		background: color-mix(in srgb, var(--muted) 70%, transparent);
+		color: var(--foreground);
+	}
+
+	.title-icon-btn.is-confirm {
+		color: color-mix(in srgb, var(--primary) 85%, var(--foreground));
+	}
+
+	.title-icon-btn.is-confirm:hover {
+		background: color-mix(in srgb, var(--primary) 14%, transparent);
+		color: var(--primary);
+	}
+
+	.title-icon-btn.is-cancel:hover {
+		background: color-mix(in srgb, var(--destructive) 14%, transparent);
+		color: var(--destructive);
+	}
+
+	.template-switcher {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		height: 1.75rem;
+		width: 1.75rem;
+		border-radius: 0.4rem;
+		color: var(--muted-foreground);
+		transition:
+			background 150ms ease,
+			color 150ms ease;
+	}
+
+	.template-switcher:hover {
+		background: color-mix(in srgb, var(--muted) 70%, transparent);
+		color: var(--foreground);
+	}
+
+	:global(.publish-btn) {
+		box-shadow: 0 1px 0 rgba(255, 255, 255, 0.1) inset;
+	}
+</style>
