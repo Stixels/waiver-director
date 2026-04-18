@@ -24,6 +24,7 @@
 	import CloudOffIcon from '@lucide/svelte/icons/cloud-off';
 	import LoaderIcon from '@lucide/svelte/icons/loader';
 	import type { WaiverField } from '$lib/domain/waivers';
+	import WaiverDocumentShell from '$lib/components/waivers/WaiverDocumentShell.svelte';
 	import WaiverPublicAboutSignerCard from '$lib/components/waivers/WaiverPublicAboutSignerCard.svelte';
 	import WaiverPublicAdditionalInfoSection from '$lib/components/waivers/WaiverPublicAdditionalInfoSection.svelte';
 	import WaiverPublicMinorsBlock from '$lib/components/waivers/WaiverPublicMinorsBlock.svelte';
@@ -43,6 +44,7 @@
 		DropdownMenuTrigger
 	} from '$lib/components/ui/dropdown-menu';
 	import { sanitizeRichTextHtml } from '$lib/utils/rich-text';
+	import WaiverFieldDisplay from '$lib/components/waivers/WaiverFieldDisplay.svelte';
 
 	export type SaveState = 'idle' | 'saving' | 'saved' | 'dirty' | 'error';
 
@@ -244,21 +246,6 @@
 		editor.commands.setContent(sanitized, { emitUpdate: false });
 		lastSyncedValue = sanitizeRichTextHtml(editor.getHTML());
 	});
-
-	function sampleValue(field: WaiverField) {
-		switch (field.type) {
-			case 'shortText':
-				return 'Sample answer';
-			case 'longText':
-				return 'Guests will fill this out before signing the waiver.';
-			case 'select':
-				return field.options[0]?.label ?? 'Choose one';
-			case 'date':
-				return 'YYYY-MM-DD';
-			case 'checkbox':
-				return field.label;
-		}
-	}
 </script>
 
 <section class="flex min-h-0 min-w-0 flex-1 flex-col bg-muted/10">
@@ -464,15 +451,7 @@
 
 	<!-- Scrollable document canvas -->
 	<div class="flex-1 overflow-y-auto overscroll-y-contain" data-canvas-scroll>
-		<div class="mx-auto w-full max-w-3xl px-4 py-8 sm:px-8 sm:py-12">
-			{#if workspaceName}
-				<p
-					class="mb-6 text-center text-[10px] font-bold tracking-[0.24em] text-muted-foreground/60 uppercase"
-				>
-					{workspaceName}
-				</p>
-			{/if}
-
+		<WaiverDocumentShell {workspaceName}>
 			<!-- Editable waiver copy — just the body, no eyebrow/title/separator -->
 			<section class="{waiverSectionCardClass} canvas-document-card" class:is-focused={hasFocus}>
 				<div class="canvas-editor-wrapper">
@@ -527,30 +506,7 @@
 					{#if fields.length > 0}
 						<WaiverPublicAdditionalInfoSection>
 							{#each fields as field (field.id)}
-								<div>
-									<div class={waiverFieldLabelClass}>
-										{field.label}
-										{#if field.required}
-											<span class="text-foreground/40">*</span>
-										{/if}
-									</div>
-
-									{#if field.type === 'checkbox'}
-										<div class="mt-2 flex items-center gap-3" aria-hidden="true">
-											<span
-												class="flex h-5 w-5 shrink-0 items-center justify-center border border-foreground/25 bg-transparent"
-											></span>
-											<span class="text-sm">{field.label}</span>
-										</div>
-									{:else}
-										<div
-											class="{waiverUnderlineInputClass} pointer-events-none text-muted-foreground/45 select-none"
-											aria-hidden="true"
-										>
-											{sampleValue(field)}
-										</div>
-									{/if}
-								</div>
+								<WaiverFieldDisplay {field} preview />
 							{/each}
 						</WaiverPublicAdditionalInfoSection>
 					{/if}
@@ -566,7 +522,7 @@
 			<p class="mt-6 text-center text-[10px] tracking-[0.18em] text-muted-foreground/45 uppercase">
 				Preview
 			</p>
-		</div>
+		</WaiverDocumentShell>
 	</div>
 </section>
 

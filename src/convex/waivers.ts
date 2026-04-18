@@ -147,12 +147,13 @@ export const listTemplates = query({
 	handler: async (ctx, args) => {
 		await requireWorkspaceMember(ctx, args.workspaceId);
 
-		const [template, activeLink] = await Promise.all([
+		const [template, activeLink, workspace] = await Promise.all([
 			getWorkspaceTemplate(ctx, args.workspaceId),
-			getWorkspacePublicLink(ctx, args.workspaceId)
+			getWorkspacePublicLink(ctx, args.workspaceId),
+			ctx.db.get(args.workspaceId)
 		]);
 
-		if (!template) {
+		if (!template || !workspace) {
 			return [];
 		}
 
@@ -287,12 +288,13 @@ export const listVersionHistory = query({
 	handler: async (ctx, args) => {
 		await requireWorkspaceMember(ctx, args.workspaceId);
 
-		const [template, activeLink] = await Promise.all([
+		const [template, activeLink, workspace] = await Promise.all([
 			getWorkspaceTemplate(ctx, args.workspaceId),
-			getWorkspacePublicLink(ctx, args.workspaceId)
+			getWorkspacePublicLink(ctx, args.workspaceId),
+			ctx.db.get(args.workspaceId)
 		]);
 
-		if (!template) {
+		if (!template || !workspace) {
 			return [];
 		}
 
@@ -308,6 +310,7 @@ export const listVersionHistory = query({
 			title: version.title,
 			introCopy: version.introCopy,
 			fields: version.fields,
+			workspaceName: workspace.name,
 			publishedAt: version.publishedAt,
 			isActivePublic: activeLink?.versionId === version._id
 		}));

@@ -4,9 +4,10 @@
 	import { toast } from 'svelte-sonner';
 	import { api } from '$convex/_generated/api';
 	import SignaturePad from '$lib/components/waivers/SignaturePad.svelte';
+	import WaiverCopySection from '$lib/components/waivers/WaiverCopySection.svelte';
+	import WaiverDocumentShell from '$lib/components/waivers/WaiverDocumentShell.svelte';
 	import WaiverPublicAboutSignerCard from '$lib/components/waivers/WaiverPublicAboutSignerCard.svelte';
 	import WaiverPublicAdditionalInfoSection from '$lib/components/waivers/WaiverPublicAdditionalInfoSection.svelte';
-	import WaiverPublicIntroCard from '$lib/components/waivers/WaiverPublicIntroCard.svelte';
 	import WaiverPublicMinorsBlock from '$lib/components/waivers/WaiverPublicMinorsBlock.svelte';
 	import WaiverPublicSignatureCard from '$lib/components/waivers/WaiverPublicSignatureCard.svelte';
 	import {
@@ -93,14 +94,7 @@
 </svelte:head>
 
 <div class="min-h-screen bg-background">
-	<!-- Workspace header -->
-	<header class="border-b border-border/40 px-6 py-4">
-		<p class="text-center text-xs font-bold tracking-[0.2em] text-muted-foreground uppercase">
-			{waiver.workspaceName}
-		</p>
-	</header>
-
-	<div class={`mx-auto px-6 ${data.embed ? 'max-w-none py-8' : 'max-w-2xl py-12'}`}>
+	<WaiverDocumentShell workspaceName={waiver.workspaceName}>
 		{#if isSubmitted}
 			<!-- Success state -->
 			<div class="flex flex-col items-center py-24 text-center">
@@ -132,7 +126,7 @@
 			</div>
 		{:else}
 			<div class="space-y-6">
-				<WaiverPublicIntroCard title={waiver.title} introCopy={waiver.introCopy} />
+				<WaiverCopySection introCopy={waiver.introCopy} />
 
 				<form onsubmit={handleSubmit} class="space-y-6">
 					<WaiverPublicAboutSignerCard>
@@ -339,5 +333,5 @@
 				</form>
 			</div>
 		{/if}
-	</div>
+	</WaiverDocumentShell>
 </div>

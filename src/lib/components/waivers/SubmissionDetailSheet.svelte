@@ -103,7 +103,6 @@
 				{#if submission.waiver}
 					<WaiverReadonlyDocument
 						workspaceName={submission.workspaceName}
-						title={submission.waiver.title}
 						introCopy={submission.waiver.introCopy}
 						fields={submission.waiver.fields}
 						signerName={submission.signerName}
