@@ -910,14 +910,48 @@
 		{#if isLoadingProtectedData}
 			<div class="flex flex-1 flex-col lg:flex-row">
 				<aside
-					class="w-full shrink-0 border-b border-border/80 p-5 lg:w-96 lg:border-r lg:border-b-0"
+					class="builder-panel w-full shrink-0 border-b border-border/80 bg-card/20 lg:w-96 lg:border-r lg:border-b-0"
 				>
-					<Skeleton class="mb-3 h-3 w-32" />
-					<Skeleton class="h-10 w-full" />
-					<div class="mt-6 space-y-2">
-						<Skeleton class="h-8 w-full" />
-						<Skeleton class="h-8 w-full" />
-						<Skeleton class="h-8 w-full" />
+					<div class="flex h-full min-h-0 flex-col">
+						<div
+							class="title-bar flex shrink-0 items-center gap-1.5 border-b border-border/80 bg-card/40 px-4 py-2"
+						>
+							<Skeleton class="h-2.5 w-14" />
+							<span class="h-3.5 w-px shrink-0 bg-border"></span>
+							<Skeleton class="h-4 min-w-0 flex-1" />
+							<Skeleton class="h-[1.85rem] w-[1.85rem] shrink-0 rounded-md" />
+						</div>
+						<div
+							class="flex shrink-0 items-center justify-between gap-3 border-b border-border/80 px-4 py-2.5"
+						>
+							<div class="min-w-0 space-y-1.5">
+								<Skeleton class="h-2.5 w-28" />
+								<Skeleton class="h-2.5 w-36" />
+							</div>
+							<Skeleton class="h-8 w-20 shrink-0 rounded-md" />
+						</div>
+						<div class="min-h-0 flex-1 overflow-hidden p-4">
+							<div class="space-y-1.5">
+								{#each [0, 1, 2] as index (index)}
+									<div
+										class="flex min-w-0 overflow-hidden rounded-[0.55rem] border border-border bg-card/20"
+									>
+										<Skeleton class="w-6 shrink-0 rounded-none bg-muted/30" />
+										<div class="min-w-0 flex-1 px-2.5 py-1.5">
+											<div class="flex items-center justify-between gap-2">
+												<div class="flex min-w-0 items-center gap-1.5">
+													<Skeleton class="h-[1.2rem] w-20 rounded-full" />
+													<Skeleton class="h-[0.85rem] w-6 rounded-full" />
+													<Skeleton class="h-2.5 w-12" />
+												</div>
+												<Skeleton class="h-6 w-6 rounded-md" />
+											</div>
+											<Skeleton class="mt-1.5 h-[1.9rem] w-full rounded-md" />
+										</div>
+									</div>
+								{/each}
+							</div>
+						</div>
 					</div>
 				</aside>
 				<section class="min-h-0 flex-1 p-8">
