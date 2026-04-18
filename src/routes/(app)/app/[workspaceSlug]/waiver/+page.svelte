@@ -112,6 +112,7 @@
 	let recentCreatedTemplateId = $state<TemplateSummary['templateId'] | null>(null);
 	let pastWaiversOpen = $state(false);
 	let copyingKey = $state<string | null>(null);
+	let copiedKey = $state<string | null>(null);
 	let qrDialogOpen = $state(false);
 	let pendingDiscardAction = $state<PendingDiscardAction>(null);
 
@@ -125,6 +126,7 @@
 	let lastSavedAt = $state<number | null>(null);
 	let lastSaveError = $state(false);
 	let autosaveTimer: ReturnType<typeof setTimeout> | null = null;
+	let copyFeedbackTimer: ReturnType<typeof setTimeout> | null = null;
 	const AUTOSAVE_DELAY_MS = 800;
 
 	let isPublishing = $state(false);
@@ -308,6 +310,10 @@
 		window.addEventListener('beforeunload', handleBeforeUnload);
 		return () => {
 			window.removeEventListener('beforeunload', handleBeforeUnload);
+			if (copyFeedbackTimer) {
+				clearTimeout(copyFeedbackTimer);
+				copyFeedbackTimer = null;
+			}
 		};
 	});
 
@@ -509,6 +515,16 @@
 		try {
 			copyingKey = key;
 			await navigator.clipboard.writeText(text);
+			copiedKey = key;
+			if (copyFeedbackTimer) {
+				clearTimeout(copyFeedbackTimer);
+			}
+			copyFeedbackTimer = setTimeout(() => {
+				if (copiedKey === key) {
+					copiedKey = null;
+				}
+				copyFeedbackTimer = null;
+			}, 1600);
 			toast.success('Copied to clipboard.');
 		} catch {
 			toast.error('Unable to copy to the clipboard.');
@@ -663,11 +679,25 @@
 			</DialogHeader>
 			<div class="flex flex-col items-center gap-4 p-6">
 				<QrCodePreview text={activePublicUrl} size={200} />
-				<p class="max-w-full text-center font-mono text-xs break-all text-muted-foreground">
-					{activePublicUrl}
-				</p>
+				<button
+					type="button"
+					class="public-url-copy public-url-copy-dialog"
+					class:is-copied={copiedKey === 'link'}
+					onclick={() => copyText('link', activePublicUrl)}
+					disabled={copyingKey === 'link'}
+					aria-label="Copy waiver link"
+				>
+					<span class="public-url-copy-text">{activePublicUrl}</span>
+					<span class="public-url-copy-icon" aria-hidden="true">
+						{#if copiedKey === 'link'}
+							<CheckIcon class="size-3.5" />
+						{:else}
+							<ClipboardIcon class="size-3.5" />
+						{/if}
+					</span>
+				</button>
 				<Button variant="outline" class="w-full" onclick={() => copyText('link', activePublicUrl)}>
-					{copyingKey === 'link' ? '✓ Copied link' : 'Copy link'}
+					{copiedKey === 'link' ? 'Copied link' : 'Copy link'}
 				</Button>
 			</div>
 		</DialogContent>
@@ -704,35 +734,50 @@
 					</div>
 					<div class="hidden h-4 w-px shrink-0 bg-border sm:block"></div>
 					<div class="hidden min-w-0 flex-1 sm:block">
-						<p class="truncate text-[13px] font-medium text-foreground">
-							{publishingOverview.activeLink.title}
-						</p>
-						<p class="truncate font-mono text-[11px] leading-tight text-muted-foreground/60">
-							{activePublicUrl}
-						</p>
+						<button
+							type="button"
+							class="public-url-copy"
+							class:is-copied={copiedKey === 'link'}
+							onclick={() => copyText('link', activePublicUrl)}
+							disabled={copyingKey === 'link'}
+							aria-label="Copy waiver link"
+						>
+							<span class="public-url-copy-label" aria-hidden="true">URL</span>
+							<span class="public-url-copy-divider" aria-hidden="true"></span>
+							<span class="public-url-copy-text">{activePublicUrl}</span>
+							<span class="public-url-copy-icon" aria-hidden="true">
+								{#if copiedKey === 'link'}
+									<CheckIcon class="size-3.5" />
+								{:else}
+									<ClipboardIcon class="size-3.5" />
+								{/if}
+							</span>
+						</button>
 					</div>
 
 					<div class="flex shrink-0 items-center gap-1">
-						<Tooltip>
-							<TooltipTrigger class="inline-flex">
-								<button
-									type="button"
-									class="topbar-icon-btn"
-									onclick={() => copyText('link', activePublicUrl)}
-									disabled={copyingKey === 'link'}
-									aria-label="Copy link"
-								>
-									{#if copyingKey === 'link'}
-										<CheckIcon class="size-3.5 text-emerald-500" />
-									{:else}
-										<ClipboardIcon class="size-3.5" />
-									{/if}
-								</button>
-							</TooltipTrigger>
-							<TooltipContent side="bottom" sideOffset={4}>
-								{copyingKey === 'link' ? 'Copied!' : 'Copy link'}
-							</TooltipContent>
-						</Tooltip>
+						<div class="sm:hidden">
+							<Tooltip>
+								<TooltipTrigger class="inline-flex">
+									<button
+										type="button"
+										class="topbar-icon-btn"
+										onclick={() => copyText('link', activePublicUrl)}
+										disabled={copyingKey === 'link'}
+										aria-label="Copy link"
+									>
+										{#if copiedKey === 'link'}
+											<CheckIcon class="size-3.5 text-emerald-500" />
+										{:else}
+											<ClipboardIcon class="size-3.5" />
+										{/if}
+									</button>
+								</TooltipTrigger>
+								<TooltipContent side="bottom" sideOffset={4}>
+									{copiedKey === 'link' ? 'Copied!' : 'Copy link'}
+								</TooltipContent>
+							</Tooltip>
+						</div>
 
 						<Tooltip>
 							<TooltipTrigger class="inline-flex">
@@ -743,7 +788,7 @@
 									disabled={copyingKey === 'embed'}
 									aria-label="Copy embed code"
 								>
-									{#if copyingKey === 'embed'}
+									{#if copiedKey === 'embed'}
 										<CheckIcon class="size-3.5 text-emerald-500" />
 									{:else}
 										<Code2Icon class="size-3.5" />
@@ -751,7 +796,7 @@
 								</button>
 							</TooltipTrigger>
 							<TooltipContent side="bottom" sideOffset={4}>
-								{copyingKey === 'embed' ? 'Copied!' : 'Copy embed code'}
+								{copiedKey === 'embed' ? 'Copied!' : 'Copy embed code'}
 							</TooltipContent>
 						</Tooltip>
 
@@ -907,11 +952,17 @@
 					<div class="flex h-full min-h-0 flex-col">
 						<!-- Inline editable title row -->
 						<div
-							class="flex shrink-0 items-center gap-2 border-b border-border/80 bg-card/40 px-5 py-3"
+							class="title-bar flex shrink-0 items-center gap-1.5 border-b border-border/80 bg-card/40 px-4 py-2"
 						>
-							<div class="title-row group min-w-0 flex-1">
+							<span
+								class="shrink-0 text-[10px] font-bold tracking-[0.22em] text-muted-foreground/55 uppercase"
+							>
+								Waiver
+							</span>
+							<span class="h-3.5 w-px shrink-0 bg-border"></span>
+							<div class="title-row group min-w-0 flex-1" class:is-editing={isEditingTitle}>
 								{#if isEditingTitle}
-									<div class="flex items-center gap-1.5">
+									<div class="title-edit-frame">
 										<input
 											bind:this={titleInputEl}
 											type="text"
@@ -922,56 +973,54 @@
 											onkeydown={handleTitleKeydown}
 											onblur={commitTitleEdit}
 										/>
-										<button
-											type="button"
-											class="title-icon-btn is-confirm"
-											onmousedown={(e) => {
-												e.preventDefault();
-												commitTitleEdit();
-											}}
-											aria-label="Confirm title"
-										>
-											<CheckIcon class="size-3.5" />
-										</button>
-										<button
-											type="button"
-											class="title-icon-btn is-cancel"
-											onmousedown={(e) => {
-												e.preventDefault();
-												cancelTitleEdit();
-											}}
-											aria-label="Cancel edit"
-										>
-											<XIcon class="size-3.5" />
-										</button>
+										<div class="title-action-cluster">
+											<button
+												type="button"
+												class="title-icon-btn is-confirm"
+												onmousedown={(e) => {
+													e.preventDefault();
+													commitTitleEdit();
+												}}
+												aria-label="Confirm title"
+											>
+												<CheckIcon class="size-3" />
+											</button>
+											<button
+												type="button"
+												class="title-icon-btn is-cancel"
+												onmousedown={(e) => {
+													e.preventDefault();
+													cancelTitleEdit();
+												}}
+												aria-label="Cancel edit"
+											>
+												<XIcon class="size-3" />
+											</button>
+										</div>
 									</div>
-								{:else}
-									<div class="flex items-center gap-1.5">
-										<h2
-											class="min-w-0 truncate text-sm font-semibold tracking-tight text-foreground"
-										>
+								{:else if !isReadOnly}
+									<button
+										type="button"
+										class="title-display-btn"
+										onclick={startTitleEdit}
+										title="Rename waiver"
+										aria-label="Rename waiver"
+									>
+										<span class="title-display-text">
 											{currentDraft.title || 'Untitled waiver'}
-										</h2>
-										{#if !isReadOnly}
-											<Tooltip>
-												<TooltipTrigger class="inline-flex">
-													<button
-														type="button"
-														class="title-icon-btn opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
-														onclick={startTitleEdit}
-														aria-label="Edit waiver title"
-													>
-														<Pencil class="size-3" />
-													</button>
-												</TooltipTrigger>
-												<TooltipContent side="bottom" sideOffset={4}>Rename waiver</TooltipContent>
-											</Tooltip>
-										{/if}
+										</span>
+										<Pencil class="title-display-icon size-3" />
+									</button>
+								{:else}
+									<div class="title-display-btn is-readonly">
+										<span class="title-display-text">
+											{currentDraft.title || 'Untitled waiver'}
+										</span>
 									</div>
 								{/if}
 							</div>
 
-							{#if activeTemplates.length > 1 && !isEditingTitle}
+							{#if activeTemplates.length > 1}
 								<DropdownMenu>
 									<DropdownMenuTrigger class="inline-flex">
 										<button
@@ -1054,8 +1103,214 @@
 		cursor: not-allowed;
 	}
 
+	.public-url-copy {
+		display: inline-flex;
+		max-width: 100%;
+		min-width: 0;
+		align-items: center;
+		gap: 0.5rem;
+		height: 1.65rem;
+		padding: 0 0.55rem 0 0.5rem;
+		border-radius: 9999px;
+		border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+		background: color-mix(in srgb, var(--muted) 35%, transparent);
+		font-family: var(--font-sans);
+		font-size: 0.7rem;
+		line-height: 1;
+		color: color-mix(in srgb, var(--muted-foreground) 85%, var(--foreground));
+		text-align: left;
+		transition:
+			color 160ms ease,
+			background 160ms ease,
+			border-color 160ms ease,
+			box-shadow 160ms ease;
+	}
+
+	.public-url-copy:hover:not(:disabled),
+	.public-url-copy:focus-visible {
+		color: var(--foreground);
+		background: color-mix(in srgb, var(--muted) 65%, transparent);
+		border-color: color-mix(in srgb, var(--primary) 35%, var(--border));
+		outline: none;
+	}
+
+	.public-url-copy:focus-visible {
+		box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 18%, transparent);
+	}
+
+	.public-url-copy:disabled {
+		cursor: wait;
+	}
+
+	.public-url-copy.is-copied {
+		color: oklch(0.596 0.145 163.225);
+		border-color: color-mix(in srgb, oklch(0.596 0.145 163.225) 45%, var(--border));
+		background: color-mix(in srgb, oklch(0.596 0.145 163.225) 10%, transparent);
+	}
+
+	.public-url-copy-label {
+		display: inline-flex;
+		flex: 0 0 auto;
+		align-items: center;
+		font-size: 0.58rem;
+		font-weight: 700;
+		letter-spacing: 0.16em;
+		text-transform: uppercase;
+		color: color-mix(in srgb, var(--muted-foreground) 70%, transparent);
+		transition: color 160ms ease;
+	}
+
+	.public-url-copy:hover .public-url-copy-label,
+	.public-url-copy:focus-visible .public-url-copy-label {
+		color: color-mix(in srgb, var(--primary) 70%, var(--foreground));
+	}
+
+	.public-url-copy.is-copied .public-url-copy-label {
+		color: oklch(0.596 0.145 163.225);
+	}
+
+	.public-url-copy-divider {
+		display: inline-block;
+		flex: 0 0 auto;
+		width: 1px;
+		height: 0.75rem;
+		background: color-mix(in srgb, var(--border) 100%, transparent);
+		transition: background 160ms ease;
+	}
+
+	.public-url-copy:hover .public-url-copy-divider,
+	.public-url-copy:focus-visible .public-url-copy-divider {
+		background: color-mix(in srgb, var(--primary) 30%, var(--border));
+	}
+
+	.public-url-copy.is-copied .public-url-copy-divider {
+		background: color-mix(in srgb, oklch(0.596 0.145 163.225) 40%, var(--border));
+	}
+
+	.public-url-copy-text {
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		font-family:
+			ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New',
+			monospace;
+		font-size: 0.7rem;
+		letter-spacing: -0.01em;
+	}
+
+	.public-url-copy-icon {
+		display: inline-flex;
+		flex: 0 0 auto;
+		color: color-mix(in srgb, var(--muted-foreground) 80%, transparent);
+		transition:
+			color 160ms ease,
+			transform 240ms cubic-bezier(0.22, 1.2, 0.36, 1);
+	}
+
+	.public-url-copy:hover .public-url-copy-icon,
+	.public-url-copy:focus-visible .public-url-copy-icon {
+		color: color-mix(in srgb, var(--primary) 85%, var(--foreground));
+	}
+
+	.public-url-copy.is-copied .public-url-copy-icon {
+		color: oklch(0.596 0.145 163.225);
+		transform: scale(1.12);
+	}
+
+	.public-url-copy-dialog {
+		width: 100%;
+		justify-content: center;
+		padding: 0.5rem 0.75rem;
+		height: auto;
+		text-align: center;
+	}
+
+	.public-url-copy-dialog .public-url-copy-text {
+		white-space: normal;
+		overflow-wrap: anywhere;
+	}
+
+	.title-bar {
+		min-height: 2.85rem;
+	}
+
 	.title-row {
 		min-width: 0;
+	}
+
+	.title-edit-frame {
+		display: flex;
+		height: 1.85rem;
+		min-width: 0;
+		align-items: center;
+		gap: 0.3rem;
+	}
+
+	.title-display-btn {
+		display: inline-flex;
+		height: 1.85rem;
+		width: 100%;
+		min-width: 0;
+		align-items: center;
+		gap: 0.4rem;
+		padding: 0 0.45rem;
+		border-radius: 0.4rem;
+		text-align: left;
+		transition:
+			background 160ms ease,
+			color 160ms ease;
+	}
+
+	.title-display-btn:not(.is-readonly):hover,
+	.title-display-btn:not(.is-readonly):focus-visible {
+		background: color-mix(in srgb, var(--muted) 55%, transparent);
+		outline: none;
+	}
+
+	.title-display-btn:focus-visible {
+		box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 25%, transparent);
+	}
+
+	.title-display-btn.is-readonly {
+		cursor: default;
+	}
+
+	.title-display-text {
+		min-width: 0;
+		flex: 1;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		font-size: 0.8125rem;
+		font-weight: 600;
+		letter-spacing: -0.005em;
+		color: var(--foreground);
+	}
+
+	:global(.title-display-icon) {
+		flex: 0 0 auto;
+		color: color-mix(in srgb, var(--muted-foreground) 70%, transparent);
+		opacity: 0;
+		transform: translateX(-0.15rem);
+		transition:
+			opacity 160ms ease,
+			transform 160ms ease,
+			color 160ms ease;
+	}
+
+	.title-display-btn:hover :global(.title-display-icon),
+	.title-display-btn:focus-visible :global(.title-display-icon) {
+		opacity: 1;
+		transform: translateX(0);
+		color: color-mix(in srgb, var(--primary) 70%, var(--foreground));
+	}
+
+	.title-action-cluster {
+		display: inline-flex;
+		flex: 0 0 auto;
+		align-items: center;
+		gap: 0.2rem;
 	}
 
 	.title-input {
@@ -1066,8 +1321,9 @@
 		border-radius: 0.4rem;
 		border: 1px solid color-mix(in srgb, var(--primary) 45%, var(--border));
 		background: var(--background);
-		font-size: 0.85rem;
+		font-size: 0.8125rem;
 		font-weight: 600;
+		letter-spacing: -0.005em;
 		color: var(--foreground);
 		box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 14%, transparent);
 		outline: none;
@@ -1077,8 +1333,8 @@
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
-		height: 1.4rem;
-		width: 1.4rem;
+		height: 1.5rem;
+		width: 1.5rem;
 		border-radius: 0.3rem;
 		color: color-mix(in srgb, var(--muted-foreground) 80%, transparent);
 		transition:
@@ -1110,8 +1366,8 @@
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
-		height: 1.75rem;
-		width: 1.75rem;
+		height: 1.85rem;
+		width: 1.85rem;
 		border-radius: 0.4rem;
 		color: var(--muted-foreground);
 		transition:

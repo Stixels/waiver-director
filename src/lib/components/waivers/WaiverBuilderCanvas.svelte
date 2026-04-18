@@ -320,6 +320,53 @@
 					</DropdownMenuContent>
 				</DropdownMenu>
 
+				<!-- Alignment -->
+				<DropdownMenu>
+					<DropdownMenuTrigger class="inline-flex">
+						<button type="button" class="toolbar-button" disabled={!editor} aria-label="Alignment">
+							{#if toolbarState.alignment === 'center'}
+								<AlignCenterIcon class="size-3.5" />
+							{:else if toolbarState.alignment === 'right'}
+								<AlignRightIcon class="size-3.5" />
+							{:else if toolbarState.alignment === 'justify'}
+								<AlignJustifyIcon class="size-3.5" />
+							{:else}
+								<AlignLeftIcon class="size-3.5" />
+							{/if}
+						</button>
+					</DropdownMenuTrigger>
+					<DropdownMenuContent align="end" class="w-40">
+						<DropdownMenuItem
+							class={toolbarState.alignment === 'left' ? 'font-semibold' : undefined}
+							onclick={() => command((e) => e.chain().focus().setTextAlign('left').run())}
+						>
+							<AlignLeftIcon class="size-4" />
+							<span>Left</span>
+						</DropdownMenuItem>
+						<DropdownMenuItem
+							class={toolbarState.alignment === 'center' ? 'font-semibold' : undefined}
+							onclick={() => command((e) => e.chain().focus().setTextAlign('center').run())}
+						>
+							<AlignCenterIcon class="size-4" />
+							<span>Center</span>
+						</DropdownMenuItem>
+						<DropdownMenuItem
+							class={toolbarState.alignment === 'right' ? 'font-semibold' : undefined}
+							onclick={() => command((e) => e.chain().focus().setTextAlign('right').run())}
+						>
+							<AlignRightIcon class="size-4" />
+							<span>Right</span>
+						</DropdownMenuItem>
+						<DropdownMenuItem
+							class={toolbarState.alignment === 'justify' ? 'font-semibold' : undefined}
+							onclick={() => command((e) => e.chain().focus().setTextAlign('justify').run())}
+						>
+							<AlignJustifyIcon class="size-4" />
+							<span>Justify</span>
+						</DropdownMenuItem>
+					</DropdownMenuContent>
+				</DropdownMenu>
+
 				<span class="toolbar-divider"></span>
 
 				<button
@@ -380,7 +427,7 @@
 					aria-pressed={toolbarState.bulletList}
 					aria-label="Bulleted list"
 					title="Bulleted list"
-					disabled={!canCommand((e) => e.can().chain().focus().toggleBulletList().run())}
+					disabled={!editor}
 					onclick={() => command((e) => e.chain().focus().toggleBulletList().run())}
 				>
 					<ListIcon class="size-3.5" />
@@ -392,60 +439,13 @@
 					aria-pressed={toolbarState.orderedList}
 					aria-label="Numbered list"
 					title="Numbered list"
-					disabled={!canCommand((e) => e.can().chain().focus().toggleOrderedList().run())}
+					disabled={!editor}
 					onclick={() => command((e) => e.chain().focus().toggleOrderedList().run())}
 				>
 					<ListOrderedIcon class="size-3.5" />
 				</button>
 
 				<span class="toolbar-divider"></span>
-
-				<!-- Alignment -->
-				<DropdownMenu>
-					<DropdownMenuTrigger class="inline-flex">
-						<button type="button" class="toolbar-button" disabled={!editor} aria-label="Alignment">
-							{#if toolbarState.alignment === 'center'}
-								<AlignCenterIcon class="size-3.5" />
-							{:else if toolbarState.alignment === 'right'}
-								<AlignRightIcon class="size-3.5" />
-							{:else if toolbarState.alignment === 'justify'}
-								<AlignJustifyIcon class="size-3.5" />
-							{:else}
-								<AlignLeftIcon class="size-3.5" />
-							{/if}
-						</button>
-					</DropdownMenuTrigger>
-					<DropdownMenuContent align="end" class="w-40">
-						<DropdownMenuItem
-							class={toolbarState.alignment === 'left' ? 'font-semibold' : undefined}
-							onclick={() => command((e) => e.chain().focus().setTextAlign('left').run())}
-						>
-							<AlignLeftIcon class="size-4" />
-							<span>Left</span>
-						</DropdownMenuItem>
-						<DropdownMenuItem
-							class={toolbarState.alignment === 'center' ? 'font-semibold' : undefined}
-							onclick={() => command((e) => e.chain().focus().setTextAlign('center').run())}
-						>
-							<AlignCenterIcon class="size-4" />
-							<span>Center</span>
-						</DropdownMenuItem>
-						<DropdownMenuItem
-							class={toolbarState.alignment === 'right' ? 'font-semibold' : undefined}
-							onclick={() => command((e) => e.chain().focus().setTextAlign('right').run())}
-						>
-							<AlignRightIcon class="size-4" />
-							<span>Right</span>
-						</DropdownMenuItem>
-						<DropdownMenuItem
-							class={toolbarState.alignment === 'justify' ? 'font-semibold' : undefined}
-							onclick={() => command((e) => e.chain().focus().setTextAlign('justify').run())}
-						>
-							<AlignJustifyIcon class="size-4" />
-							<span>Justify</span>
-						</DropdownMenuItem>
-					</DropdownMenuContent>
-				</DropdownMenu>
 
 				<button
 					type="button"
