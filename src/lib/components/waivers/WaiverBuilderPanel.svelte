@@ -52,6 +52,10 @@
 		{ type: 'date', label: 'Date', icon: CalendarIcon, hint: 'Calendar picker' }
 	];
 
+	function getFieldTypeIcon(type: WaiverFieldType) {
+		return fieldTypes.find((entry) => entry.type === type)?.icon ?? TypeIcon;
+	}
+
 	function addField(type: WaiverFieldType) {
 		if (!draft || readOnly) return;
 		draft.fields.push(createBlankField(type));
@@ -109,12 +113,12 @@
 	<div class="flex h-full min-h-0 flex-col">
 		<!-- Header row: Custom fields label + Add button -->
 		<div
-			class="flex shrink-0 items-center justify-between gap-2 border-b border-border/80 px-5 py-3.5"
+			class="flex shrink-0 items-center justify-between gap-3 border-b border-border/80 px-5 py-2.5"
 		>
-			<div>
+			<div class="min-w-0">
 				<p class="panel-section-label">Custom fields</p>
-				<p class="mt-0.5 text-[11px] leading-relaxed text-muted-foreground/70">
-					Questions that appear before the signature.
+				<p class="text-[10.5px] leading-tight text-muted-foreground/65">
+					Questions before the signature.
 				</p>
 			</div>
 			{#if !readOnly}
@@ -146,7 +150,7 @@
 		</div>
 
 		<!-- Scrollable fields list -->
-		<div class="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-5 py-4">
+		<div class="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-5 py-3">
 			{#if draft.fields.length === 0}
 				<div
 					class="rounded-lg border border-dashed border-border bg-muted/10 px-4 py-10 text-center"
@@ -159,7 +163,7 @@
 				</div>
 			{:else}
 				<DragDropProvider onDragEnd={handleFieldDragEnd}>
-					<ul class="space-y-2.5">
+					<ul class="space-y-1.5">
 						{#each draft.fields as field, index (field.id)}
 							{@const sortable = createSortable({
 								id: field.id,
@@ -170,6 +174,7 @@
 									return readOnly;
 								}
 							})}
+							{@const FieldIcon = getFieldTypeIcon(field.type)}
 							<li
 								{@attach sortable.attach}
 								class="field-row"
@@ -188,12 +193,15 @@
 									</button>
 								{/if}
 
-								<div class="min-w-0 flex-1 px-3 py-2.5">
+								<div class="min-w-0 flex-1 px-2.5 py-1.5">
 									<!-- Meta row: type pill + required toggle + delete -->
 									<div class="flex items-center justify-between gap-2">
-										<div class="flex min-w-0 items-center gap-2">
+										<div class="flex min-w-0 items-center gap-1.5">
 											<span class="field-type-pill">
-												{formatFieldTypeLabel(field.type)}
+												<FieldIcon class="field-type-pill-icon size-3" />
+												<span class="field-type-pill-text">
+													{formatFieldTypeLabel(field.type)}
+												</span>
 											</span>
 											{#if !readOnly}
 												<label class="required-switch">
@@ -230,7 +238,7 @@
 									</div>
 
 									<!-- Label input below -->
-									<div class="mt-2">
+									<div class="mt-1.5">
 										<label for={`${field.id}-label`} class="sr-only"> Label guests will see </label>
 										<Input
 											id={`${field.id}-label`}
@@ -243,32 +251,26 @@
 									</div>
 
 									{#if field.type === 'select'}
-										<div class="mt-3 rounded-md border border-border/60 bg-muted/20 p-2.5">
-											<div class="flex items-center justify-between">
-												<p
-													class="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase"
-												>
-													Options
-												</p>
-												{#if !readOnly}
-													<button
-														type="button"
-														class="text-[10px] font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
-														onclick={() => addOption(field)}
-													>
-														+ Add option
-													</button>
-												{/if}
+										<div class="options-card mt-2">
+											<div class="flex items-center justify-between gap-2">
+												<p class="options-label">Options</p>
+												<span class="options-count">
+													{field.options.length}
+													{field.options.length === 1 ? 'item' : 'items'}
+												</span>
 											</div>
-											<div class="mt-1.5 space-y-1.5">
+											<div class="mt-1.5 space-y-1">
 												{#each field.options as option, optionIndex (option.id)}
-													<div class="flex items-center gap-1.5">
+													<div class="option-row">
+														<span class="option-index" aria-hidden="true">
+															{optionIndex + 1}
+														</span>
 														<Input
 															id={`${field.id}-option-${optionIndex}`}
 															bind:value={option.label}
 															maxlength={80}
 															disabled={readOnly}
-															class="h-7 text-xs"
+															class="option-input"
 															placeholder="Option label"
 														/>
 														{#if !readOnly}
@@ -285,6 +287,16 @@
 													</div>
 												{/each}
 											</div>
+											{#if !readOnly}
+												<button
+													type="button"
+													class="add-option-btn"
+													onclick={() => addOption(field)}
+												>
+													<PlusIcon class="size-3" />
+													<span>Add option</span>
+												</button>
+											{/if}
 										</div>
 									{/if}
 								</div>
@@ -321,8 +333,19 @@
 		overflow: hidden;
 		transition:
 			border-color 160ms ease,
+			background 160ms ease,
 			box-shadow 160ms ease,
 			transform 160ms ease;
+	}
+
+	.field-row:hover {
+		border-color: color-mix(in srgb, var(--border) 100%, var(--foreground) 4%);
+		background: color-mix(in srgb, var(--card) 70%, transparent);
+	}
+
+	.field-row:focus-within {
+		border-color: color-mix(in srgb, var(--primary) 35%, var(--border));
+		background: color-mix(in srgb, var(--card) 80%, transparent);
 	}
 
 	.field-row.is-drop-target {
@@ -335,7 +358,7 @@
 
 	.field-grip {
 		display: flex;
-		width: 1.75rem;
+		width: 1.5rem;
 		flex-shrink: 0;
 		align-items: center;
 		justify-content: center;
@@ -358,11 +381,11 @@
 	}
 
 	:global(.field-label-input) {
-		height: 2.15rem;
+		height: 1.9rem;
 		background: color-mix(in srgb, var(--background) 60%, transparent);
 		border: 1px solid var(--border);
-		padding-left: 0.65rem;
-		font-size: 0.85rem;
+		padding-left: 0.6rem;
+		font-size: 0.8rem;
 		font-weight: 500;
 		color: var(--foreground);
 		transition:
@@ -379,16 +402,26 @@
 	.field-type-pill {
 		display: inline-flex;
 		align-items: center;
-		height: 1.3rem;
-		padding: 0 0.5rem;
+		gap: 0.28rem;
+		height: 1.2rem;
+		padding: 0 0.5rem 0 0.38rem;
 		border-radius: 999px;
 		border: 1px solid var(--border);
 		background: color-mix(in srgb, var(--muted) 40%, transparent);
-		font-size: 0.64rem;
+		font-size: 0.6rem;
 		font-weight: 600;
-		letter-spacing: 0.1em;
+		letter-spacing: 0.09em;
 		color: color-mix(in srgb, var(--muted-foreground) 90%, var(--foreground));
 		text-transform: uppercase;
+	}
+
+	:global(.field-type-pill-icon) {
+		flex: 0 0 auto;
+		color: color-mix(in srgb, var(--muted-foreground) 85%, transparent);
+	}
+
+	.field-type-pill-text {
+		line-height: 1;
 	}
 
 	.field-type-pill.is-required {
@@ -420,8 +453,8 @@
 	.switch-track {
 		position: relative;
 		display: inline-block;
-		width: 1.7rem;
-		height: 0.95rem;
+		width: 1.5rem;
+		height: 0.85rem;
 		border-radius: 999px;
 		background: color-mix(in srgb, var(--muted-foreground) 25%, var(--border));
 		transition: background 180ms ease;
@@ -431,8 +464,8 @@
 		position: absolute;
 		top: 0.1rem;
 		left: 0.1rem;
-		width: 0.75rem;
-		height: 0.75rem;
+		width: 0.65rem;
+		height: 0.65rem;
 		border-radius: 999px;
 		background: var(--background);
 		box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
@@ -444,7 +477,7 @@
 	}
 
 	.required-switch input:checked ~ .switch-track .switch-thumb {
-		transform: translateX(0.75rem);
+		transform: translateX(0.65rem);
 	}
 
 	.required-switch input:focus-visible ~ .switch-track {
@@ -452,9 +485,9 @@
 	}
 
 	.switch-label {
-		font-size: 0.68rem;
+		font-size: 0.65rem;
 		font-weight: 500;
-		letter-spacing: 0.06em;
+		letter-spacing: 0.05em;
 		color: var(--muted-foreground);
 	}
 
@@ -462,9 +495,9 @@
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
-		width: 1.65rem;
-		height: 1.65rem;
-		border-radius: 0.4rem;
+		width: 1.5rem;
+		height: 1.5rem;
+		border-radius: 0.35rem;
 		color: color-mix(in srgb, var(--muted-foreground) 70%, transparent);
 		transition:
 			background 150ms ease,
@@ -497,5 +530,101 @@
 	.field-inline-remove:disabled {
 		opacity: 0.35;
 		cursor: not-allowed;
+	}
+
+	.options-card {
+		position: relative;
+		padding: 0.45rem 0.55rem 0.45rem 0.6rem;
+		border-radius: 0.45rem;
+		border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+		background: color-mix(in srgb, var(--muted) 18%, transparent);
+	}
+
+	.options-card::before {
+		content: '';
+		position: absolute;
+		left: 0;
+		top: 0.4rem;
+		bottom: 0.4rem;
+		width: 2px;
+		border-radius: 999px;
+		background: color-mix(in srgb, var(--primary) 45%, var(--border));
+		opacity: 0.6;
+	}
+
+	.options-label {
+		font-size: 0.58rem;
+		font-weight: 700;
+		letter-spacing: 0.16em;
+		text-transform: uppercase;
+		color: color-mix(in srgb, var(--muted-foreground) 85%, var(--foreground));
+	}
+
+	.options-count {
+		font-size: 0.58rem;
+		font-weight: 500;
+		letter-spacing: 0.04em;
+		color: color-mix(in srgb, var(--muted-foreground) 75%, transparent);
+		font-variant-numeric: tabular-nums;
+	}
+
+	.option-row {
+		display: flex;
+		align-items: center;
+		gap: 0.35rem;
+	}
+
+	.option-index {
+		display: inline-flex;
+		flex: 0 0 auto;
+		width: 0.95rem;
+		height: 0.95rem;
+		align-items: center;
+		justify-content: center;
+		border-radius: 999px;
+		background: color-mix(in srgb, var(--muted) 60%, transparent);
+		font-size: 0.55rem;
+		font-weight: 600;
+		font-variant-numeric: tabular-nums;
+		color: color-mix(in srgb, var(--muted-foreground) 90%, transparent);
+	}
+
+	:global(.option-input) {
+		height: 1.55rem !important;
+		font-size: 0.72rem !important;
+		padding-left: 0.5rem !important;
+		padding-right: 0.5rem !important;
+		background: color-mix(in srgb, var(--background) 85%, transparent);
+	}
+
+	.add-option-btn {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.28rem;
+		margin-top: 0.4rem;
+		height: 1.4rem;
+		padding: 0 0.5rem 0 0.4rem;
+		border-radius: 999px;
+		border: 1px dashed color-mix(in srgb, var(--primary) 35%, var(--border));
+		background: transparent;
+		font-size: 0.62rem;
+		font-weight: 500;
+		letter-spacing: 0.02em;
+		color: color-mix(in srgb, var(--primary) 70%, var(--foreground));
+		transition:
+			background 150ms ease,
+			border-color 150ms ease,
+			color 150ms ease;
+	}
+
+	.add-option-btn:hover {
+		background: color-mix(in srgb, var(--primary) 10%, transparent);
+		border-color: color-mix(in srgb, var(--primary) 55%, var(--border));
+		color: color-mix(in srgb, var(--primary) 90%, var(--foreground));
+	}
+
+	.add-option-btn:focus-visible {
+		outline: none;
+		box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 30%, transparent);
 	}
 </style>
