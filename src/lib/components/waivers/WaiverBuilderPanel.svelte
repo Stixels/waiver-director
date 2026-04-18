@@ -30,10 +30,9 @@
 
 	interface Props {
 		draft?: WaiverDefinition | null;
-		readOnly?: boolean;
 	}
 
-	let { draft = $bindable(null), readOnly = false }: Props = $props();
+	let { draft = $bindable(null) }: Props = $props();
 
 	type DragEndHandlerEvent = Parameters<
 		NonNullable<ComponentProps<typeof DragDropProvider>['onDragEnd']>
@@ -57,17 +56,17 @@
 	}
 
 	function addField(type: WaiverFieldType) {
-		if (!draft || readOnly) return;
+		if (!draft) return;
 		draft.fields.push(createBlankField(type));
 	}
 
 	function removeField(index: number) {
-		if (!draft || readOnly) return;
+		if (!draft) return;
 		draft.fields.splice(index, 1);
 	}
 
 	function reorderFields(fromIndex: number, toIndex: number) {
-		if (!draft || readOnly) return;
+		if (!draft) return;
 		if (fromIndex === toIndex) return;
 		if (
 			fromIndex < 0 ||
@@ -86,7 +85,7 @@
 	}
 
 	function handleFieldDragEnd(event: DragEndHandlerEvent) {
-		if (!draft || readOnly) return;
+		if (!draft) return;
 		if (event.canceled) return;
 
 		const { source, target } = event.operation;
@@ -96,7 +95,6 @@
 	}
 
 	function addOption(field: Extract<WaiverField, { type: 'select' }>) {
-		if (readOnly) return;
 		field.options.push({
 			id: createOptionId('option'),
 			label: `Option ${field.options.length + 1}`
@@ -104,7 +102,6 @@
 	}
 
 	function removeOption(field: Extract<WaiverField, { type: 'select' }>, optionIndex: number) {
-		if (readOnly) return;
 		field.options.splice(optionIndex, 1);
 	}
 </script>
@@ -121,32 +118,30 @@
 					Questions before the signature.
 				</p>
 			</div>
-			{#if !readOnly}
-				<DropdownMenu>
-					<DropdownMenuTrigger class="inline-flex">
-						<Button
-							type="button"
-							size="sm"
-							variant="outline"
-							class="h-8 shrink-0 gap-1 rounded-md px-2.5 text-[11px] font-medium tracking-wide"
-						>
-							<PlusIcon class="size-3" />
-							Add field
-						</Button>
-					</DropdownMenuTrigger>
-					<DropdownMenuContent align="end" class="w-56">
-						{#each fieldTypes as type (type.type)}
-							<DropdownMenuItem onclick={() => addField(type.type)}>
-								<type.icon class="size-4 text-muted-foreground" />
-								<div class="flex flex-col">
-									<span class="text-sm font-medium">{type.label}</span>
-									<span class="text-[11px] text-muted-foreground">{type.hint}</span>
-								</div>
-							</DropdownMenuItem>
-						{/each}
-					</DropdownMenuContent>
-				</DropdownMenu>
-			{/if}
+			<DropdownMenu>
+				<DropdownMenuTrigger class="inline-flex">
+					<Button
+						type="button"
+						size="sm"
+						variant="outline"
+						class="h-8 shrink-0 gap-1 rounded-md px-2.5 text-[11px] font-medium tracking-wide"
+					>
+						<PlusIcon class="size-3" />
+						Add field
+					</Button>
+				</DropdownMenuTrigger>
+				<DropdownMenuContent align="end" class="w-56">
+					{#each fieldTypes as type (type.type)}
+						<DropdownMenuItem onclick={() => addField(type.type)}>
+							<type.icon class="size-4 text-muted-foreground" />
+							<div class="flex flex-col">
+								<span class="text-sm font-medium">{type.label}</span>
+								<span class="text-[11px] text-muted-foreground">{type.hint}</span>
+							</div>
+						</DropdownMenuItem>
+					{/each}
+				</DropdownMenuContent>
+			</DropdownMenu>
 		</div>
 
 		<!-- Scrollable fields list -->
@@ -169,9 +164,6 @@
 								id: field.id,
 								get index() {
 									return index;
-								},
-								get disabled() {
-									return readOnly;
 								}
 							})}
 							{@const FieldIcon = getFieldTypeIcon(field.type)}
@@ -181,17 +173,15 @@
 								class:is-dragging={sortable.isDragging}
 								class:is-drop-target={sortable.isDropTarget}
 							>
-								{#if !readOnly}
-									<button
-										type="button"
-										{@attach sortable.attachHandle}
-										class="field-grip"
-										aria-label="Drag to reorder field"
-										title="Drag to reorder"
-									>
-										<GripVerticalIcon class="size-3.5" />
-									</button>
-								{/if}
+								<button
+									type="button"
+									{@attach sortable.attachHandle}
+									class="field-grip"
+									aria-label="Drag to reorder field"
+									title="Drag to reorder"
+								>
+									<GripVerticalIcon class="size-3.5" />
+								</button>
 
 								<div class="min-w-0 flex-1 px-2.5 py-1.5">
 									<!-- Meta row: type pill + required toggle + delete -->
@@ -203,38 +193,28 @@
 													{formatFieldTypeLabel(field.type)}
 												</span>
 											</span>
-											{#if !readOnly}
-												<label class="required-switch">
-													<input
-														type="checkbox"
-														bind:checked={field.required}
-														disabled={readOnly}
-													/>
-													<span class="switch-track">
-														<span class="switch-thumb"></span>
-													</span>
-													<span class="switch-label">Required</span>
-												</label>
-											{:else if field.required}
-												<span class="field-type-pill is-required">Required</span>
-											{/if}
+											<label class="required-switch">
+												<input type="checkbox" bind:checked={field.required} />
+												<span class="switch-track">
+													<span class="switch-thumb"></span>
+												</span>
+												<span class="switch-label">Required</span>
+											</label>
 										</div>
 
-										{#if !readOnly}
-											<Tooltip>
-												<TooltipTrigger class="inline-flex">
-													<button
-														type="button"
-														class="field-delete"
-														onclick={() => removeField(index)}
-														aria-label="Delete field"
-													>
-														<Trash2Icon class="size-3.5" />
-													</button>
-												</TooltipTrigger>
-												<TooltipContent side="top" sideOffset={4}>Delete field</TooltipContent>
-											</Tooltip>
-										{/if}
+										<Tooltip>
+											<TooltipTrigger class="inline-flex">
+												<button
+													type="button"
+													class="field-delete"
+													onclick={() => removeField(index)}
+													aria-label="Delete field"
+												>
+													<Trash2Icon class="size-3.5" />
+												</button>
+											</TooltipTrigger>
+											<TooltipContent side="top" sideOffset={4}>Delete field</TooltipContent>
+										</Tooltip>
 									</div>
 
 									<!-- Label input below -->
@@ -244,7 +224,6 @@
 											id={`${field.id}-label`}
 											bind:value={field.label}
 											maxlength={120}
-											disabled={readOnly}
 											placeholder="Label guests will see"
 											class="field-label-input"
 										/>
@@ -269,34 +248,25 @@
 															id={`${field.id}-option-${optionIndex}`}
 															bind:value={option.label}
 															maxlength={80}
-															disabled={readOnly}
 															class="option-input"
 															placeholder="Option label"
 														/>
-														{#if !readOnly}
-															<button
-																type="button"
-																class="field-inline-remove"
-																disabled={field.options.length === 1}
-																onclick={() => removeOption(field, optionIndex)}
-																aria-label="Remove option"
-															>
-																<Trash2Icon class="size-3" />
-															</button>
-														{/if}
+														<button
+															type="button"
+															class="field-inline-remove"
+															disabled={field.options.length === 1}
+															onclick={() => removeOption(field, optionIndex)}
+															aria-label="Remove option"
+														>
+															<Trash2Icon class="size-3" />
+														</button>
 													</div>
 												{/each}
 											</div>
-											{#if !readOnly}
-												<button
-													type="button"
-													class="add-option-btn"
-													onclick={() => addOption(field)}
-												>
-													<PlusIcon class="size-3" />
-													<span>Add option</span>
-												</button>
-											{/if}
+											<button type="button" class="add-option-btn" onclick={() => addOption(field)}>
+												<PlusIcon class="size-3" />
+												<span>Add option</span>
+											</button>
 										</div>
 									{/if}
 								</div>
@@ -422,12 +392,6 @@
 
 	.field-type-pill-text {
 		line-height: 1;
-	}
-
-	.field-type-pill.is-required {
-		border-color: color-mix(in srgb, var(--primary) 40%, var(--border));
-		background: color-mix(in srgb, var(--primary) 14%, transparent);
-		color: color-mix(in srgb, var(--primary) 80%, var(--foreground));
 	}
 
 	.required-switch {

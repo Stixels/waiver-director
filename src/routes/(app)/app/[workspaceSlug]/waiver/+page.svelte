@@ -12,7 +12,7 @@
 	import { publicEnv } from '$lib/config/public';
 	import ConfirmDialog from '$lib/components/ui/ConfirmDialog.svelte';
 	import QrCodePreview from '$lib/components/waivers/QrCodePreview.svelte';
-	import PastWaiversSheet from '$lib/components/waivers/PastWaiversSheet.svelte';
+	import WaiverVersionHistorySheet from '$lib/components/waivers/WaiverVersionHistorySheet.svelte';
 	import WaiverBuilderCanvas, {
 		type SaveState
 	} from '$lib/components/waivers/WaiverBuilderCanvas.svelte';
@@ -30,7 +30,6 @@
 		DropdownMenu,
 		DropdownMenuContent,
 		DropdownMenuItem,
-		DropdownMenuSeparator,
 		DropdownMenuTrigger
 	} from '$lib/components/ui/dropdown-menu';
 	import {
@@ -48,7 +47,6 @@
 	} from '$lib/domain/waivers';
 	import { getConvexErrorMessage } from '$lib/utils/convex-errors';
 	import EllipsisIcon from '@lucide/svelte/icons/ellipsis';
-	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
 	import ClipboardIcon from '@lucide/svelte/icons/clipboard';
 	import Code2Icon from '@lucide/svelte/icons/code-2';
 	import ExternalLinkIcon from '@lucide/svelte/icons/external-link';
@@ -65,11 +63,7 @@
 
 	type TemplateSummary = FunctionReturnType<typeof api.waivers.listTemplates>[number];
 	type PublishingOverview = FunctionReturnType<typeof api.waivers.getPublishingOverview>;
-	type PendingDiscardAction =
-		| { type: 'switch-template'; templateId: TemplateSummary['templateId'] }
-		| { type: 'open-create-confirm' }
-		| null;
-	type ConfirmKind = 'create' | 'publish' | 'archive' | 'delete' | 'discard';
+	type ConfirmKind = 'publish';
 
 	const convex = useConvexClient();
 
@@ -92,29 +86,14 @@
 		appContext.isLoading || templatesQuery.isLoading || publishingQuery.isLoading
 	);
 
-	function activeTemplateRank(template: TemplateSummary) {
-		if (template.isActivePublic) return 0;
-		if (template.status === 'published') return 1;
-		return 2;
-	}
-
-	const activeTemplates = $derived(
-		[...templates]
-			.filter((template) => template.status !== 'archived')
-			.sort((a, b) => activeTemplateRank(a) - activeTemplateRank(b))
-	);
-
-	let selectedTemplateId = $state<TemplateSummary['templateId'] | null>(null);
 	let draft = $state<WaiverDefinition | null>(null);
 	let baselineDraft = $state<WaiverDefinition | null>(null);
 	let hydratedTemplateId = $state<TemplateSummary['templateId'] | null>(null);
 	let hydratedFingerprint = $state<string | null>(null);
-	let recentCreatedTemplateId = $state<TemplateSummary['templateId'] | null>(null);
-	let pastWaiversOpen = $state(false);
+	let versionHistoryOpen = $state(false);
 	let copyingKey = $state<string | null>(null);
 	let copiedKey = $state<string | null>(null);
 	let qrDialogOpen = $state(false);
-	let pendingDiscardAction = $state<PendingDiscardAction>(null);
 
 	// Inline title editing (header pencil)
 	let isEditingTitle = $state(false);
@@ -130,16 +109,12 @@
 	const AUTOSAVE_DELAY_MS = 800;
 
 	let isPublishing = $state(false);
-	let isArchiving = $state(false);
-	let isDeleting = $state(false);
-	let isCreating = $state(false);
+	let isEnsuringTemplate = $state(false);
 
 	let confirmKind = $state<ConfirmKind | null>(null);
 	let confirmOpen = $state(false);
 
-	const selectedTemplate = $derived(
-		templates.find((template) => template.templateId === selectedTemplateId) ?? null
-	);
+	const selectedTemplate = $derived(templates[0] ?? null);
 	const activePublicHref = $derived.by(() => {
 		const slug = publishingOverview.activeLink?.slug;
 		if (!slug) return null;
@@ -177,8 +152,7 @@
 	const draftFingerprint = $derived(
 		draft ? JSON.stringify(normalizeDefinitionForCompare(draft)) : ''
 	);
-	const isReadOnly = $derived(selectedTemplate?.isReadOnly ?? false);
-	const busy = $derived(isPublishing || isArchiving || isDeleting || isCreating);
+	const busy = $derived(isPublishing || isEnsuringTemplate);
 	const publishDisabled = $derived(
 		busy ||
 			isDirty ||
@@ -189,7 +163,6 @@
 
 	const saveState = $derived<SaveState>(
 		(() => {
-			if (isReadOnly) return 'idle';
 			if (lastSaveError) return 'error';
 			if (isSaving) return 'saving';
 			if (isDirty) return 'dirty';
@@ -206,39 +179,16 @@
 	});
 
 	$effect(() => {
-		if (templates.length === 0) {
-			selectedTemplateId = null;
-			draft = null;
-			baselineDraft = null;
-			hydratedTemplateId = null;
-			hydratedFingerprint = null;
-			recentCreatedTemplateId = null;
+		if (
+			!currentWorkspace ||
+			isLoadingProtectedData ||
+			templates.length > 0 ||
+			isEnsuringTemplate ||
+			convex.disabled
+		) {
 			return;
 		}
-
-		const hasSelectedTemplate = selectedTemplateId
-			? templates.some((template) => template.templateId === selectedTemplateId)
-			: false;
-
-		if (!selectedTemplateId) {
-			selectedTemplateId = activeTemplates[0]?.templateId ?? null;
-			return;
-		}
-
-		if (!hasSelectedTemplate) {
-			if (recentCreatedTemplateId === selectedTemplateId) return;
-			selectedTemplateId = activeTemplates[0]?.templateId ?? null;
-			return;
-		}
-
-		if (recentCreatedTemplateId === selectedTemplateId) {
-			recentCreatedTemplateId = null;
-		}
-
-		const current = templates.find((t) => t.templateId === selectedTemplateId);
-		if (current?.status === 'archived' && activeTemplates.length > 0) {
-			selectedTemplateId = activeTemplates[0].templateId;
-		}
+		void ensureWorkspaceTemplate();
 	});
 
 	$effect(() => {
@@ -282,7 +232,7 @@
 		// Gate the save scheduling outside of reactive tracking so we don't subscribe
 		// to unrelated state like selectedTemplate metadata or the convex client flag.
 		untrack(() => {
-			if (isReadOnly || !selectedTemplate || !currentWorkspace) return;
+			if (!selectedTemplate || !currentWorkspace) return;
 			if (!isDirty) return;
 			if (isSaving) return;
 			if (convex.disabled) return;
@@ -324,7 +274,6 @@
 
 	async function runAutosave() {
 		if (!draft || !selectedTemplate || !currentWorkspace || convex.disabled) return;
-		if (isReadOnly) return;
 		if (isSaving) return;
 		if (definitionsEqual(draft, baselineDraft)) return;
 
@@ -366,7 +315,7 @@
 	}
 
 	function startTitleEdit() {
-		if (!draft || isReadOnly) return;
+		if (!draft) return;
 		titleDraft = draft.title;
 		isEditingTitle = true;
 		queueMicrotask(() => {
@@ -417,13 +366,6 @@
 
 	function confirmConfig(kind: ConfirmKind) {
 		switch (kind) {
-			case 'create':
-				return {
-					title: 'Create a new waiver?',
-					description: 'This will create a blank waiver for this workspace.',
-					confirmLabel: 'Create waiver',
-					destructive: false
-				};
 			case 'publish':
 				return {
 					title: 'Publish and activate this waiver?',
@@ -432,83 +374,11 @@
 					confirmLabel: 'Publish waiver',
 					destructive: false
 				};
-			case 'archive':
-				return {
-					title: 'Archive this waiver?',
-					description:
-						'Archived waivers are locked and moved to past waivers. Their signed records are preserved.',
-					confirmLabel: 'Archive waiver',
-					destructive: true
-				};
-			case 'delete':
-				return {
-					title: 'Delete this waiver?',
-					description:
-						'No one has signed this waiver yet. Deleting it removes it and any public links permanently.',
-					confirmLabel: 'Delete permanently',
-					destructive: true
-				};
-			case 'discard':
-				return {
-					title: 'Discard unsaved changes?',
-					description: 'Your latest edits have not been saved yet. Continuing will discard them.',
-					confirmLabel: 'Discard changes',
-					destructive: true
-				};
 		}
 	}
 
-	function requestTemplateSelection(templateId: TemplateSummary['templateId']) {
-		if (templateId === selectedTemplateId) return;
-
-		if (isDirty || isSaving) {
-			pendingDiscardAction = { type: 'switch-template', templateId };
-			openConfirm('discard');
-			return;
-		}
-
-		selectedTemplateId = templateId;
-	}
-
-	function requestCreateTemplate() {
-		if (isDirty || isSaving) {
-			pendingDiscardAction = { type: 'open-create-confirm' };
-			openConfirm('discard');
-			return;
-		}
-
-		openConfirm('create');
-	}
-
-	function continuePendingDiscardAction() {
-		const action = pendingDiscardAction;
-		pendingDiscardAction = null;
-		confirmOpen = false;
-		confirmKind = null;
-
-		if (baselineDraft) {
-			draft = cloneDefinition(baselineDraft);
-		}
-
-		if (autosaveTimer) {
-			clearTimeout(autosaveTimer);
-			autosaveTimer = null;
-		}
-
-		if (!action) return;
-
-		if (action.type === 'switch-template') {
-			selectedTemplateId = action.templateId;
-			return;
-		}
-
-		if (action.type === 'open-create-confirm') {
-			openConfirm('create');
-		}
-	}
-
-	function openPastWaivers() {
-		pastWaiversOpen = true;
+	function openVersionHistory() {
+		versionHistoryOpen = true;
 	}
 
 	async function copyText(key: string, text: string) {
@@ -533,29 +403,22 @@
 		}
 	}
 
-	async function createTemplate() {
+	async function ensureWorkspaceTemplate() {
 		if (convex.disabled || !currentWorkspace) {
 			toast.error('Waiver editor is still loading. Please try again.');
 			return;
 		}
 
-		isCreating = true;
+		isEnsuringTemplate = true;
 
 		try {
-			const result = await convex.mutation(api.waivers.createTemplate, {
-				workspaceId: currentWorkspace.workspaceId,
-				title: `Waiver ${templates.length + 1}`
+			await convex.mutation(api.waivers.ensureWorkspaceTemplate, {
+				workspaceId: currentWorkspace.workspaceId
 			});
-
-			recentCreatedTemplateId = result.templateId;
-			selectedTemplateId = result.templateId;
-			confirmOpen = false;
-			confirmKind = null;
-			toast.success('Blank waiver created.');
 		} catch (error) {
-			toast.error(getConvexErrorMessage(error, 'Unable to create this waiver.'));
+			toast.error(getConvexErrorMessage(error, 'Unable to set up this workspace waiver.'));
 		} finally {
-			isCreating = false;
+			isEnsuringTemplate = false;
 		}
 	}
 
@@ -571,8 +434,7 @@
 		try {
 			await convex.mutation(api.waivers.publishTemplate, {
 				workspaceId: currentWorkspace.workspaceId,
-				templateId: selectedTemplate.templateId,
-				activate: true
+				templateId: selectedTemplate.templateId
 			});
 
 			confirmOpen = false;
@@ -585,64 +447,10 @@
 		}
 	}
 
-	async function archiveTemplate() {
-		if (convex.disabled || !currentWorkspace || !selectedTemplate) return;
-
-		isArchiving = true;
-
-		try {
-			await convex.mutation(api.waivers.archiveTemplate, {
-				workspaceId: currentWorkspace.workspaceId,
-				templateId: selectedTemplate.templateId
-			});
-
-			confirmOpen = false;
-			confirmKind = null;
-			toast.success('Waiver archived.');
-		} catch (error) {
-			toast.error(getConvexErrorMessage(error, 'Unable to archive this waiver.'));
-		} finally {
-			isArchiving = false;
-		}
-	}
-
-	async function deleteTemplate() {
-		if (convex.disabled || !currentWorkspace || !selectedTemplate) return;
-
-		isDeleting = true;
-
-		try {
-			await convex.mutation(api.waivers.deleteTemplate, {
-				workspaceId: currentWorkspace.workspaceId,
-				templateId: selectedTemplate.templateId
-			});
-
-			confirmOpen = false;
-			confirmKind = null;
-			toast.success('Waiver deleted.');
-		} catch (error) {
-			toast.error(getConvexErrorMessage(error, 'Unable to delete this waiver.'));
-		} finally {
-			isDeleting = false;
-		}
-	}
-
 	async function handleConfirm() {
 		switch (confirmKind) {
-			case 'create':
-				await createTemplate();
-				return;
 			case 'publish':
 				await publishTemplate();
-				return;
-			case 'archive':
-				await archiveTemplate();
-				return;
-			case 'delete':
-				await deleteTemplate();
-				return;
-			case 'discard':
-				continuePendingDiscardAction();
 				return;
 			default:
 				return;
@@ -661,13 +469,16 @@
 		description={confirmConfig(confirmKind).description}
 		confirmLabel={confirmConfig(confirmKind).confirmLabel}
 		destructive={confirmConfig(confirmKind).destructive}
-		isConfirming={isCreating || isPublishing || isArchiving || isDeleting}
+		isConfirming={isPublishing}
 		onConfirm={handleConfirm}
 	/>
 {/if}
 
 {#if currentWorkspace}
-	<PastWaiversSheet bind:open={pastWaiversOpen} workspaceId={currentWorkspace.workspaceId} />
+	<WaiverVersionHistorySheet
+		bind:open={versionHistoryOpen}
+		workspaceId={currentWorkspace.workspaceId}
+	/>
 {/if}
 
 {#if activePublicUrl}
@@ -845,7 +656,7 @@
 
 			<!-- Right cluster: secondary menu + publish -->
 			<div class="flex shrink-0 items-center gap-1 border-l border-border/80 px-2">
-				{#if selectedTemplate || activeTemplates.length > 0}
+				{#if selectedTemplate}
 					<DropdownMenu>
 						<DropdownMenuTrigger class="inline-flex">
 							<button
@@ -858,40 +669,12 @@
 							</button>
 						</DropdownMenuTrigger>
 						<DropdownMenuContent align="end" class="w-56">
-							{#if activeTemplates.length > 1}
-								{#each activeTemplates as template (template.templateId)}
-									<DropdownMenuItem
-										onclick={() => requestTemplateSelection(template.templateId)}
-										class={template.templateId === selectedTemplateId ? 'font-medium' : ''}
-									>
-										<span class="flex-1 truncate">{template.title}</span>
-										{#if template.isActivePublic}
-											<span class="ml-2 text-[10px] font-semibold text-emerald-500 uppercase">
-												Live
-											</span>
-										{/if}
-									</DropdownMenuItem>
-								{/each}
-								<DropdownMenuSeparator />
-							{/if}
-							<DropdownMenuItem onclick={requestCreateTemplate}>Create new waiver</DropdownMenuItem>
-							<DropdownMenuItem onclick={openPastWaivers}>View past waivers</DropdownMenuItem>
-							{#if selectedTemplate?.canArchive && !selectedTemplate?.isReadOnly}
-								<DropdownMenuSeparator />
-								<DropdownMenuItem onclick={() => openConfirm('archive')}>
-									Archive waiver
-								</DropdownMenuItem>
-							{/if}
-							{#if selectedTemplate?.canDelete}
-								<DropdownMenuItem onclick={() => openConfirm('delete')}>
-									Delete permanently
-								</DropdownMenuItem>
-							{/if}
+							<DropdownMenuItem onclick={openVersionHistory}>Version history</DropdownMenuItem>
 						</DropdownMenuContent>
 					</DropdownMenu>
 				{/if}
 
-				{#if selectedTemplate && !isReadOnly}
+				{#if selectedTemplate}
 					<Button
 						type="button"
 						size="sm"
@@ -958,23 +741,15 @@
 					<Skeleton class="mx-auto h-[70vh] w-full max-w-3xl rounded-[28px]" />
 				</section>
 			</div>
-		{:else if activeTemplates.length === 0}
+		{:else if !selectedTemplate}
 			<div class="flex flex-1 items-center justify-center p-6">
 				<div
 					class="w-full max-w-md rounded-2xl border border-dashed border-border bg-muted/10 px-6 py-14 text-center"
 				>
-					<p class="text-base font-semibold tracking-tight">No waiver yet</p>
+					<p class="text-base font-semibold tracking-tight">Setting up waiver</p>
 					<p class="mt-1 text-sm text-muted-foreground">
-						Create a waiver to start collecting signed submissions.
+						Every workspace includes one public waiver. This should only take a moment.
 					</p>
-					<div class="mt-5 flex flex-wrap items-center justify-center gap-3">
-						<Button onclick={requestCreateTemplate} disabled={busy}>
-							{isCreating ? 'Creating…' : 'Create waiver'}
-						</Button>
-						<Button variant="outline" onclick={openPastWaivers} disabled={busy}>
-							View past waivers
-						</Button>
-					</div>
 				</div>
 			</div>
 		{:else if selectedTemplate}
@@ -1032,7 +807,7 @@
 											</button>
 										</div>
 									</div>
-								{:else if !isReadOnly}
+								{:else}
 									<button
 										type="button"
 										class="title-display-btn"
@@ -1045,48 +820,12 @@
 										</span>
 										<Pencil class="title-display-icon size-3" />
 									</button>
-								{:else}
-									<div class="title-display-btn is-readonly">
-										<span class="title-display-text">
-											{currentDraft.title || 'Untitled waiver'}
-										</span>
-									</div>
 								{/if}
 							</div>
-
-							{#if activeTemplates.length > 1}
-								<DropdownMenu>
-									<DropdownMenuTrigger class="inline-flex">
-										<button
-											type="button"
-											class="template-switcher"
-											aria-label="Switch waiver"
-											title="Switch waiver"
-										>
-											<ChevronDownIcon class="size-3.5" />
-										</button>
-									</DropdownMenuTrigger>
-									<DropdownMenuContent align="end" class="w-56">
-										{#each activeTemplates as template (template.templateId)}
-											<DropdownMenuItem
-												onclick={() => requestTemplateSelection(template.templateId)}
-												class={template.templateId === selectedTemplateId ? 'font-medium' : ''}
-											>
-												<span class="flex-1 truncate">{template.title}</span>
-												{#if template.isActivePublic}
-													<span class="ml-2 text-[10px] font-semibold text-emerald-500 uppercase">
-														Live
-													</span>
-												{/if}
-											</DropdownMenuItem>
-										{/each}
-									</DropdownMenuContent>
-								</DropdownMenu>
-							{/if}
 						</div>
 
 						<div class="min-h-0 flex-1 overflow-hidden">
-							<WaiverBuilderPanel bind:draft readOnly={isReadOnly} />
+							<WaiverBuilderPanel bind:draft />
 						</div>
 					</div>
 				</aside>
@@ -1098,7 +837,6 @@
 							bind:introCopy={draft.introCopy}
 							fields={currentDraft.fields}
 							workspaceName={currentWorkspace?.name}
-							readOnly={isReadOnly}
 							{saveState}
 							{lastSavedAt}
 						/>
@@ -1296,18 +1034,14 @@
 			color 160ms ease;
 	}
 
-	.title-display-btn:not(.is-readonly):hover,
-	.title-display-btn:not(.is-readonly):focus-visible {
+	.title-display-btn:hover,
+	.title-display-btn:focus-visible {
 		background: color-mix(in srgb, var(--muted) 55%, transparent);
 		outline: none;
 	}
 
 	.title-display-btn:focus-visible {
 		box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 25%, transparent);
-	}
-
-	.title-display-btn.is-readonly {
-		cursor: default;
 	}
 
 	.title-display-text {
@@ -1394,24 +1128,6 @@
 	.title-icon-btn.is-cancel:hover {
 		background: color-mix(in srgb, var(--destructive) 14%, transparent);
 		color: var(--destructive);
-	}
-
-	.template-switcher {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		height: 1.85rem;
-		width: 1.85rem;
-		border-radius: 0.4rem;
-		color: var(--muted-foreground);
-		transition:
-			background 150ms ease,
-			color 150ms ease;
-	}
-
-	.template-switcher:hover {
-		background: color-mix(in srgb, var(--muted) 70%, transparent);
-		color: var(--foreground);
 	}
 
 	:global(.publish-btn) {

@@ -6,7 +6,6 @@ import { getWorkspaceMembership } from './workspaces';
 import { sanitizeRichTextHtml } from '../../lib/utils/rich-text';
 
 type FunctionCtx = QueryCtx | MutationCtx;
-export type TemplateUsageState = 'unusedDraft' | 'publishedNoSubmissions' | 'used';
 
 export const waiverFieldValidator = v.union(
 	v.object({
@@ -105,6 +104,14 @@ const PUBLIC_SLUG_REGEX = /^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])$/;
 const MAX_FIELDS = 25;
 const MAX_SELECT_OPTIONS = 12;
 const MAX_MINORS = 50;
+
+export function createDefaultWaiverDefinition(workspaceName: string): WaiverDefinition {
+	return normalizeWaiverDefinition({
+		title: `${workspaceName} Waiver`,
+		introCopy: '<p></p>',
+		fields: []
+	});
+}
 
 export async function requireWorkspaceMember(
 	ctx: FunctionCtx,
@@ -292,54 +299,21 @@ export function waiverDefinitionsEqual(a: WaiverDefinition, b: WaiverDefinition)
 	);
 }
 
-export function getTemplateUsageState(args: {
-	lastPublishedVersionId?: Id<'waiver_template_versions'>;
-	hasSubmissions: boolean;
-}): TemplateUsageState {
-	if (args.hasSubmissions) {
-		return 'used';
-	}
-
-	if (args.lastPublishedVersionId) {
-		return 'publishedNoSubmissions';
-	}
-
-	return 'unusedDraft';
-}
-
 export function buildTemplateLifecycle(args: {
 	template: Doc<'waiver_templates'>;
 	activeLink: Doc<'public_waiver_links'> | null;
-	hasSubmissions: boolean;
 	hasUnpublishedChanges: boolean;
 }) {
-	const usageState = getTemplateUsageState({
-		lastPublishedVersionId: args.template.lastPublishedVersionId,
-		hasSubmissions: args.hasSubmissions
-	});
-	const canDelete = !args.hasSubmissions;
-	const isReadOnly = !!args.template.archivedAt;
-	const status = isReadOnly
-		? 'archived'
-		: args.template.lastPublishedVersionId
-			? 'published'
-			: 'draft';
-
 	return {
 		templateId: args.template._id,
 		title: args.template.title,
 		introCopy: args.template.introCopy,
-		status,
 		fields: args.template.fields,
 		lastPublishedVersionId: args.template.lastPublishedVersionId ?? null,
 		isActivePublic:
 			!!args.template.lastPublishedVersionId &&
 			args.activeLink?.versionId === args.template.lastPublishedVersionId,
-		hasUnpublishedChanges: args.hasUnpublishedChanges,
-		usageState,
-		canDelete,
-		canArchive: args.hasSubmissions && !isReadOnly,
-		isReadOnly
+		hasUnpublishedChanges: args.hasUnpublishedChanges
 	};
 }
 

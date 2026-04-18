@@ -26,20 +26,28 @@
 
 	let { open = $bindable(), workspaceId }: Props = $props();
 
-	type TemplateSummary = FunctionReturnType<typeof api.waivers.listTemplates>[number];
+	type VersionSummary = FunctionReturnType<typeof api.waivers.listVersionHistory>[number];
 
-	const templatesQuery = useProtectedQuery(
-		api.waivers.listTemplates,
+	const versionsQuery = useProtectedQuery(
+		api.waivers.listVersionHistory,
 		() => ({ workspaceId }),
 		() => ({ keepPreviousData: true })
 	);
 
-	const archivedTemplates = $derived(
-		(templatesQuery.data ?? []).filter((t) => t.status === 'archived') as TemplateSummary[]
-	);
+	const versions = $derived((versionsQuery.data ?? []) as VersionSummary[]);
 
-	let selectedId = $state<TemplateSummary['templateId'] | null>(null);
-	const selected = $derived(archivedTemplates.find((t) => t.templateId === selectedId) ?? null);
+	let selectedId = $state<VersionSummary['versionId'] | null>(null);
+	const selected = $derived(versions.find((version) => version.versionId === selectedId) ?? null);
+
+	function formatPublishedAt(timestamp: number) {
+		return new Intl.DateTimeFormat(undefined, {
+			month: 'short',
+			day: 'numeric',
+			year: 'numeric',
+			hour: 'numeric',
+			minute: '2-digit'
+		}).format(new Date(timestamp));
+	}
 
 	// Clear selection when sheet closes
 	$effect(() => {
@@ -62,9 +70,11 @@
 						Back
 					</button>
 					<span class="text-muted-foreground/40">/</span>
-					<SheetTitle class="text-sm font-medium">{selected.title}</SheetTitle>
+					<SheetTitle class="text-sm font-medium">
+						Version {selected.versionNumber}: {selected.title}
+					</SheetTitle>
 				</div>
-				<SheetDescription class="sr-only">Archived waiver — read only</SheetDescription>
+				<SheetDescription class="sr-only">Published waiver version - read only</SheetDescription>
 			</SheetHeader>
 
 			<div class="min-h-0 flex-1 overflow-y-auto bg-muted/20 px-4 py-8 sm:px-8">
@@ -109,14 +119,14 @@
 		{:else}
 			<!-- List view -->
 			<SheetHeader class="shrink-0 border-b border-border px-6 py-5">
-				<SheetTitle class="text-base font-semibold">Past waivers</SheetTitle>
+				<SheetTitle class="text-base font-semibold">Version history</SheetTitle>
 				<SheetDescription class="text-xs text-muted-foreground">
-					Archived waivers are locked. Their signed records are preserved in submissions.
+					Published versions are locked. Signed records keep the version guests accepted.
 				</SheetDescription>
 			</SheetHeader>
 
 			<div class="min-h-0 flex-1 overflow-y-auto">
-				{#if templatesQuery.isLoading}
+				{#if versionsQuery.isLoading}
 					<ul class="divide-y divide-border">
 						{#each [0, 1, 2, 3, 4] as index (index)}
 							<li class="flex items-center justify-between gap-3 px-6 py-4">
@@ -128,26 +138,37 @@
 							</li>
 						{/each}
 					</ul>
-				{:else if archivedTemplates.length === 0}
+				{:else if versions.length === 0}
 					<div class="px-6 py-12 text-center text-sm text-muted-foreground">
-						No archived waivers yet.
+						No published versions yet.
 					</div>
 				{:else}
 					<ul class="divide-y divide-border">
-						{#each archivedTemplates as template (template.templateId)}
+						{#each versions as version (version.versionId)}
 							<li>
 								<button
 									type="button"
 									class="flex w-full items-center justify-between gap-3 px-6 py-4 text-left transition-colors hover:bg-muted/40"
-									onclick={() => (selectedId = template.templateId)}
+									onclick={() => (selectedId = version.versionId)}
 								>
 									<div class="min-w-0 space-y-0.5">
-										<p class="truncate text-sm font-medium">{template.title}</p>
+										<div class="flex min-w-0 items-center gap-2">
+											<p class="truncate text-sm font-medium">
+												Version {version.versionNumber}: {version.title}
+											</p>
+											{#if version.isActivePublic}
+												<span
+													class="shrink-0 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold tracking-[0.12em] text-emerald-600 uppercase"
+												>
+													Live
+												</span>
+											{/if}
+										</div>
 										<p class="text-xs text-muted-foreground">
-											{template.usageState === 'used' ? 'Has signed records' : 'No signatures'}
+											Published {formatPublishedAt(version.publishedAt)}
 										</p>
 									</div>
-									<span class="shrink-0 text-xs text-muted-foreground/50">View →</span>
+									<span class="shrink-0 text-xs text-muted-foreground/50">View</span>
 								</button>
 							</li>
 						{/each}

@@ -21,7 +21,7 @@
 			icon: FileText,
 			title: 'Waiver Builder',
 			description:
-				'Structured templates with rich text, custom fields, and signature blocks. Versioned so past waivers are never altered.',
+				'Structured templates with rich text, custom fields, and signature blocks. Versioned so signed waiver versions are never altered.',
 			mdClass: 'md:col-span-2',
 			lgClass: 'lg:col-span-4',
 			hero: true,

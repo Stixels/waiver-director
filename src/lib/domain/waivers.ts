@@ -1,7 +1,6 @@
 import { sanitizeRichTextHtml } from '$lib/utils/rich-text';
 
 export type WaiverFieldType = 'shortText' | 'longText' | 'checkbox' | 'select' | 'date';
-export type WaiverTemplateUsageState = 'unusedDraft' | 'publishedNoSubmissions' | 'used';
 
 export type WaiverField =
 	| {
@@ -42,14 +41,9 @@ export type WaiverDefinition = {
 
 export type WaiverTemplateRecord = WaiverDefinition & {
 	templateId: string;
-	status: 'draft' | 'published' | 'archived';
 	lastPublishedVersionId: string | null;
 	isActivePublic: boolean;
 	hasUnpublishedChanges: boolean;
-	usageState: WaiverTemplateUsageState;
-	canDelete: boolean;
-	canArchive: boolean;
-	isReadOnly: boolean;
 };
 
 export type PublicWaiverRecord = {
@@ -210,15 +204,4 @@ export function definitionsEqual(a: WaiverDefinition | null, b: WaiverDefinition
 		JSON.stringify(normalizeDefinitionForCompare(a)) ===
 		JSON.stringify(normalizeDefinitionForCompare(b))
 	);
-}
-
-export function usageStateLabel(usageState: WaiverTemplateUsageState): string {
-	switch (usageState) {
-		case 'unusedDraft':
-			return 'Unused';
-		case 'publishedNoSubmissions':
-			return 'Published';
-		case 'used':
-			return 'Used';
-	}
 }

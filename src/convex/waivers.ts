@@ -5,10 +5,10 @@ import type { MutationCtx, QueryCtx } from './_generated/server';
 import {
 	assertWorkspaceRecord,
 	buildTemplateLifecycle,
+	createDefaultWaiverDefinition,
 	minorInputValidator,
 	normalizeWaiverDefinition,
 	requireWorkspaceMember,
-	getTemplateUsageState,
 	assertValidPublicSlug,
 	normalizePublicSlug,
 	validateMinors,
@@ -41,13 +41,55 @@ async function createUniquePublicSlug(ctx: MutationCtx, baseSlug: string): Promi
 	});
 }
 
-async function getActiveWorkspaceLink(ctx: FunctionCtx, workspaceId: Id<'workspaces'>) {
-	return await ctx.db
+async function getWorkspacePublicLink(ctx: FunctionCtx, workspaceId: Id<'workspaces'>) {
+	const links = await ctx.db
 		.query('public_waiver_links')
-		.withIndex('by_workspaceId_and_status', (q) =>
-			q.eq('workspaceId', workspaceId).eq('status', 'active')
-		)
-		.unique();
+		.withIndex('by_workspaceId', (q) => q.eq('workspaceId', workspaceId))
+		.order('desc')
+		.take(1);
+
+	return links[0] ?? null;
+}
+
+async function getWorkspaceTemplate(ctx: FunctionCtx, workspaceId: Id<'workspaces'>) {
+	const publicLink = await getWorkspacePublicLink(ctx, workspaceId);
+	if (publicLink) {
+		const version = await ctx.db.get(publicLink.versionId);
+		if (version && version.workspaceId === workspaceId) {
+			const activeTemplate = await ctx.db.get(version.templateId);
+			if (activeTemplate && activeTemplate.workspaceId === workspaceId) {
+				return activeTemplate;
+			}
+		}
+	}
+
+	const templates = await ctx.db
+		.query('waiver_templates')
+		.withIndex('by_workspaceId', (q) => q.eq('workspaceId', workspaceId))
+		.order('desc')
+		.take(1);
+
+	return templates[0] ?? null;
+}
+
+async function insertWorkspaceTemplate(ctx: MutationCtx, workspaceId: Id<'workspaces'>) {
+	const workspace = await ctx.db.get(workspaceId);
+	if (!workspace) {
+		throw new ConvexError({
+			code: 'not_found',
+			message: 'Workspace not found.'
+		});
+	}
+
+	const definition = createDefaultWaiverDefinition(workspace.name);
+	const templateId = await ctx.db.insert('waiver_templates', {
+		workspaceId,
+		title: definition.title,
+		introCopy: definition.introCopy,
+		fields: definition.fields
+	});
+
+	return templateId;
 }
 
 async function getNextVersionNumber(ctx: MutationCtx, templateId: Id<'waiver_templates'>) {
@@ -89,26 +131,13 @@ async function templateSummary(
 	template: Doc<'waiver_templates'>,
 	activeLink: Doc<'public_waiver_links'> | null
 ) {
-	const [hasSubmissions, hasUnpublishedChanges] = await Promise.all([
-		templateHasSubmissions(ctx, template._id),
-		templateHasUnpublishedChanges(ctx, template)
-	]);
+	const hasUnpublishedChanges = await templateHasUnpublishedChanges(ctx, template);
 
 	return buildTemplateLifecycle({
 		template,
 		activeLink,
-		hasSubmissions,
 		hasUnpublishedChanges
 	});
-}
-
-async function templateHasSubmissions(ctx: FunctionCtx, templateId: Id<'waiver_templates'>) {
-	const existingSubmission = await ctx.db
-		.query('waiver_submissions')
-		.withIndex('by_templateId', (q) => q.eq('templateId', templateId))
-		.first();
-
-	return !!existingSubmission;
 }
 
 export const listTemplates = query({
@@ -118,59 +147,32 @@ export const listTemplates = query({
 	handler: async (ctx, args) => {
 		await requireWorkspaceMember(ctx, args.workspaceId);
 
-		const [templates, activeLink] = await Promise.all([
-			ctx.db
-				.query('waiver_templates')
-				.withIndex('by_workspaceId', (q) => q.eq('workspaceId', args.workspaceId))
-				.order('desc')
-				.collect(),
-			getActiveWorkspaceLink(ctx, args.workspaceId)
+		const [template, activeLink] = await Promise.all([
+			getWorkspaceTemplate(ctx, args.workspaceId),
+			getWorkspacePublicLink(ctx, args.workspaceId)
 		]);
 
-		return await Promise.all(
-			templates.map((template) => templateSummary(ctx, template, activeLink))
-		);
+		if (!template) {
+			return [];
+		}
+
+		return [await templateSummary(ctx, template, activeLink)];
 	}
 });
 
-export const getTemplate = query({
+export const ensureWorkspaceTemplate = mutation({
 	args: {
-		workspaceId: v.id('workspaces'),
-		templateId: v.id('waiver_templates')
+		workspaceId: v.id('workspaces')
 	},
 	handler: async (ctx, args) => {
 		await requireWorkspaceMember(ctx, args.workspaceId);
 
-		const template = assertWorkspaceRecord(
-			await ctx.db.get(args.templateId),
-			args.workspaceId,
-			'Waiver template not found.'
-		);
-		const activeLink = await getActiveWorkspaceLink(ctx, args.workspaceId);
-		return templateSummary(ctx, template, activeLink);
-	}
-});
+		const existing = await getWorkspaceTemplate(ctx, args.workspaceId);
+		if (existing) {
+			return { templateId: existing._id };
+		}
 
-export const createTemplate = mutation({
-	args: {
-		workspaceId: v.id('workspaces'),
-		title: v.string()
-	},
-	handler: async (ctx, args) => {
-		await requireWorkspaceMember(ctx, args.workspaceId);
-
-		const definition = normalizeWaiverDefinition({
-			title: args.title,
-			introCopy: '',
-			fields: []
-		});
-
-		const templateId = await ctx.db.insert('waiver_templates', {
-			workspaceId: args.workspaceId,
-			title: definition.title,
-			introCopy: definition.introCopy,
-			fields: definition.fields
-		});
+		const templateId = await insertWorkspaceTemplate(ctx, args.workspaceId);
 
 		return { templateId };
 	}
@@ -190,12 +192,6 @@ export const updateTemplate = mutation({
 			args.workspaceId,
 			'Waiver template not found.'
 		);
-		if (template.archivedAt) {
-			throw new ConvexError({
-				code: 'invalid_argument',
-				message: 'Archived waivers cannot be edited.'
-			});
-		}
 
 		const definition = normalizeWaiverDefinition(args.definition);
 
@@ -209,101 +205,10 @@ export const updateTemplate = mutation({
 	}
 });
 
-export const archiveTemplate = mutation({
-	args: {
-		workspaceId: v.id('workspaces'),
-		templateId: v.id('waiver_templates')
-	},
-	handler: async (ctx, args) => {
-		await requireWorkspaceMember(ctx, args.workspaceId);
-
-		const template = assertWorkspaceRecord(
-			await ctx.db.get(args.templateId),
-			args.workspaceId,
-			'Waiver template not found.'
-		);
-		const hasSubmissions = await templateHasSubmissions(ctx, template._id);
-		const usageState = getTemplateUsageState({
-			lastPublishedVersionId: template.lastPublishedVersionId,
-			hasSubmissions
-		});
-		if (usageState !== 'used') {
-			throw new ConvexError({
-				code: 'invalid_argument',
-				message: 'Only signed waivers should be archived. Delete unsigned templates instead.'
-			});
-		}
-
-		await ctx.db.patch(template._id, {
-			archivedAt: Date.now()
-		});
-
-		const activeLink = await getActiveWorkspaceLink(ctx, args.workspaceId);
-		if (activeLink && activeLink.versionId === template.lastPublishedVersionId) {
-			await ctx.db.patch(activeLink._id, { status: 'inactive' });
-		}
-
-		return { templateId: template._id };
-	}
-});
-
-export const deleteTemplate = mutation({
-	args: {
-		workspaceId: v.id('workspaces'),
-		templateId: v.id('waiver_templates')
-	},
-	handler: async (ctx, args) => {
-		await requireWorkspaceMember(ctx, args.workspaceId);
-
-		const template = assertWorkspaceRecord(
-			await ctx.db.get(args.templateId),
-			args.workspaceId,
-			'Waiver template not found.'
-		);
-		const hasSubmissions = await templateHasSubmissions(ctx, template._id);
-		const usageState = getTemplateUsageState({
-			lastPublishedVersionId: template.lastPublishedVersionId,
-			hasSubmissions
-		});
-
-		if (usageState === 'used') {
-			throw new ConvexError({
-				code: 'invalid_argument',
-				message: 'Signed waivers cannot be deleted permanently.'
-			});
-		}
-
-		const versions = await ctx.db
-			.query('waiver_template_versions')
-			.withIndex('by_templateId', (q) => q.eq('templateId', template._id))
-			.collect();
-
-		for (const version of versions) {
-			const links = await ctx.db
-				.query('public_waiver_links')
-				.withIndex('by_versionId', (q) => q.eq('versionId', version._id))
-				.collect();
-
-			for (const link of links) {
-				await ctx.db.delete(link._id);
-			}
-		}
-
-		for (const version of versions) {
-			await ctx.db.delete(version._id);
-		}
-
-		await ctx.db.delete(template._id);
-
-		return { templateId: args.templateId };
-	}
-});
-
 export const publishTemplate = mutation({
 	args: {
 		workspaceId: v.id('workspaces'),
-		templateId: v.id('waiver_templates'),
-		activate: v.boolean()
+		templateId: v.id('waiver_templates')
 	},
 	handler: async (ctx, args) => {
 		await requireWorkspaceMember(ctx, args.workspaceId);
@@ -313,12 +218,6 @@ export const publishTemplate = mutation({
 			args.workspaceId,
 			'Waiver template not found.'
 		);
-		if (template.archivedAt) {
-			throw new ConvexError({
-				code: 'invalid_argument',
-				message: 'Archived waivers cannot be published.'
-			});
-		}
 
 		const definition = normalizeWaiverDefinition({
 			title: template.title,
@@ -326,7 +225,7 @@ export const publishTemplate = mutation({
 			fields: template.fields
 		});
 		const currentVersionId = template.lastPublishedVersionId;
-		const activeLink = args.activate ? await getActiveWorkspaceLink(ctx, args.workspaceId) : null;
+		const activeLink = await getWorkspacePublicLink(ctx, args.workspaceId);
 		if (
 			activeLink &&
 			currentVersionId &&
@@ -353,55 +252,65 @@ export const publishTemplate = mutation({
 			lastPublishedVersionId: versionId
 		});
 
-		let publicLinkId: Id<'public_waiver_links'> | null = null;
-		if (args.activate) {
-			const workspace = await ctx.db.get(args.workspaceId);
-			if (!workspace) {
-				throw new ConvexError({
-					code: 'not_found',
-					message: 'Workspace not found.'
-				});
-			}
+		const workspace = await ctx.db.get(args.workspaceId);
+		if (!workspace) {
+			throw new ConvexError({
+				code: 'not_found',
+				message: 'Workspace not found.'
+			});
+		}
 
-			if (activeLink) {
-				await ctx.db.patch(activeLink._id, {
-					versionId,
-					status: 'active'
-				});
-				publicLinkId = activeLink._id;
-			} else {
-				const baseSlug = normalizePublicSlug(`${workspace.slug}-waiver`);
-				const slug = await createUniquePublicSlug(ctx, baseSlug);
-				publicLinkId = await ctx.db.insert('public_waiver_links', {
-					workspaceId: args.workspaceId,
-					versionId,
-					slug,
-					status: 'active'
-				});
-			}
+		let publicLinkId: Id<'public_waiver_links'>;
+		if (activeLink) {
+			await ctx.db.patch(activeLink._id, {
+				versionId
+			});
+			publicLinkId = activeLink._id;
+		} else {
+			const baseSlug = normalizePublicSlug(`${workspace.slug}-waiver`);
+			const slug = await createUniquePublicSlug(ctx, baseSlug);
+			publicLinkId = await ctx.db.insert('public_waiver_links', {
+				workspaceId: args.workspaceId,
+				versionId,
+				slug
+			});
 		}
 
 		return { versionId, publicLinkId };
 	}
 });
 
-export const deactivatePublicLink = mutation({
+export const listVersionHistory = query({
 	args: {
 		workspaceId: v.id('workspaces')
 	},
 	handler: async (ctx, args) => {
 		await requireWorkspaceMember(ctx, args.workspaceId);
 
-		const activeLink = await getActiveWorkspaceLink(ctx, args.workspaceId);
-		if (!activeLink) {
-			return { deactivated: false };
+		const [template, activeLink] = await Promise.all([
+			getWorkspaceTemplate(ctx, args.workspaceId),
+			getWorkspacePublicLink(ctx, args.workspaceId)
+		]);
+
+		if (!template) {
+			return [];
 		}
 
-		await ctx.db.patch(activeLink._id, {
-			status: 'inactive'
-		});
+		const versions = await ctx.db
+			.query('waiver_template_versions')
+			.withIndex('by_templateId', (q) => q.eq('templateId', template._id))
+			.order('desc')
+			.take(50);
 
-		return { deactivated: true };
+		return versions.map((version) => ({
+			versionId: version._id,
+			versionNumber: version.versionNumber,
+			title: version.title,
+			introCopy: version.introCopy,
+			fields: version.fields,
+			publishedAt: version.publishedAt,
+			isActivePublic: activeLink?.versionId === version._id
+		}));
 	}
 });
 
@@ -412,7 +321,7 @@ export const getPublishingOverview = query({
 	handler: async (ctx, args) => {
 		await requireWorkspaceMember(ctx, args.workspaceId);
 
-		const activeLink = await getActiveWorkspaceLink(ctx, args.workspaceId);
+		const activeLink = await getWorkspacePublicLink(ctx, args.workspaceId);
 		if (!activeLink) {
 			return {
 				activeLink: null
@@ -515,7 +424,7 @@ export const getPublicWaiverBySlug = query({
 			.withIndex('by_slug', (q) => q.eq('slug', args.slug))
 			.unique();
 
-		if (!link || link.status !== 'active') {
+		if (!link) {
 			return null;
 		}
 
@@ -555,7 +464,7 @@ export const submitPublicWaiver = mutation({
 			.query('public_waiver_links')
 			.withIndex('by_slug', (q) => q.eq('slug', args.slug))
 			.unique();
-		if (!link || link.status !== 'active') {
+		if (!link) {
 			throw new ConvexError({
 				code: 'not_found',
 				message: 'This public waiver is no longer available.'

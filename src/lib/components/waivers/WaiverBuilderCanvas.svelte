@@ -50,7 +50,6 @@
 		introCopy: string;
 		fields: WaiverField[];
 		workspaceName?: string;
-		readOnly?: boolean;
 		saveState?: SaveState;
 		lastSavedAt?: number | null;
 	}
@@ -62,7 +61,6 @@
 		introCopy = $bindable('<p></p>'),
 		fields,
 		workspaceName,
-		readOnly = false,
 		saveState = 'idle',
 		lastSavedAt = null
 	}: Props = $props();
@@ -89,7 +87,7 @@
 		if (saveState === 'saving') return 'Saving…';
 		if (saveState === 'error') return 'Could not save';
 		if (saveState === 'dirty') return 'Unsaved changes';
-		if (!lastSavedAt) return readOnly ? 'Read only' : 'All changes saved';
+		if (!lastSavedAt) return 'All changes saved';
 
 		const time = new Intl.DateTimeFormat('en-US', {
 			hour: 'numeric',
@@ -106,12 +104,12 @@
 	}
 
 	function command(action: (editor: Editor) => boolean) {
-		if (!editor || readOnly) return;
+		if (!editor) return;
 		action(editor);
 	}
 
 	function canCommand(action: (editor: Editor) => boolean) {
-		if (!editor || readOnly) return false;
+		if (!editor) return false;
 		return action(editor);
 	}
 
@@ -123,7 +121,7 @@
 	}
 
 	function setLink() {
-		if (!editor || readOnly) return;
+		if (!editor) return;
 
 		const previousUrl = editor.getAttributes('link').href ?? 'https://';
 		const href = window.prompt('Enter a URL', previousUrl);
@@ -172,7 +170,7 @@
 		const instance = new Editor({
 			element: editorElement,
 			content: currentHtml,
-			editable: !readOnly,
+			editable: true,
 			extensions: [
 				StarterKit.configure({
 					dropcursor: false,
@@ -239,11 +237,6 @@
 
 	$effect(() => {
 		if (!editor) return;
-		editor.setEditable(!readOnly);
-	});
-
-	$effect(() => {
-		if (!editor) return;
 		const sanitized = currentHtml;
 		if (sanitizeRichTextHtml(editor.getHTML()) === sanitized || sanitized === lastSyncedValue) {
 			return;
@@ -292,185 +285,181 @@
 			</span>
 		</div>
 
-		{#if !readOnly}
-			<div class="flex items-center gap-1">
-				<!-- Block style -->
-				<DropdownMenu>
-					<DropdownMenuTrigger class="inline-flex">
-						<button type="button" class="toolbar-select" disabled={!editor} aria-label="Text style">
-							<span class="toolbar-select-label">{toolbarState.blockShortLabel}</span>
-							<ChevronDownIcon class="size-3" />
-						</button>
-					</DropdownMenuTrigger>
-					<DropdownMenuContent align="end" class="w-40">
+		<div class="flex items-center gap-1">
+			<!-- Block style -->
+			<DropdownMenu>
+				<DropdownMenuTrigger class="inline-flex">
+					<button type="button" class="toolbar-select" disabled={!editor} aria-label="Text style">
+						<span class="toolbar-select-label">{toolbarState.blockShortLabel}</span>
+						<ChevronDownIcon class="size-3" />
+					</button>
+				</DropdownMenuTrigger>
+				<DropdownMenuContent align="end" class="w-40">
+					<DropdownMenuItem onclick={() => command((e) => e.chain().focus().setParagraph().run())}>
+						Paragraph
+					</DropdownMenuItem>
+					<DropdownMenuSeparator />
+					{#each headingLevels as level (level)}
 						<DropdownMenuItem
-							onclick={() => command((e) => e.chain().focus().setParagraph().run())}
+							class={toolbarState.blockShortLabel === `H${level}` ? 'font-semibold' : undefined}
+							onclick={() => command((e) => e.chain().focus().toggleHeading({ level }).run())}
 						>
-							Paragraph
+							Heading {level}
 						</DropdownMenuItem>
-						<DropdownMenuSeparator />
-						{#each headingLevels as level (level)}
-							<DropdownMenuItem
-								class={toolbarState.blockShortLabel === `H${level}` ? 'font-semibold' : undefined}
-								onclick={() => command((e) => e.chain().focus().toggleHeading({ level }).run())}
-							>
-								Heading {level}
-							</DropdownMenuItem>
-						{/each}
-					</DropdownMenuContent>
-				</DropdownMenu>
+					{/each}
+				</DropdownMenuContent>
+			</DropdownMenu>
 
-				<!-- Alignment -->
-				<DropdownMenu>
-					<DropdownMenuTrigger class="inline-flex">
-						<button type="button" class="toolbar-button" disabled={!editor} aria-label="Alignment">
-							{#if toolbarState.alignment === 'center'}
-								<AlignCenterIcon class="size-3.5" />
-							{:else if toolbarState.alignment === 'right'}
-								<AlignRightIcon class="size-3.5" />
-							{:else if toolbarState.alignment === 'justify'}
-								<AlignJustifyIcon class="size-3.5" />
-							{:else}
-								<AlignLeftIcon class="size-3.5" />
-							{/if}
-						</button>
-					</DropdownMenuTrigger>
-					<DropdownMenuContent align="end" class="w-40">
-						<DropdownMenuItem
-							class={toolbarState.alignment === 'left' ? 'font-semibold' : undefined}
-							onclick={() => command((e) => e.chain().focus().setTextAlign('left').run())}
-						>
-							<AlignLeftIcon class="size-4" />
-							<span>Left</span>
-						</DropdownMenuItem>
-						<DropdownMenuItem
-							class={toolbarState.alignment === 'center' ? 'font-semibold' : undefined}
-							onclick={() => command((e) => e.chain().focus().setTextAlign('center').run())}
-						>
-							<AlignCenterIcon class="size-4" />
-							<span>Center</span>
-						</DropdownMenuItem>
-						<DropdownMenuItem
-							class={toolbarState.alignment === 'right' ? 'font-semibold' : undefined}
-							onclick={() => command((e) => e.chain().focus().setTextAlign('right').run())}
-						>
-							<AlignRightIcon class="size-4" />
-							<span>Right</span>
-						</DropdownMenuItem>
-						<DropdownMenuItem
-							class={toolbarState.alignment === 'justify' ? 'font-semibold' : undefined}
-							onclick={() => command((e) => e.chain().focus().setTextAlign('justify').run())}
-						>
-							<AlignJustifyIcon class="size-4" />
-							<span>Justify</span>
-						</DropdownMenuItem>
-					</DropdownMenuContent>
-				</DropdownMenu>
+			<!-- Alignment -->
+			<DropdownMenu>
+				<DropdownMenuTrigger class="inline-flex">
+					<button type="button" class="toolbar-button" disabled={!editor} aria-label="Alignment">
+						{#if toolbarState.alignment === 'center'}
+							<AlignCenterIcon class="size-3.5" />
+						{:else if toolbarState.alignment === 'right'}
+							<AlignRightIcon class="size-3.5" />
+						{:else if toolbarState.alignment === 'justify'}
+							<AlignJustifyIcon class="size-3.5" />
+						{:else}
+							<AlignLeftIcon class="size-3.5" />
+						{/if}
+					</button>
+				</DropdownMenuTrigger>
+				<DropdownMenuContent align="end" class="w-40">
+					<DropdownMenuItem
+						class={toolbarState.alignment === 'left' ? 'font-semibold' : undefined}
+						onclick={() => command((e) => e.chain().focus().setTextAlign('left').run())}
+					>
+						<AlignLeftIcon class="size-4" />
+						<span>Left</span>
+					</DropdownMenuItem>
+					<DropdownMenuItem
+						class={toolbarState.alignment === 'center' ? 'font-semibold' : undefined}
+						onclick={() => command((e) => e.chain().focus().setTextAlign('center').run())}
+					>
+						<AlignCenterIcon class="size-4" />
+						<span>Center</span>
+					</DropdownMenuItem>
+					<DropdownMenuItem
+						class={toolbarState.alignment === 'right' ? 'font-semibold' : undefined}
+						onclick={() => command((e) => e.chain().focus().setTextAlign('right').run())}
+					>
+						<AlignRightIcon class="size-4" />
+						<span>Right</span>
+					</DropdownMenuItem>
+					<DropdownMenuItem
+						class={toolbarState.alignment === 'justify' ? 'font-semibold' : undefined}
+						onclick={() => command((e) => e.chain().focus().setTextAlign('justify').run())}
+					>
+						<AlignJustifyIcon class="size-4" />
+						<span>Justify</span>
+					</DropdownMenuItem>
+				</DropdownMenuContent>
+			</DropdownMenu>
 
-				<span class="toolbar-divider"></span>
+			<span class="toolbar-divider"></span>
 
-				<button
-					type="button"
-					class="toolbar-button"
-					class:is-active={toolbarState.bold}
-					aria-pressed={toolbarState.bold}
-					aria-label="Bold"
-					title="Bold"
-					disabled={!canCommand((e) => e.can().chain().focus().toggleBold().run())}
-					onclick={() => command((e) => e.chain().focus().toggleBold().run())}
-				>
-					<BoldIcon class="size-3.5" />
-				</button>
-				<button
-					type="button"
-					class="toolbar-button"
-					class:is-active={toolbarState.italic}
-					aria-pressed={toolbarState.italic}
-					aria-label="Italic"
-					title="Italic"
-					disabled={!canCommand((e) => e.can().chain().focus().toggleItalic().run())}
-					onclick={() => command((e) => e.chain().focus().toggleItalic().run())}
-				>
-					<ItalicIcon class="size-3.5" />
-				</button>
-				<button
-					type="button"
-					class="toolbar-button"
-					class:is-active={toolbarState.underline}
-					aria-pressed={toolbarState.underline}
-					aria-label="Underline"
-					title="Underline"
-					disabled={!canCommand((e) => e.can().chain().focus().toggleUnderline().run())}
-					onclick={() => command((e) => e.chain().focus().toggleUnderline().run())}
-				>
-					<UnderlineIcon class="size-3.5" />
-				</button>
-				<button
-					type="button"
-					class="toolbar-button"
-					class:is-active={toolbarState.strike}
-					aria-pressed={toolbarState.strike}
-					aria-label="Strikethrough"
-					title="Strikethrough"
-					disabled={!canCommand((e) => e.can().chain().focus().toggleStrike().run())}
-					onclick={() => command((e) => e.chain().focus().toggleStrike().run())}
-				>
-					<StrikethroughIcon class="size-3.5" />
-				</button>
+			<button
+				type="button"
+				class="toolbar-button"
+				class:is-active={toolbarState.bold}
+				aria-pressed={toolbarState.bold}
+				aria-label="Bold"
+				title="Bold"
+				disabled={!canCommand((e) => e.can().chain().focus().toggleBold().run())}
+				onclick={() => command((e) => e.chain().focus().toggleBold().run())}
+			>
+				<BoldIcon class="size-3.5" />
+			</button>
+			<button
+				type="button"
+				class="toolbar-button"
+				class:is-active={toolbarState.italic}
+				aria-pressed={toolbarState.italic}
+				aria-label="Italic"
+				title="Italic"
+				disabled={!canCommand((e) => e.can().chain().focus().toggleItalic().run())}
+				onclick={() => command((e) => e.chain().focus().toggleItalic().run())}
+			>
+				<ItalicIcon class="size-3.5" />
+			</button>
+			<button
+				type="button"
+				class="toolbar-button"
+				class:is-active={toolbarState.underline}
+				aria-pressed={toolbarState.underline}
+				aria-label="Underline"
+				title="Underline"
+				disabled={!canCommand((e) => e.can().chain().focus().toggleUnderline().run())}
+				onclick={() => command((e) => e.chain().focus().toggleUnderline().run())}
+			>
+				<UnderlineIcon class="size-3.5" />
+			</button>
+			<button
+				type="button"
+				class="toolbar-button"
+				class:is-active={toolbarState.strike}
+				aria-pressed={toolbarState.strike}
+				aria-label="Strikethrough"
+				title="Strikethrough"
+				disabled={!canCommand((e) => e.can().chain().focus().toggleStrike().run())}
+				onclick={() => command((e) => e.chain().focus().toggleStrike().run())}
+			>
+				<StrikethroughIcon class="size-3.5" />
+			</button>
 
-				<span class="toolbar-divider"></span>
+			<span class="toolbar-divider"></span>
 
-				<button
-					type="button"
-					class="toolbar-button"
-					class:is-active={toolbarState.bulletList}
-					aria-pressed={toolbarState.bulletList}
-					aria-label="Bulleted list"
-					title="Bulleted list"
-					disabled={!editor}
-					onclick={() => command((e) => e.chain().focus().toggleBulletList().run())}
-				>
-					<ListIcon class="size-3.5" />
-				</button>
-				<button
-					type="button"
-					class="toolbar-button"
-					class:is-active={toolbarState.orderedList}
-					aria-pressed={toolbarState.orderedList}
-					aria-label="Numbered list"
-					title="Numbered list"
-					disabled={!editor}
-					onclick={() => command((e) => e.chain().focus().toggleOrderedList().run())}
-				>
-					<ListOrderedIcon class="size-3.5" />
-				</button>
+			<button
+				type="button"
+				class="toolbar-button"
+				class:is-active={toolbarState.bulletList}
+				aria-pressed={toolbarState.bulletList}
+				aria-label="Bulleted list"
+				title="Bulleted list"
+				disabled={!editor}
+				onclick={() => command((e) => e.chain().focus().toggleBulletList().run())}
+			>
+				<ListIcon class="size-3.5" />
+			</button>
+			<button
+				type="button"
+				class="toolbar-button"
+				class:is-active={toolbarState.orderedList}
+				aria-pressed={toolbarState.orderedList}
+				aria-label="Numbered list"
+				title="Numbered list"
+				disabled={!editor}
+				onclick={() => command((e) => e.chain().focus().toggleOrderedList().run())}
+			>
+				<ListOrderedIcon class="size-3.5" />
+			</button>
 
-				<span class="toolbar-divider"></span>
+			<span class="toolbar-divider"></span>
 
-				<button
-					type="button"
-					class="toolbar-button"
-					class:is-active={toolbarState.link}
-					aria-pressed={toolbarState.link}
-					aria-label="Set link"
-					title="Set link"
-					disabled={!editor}
-					onclick={setLink}
-				>
-					<LinkIcon class="size-3.5" />
-				</button>
-				<button
-					type="button"
-					class="toolbar-button"
-					aria-label="Clear formatting"
-					title="Clear formatting"
-					disabled={!canCommand((e) => e.can().chain().focus().unsetAllMarks().clearNodes().run())}
-					onclick={() => command((e) => e.chain().focus().unsetAllMarks().clearNodes().run())}
-				>
-					<RemoveFormattingIcon class="size-3.5" />
-				</button>
-			</div>
-		{/if}
+			<button
+				type="button"
+				class="toolbar-button"
+				class:is-active={toolbarState.link}
+				aria-pressed={toolbarState.link}
+				aria-label="Set link"
+				title="Set link"
+				disabled={!editor}
+				onclick={setLink}
+			>
+				<LinkIcon class="size-3.5" />
+			</button>
+			<button
+				type="button"
+				class="toolbar-button"
+				aria-label="Clear formatting"
+				title="Clear formatting"
+				disabled={!canCommand((e) => e.can().chain().focus().unsetAllMarks().clearNodes().run())}
+				onclick={() => command((e) => e.chain().focus().unsetAllMarks().clearNodes().run())}
+			>
+				<RemoveFormattingIcon class="size-3.5" />
+			</button>
+		</div>
 	</div>
 
 	<!-- Scrollable document canvas -->
