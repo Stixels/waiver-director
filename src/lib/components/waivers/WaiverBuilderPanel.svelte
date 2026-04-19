@@ -26,7 +26,7 @@
 		type WaiverField,
 		type WaiverFieldType
 	} from '$lib/domain/waivers';
-	import { MAX_SELECT_OPTIONS } from '$lib/domain/waiver-constraints';
+	import { MAX_SELECT_OPTIONS, MAX_WAIVER_FIELDS } from '$lib/domain/waiver-constraints';
 
 	interface Props {
 		draft?: WaiverDefinition | null;
@@ -49,6 +49,7 @@
 		{ type: 'select', label: 'Dropdown', icon: ChevronsUpDownIcon, hint: 'Pick one option' },
 		{ type: 'date', label: 'Date', icon: CalendarIcon, hint: 'Calendar picker' }
 	];
+	const canAddField = $derived((draft?.fields.length ?? 0) < MAX_WAIVER_FIELDS);
 
 	function getFieldTypeIcon(type: WaiverFieldType) {
 		return fieldTypes.find((entry) => entry.type === type)?.icon ?? TypeIcon;
@@ -56,6 +57,7 @@
 
 	function addField(type: WaiverFieldType) {
 		if (!draft) return;
+		if (draft.fields.length >= MAX_WAIVER_FIELDS) return;
 		draft.fields.push(createBlankField(type));
 	}
 
@@ -166,20 +168,20 @@
 				</p>
 			</div>
 			<DropdownMenu>
-				<DropdownMenuTrigger class="inline-flex">
-					<Button
-						type="button"
-						size="sm"
-						variant="outline"
-						class="h-8 shrink-0 gap-1 rounded-md px-2.5 text-[11px] font-medium tracking-wide"
-					>
-						<PlusIcon class="size-3" />
-						Add field
-					</Button>
+				<DropdownMenuTrigger
+					class="h-8 shrink-0 gap-1 rounded-md px-2.5 text-[11px] font-medium tracking-wide"
+					disabled={!canAddField}
+				>
+					{#snippet child({ props })}
+						<Button size="sm" variant="outline" {...props}>
+							<PlusIcon class="size-3" />
+							Add field
+						</Button>
+					{/snippet}
 				</DropdownMenuTrigger>
 				<DropdownMenuContent align="end" class="w-56">
 					{#each fieldTypes as type (type.type)}
-						<DropdownMenuItem onclick={() => addField(type.type)}>
+						<DropdownMenuItem disabled={!canAddField} onclick={() => addField(type.type)}>
 							<type.icon class="size-4 text-muted-foreground" />
 							<div class="flex flex-col">
 								<span class="text-sm font-medium">{type.label}</span>
@@ -250,15 +252,16 @@
 										</div>
 
 										<Tooltip>
-											<TooltipTrigger class="inline-flex">
-												<button
-													type="button"
-													class="field-delete"
-													onclick={() => removeField(index)}
-													aria-label="Delete field"
-												>
-													<Trash2Icon class="size-3.5" />
-												</button>
+											<TooltipTrigger
+												class="field-delete"
+												onclick={() => removeField(index)}
+												aria-label="Delete field"
+											>
+												{#snippet child({ props })}
+													<button {...props}>
+														<Trash2Icon class="size-3.5" />
+													</button>
+												{/snippet}
 											</TooltipTrigger>
 											<TooltipContent side="top" sideOffset={4}>Delete field</TooltipContent>
 										</Tooltip>

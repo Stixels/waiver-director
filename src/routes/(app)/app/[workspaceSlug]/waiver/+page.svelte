@@ -92,7 +92,7 @@
 	// Save state machine for debounced autosave
 	let isSaving = $state(false);
 	let lastSavedAt = $state<number | null>(null);
-	let lastSaveError = $state(false);
+	let lastSaveError = $state<string | null>(null);
 	let autosaveTimer: ReturnType<typeof setTimeout> | null = null;
 	let copyFeedbackTimer: ReturnType<typeof setTimeout> | null = null;
 	const AUTOSAVE_DELAY_MS = 800;
@@ -149,6 +149,12 @@
 	beforeNavigate((navigation) => {
 		if (!isDirty && !isSaving) return;
 		if (navigation.willUnload) return;
+
+		if (saveState === 'error' || lastSaveError) {
+			toast.message('Autosave failed - your changes may not be saved.');
+			return;
+		}
+
 		navigation.cancel();
 		toast.message('Still saving your latest changes. Give it a moment and try again.');
 	});
@@ -169,7 +175,7 @@
 		baselineDraft = cloneDefinition(nextDraft);
 		hydratedWaiverId = workspaceWaiver.waiverId;
 		lastSavedAt = null;
-		lastSaveError = false;
+		lastSaveError = null;
 	});
 
 	// Debounced autosave: whenever the draft diverges from baseline, schedule a
@@ -242,7 +248,7 @@
 		const workspaceId = currentWorkspace.workspaceId;
 
 		isSaving = true;
-		lastSaveError = false;
+		lastSaveError = null;
 
 		try {
 			await convex.mutation(api.waivers.updateWorkspaceWaiver, {
@@ -264,8 +270,9 @@
 				lastSavedAt = Date.now();
 			}
 		} catch (error) {
-			lastSaveError = true;
-			toast.error(getConvexErrorMessage(error, 'We could not save your latest changes.'));
+			const message = getConvexErrorMessage(error, 'We could not save your latest changes.');
+			lastSaveError = message;
+			toast.error(message);
 		} finally {
 			isSaving = false;
 		}
@@ -368,12 +375,18 @@
 		}
 	}
 
-	async function publishWorkspaceWaiver() {
+	async function handlePublish() {
 		if (convex.disabled || !currentWorkspace || !workspaceWaiver) return;
 
 		// Ensure any pending edits are persisted before publishing.
 		await flushAutosave();
-		if (lastSaveError || isDirty) return;
+		if (lastSaveError || isDirty) {
+			toast.error(
+				lastSaveError ??
+					'Your latest changes have not finished saving. Wait a moment and try again.'
+			);
+			return;
+		}
 
 		isPublishing = true;
 
@@ -396,7 +409,7 @@
 	async function handleConfirm() {
 		switch (confirmKind) {
 			case 'publish':
-				await publishWorkspaceWaiver();
+				await handlePublish();
 				return;
 			default:
 				return;
@@ -515,20 +528,21 @@
 					<div class="flex shrink-0 items-center gap-1">
 						<div class="sm:hidden">
 							<Tooltip>
-								<TooltipTrigger class="inline-flex">
-									<button
-										type="button"
-										class="topbar-icon-btn"
-										onclick={() => copyText('link', activePublicUrl)}
-										disabled={copyingKey === 'link'}
-										aria-label="Copy link"
-									>
-										{#if copiedKey === 'link'}
-											<CheckIcon class="size-3.5 text-emerald-500" />
-										{:else}
-											<ClipboardIcon class="size-3.5" />
-										{/if}
-									</button>
+								<TooltipTrigger
+									class="topbar-icon-btn"
+									onclick={() => copyText('link', activePublicUrl)}
+									disabled={copyingKey === 'link'}
+									aria-label="Copy link"
+								>
+									{#snippet child({ props })}
+										<button {...props}>
+											{#if copiedKey === 'link'}
+												<CheckIcon class="size-3.5 text-emerald-500" />
+											{:else}
+												<ClipboardIcon class="size-3.5" />
+											{/if}
+										</button>
+									{/snippet}
 								</TooltipTrigger>
 								<TooltipContent side="bottom" sideOffset={4}>
 									{copiedKey === 'link' ? 'Copied!' : 'Copy link'}
@@ -537,20 +551,21 @@
 						</div>
 
 						<Tooltip>
-							<TooltipTrigger class="inline-flex">
-								<button
-									type="button"
-									class="topbar-icon-btn"
-									onclick={() => copyText('embed', activeEmbedSnippet)}
-									disabled={copyingKey === 'embed'}
-									aria-label="Copy embed code"
-								>
-									{#if copiedKey === 'embed'}
-										<CheckIcon class="size-3.5 text-emerald-500" />
-									{:else}
-										<Code2Icon class="size-3.5" />
-									{/if}
-								</button>
+							<TooltipTrigger
+								class="topbar-icon-btn"
+								onclick={() => copyText('embed', activeEmbedSnippet)}
+								disabled={copyingKey === 'embed'}
+								aria-label="Copy embed code"
+							>
+								{#snippet child({ props })}
+									<button {...props}>
+										{#if copiedKey === 'embed'}
+											<CheckIcon class="size-3.5 text-emerald-500" />
+										{:else}
+											<Code2Icon class="size-3.5" />
+										{/if}
+									</button>
+								{/snippet}
 							</TooltipTrigger>
 							<TooltipContent side="bottom" sideOffset={4}>
 								{copiedKey === 'embed' ? 'Copied!' : 'Copy embed code'}
@@ -558,30 +573,32 @@
 						</Tooltip>
 
 						<Tooltip>
-							<TooltipTrigger class="inline-flex">
-								<a
-									href={resolve(`/w/${workspaceWaiver.publicSlug}` as `/w/${string}`)}
-									target="_blank"
-									rel="noopener noreferrer"
-									class="topbar-icon-btn"
-									aria-label="Open live waiver"
-								>
-									<ExternalLinkIcon class="size-3.5" />
-								</a>
+							<TooltipTrigger class="topbar-icon-btn" aria-label="Open live waiver">
+								{#snippet child({ props })}
+									<a
+										href={resolve(`/w/${workspaceWaiver.publicSlug}` as `/w/${string}`)}
+										target="_blank"
+										rel="noopener noreferrer"
+										{...props}
+									>
+										<ExternalLinkIcon class="size-3.5" />
+									</a>
+								{/snippet}
 							</TooltipTrigger>
 							<TooltipContent side="bottom" sideOffset={4}>Open live waiver</TooltipContent>
 						</Tooltip>
 
 						<Tooltip>
-							<TooltipTrigger class="inline-flex">
-								<button
-									type="button"
-									class="topbar-icon-btn"
-									onclick={() => (qrDialogOpen = true)}
-									aria-label="Show QR code"
-								>
-									<QrCodeIcon class="size-3.5" />
-								</button>
+							<TooltipTrigger
+								class="topbar-icon-btn"
+								onclick={() => (qrDialogOpen = true)}
+								aria-label="Show QR code"
+							>
+								{#snippet child({ props })}
+									<button {...props}>
+										<QrCodeIcon class="size-3.5" />
+									</button>
+								{/snippet}
 							</TooltipTrigger>
 							<TooltipContent side="bottom" sideOffset={4}>Show QR code</TooltipContent>
 						</Tooltip>
@@ -604,15 +621,16 @@
 			<div class="flex shrink-0 items-center gap-1 border-l border-border/80 px-2">
 				{#if workspaceWaiver}
 					<DropdownMenu>
-						<DropdownMenuTrigger class="inline-flex">
-							<button
-								type="button"
-								class="topbar-icon-btn"
-								aria-label="More actions"
-								title="More actions"
-							>
-								<EllipsisIcon class="size-4" />
-							</button>
+						<DropdownMenuTrigger
+							class="topbar-icon-btn"
+							aria-label="More actions"
+							title="More actions"
+						>
+							{#snippet child({ props })}
+								<button {...props}>
+									<EllipsisIcon class="size-4" />
+								</button>
+							{/snippet}
 						</DropdownMenuTrigger>
 						<DropdownMenuContent align="end" class="w-56">
 							<DropdownMenuItem onclick={openVersionHistory}>Version history</DropdownMenuItem>

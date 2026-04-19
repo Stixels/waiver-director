@@ -54,10 +54,11 @@
 	{/if}
 
 	{#if field.type === 'checkbox'}
-		<div class="flex items-center gap-3" aria-hidden={preview}>
+		<div class="flex items-center gap-3" role="checkbox" aria-checked={value === true}>
 			<span
 				class="flex h-5 w-5 shrink-0 items-center justify-center border border-foreground/25 bg-transparent"
 				class:bg-foreground={!preview && value === true}
+				aria-hidden={preview ? 'true' : undefined}
 			>
 				{#if !preview && value === true}
 					<svg
@@ -66,6 +67,7 @@
 						viewBox="0 0 24 24"
 						stroke="currentColor"
 						stroke-width="3"
+						aria-hidden="true"
 					>
 						<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
 					</svg>

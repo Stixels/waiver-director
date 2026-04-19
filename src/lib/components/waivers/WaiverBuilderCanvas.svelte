@@ -122,6 +122,19 @@
 		event.preventDefault();
 	}
 
+	function safeLinkHref(rawHref: string): string | null {
+		const trimmed = rawHref.trim();
+		if (!trimmed) return null;
+
+		const href = /^[a-z][a-z0-9+.-]*:/i.test(trimmed) ? trimmed : `https://${trimmed}`;
+		try {
+			const url = new URL(href);
+			return ['http:', 'https:', 'mailto:', 'tel:'].includes(url.protocol) ? href : null;
+		} catch {
+			return null;
+		}
+	}
+
 	function setLink() {
 		if (!editor) return;
 
@@ -135,7 +148,13 @@
 			return;
 		}
 
-		editor.chain().focus().extendMarkRange('link').setLink({ href: trimmed }).run();
+		const safeHref = safeLinkHref(trimmed);
+		if (!safeHref) {
+			window.alert('Links must start with http://, https://, mailto:, or tel:.');
+			return;
+		}
+
+		editor.chain().focus().extendMarkRange('link').setLink({ href: safeHref }).run();
 	}
 
 	function syncToolbarState(sourceEditor: Editor | null) {
@@ -224,14 +243,7 @@
 		editor = instance;
 		syncToolbarState(instance);
 
-		const onSelection = () => syncToolbarState(instance);
-		const onTransaction = () => syncToolbarState(instance);
-		instance.on('selectionUpdate', onSelection);
-		instance.on('transaction', onTransaction);
-
 		return () => {
-			instance.off('selectionUpdate', onSelection);
-			instance.off('transaction', onTransaction);
 			instance.destroy();
 			editor = null;
 		};
@@ -275,11 +287,13 @@
 		<div class="flex items-center gap-1">
 			<!-- Block style -->
 			<DropdownMenu>
-				<DropdownMenuTrigger class="inline-flex">
-					<button type="button" class="toolbar-select" disabled={!editor} aria-label="Text style">
-						<span class="toolbar-select-label">{toolbarState.blockShortLabel}</span>
-						<ChevronDownIcon class="size-3" />
-					</button>
+				<DropdownMenuTrigger class="toolbar-select" disabled={!editor} aria-label="Text style">
+					{#snippet child({ props })}
+						<button {...props}>
+							<span class="toolbar-select-label">{toolbarState.blockShortLabel}</span>
+							<ChevronDownIcon class="size-3" />
+						</button>
+					{/snippet}
 				</DropdownMenuTrigger>
 				<DropdownMenuContent align="end" class="w-40">
 					<DropdownMenuItem onclick={() => command((e) => e.chain().focus().setParagraph().run())}>
@@ -299,18 +313,20 @@
 
 			<!-- Alignment -->
 			<DropdownMenu>
-				<DropdownMenuTrigger class="inline-flex">
-					<button type="button" class="toolbar-button" disabled={!editor} aria-label="Alignment">
-						{#if toolbarState.alignment === 'center'}
-							<AlignCenterIcon class="size-3.5" />
-						{:else if toolbarState.alignment === 'right'}
-							<AlignRightIcon class="size-3.5" />
-						{:else if toolbarState.alignment === 'justify'}
-							<AlignJustifyIcon class="size-3.5" />
-						{:else}
-							<AlignLeftIcon class="size-3.5" />
-						{/if}
-					</button>
+				<DropdownMenuTrigger class="toolbar-button" disabled={!editor} aria-label="Alignment">
+					{#snippet child({ props })}
+						<button {...props}>
+							{#if toolbarState.alignment === 'center'}
+								<AlignCenterIcon class="size-3.5" />
+							{:else if toolbarState.alignment === 'right'}
+								<AlignRightIcon class="size-3.5" />
+							{:else if toolbarState.alignment === 'justify'}
+								<AlignJustifyIcon class="size-3.5" />
+							{:else}
+								<AlignLeftIcon class="size-3.5" />
+							{/if}
+						</button>
+					{/snippet}
 				</DropdownMenuTrigger>
 				<DropdownMenuContent align="end" class="w-40">
 					<DropdownMenuItem

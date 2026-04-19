@@ -235,9 +235,10 @@
 													)}
 											></textarea>
 										{:else if field.type === 'checkbox'}
-											<label class="flex cursor-pointer items-center gap-3">
+											<label class="waiver-checkbox-label flex cursor-pointer items-center gap-3">
 												<span
-													class={`flex h-5 w-5 shrink-0 items-center justify-center border transition-colors ${currentBooleanAnswer(field.id) ? 'border-foreground bg-foreground' : 'border-foreground/25 bg-transparent'}`}
+													class={`waiver-checkbox-box flex h-5 w-5 shrink-0 items-center justify-center border transition-colors ${currentBooleanAnswer(field.id) ? 'border-foreground bg-foreground' : 'border-foreground/25 bg-transparent'}`}
+													aria-hidden="true"
 												>
 													{#if currentBooleanAnswer(field.id)}
 														<svg
@@ -251,6 +252,7 @@
 															stroke-linecap="round"
 															stroke-linejoin="round"
 															class="text-background"
+															aria-hidden="true"
 														>
 															<polyline points="20 6 9 17 4 12" />
 														</svg>
@@ -333,3 +335,11 @@
 		{/if}
 	</WaiverDocumentShell>
 </div>
+
+<style>
+	.waiver-checkbox-label:focus-within .waiver-checkbox-box {
+		border-color: color-mix(in srgb, var(--primary) 80%, var(--foreground));
+		box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 24%, transparent);
+		outline: none;
+	}
+</style>
