@@ -39,8 +39,8 @@ export type WaiverDefinition = {
 	fields: WaiverField[];
 };
 
-export type WaiverTemplateRecord = WaiverDefinition & {
-	templateId: string;
+export type WorkspaceWaiverRecord = WaiverDefinition & {
+	waiverId: string;
 	lastPublishedVersionId: string | null;
 	isActivePublic: boolean;
 	hasUnpublishedChanges: boolean;

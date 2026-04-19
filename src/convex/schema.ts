@@ -42,7 +42,7 @@ export default defineSchema({
 		.index('by_userId_and_workspaceId', ['userId', 'workspaceId'])
 		.index('by_workspaceId_and_userId', ['workspaceId', 'userId']),
 
-	waiver_templates: defineTable({
+	workspace_waivers: defineTable({
 		workspaceId: v.id('workspaces'),
 		title: v.string(),
 		introCopy: v.string(),
@@ -88,12 +88,12 @@ export default defineSchema({
 				})
 			)
 		),
-		lastPublishedVersionId: v.optional(v.id('waiver_template_versions'))
+		lastPublishedVersionId: v.optional(v.id('waiver_versions'))
 	}).index('by_workspaceId', ['workspaceId']),
 
-	waiver_template_versions: defineTable({
+	waiver_versions: defineTable({
 		workspaceId: v.id('workspaces'),
-		templateId: v.id('waiver_templates'),
+		waiverId: v.id('workspace_waivers'),
 		versionNumber: v.number(),
 		title: v.string(),
 		introCopy: v.string(),
@@ -142,12 +142,12 @@ export default defineSchema({
 		publishedAt: v.number()
 	})
 		.index('by_workspaceId', ['workspaceId'])
-		.index('by_templateId', ['templateId'])
-		.index('by_templateId_and_versionNumber', ['templateId', 'versionNumber']),
+		.index('by_waiverId', ['waiverId'])
+		.index('by_waiverId_and_versionNumber', ['waiverId', 'versionNumber']),
 
 	public_waiver_links: defineTable({
 		workspaceId: v.id('workspaces'),
-		versionId: v.id('waiver_template_versions'),
+		versionId: v.id('waiver_versions'),
 		slug: v.string()
 	})
 		.index('by_slug', ['slug'])
@@ -157,8 +157,8 @@ export default defineSchema({
 	waiver_submissions: defineTable({
 		workspaceId: v.id('workspaces'),
 		publicLinkId: v.id('public_waiver_links'),
-		templateId: v.id('waiver_templates'),
-		versionId: v.id('waiver_template_versions'),
+		waiverId: v.id('workspace_waivers'),
+		versionId: v.id('waiver_versions'),
 		signerName: v.string(),
 		signerEmail: v.string(),
 		signerDateOfBirth: v.string(),
@@ -175,5 +175,5 @@ export default defineSchema({
 		.index('by_workspaceId', ['workspaceId'])
 		.index('by_publicLinkId', ['publicLinkId'])
 		.index('by_versionId', ['versionId'])
-		.index('by_templateId', ['templateId'])
+		.index('by_waiverId', ['waiverId'])
 });

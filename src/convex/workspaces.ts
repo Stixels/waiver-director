@@ -74,7 +74,7 @@ export const createWorkspace = mutation({
 		});
 
 		const waiverDefinition = createDefaultWaiverDefinition(name);
-		await ctx.db.insert('waiver_templates', {
+		await ctx.db.insert('workspace_waivers', {
 			workspaceId,
 			title: waiverDefinition.title,
 			introCopy: waiverDefinition.introCopy,

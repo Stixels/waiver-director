@@ -61,14 +61,16 @@
 		appContext.workspaces.find((workspace) => workspace.slug === page.params.workspaceSlug) ?? null
 	);
 
-	type TemplateSummary = FunctionReturnType<typeof api.waivers.listTemplates>[number];
+	type WorkspaceWaiverSummary = NonNullable<
+		FunctionReturnType<typeof api.waivers.getWorkspaceWaiver>
+	>;
 	type PublishingOverview = FunctionReturnType<typeof api.waivers.getPublishingOverview>;
 	type ConfirmKind = 'publish';
 
 	const convex = useConvexClient();
 
-	const templatesQuery = useProtectedQuery(
-		api.waivers.listTemplates,
+	const waiverQuery = useProtectedQuery(
+		api.waivers.getWorkspaceWaiver,
 		() => (currentWorkspace ? { workspaceId: currentWorkspace.workspaceId } : 'skip'),
 		() => ({ keepPreviousData: true })
 	);
@@ -78,17 +80,17 @@
 		() => ({ keepPreviousData: true })
 	);
 
-	const templates = $derived((templatesQuery.data ?? []) as TemplateSummary[]);
+	const workspaceWaiver = $derived((waiverQuery.data ?? null) as WorkspaceWaiverSummary | null);
 	const publishingOverview = $derived(
 		(publishingQuery.data ?? { activeLink: null }) as PublishingOverview
 	);
 	const isLoadingProtectedData = $derived(
-		appContext.isLoading || templatesQuery.isLoading || publishingQuery.isLoading
+		appContext.isLoading || waiverQuery.isLoading || publishingQuery.isLoading
 	);
 
 	let draft = $state<WaiverDefinition | null>(null);
 	let baselineDraft = $state<WaiverDefinition | null>(null);
-	let hydratedTemplateId = $state<TemplateSummary['templateId'] | null>(null);
+	let hydratedWaiverId = $state<WorkspaceWaiverSummary['waiverId'] | null>(null);
 	let hydratedFingerprint = $state<string | null>(null);
 	let versionHistoryOpen = $state(false);
 	let copyingKey = $state<string | null>(null);
@@ -109,12 +111,11 @@
 	const AUTOSAVE_DELAY_MS = 800;
 
 	let isPublishing = $state(false);
-	let isEnsuringTemplate = $state(false);
+	let isEnsuringWaiver = $state(false);
 
 	let confirmKind = $state<ConfirmKind | null>(null);
 	let confirmOpen = $state(false);
 
-	const selectedTemplate = $derived(templates[0] ?? null);
 	const activePublicHref = $derived.by(() => {
 		const slug = publishingOverview.activeLink?.slug;
 		if (!slug) return null;
@@ -135,12 +136,12 @@
 			: ''
 	);
 	const selectedFingerprint = $derived(
-		selectedTemplate
+		workspaceWaiver
 			? JSON.stringify(
 					normalizeDefinitionForCompare({
-						title: selectedTemplate.title,
-						introCopy: selectedTemplate.introCopy,
-						fields: selectedTemplate.fields
+						title: workspaceWaiver.title,
+						introCopy: workspaceWaiver.introCopy,
+						fields: workspaceWaiver.fields
 					})
 				)
 			: null
@@ -152,13 +153,13 @@
 	const draftFingerprint = $derived(
 		draft ? JSON.stringify(normalizeDefinitionForCompare(draft)) : ''
 	);
-	const busy = $derived(isPublishing || isEnsuringTemplate);
+	const busy = $derived(isPublishing || isEnsuringWaiver);
 	const publishDisabled = $derived(
 		busy ||
 			isDirty ||
 			isSaving ||
-			!selectedTemplate ||
-			(selectedTemplate.isActivePublic && !selectedTemplate.hasUnpublishedChanges)
+			!workspaceWaiver ||
+			(workspaceWaiver.isActivePublic && !workspaceWaiver.hasUnpublishedChanges)
 	);
 
 	const saveState = $derived<SaveState>(
@@ -182,41 +183,41 @@
 		if (
 			!currentWorkspace ||
 			isLoadingProtectedData ||
-			templates.length > 0 ||
-			isEnsuringTemplate ||
+			!!workspaceWaiver ||
+			isEnsuringWaiver ||
 			convex.disabled
 		) {
 			return;
 		}
-		void ensureWorkspaceTemplate();
+		void ensureWorkspaceWaiver();
 	});
 
 	$effect(() => {
-		if (!selectedTemplate || !selectedFingerprint) {
+		if (!workspaceWaiver || !selectedFingerprint) {
 			draft = null;
 			baselineDraft = null;
-			hydratedTemplateId = null;
+			hydratedWaiverId = null;
 			hydratedFingerprint = null;
 			return;
 		}
 
 		if (
-			selectedTemplate.templateId !== hydratedTemplateId ||
+			workspaceWaiver.waiverId !== hydratedWaiverId ||
 			(!isDirty && selectedFingerprint !== hydratedFingerprint)
 		) {
-			const nextDraft = cloneDefinition(selectedTemplate);
+			const nextDraft = cloneDefinition(workspaceWaiver);
 			draft = nextDraft;
 			baselineDraft = cloneDefinition(nextDraft);
-			hydratedTemplateId = selectedTemplate.templateId;
+			hydratedWaiverId = workspaceWaiver.waiverId;
 			hydratedFingerprint = selectedFingerprint;
 			lastSavedAt = null;
 			lastSaveError = false;
 		}
 	});
 
-	// Debounced autosave: whenever the draft diverges from baseline (and not read-only),
-	// schedule a save. Re-triggers on every deep change via `draftFingerprint`; only
-	// the trailing call runs.
+	// Debounced autosave: whenever the draft diverges from baseline, schedule a
+	// save. Re-triggers on every deep change via `draftFingerprint`; only the
+	// trailing call runs.
 	$effect(() => {
 		// Subscribe to every deep mutation of the draft AND to the save cycle, so that
 		// if the user keeps editing while a save is in flight, we re-schedule an
@@ -230,9 +231,9 @@
 		}
 
 		// Gate the save scheduling outside of reactive tracking so we don't subscribe
-		// to unrelated state like selectedTemplate metadata or the convex client flag.
+		// to unrelated state like workspaceWaiver metadata or the convex client flag.
 		untrack(() => {
-			if (!selectedTemplate || !currentWorkspace) return;
+			if (!workspaceWaiver || !currentWorkspace) return;
 			if (!isDirty) return;
 			if (isSaving) return;
 			if (convex.disabled) return;
@@ -273,28 +274,28 @@
 	}
 
 	async function runAutosave() {
-		if (!draft || !selectedTemplate || !currentWorkspace || convex.disabled) return;
+		if (!draft || !workspaceWaiver || !currentWorkspace || convex.disabled) return;
 		if (isSaving) return;
 		if (definitionsEqual(draft, baselineDraft)) return;
 
 		const snapshot = cloneDefinition(draft);
-		const targetTemplateId = selectedTemplate.templateId;
+		const targetWaiverId = workspaceWaiver.waiverId;
 		const workspaceId = currentWorkspace.workspaceId;
 
 		isSaving = true;
 		lastSaveError = false;
 
 		try {
-			await convex.mutation(api.waivers.updateTemplate, {
+			await convex.mutation(api.waivers.updateWorkspaceWaiver, {
 				workspaceId,
-				templateId: targetTemplateId,
+				waiverId: targetWaiverId,
 				definition: snapshot
 			});
 
 			// If the user continued editing while we saved, the current draft may
 			// have moved on. Re-baseline to the snapshot we just persisted so the
 			// new diff only covers the post-save edits.
-			if (selectedTemplate && selectedTemplate.templateId === targetTemplateId) {
+			if (workspaceWaiver && workspaceWaiver.waiverId === targetWaiverId) {
 				syncBaseline(snapshot);
 				lastSavedAt = Date.now();
 			}
@@ -351,11 +352,11 @@
 		}
 	}
 
-	function publishButtonLabel(template: TemplateSummary | null) {
-		if (!template) return 'Publish';
-		if (template.isActivePublic && !template.hasUnpublishedChanges) return 'Live';
-		if (template.lastPublishedVersionId && template.hasUnpublishedChanges) return 'Publish changes';
-		if (template.lastPublishedVersionId) return 'Republish';
+	function publishButtonLabel(waiver: WorkspaceWaiverSummary | null) {
+		if (!waiver) return 'Publish';
+		if (waiver.isActivePublic && !waiver.hasUnpublishedChanges) return 'Live';
+		if (waiver.lastPublishedVersionId && waiver.hasUnpublishedChanges) return 'Publish changes';
+		if (waiver.lastPublishedVersionId) return 'Republish';
 		return 'Publish';
 	}
 
@@ -368,7 +369,7 @@
 		switch (kind) {
 			case 'publish':
 				return {
-					title: 'Publish and activate this waiver?',
+					title: 'Publish this waiver?',
 					description:
 						'This creates a new published version and makes it the live waiver guests will sign.',
 					confirmLabel: 'Publish waiver',
@@ -403,27 +404,27 @@
 		}
 	}
 
-	async function ensureWorkspaceTemplate() {
+	async function ensureWorkspaceWaiver() {
 		if (convex.disabled || !currentWorkspace) {
 			toast.error('Waiver editor is still loading. Please try again.');
 			return;
 		}
 
-		isEnsuringTemplate = true;
+		isEnsuringWaiver = true;
 
 		try {
-			await convex.mutation(api.waivers.ensureWorkspaceTemplate, {
+			await convex.mutation(api.waivers.ensureWorkspaceWaiver, {
 				workspaceId: currentWorkspace.workspaceId
 			});
 		} catch (error) {
 			toast.error(getConvexErrorMessage(error, 'Unable to set up this workspace waiver.'));
 		} finally {
-			isEnsuringTemplate = false;
+			isEnsuringWaiver = false;
 		}
 	}
 
-	async function publishTemplate() {
-		if (convex.disabled || !currentWorkspace || !selectedTemplate) return;
+	async function publishWorkspaceWaiver() {
+		if (convex.disabled || !currentWorkspace || !workspaceWaiver) return;
 
 		// Ensure any pending edits are persisted before publishing.
 		await flushAutosave();
@@ -432,14 +433,14 @@
 		isPublishing = true;
 
 		try {
-			await convex.mutation(api.waivers.publishTemplate, {
+			await convex.mutation(api.waivers.publishWorkspaceWaiver, {
 				workspaceId: currentWorkspace.workspaceId,
-				templateId: selectedTemplate.templateId
+				waiverId: workspaceWaiver.waiverId
 			});
 
 			confirmOpen = false;
 			confirmKind = null;
-			toast.success('Waiver published and activated.');
+			toast.success('Waiver published.');
 		} catch (error) {
 			toast.error(getConvexErrorMessage(error, 'Unable to publish this waiver.'));
 		} finally {
@@ -450,7 +451,7 @@
 	async function handleConfirm() {
 		switch (confirmKind) {
 			case 'publish':
-				await publishTemplate();
+				await publishWorkspaceWaiver();
 				return;
 			default:
 				return;
@@ -656,7 +657,7 @@
 
 			<!-- Right cluster: secondary menu + publish -->
 			<div class="flex shrink-0 items-center gap-1 border-l border-border/80 px-2">
-				{#if selectedTemplate}
+				{#if workspaceWaiver}
 					<DropdownMenu>
 						<DropdownMenuTrigger class="inline-flex">
 							<button
@@ -674,7 +675,7 @@
 					</DropdownMenu>
 				{/if}
 
-				{#if selectedTemplate}
+				{#if workspaceWaiver}
 					<Button
 						type="button"
 						size="sm"
@@ -683,7 +684,7 @@
 						class="publish-btn ml-1 h-8 gap-1.5"
 					>
 						<UploadCloudIcon class="size-3.5" />
-						<span>{isPublishing ? 'Publishing…' : publishButtonLabel(selectedTemplate)}</span>
+						<span>{isPublishing ? 'Publishing…' : publishButtonLabel(workspaceWaiver)}</span>
 					</Button>
 				{/if}
 			</div>
@@ -741,7 +742,7 @@
 					<Skeleton class="mx-auto h-[70vh] w-full max-w-3xl rounded-[28px]" />
 				</section>
 			</div>
-		{:else if !selectedTemplate}
+		{:else if !workspaceWaiver}
 			<div class="flex flex-1 items-center justify-center p-6">
 				<div
 					class="w-full max-w-md rounded-2xl border border-dashed border-border bg-muted/10 px-6 py-14 text-center"
@@ -752,7 +753,7 @@
 					</p>
 				</div>
 			</div>
-		{:else if selectedTemplate}
+		{:else if workspaceWaiver}
 			<div class="flex min-h-0 flex-1 flex-col lg:flex-row">
 				<!-- Left panel (edit) -->
 				<aside

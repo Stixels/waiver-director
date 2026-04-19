@@ -4,7 +4,7 @@ import type { Doc, Id } from './_generated/dataModel';
 import type { MutationCtx, QueryCtx } from './_generated/server';
 import {
 	assertWorkspaceRecord,
-	buildTemplateLifecycle,
+	buildWorkspaceWaiverSummary,
 	createDefaultWaiverDefinition,
 	minorInputValidator,
 	normalizeWaiverDefinition,
@@ -51,28 +51,28 @@ async function getWorkspacePublicLink(ctx: FunctionCtx, workspaceId: Id<'workspa
 	return links[0] ?? null;
 }
 
-async function getWorkspaceTemplate(ctx: FunctionCtx, workspaceId: Id<'workspaces'>) {
+async function getWorkspaceWaiverRecord(ctx: FunctionCtx, workspaceId: Id<'workspaces'>) {
 	const publicLink = await getWorkspacePublicLink(ctx, workspaceId);
 	if (publicLink) {
 		const version = await ctx.db.get(publicLink.versionId);
 		if (version && version.workspaceId === workspaceId) {
-			const activeTemplate = await ctx.db.get(version.templateId);
-			if (activeTemplate && activeTemplate.workspaceId === workspaceId) {
-				return activeTemplate;
+			const activeWaiver = await ctx.db.get(version.waiverId);
+			if (activeWaiver && activeWaiver.workspaceId === workspaceId) {
+				return activeWaiver;
 			}
 		}
 	}
 
-	const templates = await ctx.db
-		.query('waiver_templates')
+	const waivers = await ctx.db
+		.query('workspace_waivers')
 		.withIndex('by_workspaceId', (q) => q.eq('workspaceId', workspaceId))
 		.order('desc')
 		.take(1);
 
-	return templates[0] ?? null;
+	return waivers[0] ?? null;
 }
 
-async function insertWorkspaceTemplate(ctx: MutationCtx, workspaceId: Id<'workspaces'>) {
+async function insertWorkspaceWaiver(ctx: MutationCtx, workspaceId: Id<'workspaces'>) {
 	const workspace = await ctx.db.get(workspaceId);
 	if (!workspace) {
 		throw new ConvexError({
@@ -82,41 +82,41 @@ async function insertWorkspaceTemplate(ctx: MutationCtx, workspaceId: Id<'worksp
 	}
 
 	const definition = createDefaultWaiverDefinition(workspace.name);
-	const templateId = await ctx.db.insert('waiver_templates', {
+	const waiverId = await ctx.db.insert('workspace_waivers', {
 		workspaceId,
 		title: definition.title,
 		introCopy: definition.introCopy,
 		fields: definition.fields
 	});
 
-	return templateId;
+	return waiverId;
 }
 
-async function getNextVersionNumber(ctx: MutationCtx, templateId: Id<'waiver_templates'>) {
+async function getNextVersionNumber(ctx: MutationCtx, waiverId: Id<'workspace_waivers'>) {
 	const latest = await ctx.db
-		.query('waiver_template_versions')
-		.withIndex('by_templateId_and_versionNumber', (q) => q.eq('templateId', templateId))
+		.query('waiver_versions')
+		.withIndex('by_waiverId_and_versionNumber', (q) => q.eq('waiverId', waiverId))
 		.order('desc')
 		.first();
 
 	return latest ? latest.versionNumber + 1 : 1;
 }
 
-async function templateHasUnpublishedChanges(ctx: FunctionCtx, template: Doc<'waiver_templates'>) {
-	if (!template.lastPublishedVersionId) {
+async function waiverHasUnpublishedChanges(ctx: FunctionCtx, waiver: Doc<'workspace_waivers'>) {
+	if (!waiver.lastPublishedVersionId) {
 		return false;
 	}
 
-	const version = await ctx.db.get(template.lastPublishedVersionId);
+	const version = await ctx.db.get(waiver.lastPublishedVersionId);
 	if (!version) {
 		return true;
 	}
 
 	return !waiverDefinitionsEqual(
 		{
-			title: template.title,
-			introCopy: template.introCopy,
-			fields: template.fields
+			title: waiver.title,
+			introCopy: waiver.introCopy,
+			fields: waiver.fields
 		},
 		{
 			title: version.title,
@@ -126,112 +126,112 @@ async function templateHasUnpublishedChanges(ctx: FunctionCtx, template: Doc<'wa
 	);
 }
 
-async function templateSummary(
+async function workspaceWaiverSummary(
 	ctx: FunctionCtx,
-	template: Doc<'waiver_templates'>,
+	waiver: Doc<'workspace_waivers'>,
 	activeLink: Doc<'public_waiver_links'> | null
 ) {
-	const hasUnpublishedChanges = await templateHasUnpublishedChanges(ctx, template);
+	const hasUnpublishedChanges = await waiverHasUnpublishedChanges(ctx, waiver);
 
-	return buildTemplateLifecycle({
-		template,
+	return buildWorkspaceWaiverSummary({
+		waiver,
 		activeLink,
 		hasUnpublishedChanges
 	});
 }
 
-export const listTemplates = query({
+export const getWorkspaceWaiver = query({
 	args: {
 		workspaceId: v.id('workspaces')
 	},
 	handler: async (ctx, args) => {
 		await requireWorkspaceMember(ctx, args.workspaceId);
 
-		const [template, activeLink, workspace] = await Promise.all([
-			getWorkspaceTemplate(ctx, args.workspaceId),
+		const [waiver, activeLink, workspace] = await Promise.all([
+			getWorkspaceWaiverRecord(ctx, args.workspaceId),
 			getWorkspacePublicLink(ctx, args.workspaceId),
 			ctx.db.get(args.workspaceId)
 		]);
 
-		if (!template || !workspace) {
-			return [];
+		if (!waiver || !workspace) {
+			return null;
 		}
 
-		return [await templateSummary(ctx, template, activeLink)];
+		return await workspaceWaiverSummary(ctx, waiver, activeLink);
 	}
 });
 
-export const ensureWorkspaceTemplate = mutation({
+export const ensureWorkspaceWaiver = mutation({
 	args: {
 		workspaceId: v.id('workspaces')
 	},
 	handler: async (ctx, args) => {
 		await requireWorkspaceMember(ctx, args.workspaceId);
 
-		const existing = await getWorkspaceTemplate(ctx, args.workspaceId);
+		const existing = await getWorkspaceWaiverRecord(ctx, args.workspaceId);
 		if (existing) {
-			return { templateId: existing._id };
+			return { waiverId: existing._id };
 		}
 
-		const templateId = await insertWorkspaceTemplate(ctx, args.workspaceId);
+		const waiverId = await insertWorkspaceWaiver(ctx, args.workspaceId);
 
-		return { templateId };
+		return { waiverId };
 	}
 });
 
-export const updateTemplate = mutation({
+export const updateWorkspaceWaiver = mutation({
 	args: {
 		workspaceId: v.id('workspaces'),
-		templateId: v.id('waiver_templates'),
+		waiverId: v.id('workspace_waivers'),
 		definition: waiverDefinitionValidator
 	},
 	handler: async (ctx, args) => {
 		await requireWorkspaceMember(ctx, args.workspaceId);
 
-		const template = assertWorkspaceRecord(
-			await ctx.db.get(args.templateId),
+		const waiver = assertWorkspaceRecord(
+			await ctx.db.get(args.waiverId),
 			args.workspaceId,
-			'Waiver template not found.'
+			'Workspace waiver not found.'
 		);
 
 		const definition = normalizeWaiverDefinition(args.definition);
 
-		await ctx.db.patch(template._id, {
+		await ctx.db.patch(waiver._id, {
 			title: definition.title,
 			introCopy: definition.introCopy,
 			fields: definition.fields
 		});
 
-		return { templateId: template._id };
+		return { waiverId: waiver._id };
 	}
 });
 
-export const publishTemplate = mutation({
+export const publishWorkspaceWaiver = mutation({
 	args: {
 		workspaceId: v.id('workspaces'),
-		templateId: v.id('waiver_templates')
+		waiverId: v.id('workspace_waivers')
 	},
 	handler: async (ctx, args) => {
 		await requireWorkspaceMember(ctx, args.workspaceId);
 
-		const template = assertWorkspaceRecord(
-			await ctx.db.get(args.templateId),
+		const waiver = assertWorkspaceRecord(
+			await ctx.db.get(args.waiverId),
 			args.workspaceId,
-			'Waiver template not found.'
+			'Workspace waiver not found.'
 		);
 
 		const definition = normalizeWaiverDefinition({
-			title: template.title,
-			introCopy: template.introCopy,
-			fields: template.fields
+			title: waiver.title,
+			introCopy: waiver.introCopy,
+			fields: waiver.fields
 		});
-		const currentVersionId = template.lastPublishedVersionId;
+		const currentVersionId = waiver.lastPublishedVersionId;
 		const activeLink = await getWorkspacePublicLink(ctx, args.workspaceId);
 		if (
 			activeLink &&
 			currentVersionId &&
 			activeLink.versionId === currentVersionId &&
-			!(await templateHasUnpublishedChanges(ctx, template))
+			!(await waiverHasUnpublishedChanges(ctx, waiver))
 		) {
 			return {
 				versionId: currentVersionId,
@@ -239,17 +239,17 @@ export const publishTemplate = mutation({
 			};
 		}
 
-		const versionId = await ctx.db.insert('waiver_template_versions', {
+		const versionId = await ctx.db.insert('waiver_versions', {
 			workspaceId: args.workspaceId,
-			templateId: template._id,
-			versionNumber: await getNextVersionNumber(ctx, template._id),
+			waiverId: waiver._id,
+			versionNumber: await getNextVersionNumber(ctx, waiver._id),
 			title: definition.title,
 			introCopy: definition.introCopy,
 			fields: definition.fields,
 			publishedAt: Date.now()
 		});
 
-		await ctx.db.patch(template._id, {
+		await ctx.db.patch(waiver._id, {
 			lastPublishedVersionId: versionId
 		});
 
@@ -281,26 +281,26 @@ export const publishTemplate = mutation({
 	}
 });
 
-export const listVersionHistory = query({
+export const listWaiverVersions = query({
 	args: {
 		workspaceId: v.id('workspaces')
 	},
 	handler: async (ctx, args) => {
 		await requireWorkspaceMember(ctx, args.workspaceId);
 
-		const [template, activeLink, workspace] = await Promise.all([
-			getWorkspaceTemplate(ctx, args.workspaceId),
+		const [waiver, activeLink, workspace] = await Promise.all([
+			getWorkspaceWaiverRecord(ctx, args.workspaceId),
 			getWorkspacePublicLink(ctx, args.workspaceId),
 			ctx.db.get(args.workspaceId)
 		]);
 
-		if (!template || !workspace) {
+		if (!waiver || !workspace) {
 			return [];
 		}
 
 		const versions = await ctx.db
-			.query('waiver_template_versions')
-			.withIndex('by_templateId', (q) => q.eq('templateId', template._id))
+			.query('waiver_versions')
+			.withIndex('by_waiverId', (q) => q.eq('waiverId', waiver._id))
 			.order('desc')
 			.take(50);
 
@@ -454,7 +454,7 @@ export const getPublicWaiverBySlug = query({
 export const submitPublicWaiver = mutation({
 	args: {
 		slug: v.string(),
-		versionId: v.id('waiver_template_versions'),
+		versionId: v.id('waiver_versions'),
 		signerName: v.string(),
 		signerEmail: v.string(),
 		signerDateOfBirth: v.string(),
@@ -523,7 +523,7 @@ export const submitPublicWaiver = mutation({
 		const submissionId = await ctx.db.insert('waiver_submissions', {
 			workspaceId: link.workspaceId,
 			publicLinkId: link._id,
-			templateId: version.templateId,
+			waiverId: version.waiverId,
 			versionId: link.versionId,
 			signerName,
 			signerEmail,

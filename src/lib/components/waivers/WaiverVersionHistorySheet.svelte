@@ -27,10 +27,10 @@
 
 	let { open = $bindable(), workspaceId }: Props = $props();
 
-	type VersionSummary = FunctionReturnType<typeof api.waivers.listVersionHistory>[number];
+	type VersionSummary = FunctionReturnType<typeof api.waivers.listWaiverVersions>[number];
 
 	const versionsQuery = useProtectedQuery(
-		api.waivers.listVersionHistory,
+		api.waivers.listWaiverVersions,
 		() => ({ workspaceId }),
 		() => ({ keepPreviousData: true })
 	);

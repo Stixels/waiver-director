@@ -299,20 +299,20 @@ export function waiverDefinitionsEqual(a: WaiverDefinition, b: WaiverDefinition)
 	);
 }
 
-export function buildTemplateLifecycle(args: {
-	template: Doc<'waiver_templates'>;
+export function buildWorkspaceWaiverSummary(args: {
+	waiver: Doc<'workspace_waivers'>;
 	activeLink: Doc<'public_waiver_links'> | null;
 	hasUnpublishedChanges: boolean;
 }) {
 	return {
-		templateId: args.template._id,
-		title: args.template.title,
-		introCopy: args.template.introCopy,
-		fields: args.template.fields,
-		lastPublishedVersionId: args.template.lastPublishedVersionId ?? null,
+		waiverId: args.waiver._id,
+		title: args.waiver.title,
+		introCopy: args.waiver.introCopy,
+		fields: args.waiver.fields,
+		lastPublishedVersionId: args.waiver.lastPublishedVersionId ?? null,
 		isActivePublic:
-			!!args.template.lastPublishedVersionId &&
-			args.activeLink?.versionId === args.template.lastPublishedVersionId,
+			!!args.waiver.lastPublishedVersionId &&
+			args.activeLink?.versionId === args.waiver.lastPublishedVersionId,
 		hasUnpublishedChanges: args.hasUnpublishedChanges
 	};
 }
