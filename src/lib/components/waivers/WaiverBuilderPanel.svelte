@@ -106,6 +106,51 @@
 	function removeOption(field: Extract<WaiverField, { type: 'select' }>, optionIndex: number) {
 		field.options.splice(optionIndex, 1);
 	}
+
+	function reorderOptions(fieldId: string, fromIndex: number, toIndex: number) {
+		if (!draft) return;
+		const field = draft.fields.find(
+			(entry): entry is Extract<WaiverField, { type: 'select' }> =>
+				entry.id === fieldId && entry.type === 'select'
+		);
+		if (!field) return;
+		if (fromIndex === toIndex) return;
+		if (
+			fromIndex < 0 ||
+			fromIndex >= field.options.length ||
+			toIndex < 0 ||
+			toIndex >= field.options.length
+		) {
+			return;
+		}
+
+		const nextOptions = [...field.options];
+		const [option] = nextOptions.splice(fromIndex, 1);
+		if (!option) return;
+		nextOptions.splice(toIndex, 0, option);
+
+		draft = {
+			...draft,
+			fields: draft.fields.map((entry) =>
+				entry.id === fieldId && entry.type === 'select'
+					? {
+							...entry,
+							options: nextOptions
+						}
+					: entry
+			)
+		};
+	}
+
+	function handleOptionDragEnd(fieldId: string, event: DragEndHandlerEvent) {
+		if (!draft) return;
+		if (event.canceled) return;
+
+		const { source } = event.operation;
+		if (!isSortable(source)) return;
+
+		reorderOptions(fieldId, source.initialIndex, source.index);
+	}
 </script>
 
 {#if draft}
@@ -240,31 +285,51 @@
 													{field.options.length === 1 ? 'item' : 'items'}
 												</span>
 											</div>
-											<div class="mt-1.5 space-y-1">
-												{#each field.options as option, optionIndex (option.id)}
-													<div class="option-row">
-														<span class="option-index" aria-hidden="true">
-															{optionIndex + 1}
-														</span>
-														<Input
-															id={`${field.id}-option-${optionIndex}`}
-															bind:value={option.label}
-															maxlength={80}
-															class="option-input"
-															placeholder="Option label"
-														/>
-														<button
-															type="button"
-															class="field-inline-remove"
-															disabled={field.options.length === 1}
-															onclick={() => removeOption(field, optionIndex)}
-															aria-label="Remove option"
+											<DragDropProvider onDragEnd={(event) => handleOptionDragEnd(field.id, event)}>
+												<div class="mt-1.5 space-y-1">
+													{#each field.options as option, optionIndex (option.id)}
+														{@const optionSortable = createSortable({
+															id: `${field.id}:${option.id}`,
+															group: field.id,
+															get index() {
+																return optionIndex;
+															}
+														})}
+														<div
+															{@attach optionSortable.attach}
+															class="option-row"
+															class:is-dragging={optionSortable.isDragging}
+															class:is-drop-target={optionSortable.isDropTarget}
 														>
-															<Trash2Icon class="size-3" />
-														</button>
-													</div>
-												{/each}
-											</div>
+															<button
+																type="button"
+																{@attach optionSortable.attachHandle}
+																class="option-grip"
+																aria-label="Drag to reorder option"
+																title="Drag to reorder"
+															>
+																<GripVerticalIcon class="size-3" />
+															</button>
+															<Input
+																id={`${field.id}-option-${optionIndex}`}
+																bind:value={option.label}
+																maxlength={80}
+																class="option-input"
+																placeholder="Option label"
+															/>
+															<button
+																type="button"
+																class="option-remove"
+																disabled={field.options.length === 1}
+																onclick={() => removeOption(field, optionIndex)}
+																aria-label="Remove option"
+															>
+																<Trash2Icon class="size-3" />
+															</button>
+														</div>
+													{/each}
+												</div>
+											</DragDropProvider>
 											<button
 												type="button"
 												class="add-option-btn"
@@ -343,6 +408,7 @@
 		color: color-mix(in srgb, var(--muted-foreground) 60%, transparent);
 		border-right: 1px solid var(--border);
 		cursor: grab;
+		touch-action: none;
 		transition:
 			background 150ms ease,
 			color 150ms ease;
@@ -480,29 +546,6 @@
 		color: var(--destructive);
 	}
 
-	.field-inline-remove {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		width: 1.4rem;
-		height: 1.4rem;
-		border-radius: 0.35rem;
-		color: color-mix(in srgb, var(--muted-foreground) 70%, transparent);
-		transition:
-			background 150ms ease,
-			color 150ms ease;
-	}
-
-	.field-inline-remove:hover:not(:disabled) {
-		background: color-mix(in srgb, var(--destructive) 12%, transparent);
-		color: var(--destructive);
-	}
-
-	.field-inline-remove:disabled {
-		opacity: 0.35;
-		cursor: not-allowed;
-	}
-
 	.options-card {
 		position: relative;
 		padding: 0.45rem 0.55rem 0.45rem 0.6rem;
@@ -540,32 +583,110 @@
 	}
 
 	.option-row {
+		position: relative;
 		display: flex;
-		align-items: center;
-		gap: 0.35rem;
+		align-items: stretch;
+		min-width: 0;
+		border: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
+		background: color-mix(in srgb, var(--background) 55%, transparent);
+		border-radius: 0.4rem;
+		overflow: hidden;
+		transition:
+			border-color 150ms ease,
+			background 150ms ease,
+			box-shadow 150ms ease;
 	}
 
-	.option-index {
+	.option-row:hover {
+		border-color: color-mix(in srgb, var(--border) 100%, var(--foreground) 3%);
+		background: color-mix(in srgb, var(--background) 75%, transparent);
+	}
+
+	.option-row:focus-within {
+		border-color: color-mix(in srgb, var(--primary) 35%, var(--border));
+		background: color-mix(in srgb, var(--background) 90%, transparent);
+	}
+
+	.option-row.is-drop-target {
+		border-color: color-mix(in srgb, var(--primary) 45%, var(--border));
+	}
+
+	.option-row.is-dragging {
+		background: var(--card);
+		border-color: color-mix(in srgb, var(--primary) 30%, var(--border));
+		box-shadow: 0 6px 14px -4px rgba(0, 0, 0, 0.22);
+		z-index: 2;
+	}
+
+	.option-grip {
 		display: inline-flex;
-		flex: 0 0 auto;
-		width: 0.95rem;
-		height: 0.95rem;
 		align-items: center;
 		justify-content: center;
-		border-radius: 999px;
-		background: color-mix(in srgb, var(--muted) 60%, transparent);
-		font-size: 0.55rem;
-		font-weight: 600;
-		font-variant-numeric: tabular-nums;
-		color: color-mix(in srgb, var(--muted-foreground) 90%, transparent);
+		width: 1.15rem;
+		flex-shrink: 0;
+		background: color-mix(in srgb, var(--muted) 22%, transparent);
+		border-right: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+		color: color-mix(in srgb, var(--muted-foreground) 55%, transparent);
+		cursor: grab;
+		touch-action: none;
+		transition:
+			background 150ms ease,
+			color 150ms ease;
+	}
+
+	.option-row:hover .option-grip {
+		color: color-mix(in srgb, var(--muted-foreground) 90%, var(--foreground));
+	}
+
+	.option-grip:hover,
+	.option-grip:focus-visible {
+		background: color-mix(in srgb, var(--muted) 50%, transparent);
+		color: var(--foreground);
+		outline: none;
+	}
+
+	.option-grip:active {
+		cursor: grabbing;
 	}
 
 	:global(.option-input) {
-		height: 1.55rem !important;
-		font-size: 0.72rem !important;
-		padding-left: 0.5rem !important;
-		padding-right: 0.5rem !important;
-		background: color-mix(in srgb, var(--background) 85%, transparent);
+		height: 1.7rem !important;
+		font-size: 0.75rem !important;
+		padding-left: 0.55rem !important;
+		padding-right: 0.4rem !important;
+		background: transparent !important;
+		border: 0 !important;
+		border-radius: 0 !important;
+		box-shadow: none !important;
+	}
+
+	:global(.option-input:focus-visible) {
+		box-shadow: none !important;
+		outline: none !important;
+	}
+
+	.option-remove {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 1.6rem;
+		flex-shrink: 0;
+		border-left: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+		color: color-mix(in srgb, var(--muted-foreground) 60%, transparent);
+		transition:
+			background 150ms ease,
+			color 150ms ease,
+			border-color 150ms ease;
+	}
+
+	.option-remove:hover:not(:disabled) {
+		background: color-mix(in srgb, var(--destructive) 12%, transparent);
+		color: var(--destructive);
+	}
+
+	.option-remove:disabled {
+		opacity: 0.3;
+		cursor: not-allowed;
 	}
 
 	.add-option-btn {
