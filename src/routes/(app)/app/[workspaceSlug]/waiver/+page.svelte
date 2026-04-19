@@ -42,6 +42,7 @@
 		cloneDefinition,
 		createBlankDefinition,
 		definitionsEqual,
+		isWaiverDefinitionAutosaveable,
 		normalizeDefinitionForCompare,
 		type WaiverDefinition
 	} from '$lib/domain/waivers';
@@ -138,6 +139,7 @@
 	const draftFingerprint = $derived(
 		draft ? JSON.stringify(normalizeDefinitionForCompare(draft)) : ''
 	);
+	const draftCanAutosave = $derived(isWaiverDefinitionAutosaveable(draft));
 	const publishDisabled = $derived(
 		isPublishing ||
 			isDirty ||
@@ -194,6 +196,7 @@
 		// if the user keeps editing while a save is in flight, we re-schedule an
 		// autosave the moment the in-flight save completes.
 		void draftFingerprint;
+		void draftCanAutosave;
 		void isSaving;
 
 		if (autosaveTimer) {
@@ -206,6 +209,7 @@
 		untrack(() => {
 			if (!workspaceWaiver || !currentWorkspace) return;
 			if (!isDirty) return;
+			if (!draftCanAutosave) return;
 			if (isSaving) return;
 			if (convex.disabled) return;
 
@@ -248,6 +252,7 @@
 		if (!draft || !workspaceWaiver || !currentWorkspace || convex.disabled) return;
 		if (isSaving) return;
 		if (definitionsEqual(draft, baselineDraft)) return;
+		if (!isWaiverDefinitionAutosaveable(draft)) return;
 
 		const snapshot = cloneDefinition(draft);
 		const targetWaiverId = workspaceWaiver.waiverId;
@@ -380,7 +385,7 @@
 
 		// Ensure any pending edits are persisted before publishing.
 		await flushAutosave();
-		if (lastSaveError) return;
+		if (lastSaveError || isDirty) return;
 
 		isPublishing = true;
 

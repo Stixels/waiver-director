@@ -1,4 +1,15 @@
 import { sanitizeRichTextHtml } from '$lib/utils/rich-text';
+import {
+	MAX_SELECT_OPTION_LABEL_LENGTH,
+	MAX_SELECT_OPTIONS,
+	MAX_WAIVER_FIELD_LABEL_LENGTH,
+	MAX_WAIVER_FIELDS,
+	MAX_WAIVER_TITLE_LENGTH,
+	MIN_SELECT_OPTION_LABEL_LENGTH,
+	MIN_SELECT_OPTIONS,
+	MIN_WAIVER_FIELD_LABEL_LENGTH,
+	MIN_WAIVER_TITLE_LENGTH
+} from '$lib/domain/waiver-constraints';
 
 export type WaiverFieldType = 'text' | 'checkbox' | 'select' | 'date';
 
@@ -152,6 +163,44 @@ export function cloneDefinition(definition: WaiverDefinition): WaiverDefinition 
 
 export function formatFieldTypeLabel(type: WaiverFieldType): string {
 	return waiverFieldTypeOptions.find((option) => option.value === type)?.label ?? type;
+}
+
+export function isWaiverDefinitionAutosaveable(definition: WaiverDefinition | null): boolean {
+	if (!definition) return false;
+
+	const title = definition.title.trim();
+	if (title.length < MIN_WAIVER_TITLE_LENGTH || title.length > MAX_WAIVER_TITLE_LENGTH) {
+		return false;
+	}
+	if (definition.fields.length > MAX_WAIVER_FIELDS) return false;
+
+	for (const field of definition.fields) {
+		const label = field.label.trim();
+		if (
+			label.length < MIN_WAIVER_FIELD_LABEL_LENGTH ||
+			label.length > MAX_WAIVER_FIELD_LABEL_LENGTH
+		) {
+			return false;
+		}
+
+		if (field.type === 'select') {
+			if (field.options.length < MIN_SELECT_OPTIONS || field.options.length > MAX_SELECT_OPTIONS) {
+				return false;
+			}
+
+			for (const option of field.options) {
+				const optionLabel = option.label.trim();
+				if (
+					optionLabel.length < MIN_SELECT_OPTION_LABEL_LENGTH ||
+					optionLabel.length > MAX_SELECT_OPTION_LABEL_LENGTH
+				) {
+					return false;
+				}
+			}
+		}
+	}
+
+	return true;
 }
 
 export function normalizeDefinitionForCompare(definition: WaiverDefinition): WaiverDefinition {

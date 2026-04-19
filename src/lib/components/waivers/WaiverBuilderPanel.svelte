@@ -26,6 +26,7 @@
 		type WaiverField,
 		type WaiverFieldType
 	} from '$lib/domain/waivers';
+	import { MAX_SELECT_OPTIONS } from '$lib/domain/waiver-constraints';
 
 	interface Props {
 		draft?: WaiverDefinition | null;
@@ -261,7 +262,12 @@
 													</div>
 												{/each}
 											</div>
-											<button type="button" class="add-option-btn" onclick={() => addOption(field)}>
+											<button
+												type="button"
+												class="add-option-btn"
+												disabled={field.options.length >= MAX_SELECT_OPTIONS}
+												onclick={() => addOption(field)}
+											>
 												<PlusIcon class="size-3" />
 												<span>Add option</span>
 											</button>
@@ -579,10 +585,15 @@
 			color 150ms ease;
 	}
 
-	.add-option-btn:hover {
+	.add-option-btn:hover:not(:disabled) {
 		background: color-mix(in srgb, var(--primary) 10%, transparent);
 		border-color: color-mix(in srgb, var(--primary) 55%, var(--border));
 		color: color-mix(in srgb, var(--primary) 90%, var(--foreground));
+	}
+
+	.add-option-btn:disabled {
+		opacity: 0.45;
+		cursor: not-allowed;
 	}
 
 	.add-option-btn:focus-visible {
