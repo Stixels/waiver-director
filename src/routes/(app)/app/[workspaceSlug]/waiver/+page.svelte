@@ -79,7 +79,6 @@
 	let draft = $state<WaiverDefinition | null>(null);
 	let baselineDraft = $state<WaiverDefinition | null>(null);
 	let hydratedWaiverId = $state<WorkspaceWaiverSummary['waiverId'] | null>(null);
-	let hydratedFingerprint = $state<string | null>(null);
 	let versionHistoryOpen = $state(false);
 	let copyingKey = $state<string | null>(null);
 	let copiedKey = $state<string | null>(null);
@@ -121,17 +120,6 @@
 			? `<iframe src="${activePublicUrl}?embed=1" title="Waiver form" width="100%" height="920" style="border:0;border-radius:16px;overflow:hidden"></iframe>`
 			: ''
 	);
-	const selectedFingerprint = $derived(
-		workspaceWaiver
-			? JSON.stringify(
-					normalizeDefinitionForCompare({
-						title: workspaceWaiver.title,
-						introCopy: workspaceWaiver.introCopy,
-						fields: workspaceWaiver.fields
-					})
-				)
-			: null
-	);
 	const currentDraft = $derived(draft ?? createBlankDefinition());
 	const isDirty = $derived(!definitionsEqual(draft, baselineDraft));
 	// Fingerprint that changes on every deep mutation of the draft. We read it
@@ -166,26 +154,22 @@
 	});
 
 	$effect(() => {
-		if (!workspaceWaiver || !selectedFingerprint) {
+		if (!workspaceWaiver) {
 			draft = null;
 			baselineDraft = null;
 			hydratedWaiverId = null;
-			hydratedFingerprint = null;
 			return;
 		}
 
-		if (
-			workspaceWaiver.waiverId !== hydratedWaiverId ||
-			(!isDirty && selectedFingerprint !== hydratedFingerprint)
-		) {
-			const nextDraft = cloneDefinition(workspaceWaiver);
-			draft = nextDraft;
-			baselineDraft = cloneDefinition(nextDraft);
-			hydratedWaiverId = workspaceWaiver.waiverId;
-			hydratedFingerprint = selectedFingerprint;
-			lastSavedAt = null;
-			lastSaveError = false;
-		}
+		const isNewWaiver = workspaceWaiver.waiverId !== hydratedWaiverId;
+		if (!isNewWaiver) return;
+
+		const nextDraft = cloneDefinition(workspaceWaiver);
+		draft = nextDraft;
+		baselineDraft = cloneDefinition(nextDraft);
+		hydratedWaiverId = workspaceWaiver.waiverId;
+		lastSavedAt = null;
+		lastSaveError = false;
 	});
 
 	// Debounced autosave: whenever the draft diverges from baseline, schedule a
@@ -245,7 +229,6 @@
 
 	function syncBaseline(definition: WaiverDefinition) {
 		baselineDraft = cloneDefinition(definition);
-		hydratedFingerprint = JSON.stringify(normalizeDefinitionForCompare(definition));
 	}
 
 	async function runAutosave() {
@@ -269,9 +252,14 @@
 			});
 
 			// If the user continued editing while we saved, the current draft may
-			// have moved on. Re-baseline to the snapshot we just persisted so the
-			// new diff only covers the post-save edits.
-			if (workspaceWaiver && workspaceWaiver.waiverId === targetWaiverId) {
+			// have moved on. Only re-baseline if the saved snapshot is still the
+			// visible draft; otherwise leave the newer local edits dirty so the next
+			// autosave persists them.
+			if (
+				workspaceWaiver &&
+				workspaceWaiver.waiverId === targetWaiverId &&
+				definitionsEqual(draft, snapshot)
+			) {
 				syncBaseline(snapshot);
 				lastSavedAt = Date.now();
 			}
