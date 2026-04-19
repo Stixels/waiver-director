@@ -41,8 +41,7 @@ export type WaiverDefinition = {
 
 export type WorkspaceWaiverRecord = WaiverDefinition & {
 	waiverId: string;
-	lastPublishedVersionId: string | null;
-	isActivePublic: boolean;
+	publishedVersionId: string | null;
 	hasUnpublishedChanges: boolean;
 };
 

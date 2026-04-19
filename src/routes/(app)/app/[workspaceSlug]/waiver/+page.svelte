@@ -61,9 +61,7 @@
 		appContext.workspaces.find((workspace) => workspace.slug === page.params.workspaceSlug) ?? null
 	);
 
-	type WorkspaceWaiverSummary = NonNullable<
-		FunctionReturnType<typeof api.waivers.getWorkspaceWaiver>
-	>;
+	type WorkspaceWaiverSummary = FunctionReturnType<typeof api.waivers.getWorkspaceWaiver>;
 	type PublishingOverview = FunctionReturnType<typeof api.waivers.getPublishingOverview>;
 	type ConfirmKind = 'publish';
 
@@ -157,7 +155,7 @@
 			isDirty ||
 			isSaving ||
 			!workspaceWaiver ||
-			(workspaceWaiver.isActivePublic && !workspaceWaiver.hasUnpublishedChanges)
+			(!!workspaceWaiver.publishedVersionId && !workspaceWaiver.hasUnpublishedChanges)
 	);
 
 	const saveState = $derived<SaveState>(
@@ -339,9 +337,9 @@
 
 	function publishButtonLabel(waiver: WorkspaceWaiverSummary | null) {
 		if (!waiver) return 'Publish';
-		if (waiver.isActivePublic && !waiver.hasUnpublishedChanges) return 'Live';
-		if (waiver.lastPublishedVersionId && waiver.hasUnpublishedChanges) return 'Publish changes';
-		if (waiver.lastPublishedVersionId) return 'Republish';
+		if (waiver.publishedVersionId && !waiver.hasUnpublishedChanges) return 'Live';
+		if (waiver.publishedVersionId && waiver.hasUnpublishedChanges) return 'Publish changes';
+		if (waiver.publishedVersionId) return 'Republish';
 		return 'Publish';
 	}
 

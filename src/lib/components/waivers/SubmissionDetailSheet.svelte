@@ -37,11 +37,6 @@
 			new Date(ts)
 		);
 	}
-
-	function formatDob(dob: string) {
-		const [y, m, d] = dob.split('-').map(Number);
-		return new Intl.DateTimeFormat('en-US', { dateStyle: 'long' }).format(new Date(y, m - 1, d));
-	}
 </script>
 
 <Dialog bind:open>
@@ -100,53 +95,18 @@
 			</DialogHeader>
 
 			<div class="min-h-0 flex-1 overflow-y-auto bg-muted/20">
-				{#if submission.waiver}
-					<WaiverReadonlyDocument
-						workspaceName={submission.workspaceName}
-						introCopy={submission.waiver.introCopy}
-						fields={submission.waiver.fields}
-						signerName={submission.signerName}
-						signerEmail={submission.signerEmail}
-						signerDateOfBirth={submission.signerDateOfBirth}
-						minors={submission.minors}
-						answers={submission.answers}
-						signatureDataUrl={submission.signatureDataUrl}
-						submittedAt={submission.submittedAt}
-					/>
-				{:else}
-					<div class="mx-auto max-w-3xl p-4 sm:p-6">
-						<section class="rounded-2xl border border-border bg-background p-6 shadow-sm">
-							<p class="text-xs font-semibold tracking-[0.14em] text-muted-foreground uppercase">
-								Waiver version unavailable
-							</p>
-							<h3 class="mt-2 text-lg font-semibold tracking-tight">
-								This signed record is preserved, but its original waiver body is no longer
-								available.
-							</h3>
-							<p class="mt-2 text-sm text-muted-foreground">
-								Workspace: {submission.workspaceName}
-							</p>
-							<div class="mt-5 grid gap-4 text-sm text-muted-foreground sm:grid-cols-2">
-								<div>
-									<p class="text-xs font-semibold tracking-[0.12em] uppercase">Signer</p>
-									<p class="mt-1 text-foreground">{submission.signerName}</p>
-								</div>
-								<div>
-									<p class="text-xs font-semibold tracking-[0.12em] uppercase">Email</p>
-									<p class="mt-1 text-foreground">{submission.signerEmail}</p>
-								</div>
-								<div>
-									<p class="text-xs font-semibold tracking-[0.12em] uppercase">Date of birth</p>
-									<p class="mt-1 text-foreground">{formatDob(submission.signerDateOfBirth)}</p>
-								</div>
-								<div>
-									<p class="text-xs font-semibold tracking-[0.12em] uppercase">Submitted</p>
-									<p class="mt-1 text-foreground">{formatTimestamp(submission.submittedAt)}</p>
-								</div>
-							</div>
-						</section>
-					</div>
-				{/if}
+				<WaiverReadonlyDocument
+					workspaceName={submission.workspaceName}
+					introCopy={submission.waiver.introCopy}
+					fields={submission.waiver.fields}
+					signerName={submission.signerName}
+					signerEmail={submission.signerEmail}
+					signerDateOfBirth={submission.signerDateOfBirth}
+					minors={submission.minors}
+					answers={submission.answers}
+					signatureDataUrl={submission.signatureDataUrl}
+					submittedAt={submission.submittedAt}
+				/>
 			</div>
 		{/if}
 	</DialogContent>

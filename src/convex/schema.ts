@@ -87,8 +87,7 @@ export default defineSchema({
 					required: v.boolean()
 				})
 			)
-		),
-		lastPublishedVersionId: v.optional(v.id('waiver_versions'))
+		)
 	}).index('by_workspaceId', ['workspaceId']),
 
 	waiver_versions: defineTable({
@@ -151,13 +150,10 @@ export default defineSchema({
 		slug: v.string()
 	})
 		.index('by_slug', ['slug'])
-		.index('by_workspaceId', ['workspaceId'])
-		.index('by_versionId', ['versionId']),
+		.index('by_workspaceId', ['workspaceId']),
 
 	waiver_submissions: defineTable({
 		workspaceId: v.id('workspaces'),
-		publicLinkId: v.id('public_waiver_links'),
-		waiverId: v.id('workspace_waivers'),
 		versionId: v.id('waiver_versions'),
 		signerName: v.string(),
 		signerEmail: v.string(),
@@ -171,9 +167,5 @@ export default defineSchema({
 		),
 		status: v.union(v.literal('submitted')),
 		submittedAt: v.number()
-	})
-		.index('by_workspaceId', ['workspaceId'])
-		.index('by_publicLinkId', ['publicLinkId'])
-		.index('by_versionId', ['versionId'])
-		.index('by_waiverId', ['waiverId'])
+	}).index('by_workspaceId', ['workspaceId'])
 });
