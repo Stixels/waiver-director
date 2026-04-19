@@ -211,24 +211,16 @@
 							<WaiverPublicAdditionalInfoSection>
 								{#each waiver.fields as field (field.id)}
 									<div>
-										<label class={waiverFieldLabelClass} for={field.id}>
-											{field.label}
-											{#if field.required}
-												<span class="text-foreground/40">*</span>
-											{/if}
-										</label>
+										{#if field.type !== 'checkbox'}
+											<label class={waiverFieldLabelClass} for={field.id}>
+												{field.label}
+												{#if field.required}
+													<span class="text-foreground/40">*</span>
+												{/if}
+											</label>
+										{/if}
 
-										{#if field.type === 'shortText'}
-											<input
-												id={field.id}
-												class={waiverUnderlineInputClass}
-												value={currentStringAnswer(field.id)}
-												placeholder={field.placeholder ?? ''}
-												required={field.required}
-												oninput={(event) =>
-													setFieldAnswer(field.id, (event.currentTarget as HTMLInputElement).value)}
-											/>
-										{:else if field.type === 'longText'}
+										{#if field.type === 'text'}
 											<textarea
 												id={field.id}
 												class={waiverUnderlineTextareaClass}
@@ -243,7 +235,7 @@
 													)}
 											></textarea>
 										{:else if field.type === 'checkbox'}
-											<label class="mt-2 flex cursor-pointer items-center gap-3">
+											<label class="flex cursor-pointer items-center gap-3">
 												<span
 													class={`flex h-5 w-5 shrink-0 items-center justify-center border transition-colors ${currentBooleanAnswer(field.id) ? 'border-foreground bg-foreground' : 'border-foreground/25 bg-transparent'}`}
 												>
@@ -265,6 +257,7 @@
 													{/if}
 												</span>
 												<input
+													id={field.id}
 													type="checkbox"
 													class="sr-only"
 													checked={currentBooleanAnswer(field.id)}
@@ -275,7 +268,12 @@
 															(event.currentTarget as HTMLInputElement).checked
 														)}
 												/>
-												<span class="text-sm">{field.label}</span>
+												<span class="text-sm">
+													{field.label}
+													{#if field.required}
+														<span class="text-foreground/40">*</span>
+													{/if}
+												</span>
 											</label>
 										{:else if field.type === 'select'}
 											<select

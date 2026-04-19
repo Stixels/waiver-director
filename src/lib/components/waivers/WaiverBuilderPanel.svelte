@@ -15,7 +15,6 @@
 	import Trash2Icon from '@lucide/svelte/icons/trash-2';
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import TypeIcon from '@lucide/svelte/icons/type';
-	import AlignLeftIcon from '@lucide/svelte/icons/align-left';
 	import SquareCheckIcon from '@lucide/svelte/icons/square-check';
 	import ChevronsUpDownIcon from '@lucide/svelte/icons/chevrons-up-down';
 	import CalendarIcon from '@lucide/svelte/icons/calendar';
@@ -44,8 +43,7 @@
 		icon: typeof TypeIcon;
 		hint: string;
 	}[] = [
-		{ type: 'shortText', label: 'Short text', icon: TypeIcon, hint: 'Single line answer' },
-		{ type: 'longText', label: 'Long text', icon: AlignLeftIcon, hint: 'Paragraph answer' },
+		{ type: 'text', label: 'Text', icon: TypeIcon, hint: 'Written answer' },
 		{ type: 'checkbox', label: 'Checkbox', icon: SquareCheckIcon, hint: 'Single agreement' },
 		{ type: 'select', label: 'Dropdown', icon: ChevronsUpDownIcon, hint: 'Pick one option' },
 		{ type: 'date', label: 'Date', icon: CalendarIcon, hint: 'Calendar picker' }

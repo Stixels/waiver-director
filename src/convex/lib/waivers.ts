@@ -10,14 +10,7 @@ type FunctionCtx = QueryCtx | MutationCtx;
 export const waiverFieldValidator = v.union(
 	v.object({
 		id: v.string(),
-		type: v.literal('shortText'),
-		label: v.string(),
-		required: v.boolean(),
-		placeholder: v.optional(v.string())
-	}),
-	v.object({
-		id: v.string(),
-		type: v.literal('longText'),
+		type: v.literal('text'),
 		label: v.string(),
 		required: v.boolean(),
 		placeholder: v.optional(v.string())
@@ -66,7 +59,7 @@ export type WaiverDefinition = {
 	fields: Array<
 		| {
 				id: string;
-				type: 'shortText' | 'longText';
+				type: 'text';
 				label: string;
 				required: boolean;
 				placeholder?: string;

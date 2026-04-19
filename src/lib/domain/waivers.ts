@@ -1,11 +1,11 @@
 import { sanitizeRichTextHtml } from '$lib/utils/rich-text';
 
-export type WaiverFieldType = 'shortText' | 'longText' | 'checkbox' | 'select' | 'date';
+export type WaiverFieldType = 'text' | 'checkbox' | 'select' | 'date';
 
 export type WaiverField =
 	| {
 			id: string;
-			type: 'shortText' | 'longText';
+			type: 'text';
 			label: string;
 			required: boolean;
 			placeholder?: string;
@@ -63,10 +63,9 @@ export const waiverFieldTypeOptions: Array<{
 	value: WaiverFieldType;
 	label: string;
 }> = [
-	{ value: 'shortText', label: 'Short text' },
-	{ value: 'longText', label: 'Long text' },
+	{ value: 'text', label: 'Text' },
 	{ value: 'checkbox', label: 'Checkbox' },
-	{ value: 'select', label: 'Select' },
+	{ value: 'select', label: 'Dropdown' },
 	{ value: 'date', label: 'Date' }
 ];
 
@@ -90,19 +89,11 @@ export function createBlankField(type: WaiverFieldType): WaiverField {
 	const id = createFieldId(type);
 
 	switch (type) {
-		case 'shortText':
+		case 'text':
 			return {
 				id,
 				type,
-				label: 'Short answer',
-				required: false,
-				placeholder: ''
-			};
-		case 'longText':
-			return {
-				id,
-				type,
-				label: 'Long answer',
+				label: 'Text answer',
 				required: false,
 				placeholder: ''
 			};

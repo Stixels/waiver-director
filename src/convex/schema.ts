@@ -52,14 +52,7 @@ export default defineSchema({
 			v.union(
 				v.object({
 					id: v.string(),
-					type: v.literal('shortText'),
-					label: v.string(),
-					required: v.boolean(),
-					placeholder: v.optional(v.string())
-				}),
-				v.object({
-					id: v.string(),
-					type: v.literal('longText'),
+					type: v.literal('text'),
 					label: v.string(),
 					required: v.boolean(),
 					placeholder: v.optional(v.string())
@@ -104,14 +97,7 @@ export default defineSchema({
 			v.union(
 				v.object({
 					id: v.string(),
-					type: v.literal('shortText'),
-					label: v.string(),
-					required: v.boolean(),
-					placeholder: v.optional(v.string())
-				}),
-				v.object({
-					id: v.string(),
-					type: v.literal('longText'),
+					type: v.literal('text'),
 					label: v.string(),
 					required: v.boolean(),
 					placeholder: v.optional(v.string())

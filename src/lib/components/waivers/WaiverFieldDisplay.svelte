@@ -21,10 +21,8 @@
 
 	function sampleValue(field: WaiverField) {
 		switch (field.type) {
-			case 'shortText':
+			case 'text':
 				return 'Sample answer';
-			case 'longText':
-				return 'Guests will fill this out before signing the waiver.';
 			case 'select':
 				return field.options[0]?.label ?? 'Choose one';
 			case 'date':
@@ -46,15 +44,17 @@
 </script>
 
 <div>
-	<div class={waiverFieldLabelClass}>
-		{field.label}
-		{#if field.required}
-			<span class="text-foreground/40">*</span>
-		{/if}
-	</div>
+	{#if field.type !== 'checkbox'}
+		<div class={waiverFieldLabelClass}>
+			{field.label}
+			{#if field.required}
+				<span class="text-foreground/40">*</span>
+			{/if}
+		</div>
+	{/if}
 
 	{#if field.type === 'checkbox'}
-		<div class="mt-2 flex items-center gap-3" aria-hidden={preview}>
+		<div class="flex items-center gap-3" aria-hidden={preview}>
 			<span
 				class="flex h-5 w-5 shrink-0 items-center justify-center border border-foreground/25 bg-transparent"
 				class:bg-foreground={!preview && value === true}
@@ -71,9 +71,14 @@
 					</svg>
 				{/if}
 			</span>
-			<span class="text-sm">{field.label}</span>
+			<span class="text-sm">
+				{field.label}
+				{#if field.required}
+					<span class="text-foreground/40">*</span>
+				{/if}
+			</span>
 		</div>
-	{:else if field.type === 'longText'}
+	{:else if field.type === 'text'}
 		<div
 			class={`${waiverUnderlineTextareaClass} ${preview ? 'pointer-events-none min-h-21 whitespace-pre-wrap text-muted-foreground/45 select-none' : 'min-h-21 whitespace-pre-wrap'}`}
 			aria-hidden={preview}
