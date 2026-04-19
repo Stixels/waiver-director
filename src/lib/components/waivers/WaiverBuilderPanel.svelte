@@ -80,17 +80,20 @@
 		const [field] = next.splice(fromIndex, 1);
 		if (!field) return;
 		next.splice(toIndex, 0, field);
-		draft.fields = next;
+		draft = {
+			...draft,
+			fields: next
+		};
 	}
 
 	function handleFieldDragEnd(event: DragEndHandlerEvent) {
 		if (!draft) return;
 		if (event.canceled) return;
 
-		const { source, target } = event.operation;
-		if (!isSortable(source) || !isSortable(target)) return;
+		const { source } = event.operation;
+		if (!isSortable(source)) return;
 
-		reorderFields(source.index, target.index);
+		reorderFields(source.initialIndex, source.index);
 	}
 
 	function addOption(field: Extract<WaiverField, { type: 'select' }>) {
