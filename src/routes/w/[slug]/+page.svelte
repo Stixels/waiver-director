@@ -224,7 +224,7 @@
 											<textarea
 												id={field.id}
 												class={waiverUnderlineTextareaClass}
-												rows={3}
+												rows={1}
 												value={currentStringAnswer(field.id)}
 												placeholder={field.placeholder ?? ''}
 												required={field.required}
