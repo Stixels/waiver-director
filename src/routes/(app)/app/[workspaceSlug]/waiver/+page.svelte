@@ -62,7 +62,6 @@
 	);
 
 	type WorkspaceWaiverSummary = FunctionReturnType<typeof api.waivers.getWorkspaceWaiver>;
-	type PublishingOverview = FunctionReturnType<typeof api.waivers.getPublishingOverview>;
 	type ConfirmKind = 'publish';
 
 	const convex = useConvexClient();
@@ -72,19 +71,9 @@
 		() => (currentWorkspace ? { workspaceId: currentWorkspace.workspaceId } : 'skip'),
 		() => ({ keepPreviousData: true })
 	);
-	const publishingQuery = useProtectedQuery(
-		api.waivers.getPublishingOverview,
-		() => (currentWorkspace ? { workspaceId: currentWorkspace.workspaceId } : 'skip'),
-		() => ({ keepPreviousData: true })
-	);
 
 	const workspaceWaiver = $derived((waiverQuery.data ?? null) as WorkspaceWaiverSummary | null);
-	const publishingOverview = $derived(
-		(publishingQuery.data ?? { activeLink: null }) as PublishingOverview
-	);
-	const isLoadingProtectedData = $derived(
-		appContext.isLoading || waiverQuery.isLoading || publishingQuery.isLoading
-	);
+	const isLoadingProtectedData = $derived(appContext.isLoading || waiverQuery.isLoading);
 
 	let draft = $state<WaiverDefinition | null>(null);
 	let baselineDraft = $state<WaiverDefinition | null>(null);
@@ -114,9 +103,8 @@
 	let confirmOpen = $state(false);
 
 	const activePublicHref = $derived.by(() => {
-		const slug = publishingOverview.activeLink?.slug;
-		if (!slug) return null;
-		return resolve(`/w/${slug}` as `/w/${string}`);
+		if (!workspaceWaiver?.publishedVersionId) return null;
+		return resolve(`/w/${workspaceWaiver.publicSlug}` as `/w/${string}`);
 	});
 	const activePublicUrl = $derived.by(() => {
 		if (!activePublicHref) return null;
@@ -495,7 +483,7 @@
 						<Skeleton class="h-8 w-24" />
 					</div>
 				</div>
-			{:else if publishingOverview.activeLink && activePublicUrl}
+			{:else if activePublicUrl && workspaceWaiver}
 				<div class="flex min-w-0 flex-1 items-center gap-3 px-4 py-2.5">
 					<div class="flex shrink-0 items-center gap-1.5">
 						<span class="relative flex h-2 w-2">
@@ -579,7 +567,7 @@
 						<Tooltip>
 							<TooltipTrigger class="inline-flex">
 								<a
-									href={resolve(`/w/${publishingOverview.activeLink.slug}` as `/w/${string}`)}
+									href={resolve(`/w/${workspaceWaiver.publicSlug}` as `/w/${string}`)}
 									target="_blank"
 									rel="noopener noreferrer"
 									class="topbar-icon-btn"

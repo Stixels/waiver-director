@@ -7,8 +7,6 @@ import {
 	minorInputValidator,
 	normalizeWaiverDefinition,
 	requireWorkspaceMember,
-	assertValidPublicSlug,
-	normalizePublicSlug,
 	validateMinors,
 	validateSubmissionAnswers,
 	waiverDefinitionsEqual,
@@ -21,6 +19,7 @@ type FunctionCtx = QueryCtx | MutationCtx;
 
 const workspaceWaiverValue = v.object({
 	waiverId: v.id('workspace_waivers'),
+	publicSlug: v.string(),
 	title: v.string(),
 	introCopy: v.string(),
 	fields: v.array(waiverFieldValidator),
@@ -48,34 +47,6 @@ const publicWaiverValue = v.object({
 	fields: v.array(waiverFieldValidator)
 });
 
-async function createUniquePublicSlug(ctx: MutationCtx, baseSlug: string): Promise<string> {
-	for (let attempt = 0; attempt < 20; attempt += 1) {
-		const suffix = attempt === 0 ? '' : `-${attempt + 1}`;
-		const slug = `${baseSlug}${suffix}`;
-		assertValidPublicSlug(slug);
-
-		const existing = await ctx.db
-			.query('public_waiver_links')
-			.withIndex('by_slug', (q) => q.eq('slug', slug))
-			.unique();
-		if (!existing) {
-			return slug;
-		}
-	}
-
-	throw new ConvexError({
-		code: 'already_exists',
-		message: 'Unable to create a unique public waiver link for this workspace.'
-	});
-}
-
-async function getWorkspacePublicLink(ctx: FunctionCtx, workspaceId: Id<'workspaces'>) {
-	return await ctx.db
-		.query('public_waiver_links')
-		.withIndex('by_workspaceId', (q) => q.eq('workspaceId', workspaceId))
-		.unique();
-}
-
 async function getWorkspaceWaiverRecord(ctx: FunctionCtx, workspaceId: Id<'workspaces'>) {
 	return await ctx.db
 		.query('workspace_waivers')
@@ -93,11 +64,8 @@ async function getNextVersionNumber(ctx: MutationCtx, waiverId: Id<'workspace_wa
 	return latest ? latest.versionNumber + 1 : 1;
 }
 
-async function waiverHasUnpublishedChanges(
-	ctx: FunctionCtx,
-	waiver: Doc<'workspace_waivers'>,
-	publishedVersionId: Id<'waiver_versions'> | null
-) {
+async function waiverHasUnpublishedChanges(ctx: FunctionCtx, waiver: Doc<'workspace_waivers'>) {
+	const publishedVersionId = waiver.publishedVersionId ?? null;
 	if (!publishedVersionId) {
 		return false;
 	}
@@ -107,6 +75,12 @@ async function waiverHasUnpublishedChanges(
 		throw new ConvexError({
 			code: 'not_found',
 			message: 'Published waiver version not found.'
+		});
+	}
+	if (version.waiverId !== waiver._id) {
+		throw new ConvexError({
+			code: 'invalid_state',
+			message: 'Published waiver version does not belong to this workspace waiver.'
 		});
 	}
 
@@ -124,20 +98,16 @@ async function waiverHasUnpublishedChanges(
 	);
 }
 
-async function workspaceWaiverSummary(
-	ctx: FunctionCtx,
-	waiver: Doc<'workspace_waivers'>,
-	activeLink: Doc<'public_waiver_links'> | null
-) {
-	const publishedVersionId = activeLink?.versionId ?? null;
-	const hasUnpublishedChanges = await waiverHasUnpublishedChanges(ctx, waiver, publishedVersionId);
+async function workspaceWaiverSummary(ctx: FunctionCtx, waiver: Doc<'workspace_waivers'>) {
+	const hasUnpublishedChanges = await waiverHasUnpublishedChanges(ctx, waiver);
 
 	return {
 		waiverId: waiver._id,
+		publicSlug: waiver.publicSlug,
 		title: waiver.title,
 		introCopy: waiver.introCopy,
 		fields: waiver.fields,
-		publishedVersionId,
+		publishedVersionId: waiver.publishedVersionId ?? null,
 		hasUnpublishedChanges
 	};
 }
@@ -150,20 +120,15 @@ export const getWorkspaceWaiver = query({
 	handler: async (ctx, args) => {
 		await requireWorkspaceMember(ctx, args.workspaceId);
 
-		const [waiver, activeLink, workspace] = await Promise.all([
-			getWorkspaceWaiverRecord(ctx, args.workspaceId),
-			getWorkspacePublicLink(ctx, args.workspaceId),
-			ctx.db.get(args.workspaceId)
-		]);
-
-		if (!waiver || !workspace) {
+		const waiver = await getWorkspaceWaiverRecord(ctx, args.workspaceId);
+		if (!waiver) {
 			throw new ConvexError({
 				code: 'not_found',
 				message: 'Workspace waiver not found.'
 			});
 		}
 
-		return await workspaceWaiverSummary(ctx, waiver, activeLink);
+		return await workspaceWaiverSummary(ctx, waiver);
 	}
 });
 
@@ -219,13 +184,8 @@ export const publishWorkspaceWaiver = mutation({
 			introCopy: waiver.introCopy,
 			fields: waiver.fields
 		});
-		const activeLink = await getWorkspacePublicLink(ctx, args.workspaceId);
-		const publishedVersionId = activeLink?.versionId ?? null;
-		if (
-			activeLink &&
-			publishedVersionId &&
-			!(await waiverHasUnpublishedChanges(ctx, waiver, publishedVersionId))
-		) {
+		const publishedVersionId = waiver.publishedVersionId ?? null;
+		if (publishedVersionId && !(await waiverHasUnpublishedChanges(ctx, waiver))) {
 			return {
 				versionId: publishedVersionId
 			};
@@ -241,27 +201,9 @@ export const publishWorkspaceWaiver = mutation({
 			publishedAt: Date.now()
 		});
 
-		const workspace = await ctx.db.get(args.workspaceId);
-		if (!workspace) {
-			throw new ConvexError({
-				code: 'not_found',
-				message: 'Workspace not found.'
-			});
-		}
-
-		if (activeLink) {
-			await ctx.db.patch(activeLink._id, {
-				versionId
-			});
-		} else {
-			const baseSlug = normalizePublicSlug(`${workspace.slug}-waiver`);
-			const slug = await createUniquePublicSlug(ctx, baseSlug);
-			await ctx.db.insert('public_waiver_links', {
-				workspaceId: args.workspaceId,
-				versionId,
-				slug
-			});
-		}
+		await ctx.db.patch(waiver._id, {
+			publishedVersionId: versionId
+		});
 
 		return { versionId };
 	}
@@ -275,9 +217,8 @@ export const listWaiverVersions = query({
 	handler: async (ctx, args) => {
 		await requireWorkspaceMember(ctx, args.workspaceId);
 
-		const [waiver, activeLink, workspace] = await Promise.all([
+		const [waiver, workspace] = await Promise.all([
 			getWorkspaceWaiverRecord(ctx, args.workspaceId),
-			getWorkspacePublicLink(ctx, args.workspaceId),
 			ctx.db.get(args.workspaceId)
 		]);
 
@@ -302,61 +243,8 @@ export const listWaiverVersions = query({
 			fields: version.fields,
 			workspaceName: workspace.name,
 			publishedAt: version.publishedAt,
-			isActivePublic: activeLink?.versionId === version._id
+			isActivePublic: waiver.publishedVersionId === version._id
 		}));
-	}
-});
-
-export const getPublishingOverview = query({
-	args: {
-		workspaceId: v.id('workspaces')
-	},
-	returns: v.object({
-		activeLink: v.union(
-			v.null(),
-			v.object({
-				slug: v.string(),
-				title: v.string(),
-				versionId: v.id('waiver_versions'),
-				versionNumber: v.number(),
-				workspaceName: v.string(),
-				introCopy: v.string(),
-				fields: v.array(waiverFieldValidator)
-			})
-		)
-	}),
-	handler: async (ctx, args) => {
-		await requireWorkspaceMember(ctx, args.workspaceId);
-
-		const activeLink = await getWorkspacePublicLink(ctx, args.workspaceId);
-		if (!activeLink) {
-			return {
-				activeLink: null
-			};
-		}
-
-		const [version, workspace] = await Promise.all([
-			ctx.db.get(activeLink.versionId),
-			ctx.db.get(args.workspaceId)
-		]);
-		if (!version || !workspace) {
-			throw new ConvexError({
-				code: 'not_found',
-				message: 'Published waiver version not found.'
-			});
-		}
-
-		return {
-			activeLink: {
-				slug: activeLink.slug,
-				title: version.title,
-				versionId: version._id,
-				versionNumber: version.versionNumber,
-				workspaceName: workspace.name,
-				introCopy: version.introCopy,
-				fields: version.fields
-			}
-		};
 	}
 });
 
@@ -458,21 +346,21 @@ export const getPublicWaiverBySlug = query({
 	},
 	returns: v.union(v.null(), publicWaiverValue),
 	handler: async (ctx, args) => {
-		const link = await ctx.db
-			.query('public_waiver_links')
-			.withIndex('by_slug', (q) => q.eq('slug', args.slug))
+		const waiver = await ctx.db
+			.query('workspace_waivers')
+			.withIndex('by_publicSlug', (q) => q.eq('publicSlug', args.slug))
 			.unique();
 
-		if (!link) {
+		if (!waiver || !waiver.publishedVersionId) {
 			return null;
 		}
 
 		const [workspace, version] = await Promise.all([
-			ctx.db.get(link.workspaceId),
-			ctx.db.get(link.versionId)
+			ctx.db.get(waiver.workspaceId),
+			ctx.db.get(waiver.publishedVersionId)
 		]);
 
-		if (!workspace || !version) {
+		if (!workspace || !version || version.waiverId !== waiver._id) {
 			throw new ConvexError({
 				code: 'not_found',
 				message: 'This public waiver is no longer available.'
@@ -480,7 +368,7 @@ export const getPublicWaiverBySlug = query({
 		}
 
 		return {
-			slug: link.slug,
+			slug: waiver.publicSlug,
 			versionId: version._id,
 			workspaceName: workspace.name,
 			title: version.title,
@@ -505,25 +393,25 @@ export const submitPublicWaiver = mutation({
 		submissionId: v.id('waiver_submissions')
 	}),
 	handler: async (ctx, args) => {
-		const link = await ctx.db
-			.query('public_waiver_links')
-			.withIndex('by_slug', (q) => q.eq('slug', args.slug))
+		const waiver = await ctx.db
+			.query('workspace_waivers')
+			.withIndex('by_publicSlug', (q) => q.eq('publicSlug', args.slug))
 			.unique();
-		if (!link) {
+		if (!waiver || !waiver.publishedVersionId) {
 			throw new ConvexError({
 				code: 'not_found',
 				message: 'This public waiver is no longer available.'
 			});
 		}
-		if (link.versionId !== args.versionId) {
+		if (waiver.publishedVersionId !== args.versionId) {
 			throw new ConvexError({
 				code: 'stale_version',
 				message: 'This waiver has been updated. Reload and try again.'
 			});
 		}
 
-		const version = await ctx.db.get(link.versionId);
-		if (!version) {
+		const version = await ctx.db.get(waiver.publishedVersionId);
+		if (!version || version.waiverId !== waiver._id) {
 			throw new ConvexError({
 				code: 'not_found',
 				message: 'Published waiver version not found.'
@@ -563,8 +451,8 @@ export const submitPublicWaiver = mutation({
 
 		const submittedAt = Date.now();
 		const submissionId = await ctx.db.insert('waiver_submissions', {
-			workspaceId: link.workspaceId,
-			versionId: link.versionId,
+			workspaceId: waiver.workspaceId,
+			versionId: waiver.publishedVersionId,
 			signerName,
 			signerEmail,
 			signerDateOfBirth,

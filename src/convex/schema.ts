@@ -44,6 +44,8 @@ export default defineSchema({
 
 	workspace_waivers: defineTable({
 		workspaceId: v.id('workspaces'),
+		publicSlug: v.string(),
+		publishedVersionId: v.optional(v.id('waiver_versions')),
 		title: v.string(),
 		introCopy: v.string(),
 		fields: v.array(
@@ -88,7 +90,9 @@ export default defineSchema({
 				})
 			)
 		)
-	}).index('by_workspaceId', ['workspaceId']),
+	})
+		.index('by_workspaceId', ['workspaceId'])
+		.index('by_publicSlug', ['publicSlug']),
 
 	waiver_versions: defineTable({
 		workspaceId: v.id('workspaces'),
@@ -143,14 +147,6 @@ export default defineSchema({
 		.index('by_workspaceId', ['workspaceId'])
 		.index('by_waiverId', ['waiverId'])
 		.index('by_waiverId_and_versionNumber', ['waiverId', 'versionNumber']),
-
-	public_waiver_links: defineTable({
-		workspaceId: v.id('workspaces'),
-		versionId: v.id('waiver_versions'),
-		slug: v.string()
-	})
-		.index('by_slug', ['slug'])
-		.index('by_workspaceId', ['workspaceId']),
 
 	waiver_submissions: defineTable({
 		workspaceId: v.id('workspaces'),

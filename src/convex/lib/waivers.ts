@@ -113,6 +113,10 @@ export function createDefaultWaiverDefinition(workspaceName: string): WaiverDefi
 	});
 }
 
+export function createDefaultPublicWaiverSlug(workspaceSlug: string): string {
+	return normalizePublicSlug(`${workspaceSlug}-waiver`);
+}
+
 export async function requireWorkspaceMember(
 	ctx: FunctionCtx,
 	workspaceId: Id<'workspaces'>
