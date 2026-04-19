@@ -5,7 +5,6 @@ import type { MutationCtx, QueryCtx } from './_generated/server';
 import {
 	assertWorkspaceRecord,
 	buildWorkspaceWaiverSummary,
-	createDefaultWaiverDefinition,
 	minorInputValidator,
 	normalizeWaiverDefinition,
 	requireWorkspaceMember,
@@ -42,54 +41,17 @@ async function createUniquePublicSlug(ctx: MutationCtx, baseSlug: string): Promi
 }
 
 async function getWorkspacePublicLink(ctx: FunctionCtx, workspaceId: Id<'workspaces'>) {
-	const links = await ctx.db
+	return await ctx.db
 		.query('public_waiver_links')
 		.withIndex('by_workspaceId', (q) => q.eq('workspaceId', workspaceId))
-		.order('desc')
-		.take(1);
-
-	return links[0] ?? null;
+		.unique();
 }
 
 async function getWorkspaceWaiverRecord(ctx: FunctionCtx, workspaceId: Id<'workspaces'>) {
-	const publicLink = await getWorkspacePublicLink(ctx, workspaceId);
-	if (publicLink) {
-		const version = await ctx.db.get(publicLink.versionId);
-		if (version && version.workspaceId === workspaceId) {
-			const activeWaiver = await ctx.db.get(version.waiverId);
-			if (activeWaiver && activeWaiver.workspaceId === workspaceId) {
-				return activeWaiver;
-			}
-		}
-	}
-
-	const waivers = await ctx.db
+	return await ctx.db
 		.query('workspace_waivers')
 		.withIndex('by_workspaceId', (q) => q.eq('workspaceId', workspaceId))
-		.order('desc')
-		.take(1);
-
-	return waivers[0] ?? null;
-}
-
-async function insertWorkspaceWaiver(ctx: MutationCtx, workspaceId: Id<'workspaces'>) {
-	const workspace = await ctx.db.get(workspaceId);
-	if (!workspace) {
-		throw new ConvexError({
-			code: 'not_found',
-			message: 'Workspace not found.'
-		});
-	}
-
-	const definition = createDefaultWaiverDefinition(workspace.name);
-	const waiverId = await ctx.db.insert('workspace_waivers', {
-		workspaceId,
-		title: definition.title,
-		introCopy: definition.introCopy,
-		fields: definition.fields
-	});
-
-	return waiverId;
+		.unique();
 }
 
 async function getNextVersionNumber(ctx: MutationCtx, waiverId: Id<'workspace_waivers'>) {
@@ -158,24 +120,6 @@ export const getWorkspaceWaiver = query({
 		}
 
 		return await workspaceWaiverSummary(ctx, waiver, activeLink);
-	}
-});
-
-export const ensureWorkspaceWaiver = mutation({
-	args: {
-		workspaceId: v.id('workspaces')
-	},
-	handler: async (ctx, args) => {
-		await requireWorkspaceMember(ctx, args.workspaceId);
-
-		const existing = await getWorkspaceWaiverRecord(ctx, args.workspaceId);
-		if (existing) {
-			return { waiverId: existing._id };
-		}
-
-		const waiverId = await insertWorkspaceWaiver(ctx, args.workspaceId);
-
-		return { waiverId };
 	}
 });
 

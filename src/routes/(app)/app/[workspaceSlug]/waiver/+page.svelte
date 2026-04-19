@@ -111,7 +111,6 @@
 	const AUTOSAVE_DELAY_MS = 800;
 
 	let isPublishing = $state(false);
-	let isEnsuringWaiver = $state(false);
 
 	let confirmKind = $state<ConfirmKind | null>(null);
 	let confirmOpen = $state(false);
@@ -153,9 +152,8 @@
 	const draftFingerprint = $derived(
 		draft ? JSON.stringify(normalizeDefinitionForCompare(draft)) : ''
 	);
-	const busy = $derived(isPublishing || isEnsuringWaiver);
 	const publishDisabled = $derived(
-		busy ||
+		isPublishing ||
 			isDirty ||
 			isSaving ||
 			!workspaceWaiver ||
@@ -177,19 +175,6 @@
 		if (navigation.willUnload) return;
 		navigation.cancel();
 		toast.message('Still saving your latest changes. Give it a moment and try again.');
-	});
-
-	$effect(() => {
-		if (
-			!currentWorkspace ||
-			isLoadingProtectedData ||
-			!!workspaceWaiver ||
-			isEnsuringWaiver ||
-			convex.disabled
-		) {
-			return;
-		}
-		void ensureWorkspaceWaiver();
 	});
 
 	$effect(() => {
@@ -401,25 +386,6 @@
 			toast.error('Unable to copy to the clipboard.');
 		} finally {
 			copyingKey = null;
-		}
-	}
-
-	async function ensureWorkspaceWaiver() {
-		if (convex.disabled || !currentWorkspace) {
-			toast.error('Waiver editor is still loading. Please try again.');
-			return;
-		}
-
-		isEnsuringWaiver = true;
-
-		try {
-			await convex.mutation(api.waivers.ensureWorkspaceWaiver, {
-				workspaceId: currentWorkspace.workspaceId
-			});
-		} catch (error) {
-			toast.error(getConvexErrorMessage(error, 'Unable to set up this workspace waiver.'));
-		} finally {
-			isEnsuringWaiver = false;
 		}
 	}
 
@@ -747,9 +713,9 @@
 				<div
 					class="w-full max-w-md rounded-2xl border border-dashed border-border bg-muted/10 px-6 py-14 text-center"
 				>
-					<p class="text-base font-semibold tracking-tight">Setting up waiver</p>
+					<p class="text-base font-semibold tracking-tight">Waiver unavailable</p>
 					<p class="mt-1 text-sm text-muted-foreground">
-						Every workspace includes one public waiver. This should only take a moment.
+						This workspace is missing its waiver record.
 					</p>
 				</div>
 			</div>
