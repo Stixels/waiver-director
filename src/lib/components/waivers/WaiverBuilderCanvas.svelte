@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import { Editor } from '@tiptap/core';
 	import Link from '@tiptap/extension-link';
 	import Placeholder from '@tiptap/extension-placeholder';
@@ -43,6 +43,15 @@
 		DropdownMenuSeparator,
 		DropdownMenuTrigger
 	} from '$lib/components/ui/dropdown-menu';
+	import {
+		Dialog,
+		DialogContent,
+		DialogDescription,
+		DialogHeader,
+		DialogTitle
+	} from '$lib/components/ui/dialog';
+	import { Input } from '$lib/components/ui/input';
+	import { Button } from '$lib/components/ui/button';
 	import { sanitizeRichTextHtml } from '$lib/utils/rich-text';
 	import WaiverFieldDisplay from '$lib/components/waivers/WaiverFieldDisplay.svelte';
 
@@ -71,6 +80,10 @@
 	let editor = $state<Editor | null>(null);
 	let lastSyncedValue = $state('');
 	let hasFocus = $state(false);
+	let linkDialogOpen = $state(false);
+	let linkHrefDraft = $state('');
+	let linkError = $state<string | null>(null);
+	let linkInputEl = $state<HTMLInputElement | null>(null);
 	let toolbarState = $state({
 		blockShortLabel: 'Text',
 		alignment: 'left' as TextAlignValue,
@@ -135,26 +148,44 @@
 		}
 	}
 
-	function setLink() {
+	async function setLink() {
 		if (!editor) return;
 
 		const previousUrl = editor.getAttributes('link').href ?? 'https://';
-		const href = window.prompt('Enter a URL', previousUrl);
-		if (href === null) return;
+		linkHrefDraft = previousUrl;
+		linkError = null;
+		linkDialogOpen = true;
+		await tick();
+		linkInputEl?.focus();
+		linkInputEl?.select();
+	}
 
-		const trimmed = href.trim();
+	function cancelLinkDialog() {
+		linkDialogOpen = false;
+		linkError = null;
+	}
+
+	async function submitLink(event: SubmitEvent) {
+		event.preventDefault();
+		if (!editor) return;
+
+		const trimmed = linkHrefDraft.trim();
 		if (!trimmed) {
 			editor.chain().focus().extendMarkRange('link').unsetLink().run();
+			cancelLinkDialog();
 			return;
 		}
 
 		const safeHref = safeLinkHref(trimmed);
 		if (!safeHref) {
-			window.alert('Links must start with http://, https://, mailto:, or tel:.');
+			linkError = 'Links must start with http://, https://, mailto:, or tel:.';
+			await tick();
+			linkInputEl?.focus();
 			return;
 		}
 
 		editor.chain().focus().extendMarkRange('link').setLink({ href: safeHref }).run();
+		cancelLinkDialog();
 	}
 
 	function syncToolbarState(sourceEditor: Editor | null) {
@@ -259,6 +290,34 @@
 		lastSyncedValue = sanitizeRichTextHtml(editor.getHTML());
 	});
 </script>
+
+<Dialog bind:open={linkDialogOpen}>
+	<DialogContent class="sm:max-w-md">
+		<DialogHeader>
+			<DialogTitle>Set link</DialogTitle>
+			<DialogDescription>Enter a URL for the selected text.</DialogDescription>
+		</DialogHeader>
+		<form class="space-y-4" onsubmit={submitLink}>
+			<div class="space-y-1.5">
+				<label for="waiver-link-url" class="text-xs font-medium text-foreground">URL</label>
+				<Input
+					id="waiver-link-url"
+					bind:value={linkHrefDraft}
+					bind:ref={linkInputEl}
+					aria-invalid={linkError ? 'true' : undefined}
+					aria-describedby={linkError ? 'waiver-link-error' : undefined}
+				/>
+				{#if linkError}
+					<p id="waiver-link-error" class="text-xs text-destructive">{linkError}</p>
+				{/if}
+			</div>
+			<div class="flex justify-end gap-2">
+				<Button type="button" variant="outline" onclick={cancelLinkDialog}>Cancel</Button>
+				<Button type="submit">Apply link</Button>
+			</div>
+		</form>
+	</DialogContent>
+</Dialog>
 
 <section class="flex min-h-0 min-w-0 flex-1 flex-col bg-muted/10">
 	<!-- Toolbar -->

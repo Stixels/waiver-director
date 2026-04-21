@@ -14,11 +14,6 @@
 
 	let { field, value = null, preview = false }: Props = $props();
 
-	function formatDob(dob: string) {
-		const [y, m, d] = dob.split('-').map(Number);
-		return new Intl.DateTimeFormat('en-US', { dateStyle: 'long' }).format(new Date(y, m - 1, d));
-	}
-
 	function sampleValue(field: WaiverField) {
 		switch (field.type) {
 			case 'text':
@@ -35,7 +30,6 @@
 	function answerDisplay(field: WaiverField): string {
 		if (value === null || value === undefined || value === '') return '—';
 		if (field.type === 'checkbox') return value === true ? 'Yes' : 'No';
-		if (field.type === 'date' && typeof value === 'string') return formatDob(value);
 		if (field.type === 'select' && typeof value === 'string') {
 			return field.options.find((option) => option.id === value)?.label ?? String(value);
 		}

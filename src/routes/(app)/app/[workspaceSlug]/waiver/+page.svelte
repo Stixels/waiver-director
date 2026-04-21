@@ -2,7 +2,7 @@
 	import { beforeNavigate } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
-	import { onMount, untrack } from 'svelte';
+	import { onMount, tick, untrack } from 'svelte';
 	import type { FunctionReturnType } from 'convex/server';
 	import { useConvexClient } from 'convex-svelte';
 	import { toast } from 'svelte-sonner';
@@ -127,6 +127,7 @@
 	const draftFingerprint = $derived(
 		draft ? JSON.stringify(normalizeDefinitionForCompare(draft)) : ''
 	);
+	let lastObservedDraftFingerprint = $state('');
 	const draftCanAutosave = $derived(isWaiverDefinitionAutosaveable(draft));
 	const publishDisabled = $derived(
 		isPublishing ||
@@ -178,6 +179,17 @@
 		lastSaveError = null;
 	});
 
+	$effect(() => {
+		const currentFingerprint = draftFingerprint;
+
+		untrack(() => {
+			if (lastSaveError && currentFingerprint !== lastObservedDraftFingerprint) {
+				lastSaveError = null;
+			}
+			lastObservedDraftFingerprint = currentFingerprint;
+		});
+	});
+
 	// Debounced autosave: whenever the draft diverges from baseline, schedule a
 	// save. Re-triggers on every deep change via `draftFingerprint`; only the
 	// trailing call runs.
@@ -188,6 +200,7 @@
 		void draftFingerprint;
 		void draftCanAutosave;
 		void isSaving;
+		void lastSaveError;
 
 		if (autosaveTimer) {
 			clearTimeout(autosaveTimer);
@@ -201,6 +214,7 @@
 			if (!isDirty) return;
 			if (!draftCanAutosave) return;
 			if (isSaving) return;
+			if (lastSaveError) return;
 			if (convex.disabled) return;
 
 			autosaveTimer = setTimeout(() => {
@@ -286,14 +300,13 @@
 		await runAutosave();
 	}
 
-	function startTitleEdit() {
+	async function startTitleEdit() {
 		if (!draft) return;
 		titleDraft = draft.title;
 		isEditingTitle = true;
-		queueMicrotask(() => {
-			titleInputEl?.focus();
-			titleInputEl?.select();
-		});
+		await tick();
+		titleInputEl?.focus();
+		titleInputEl?.select();
 	}
 
 	function commitTitleEdit() {
