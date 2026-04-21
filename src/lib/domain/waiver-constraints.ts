@@ -1,0 +1,12 @@
+export const MAX_WAIVER_FIELDS = 25;
+export const MIN_WAIVER_TITLE_LENGTH = 3;
+export const MAX_WAIVER_TITLE_LENGTH = 120;
+export const MIN_WAIVER_FIELD_LABEL_LENGTH = 2;
+export const MAX_WAIVER_FIELD_LABEL_LENGTH = 120;
+export const MIN_SELECT_OPTIONS = 1;
+export const MAX_SELECT_OPTIONS = 20;
+export const MIN_SELECT_OPTION_LABEL_LENGTH = 1;
+export const MAX_SELECT_OPTION_LABEL_LENGTH = 80;
+export const MAX_MINORS = 50;
+export const MIN_MINOR_NAME_LENGTH = 2;
+export const MAX_MINOR_NAME_LENGTH = 120;

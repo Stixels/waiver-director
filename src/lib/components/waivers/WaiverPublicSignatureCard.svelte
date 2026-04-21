@@ -10,11 +10,8 @@
 </script>
 
 <section class={waiverSectionCardClass}>
-	<div class="mb-7 space-y-2">
+	<div class="mb-7">
 		<h2 class="text-lg font-semibold tracking-tight">Signature</h2>
-		<p class="max-w-2xl text-sm text-muted-foreground">
-			Draw the signature that should be attached to the full name above.
-		</p>
 	</div>
 
 	{@render children()}

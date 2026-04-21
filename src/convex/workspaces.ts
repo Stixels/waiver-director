@@ -1,6 +1,7 @@
 import { ConvexError, v } from 'convex/values';
 import { mutation, query } from './_generated/server';
 import { getCurrentUser } from './lib/auth';
+import { createDefaultPublicWaiverSlug, createDefaultWaiverDefinition } from './lib/waivers';
 import { getWorkspaceMembership, listWorkspaceMembershipsForUser } from './lib/workspaces';
 
 const WORKSPACE_SLUG_REGEX = /^[a-z0-9](?:[a-z0-9-]{0,46}[a-z0-9])$/;
@@ -70,6 +71,15 @@ export const createWorkspace = mutation({
 			userId: user._id,
 			role: 'owner',
 			status: 'active'
+		});
+
+		const waiverDefinition = createDefaultWaiverDefinition(name);
+		await ctx.db.insert('workspace_waivers', {
+			workspaceId,
+			publicSlug: createDefaultPublicWaiverSlug(slug),
+			title: waiverDefinition.title,
+			introCopy: waiverDefinition.introCopy,
+			fields: waiverDefinition.fields
 		});
 
 		if (!user.defaultWorkspaceId) {

@@ -4,9 +4,10 @@
 	import { toast } from 'svelte-sonner';
 	import { api } from '$convex/_generated/api';
 	import SignaturePad from '$lib/components/waivers/SignaturePad.svelte';
+	import WaiverCopySection from '$lib/components/waivers/WaiverCopySection.svelte';
+	import WaiverDocumentShell from '$lib/components/waivers/WaiverDocumentShell.svelte';
 	import WaiverPublicAboutSignerCard from '$lib/components/waivers/WaiverPublicAboutSignerCard.svelte';
 	import WaiverPublicAdditionalInfoSection from '$lib/components/waivers/WaiverPublicAdditionalInfoSection.svelte';
-	import WaiverPublicIntroCard from '$lib/components/waivers/WaiverPublicIntroCard.svelte';
 	import WaiverPublicMinorsBlock from '$lib/components/waivers/WaiverPublicMinorsBlock.svelte';
 	import WaiverPublicSignatureCard from '$lib/components/waivers/WaiverPublicSignatureCard.svelte';
 	import {
@@ -93,14 +94,7 @@
 </svelte:head>
 
 <div class="min-h-screen bg-background">
-	<!-- Workspace header -->
-	<header class="border-b border-border/40 px-6 py-4">
-		<p class="text-center text-xs font-bold tracking-[0.2em] text-muted-foreground uppercase">
-			{waiver.workspaceName}
-		</p>
-	</header>
-
-	<div class={`mx-auto px-6 ${data.embed ? 'max-w-none py-8' : 'max-w-2xl py-12'}`}>
+	<WaiverDocumentShell workspaceName={waiver.workspaceName}>
 		{#if isSubmitted}
 			<!-- Success state -->
 			<div class="flex flex-col items-center py-24 text-center">
@@ -132,7 +126,7 @@
 			</div>
 		{:else}
 			<div class="space-y-6">
-				<WaiverPublicIntroCard title={waiver.title} introCopy={waiver.introCopy} />
+				<WaiverCopySection introCopy={waiver.introCopy} />
 
 				<form onsubmit={handleSubmit} class="space-y-6">
 					<WaiverPublicAboutSignerCard>
@@ -217,28 +211,20 @@
 							<WaiverPublicAdditionalInfoSection>
 								{#each waiver.fields as field (field.id)}
 									<div>
-										<label class={waiverFieldLabelClass} for={field.id}>
-											{field.label}
-											{#if field.required}
-												<span class="text-foreground/40">*</span>
-											{/if}
-										</label>
+										{#if field.type !== 'checkbox'}
+											<label class={waiverFieldLabelClass} for={field.id}>
+												{field.label}
+												{#if field.required}
+													<span class="text-foreground/40">*</span>
+												{/if}
+											</label>
+										{/if}
 
-										{#if field.type === 'shortText'}
-											<input
-												id={field.id}
-												class={waiverUnderlineInputClass}
-												value={currentStringAnswer(field.id)}
-												placeholder={field.placeholder ?? ''}
-												required={field.required}
-												oninput={(event) =>
-													setFieldAnswer(field.id, (event.currentTarget as HTMLInputElement).value)}
-											/>
-										{:else if field.type === 'longText'}
+										{#if field.type === 'text'}
 											<textarea
 												id={field.id}
 												class={waiverUnderlineTextareaClass}
-												rows={3}
+												rows={1}
 												value={currentStringAnswer(field.id)}
 												placeholder={field.placeholder ?? ''}
 												required={field.required}
@@ -249,9 +235,10 @@
 													)}
 											></textarea>
 										{:else if field.type === 'checkbox'}
-											<label class="mt-2 flex cursor-pointer items-center gap-3">
+											<label class="waiver-checkbox-label flex cursor-pointer items-center gap-3">
 												<span
-													class={`flex h-5 w-5 shrink-0 items-center justify-center border transition-colors ${currentBooleanAnswer(field.id) ? 'border-foreground bg-foreground' : 'border-foreground/25 bg-transparent'}`}
+													class={`waiver-checkbox-box flex h-5 w-5 shrink-0 items-center justify-center border transition-colors ${currentBooleanAnswer(field.id) ? 'border-foreground bg-foreground' : 'border-foreground/25 bg-transparent'}`}
+													aria-hidden="true"
 												>
 													{#if currentBooleanAnswer(field.id)}
 														<svg
@@ -265,12 +252,14 @@
 															stroke-linecap="round"
 															stroke-linejoin="round"
 															class="text-background"
+															aria-hidden="true"
 														>
 															<polyline points="20 6 9 17 4 12" />
 														</svg>
 													{/if}
 												</span>
 												<input
+													id={field.id}
 													type="checkbox"
 													class="sr-only"
 													checked={currentBooleanAnswer(field.id)}
@@ -281,7 +270,12 @@
 															(event.currentTarget as HTMLInputElement).checked
 														)}
 												/>
-												<span class="text-sm">{field.label}</span>
+												<span class="text-sm">
+													{field.label}
+													{#if field.required}
+														<span class="text-foreground/40">*</span>
+													{/if}
+												</span>
 											</label>
 										{:else if field.type === 'select'}
 											<select
@@ -339,5 +333,13 @@
 				</form>
 			</div>
 		{/if}
-	</div>
+	</WaiverDocumentShell>
 </div>
+
+<style>
+	.waiver-checkbox-label:focus-within .waiver-checkbox-box {
+		border-color: color-mix(in srgb, var(--primary) 80%, var(--foreground));
+		box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 24%, transparent);
+		outline: none;
+	}
+</style>
