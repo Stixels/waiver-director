@@ -14,11 +14,6 @@
 
 	let { field, value = null, preview = false }: Props = $props();
 
-	function formatDob(dob: string) {
-		const [y, m, d] = dob.split('-').map(Number);
-		return new Intl.DateTimeFormat('en-US', { dateStyle: 'long' }).format(new Date(y, m - 1, d));
-	}
-
 	function sampleValue(field: WaiverField) {
 		switch (field.type) {
 			case 'text':
@@ -35,7 +30,6 @@
 	function answerDisplay(field: WaiverField): string {
 		if (value === null || value === undefined || value === '') return '—';
 		if (field.type === 'checkbox') return value === true ? 'Yes' : 'No';
-		if (field.type === 'date' && typeof value === 'string') return formatDob(value);
 		if (field.type === 'select' && typeof value === 'string') {
 			return field.options.find((option) => option.id === value)?.label ?? String(value);
 		}
@@ -54,10 +48,11 @@
 	{/if}
 
 	{#if field.type === 'checkbox'}
-		<div class="flex items-center gap-3" aria-hidden={preview}>
+		<div class="flex items-center gap-3" role="checkbox" aria-checked={value === true}>
 			<span
 				class="flex h-5 w-5 shrink-0 items-center justify-center border border-foreground/25 bg-transparent"
 				class:bg-foreground={!preview && value === true}
+				aria-hidden={preview ? 'true' : undefined}
 			>
 				{#if !preview && value === true}
 					<svg
@@ -66,6 +61,7 @@
 						viewBox="0 0 24 24"
 						stroke="currentColor"
 						stroke-width="3"
+						aria-hidden="true"
 					>
 						<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
 					</svg>

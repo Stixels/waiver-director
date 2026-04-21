@@ -71,17 +71,8 @@ async function waiverHasUnpublishedChanges(ctx: FunctionCtx, waiver: Doc<'worksp
 	}
 
 	const version = await ctx.db.get(publishedVersionId);
-	if (!version) {
-		throw new ConvexError({
-			code: 'not_found',
-			message: 'Published waiver version not found.'
-		});
-	}
-	if (version.waiverId !== waiver._id) {
-		throw new ConvexError({
-			code: 'invalid_state',
-			message: 'Published waiver version does not belong to this workspace waiver.'
-		});
+	if (!version || version.waiverId !== waiver._id) {
+		return true;
 	}
 
 	return !waiverDefinitionsEqual(
@@ -222,10 +213,16 @@ export const listWaiverVersions = query({
 			ctx.db.get(args.workspaceId)
 		]);
 
-		if (!waiver || !workspace) {
+		if (!waiver) {
 			throw new ConvexError({
 				code: 'not_found',
-				message: 'Workspace waiver not found.'
+				message: 'Waiver not found.'
+			});
+		}
+		if (!workspace) {
+			throw new ConvexError({
+				code: 'not_found',
+				message: 'Workspace not found.'
 			});
 		}
 

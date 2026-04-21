@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import { Editor } from '@tiptap/core';
 	import Link from '@tiptap/extension-link';
 	import Placeholder from '@tiptap/extension-placeholder';
@@ -43,6 +43,15 @@
 		DropdownMenuSeparator,
 		DropdownMenuTrigger
 	} from '$lib/components/ui/dropdown-menu';
+	import {
+		Dialog,
+		DialogContent,
+		DialogDescription,
+		DialogHeader,
+		DialogTitle
+	} from '$lib/components/ui/dialog';
+	import { Input } from '$lib/components/ui/input';
+	import { Button } from '$lib/components/ui/button';
 	import { sanitizeRichTextHtml } from '$lib/utils/rich-text';
 	import WaiverFieldDisplay from '$lib/components/waivers/WaiverFieldDisplay.svelte';
 
@@ -71,6 +80,10 @@
 	let editor = $state<Editor | null>(null);
 	let lastSyncedValue = $state('');
 	let hasFocus = $state(false);
+	let linkDialogOpen = $state(false);
+	let linkHrefDraft = $state('');
+	let linkError = $state<string | null>(null);
+	let linkInputEl = $state<HTMLInputElement | null>(null);
 	let toolbarState = $state({
 		blockShortLabel: 'Text',
 		alignment: 'left' as TextAlignValue,
@@ -122,20 +135,60 @@
 		event.preventDefault();
 	}
 
-	function setLink() {
+	function safeLinkHref(rawHref: string): string | null {
+		const trimmed = rawHref.trim();
+		if (!trimmed) return null;
+
+		const hasHierarchicalScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed);
+		const hasAllowedNonHierarchicalScheme = /^(mailto|tel):/i.test(trimmed);
+		const href =
+			hasHierarchicalScheme || hasAllowedNonHierarchicalScheme ? trimmed : `https://${trimmed}`;
+		try {
+			const url = new URL(href);
+			return ['http:', 'https:', 'mailto:', 'tel:'].includes(url.protocol) ? href : null;
+		} catch {
+			return null;
+		}
+	}
+
+	async function setLink() {
 		if (!editor) return;
 
 		const previousUrl = editor.getAttributes('link').href ?? 'https://';
-		const href = window.prompt('Enter a URL', previousUrl);
-		if (href === null) return;
+		linkHrefDraft = previousUrl;
+		linkError = null;
+		linkDialogOpen = true;
+		await tick();
+		linkInputEl?.focus();
+		linkInputEl?.select();
+	}
 
-		const trimmed = href.trim();
+	function cancelLinkDialog() {
+		linkDialogOpen = false;
+		linkError = null;
+	}
+
+	async function submitLink(event: SubmitEvent) {
+		event.preventDefault();
+		if (!editor) return;
+
+		const trimmed = linkHrefDraft.trim();
 		if (!trimmed) {
 			editor.chain().focus().extendMarkRange('link').unsetLink().run();
+			cancelLinkDialog();
 			return;
 		}
 
-		editor.chain().focus().extendMarkRange('link').setLink({ href: trimmed }).run();
+		const safeHref = safeLinkHref(trimmed);
+		if (!safeHref) {
+			linkError = 'Links must start with http://, https://, mailto:, or tel:.';
+			await tick();
+			linkInputEl?.focus();
+			return;
+		}
+
+		editor.chain().focus().extendMarkRange('link').setLink({ href: safeHref }).run();
+		cancelLinkDialog();
 	}
 
 	function syncToolbarState(sourceEditor: Editor | null) {
@@ -224,14 +277,7 @@
 		editor = instance;
 		syncToolbarState(instance);
 
-		const onSelection = () => syncToolbarState(instance);
-		const onTransaction = () => syncToolbarState(instance);
-		instance.on('selectionUpdate', onSelection);
-		instance.on('transaction', onTransaction);
-
 		return () => {
-			instance.off('selectionUpdate', onSelection);
-			instance.off('transaction', onTransaction);
 			instance.destroy();
 			editor = null;
 		};
@@ -247,6 +293,34 @@
 		lastSyncedValue = sanitizeRichTextHtml(editor.getHTML());
 	});
 </script>
+
+<Dialog bind:open={linkDialogOpen}>
+	<DialogContent class="sm:max-w-md">
+		<DialogHeader>
+			<DialogTitle>Set link</DialogTitle>
+			<DialogDescription>Enter a URL for the selected text.</DialogDescription>
+		</DialogHeader>
+		<form class="space-y-4" onsubmit={submitLink}>
+			<div class="space-y-1.5">
+				<label for="waiver-link-url" class="text-xs font-medium text-foreground">URL</label>
+				<Input
+					id="waiver-link-url"
+					bind:value={linkHrefDraft}
+					bind:ref={linkInputEl}
+					aria-invalid={linkError ? 'true' : undefined}
+					aria-describedby={linkError ? 'waiver-link-error' : undefined}
+				/>
+				{#if linkError}
+					<p id="waiver-link-error" class="text-xs text-destructive">{linkError}</p>
+				{/if}
+			</div>
+			<div class="flex justify-end gap-2">
+				<Button type="button" variant="outline" onclick={cancelLinkDialog}>Cancel</Button>
+				<Button type="submit">Apply link</Button>
+			</div>
+		</form>
+	</DialogContent>
+</Dialog>
 
 <section class="flex min-h-0 min-w-0 flex-1 flex-col bg-muted/10">
 	<!-- Toolbar -->
@@ -275,11 +349,13 @@
 		<div class="flex items-center gap-1">
 			<!-- Block style -->
 			<DropdownMenu>
-				<DropdownMenuTrigger class="inline-flex">
-					<button type="button" class="toolbar-select" disabled={!editor} aria-label="Text style">
-						<span class="toolbar-select-label">{toolbarState.blockShortLabel}</span>
-						<ChevronDownIcon class="size-3" />
-					</button>
+				<DropdownMenuTrigger class="toolbar-select" disabled={!editor} aria-label="Text style">
+					{#snippet child({ props })}
+						<button {...props}>
+							<span class="toolbar-select-label">{toolbarState.blockShortLabel}</span>
+							<ChevronDownIcon class="size-3" />
+						</button>
+					{/snippet}
 				</DropdownMenuTrigger>
 				<DropdownMenuContent align="end" class="w-40">
 					<DropdownMenuItem onclick={() => command((e) => e.chain().focus().setParagraph().run())}>
@@ -299,18 +375,20 @@
 
 			<!-- Alignment -->
 			<DropdownMenu>
-				<DropdownMenuTrigger class="inline-flex">
-					<button type="button" class="toolbar-button" disabled={!editor} aria-label="Alignment">
-						{#if toolbarState.alignment === 'center'}
-							<AlignCenterIcon class="size-3.5" />
-						{:else if toolbarState.alignment === 'right'}
-							<AlignRightIcon class="size-3.5" />
-						{:else if toolbarState.alignment === 'justify'}
-							<AlignJustifyIcon class="size-3.5" />
-						{:else}
-							<AlignLeftIcon class="size-3.5" />
-						{/if}
-					</button>
+				<DropdownMenuTrigger class="toolbar-button" disabled={!editor} aria-label="Alignment">
+					{#snippet child({ props })}
+						<button {...props}>
+							{#if toolbarState.alignment === 'center'}
+								<AlignCenterIcon class="size-3.5" />
+							{:else if toolbarState.alignment === 'right'}
+								<AlignRightIcon class="size-3.5" />
+							{:else if toolbarState.alignment === 'justify'}
+								<AlignJustifyIcon class="size-3.5" />
+							{:else}
+								<AlignLeftIcon class="size-3.5" />
+							{/if}
+						</button>
+					{/snippet}
 				</DropdownMenuTrigger>
 				<DropdownMenuContent align="end" class="w-40">
 					<DropdownMenuItem
