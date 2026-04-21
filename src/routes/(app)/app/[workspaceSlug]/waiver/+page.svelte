@@ -391,17 +391,18 @@
 	async function handlePublish() {
 		if (convex.disabled || !currentWorkspace || !workspaceWaiver) return;
 
+		isPublishing = true;
+
 		// Ensure any pending edits are persisted before publishing.
 		await flushAutosave();
 		if (lastSaveError || isDirty) {
+			isPublishing = false;
 			toast.error(
 				lastSaveError ??
 					'Your latest changes have not finished saving. Wait a moment and try again.'
 			);
 			return;
 		}
-
-		isPublishing = true;
 
 		try {
 			await convex.mutation(api.waivers.publishWorkspaceWaiver, {

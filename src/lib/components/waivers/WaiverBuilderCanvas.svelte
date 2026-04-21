@@ -139,7 +139,10 @@
 		const trimmed = rawHref.trim();
 		if (!trimmed) return null;
 
-		const href = /^[a-z][a-z0-9+.-]*:/i.test(trimmed) ? trimmed : `https://${trimmed}`;
+		const hasHierarchicalScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed);
+		const hasAllowedNonHierarchicalScheme = /^(mailto|tel):/i.test(trimmed);
+		const href =
+			hasHierarchicalScheme || hasAllowedNonHierarchicalScheme ? trimmed : `https://${trimmed}`;
 		try {
 			const url = new URL(href);
 			return ['http:', 'https:', 'mailto:', 'tel:'].includes(url.protocol) ? href : null;
