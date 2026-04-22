@@ -137,6 +137,18 @@ export default defineSchema({
 	waiver_submissions: defineTable({
 		workspaceId: v.id('workspaces'),
 		versionId: v.id('waiver_versions'),
+		bookingId: v.optional(v.id('bookings')),
+		bookingSnapshot: v.optional(
+			v.object({
+				provider: v.union(v.literal('bookeo'), v.literal('resova'), v.literal('xola')),
+				providerBookingId: v.string(),
+				title: v.string(),
+				startTime: v.optional(v.string()),
+				endTime: v.optional(v.string()),
+				leadCustomerName: v.optional(v.string()),
+				leadCustomerEmail: v.optional(v.string())
+			})
+		),
 		signerName: v.string(),
 		signerEmail: v.string(),
 		signerDateOfBirth: v.string(),
@@ -149,5 +161,140 @@ export default defineSchema({
 		),
 		status: v.union(v.literal('submitted')),
 		submittedAt: v.number()
-	}).index('by_workspaceId', ['workspaceId'])
+	})
+		.index('by_workspaceId', ['workspaceId'])
+		.index('by_bookingId', ['bookingId']),
+
+	booking_integrations: defineTable({
+		workspaceId: v.id('workspaces'),
+		provider: v.union(v.literal('bookeo'), v.literal('resova'), v.literal('xola')),
+		status: v.union(
+			v.literal('connected'),
+			v.literal('syncing'),
+			v.literal('error'),
+			v.literal('disconnected')
+		),
+		encryptedApiKey: v.optional(v.string()),
+		apiKeyLast4: v.optional(v.string()),
+		accountId: v.optional(v.string()),
+		accountName: v.optional(v.string()),
+		permissions: v.array(v.string()),
+		syncHorizonMonths: v.number(),
+		lastSyncStartedAt: v.optional(v.number()),
+		lastSyncAt: v.optional(v.number()),
+		lastSyncError: v.optional(v.string()),
+		connectedAt: v.optional(v.number()),
+		disconnectedAt: v.optional(v.number()),
+		updatedAt: v.number()
+	})
+		.index('by_workspaceId', ['workspaceId'])
+		.index('by_workspaceId_and_provider', ['workspaceId', 'provider']),
+
+	booking_connection_sessions: defineTable({
+		workspaceId: v.id('workspaces'),
+		provider: v.union(v.literal('bookeo'), v.literal('resova'), v.literal('xola')),
+		requestedByUserId: v.id('users'),
+		state: v.string(),
+		status: v.union(
+			v.literal('pending'),
+			v.literal('completed'),
+			v.literal('failed'),
+			v.literal('expired')
+		),
+		syncHorizonMonths: v.number(),
+		createdAt: v.number(),
+		expiresAt: v.number()
+	})
+		.index('by_state', ['state'])
+		.index('by_workspaceId', ['workspaceId']),
+
+	bookings: defineTable({
+		workspaceId: v.id('workspaces'),
+		integrationId: v.id('booking_integrations'),
+		provider: v.union(v.literal('bookeo'), v.literal('resova'), v.literal('xola')),
+		providerBookingId: v.string(),
+		lookupToken: v.string(),
+		status: v.union(v.literal('active'), v.literal('canceled')),
+		title: v.string(),
+		productId: v.optional(v.string()),
+		productName: v.optional(v.string()),
+		startTime: v.optional(v.string()),
+		endTime: v.optional(v.string()),
+		startAt: v.optional(v.number()),
+		endAt: v.optional(v.number()),
+		serviceDate: v.optional(v.string()),
+		leadCustomerName: v.optional(v.string()),
+		leadCustomerEmail: v.optional(v.string()),
+		participantCount: v.number(),
+		signedCount: v.number(),
+		providerCreatedAt: v.optional(v.string()),
+		providerUpdatedAt: v.optional(v.string()),
+		raw: v.optional(v.string()),
+		updatedAt: v.number()
+	})
+		.index('by_workspaceId', ['workspaceId'])
+		.index('by_integrationId', ['integrationId'])
+		.index('by_lookupToken', ['lookupToken'])
+		.index('by_workspaceId_and_providerBookingId', ['workspaceId', 'providerBookingId'])
+		.index('by_workspaceId_and_startAt', ['workspaceId', 'startAt'])
+		.index('by_workspaceId_and_leadCustomerEmail_and_serviceDate', [
+			'workspaceId',
+			'leadCustomerEmail',
+			'serviceDate'
+		]),
+
+	booking_participants: defineTable({
+		workspaceId: v.id('workspaces'),
+		bookingId: v.id('bookings'),
+		provider: v.union(v.literal('bookeo'), v.literal('resova'), v.literal('xola')),
+		providerParticipantId: v.optional(v.string()),
+		name: v.optional(v.string()),
+		email: v.optional(v.string()),
+		category: v.optional(v.string()),
+		updatedAt: v.number()
+	})
+		.index('by_workspaceId', ['workspaceId'])
+		.index('by_bookingId', ['bookingId']),
+
+	booking_sync_runs: defineTable({
+		workspaceId: v.id('workspaces'),
+		integrationId: v.id('booking_integrations'),
+		provider: v.union(v.literal('bookeo'), v.literal('resova'), v.literal('xola')),
+		syncType: v.union(
+			v.literal('initial'),
+			v.literal('manual'),
+			v.literal('webhook'),
+			v.literal('repair')
+		),
+		status: v.union(v.literal('running'), v.literal('succeeded'), v.literal('failed')),
+		rangeStart: v.optional(v.string()),
+		rangeEnd: v.optional(v.string()),
+		startedAt: v.number(),
+		finishedAt: v.optional(v.number()),
+		errorMessage: v.optional(v.string())
+	})
+		.index('by_workspaceId', ['workspaceId'])
+		.index('by_integrationId', ['integrationId']),
+
+	booking_webhook_events: defineTable({
+		workspaceId: v.id('workspaces'),
+		integrationId: v.id('booking_integrations'),
+		provider: v.union(v.literal('bookeo'), v.literal('resova'), v.literal('xola')),
+		messageId: v.string(),
+		eventType: v.string(),
+		itemId: v.string(),
+		rawBody: v.string(),
+		status: v.union(
+			v.literal('received'),
+			v.literal('processed'),
+			v.literal('ignored'),
+			v.literal('failed')
+		),
+		receivedAt: v.number(),
+		processedAt: v.optional(v.number()),
+		errorMessage: v.optional(v.string())
+	})
+		.index('by_workspaceId', ['workspaceId'])
+		.index('by_integrationId', ['integrationId'])
+		.index('by_integrationId_and_messageId', ['integrationId', 'messageId'])
 });

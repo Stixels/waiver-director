@@ -61,6 +61,13 @@
 		const [y, m, d] = dob.split('-').map(Number);
 		return new Intl.DateTimeFormat('en-US', { dateStyle: 'medium' }).format(new Date(y, m - 1, d));
 	}
+
+	function formatBookingTimestamp(timestamp: string | null) {
+		if (!timestamp) return null;
+		const date = new Date(timestamp);
+		if (Number.isNaN(date.getTime())) return null;
+		return new Intl.DateTimeFormat('en-US', { dateStyle: 'medium' }).format(date);
+	}
 </script>
 
 <svelte:head>
@@ -196,6 +203,14 @@
 										<p class="mt-0.5 text-xs text-muted-foreground">
 											+{submission.minorCount}
 											{submission.minorCount === 1 ? 'minor' : 'minors'}
+										</p>
+									{/if}
+									{#if submission.bookingTitle}
+										<p class="mt-0.5 truncate text-xs text-muted-foreground">
+											{submission.bookingTitle}
+											{#if formatBookingTimestamp(submission.bookingStartTime)}
+												- {formatBookingTimestamp(submission.bookingStartTime)}
+											{/if}
 										</p>
 									{/if}
 								</TableCell>

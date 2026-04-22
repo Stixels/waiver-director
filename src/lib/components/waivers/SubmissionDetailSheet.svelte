@@ -37,6 +37,13 @@
 			new Date(ts)
 		);
 	}
+
+	function formatBookingTimestamp(timestamp: string | undefined) {
+		if (!timestamp) return null;
+		const date = new Date(timestamp);
+		if (Number.isNaN(date.getTime())) return null;
+		return new Intl.DateTimeFormat('en-US', { dateStyle: 'long', timeStyle: 'short' }).format(date);
+	}
 </script>
 
 <Dialog bind:open>
@@ -91,6 +98,12 @@
 				<DialogTitle class="text-base font-semibold">{submission.signerName}</DialogTitle>
 				<DialogDescription class="text-xs text-muted-foreground">
 					Submitted {formatTimestamp(submission.submittedAt)}
+					{#if submission.booking}
+						for {submission.booking.title}
+						{#if formatBookingTimestamp(submission.booking.startTime)}
+							on {formatBookingTimestamp(submission.booking.startTime)}
+						{/if}
+					{/if}
 				</DialogDescription>
 			</DialogHeader>
 

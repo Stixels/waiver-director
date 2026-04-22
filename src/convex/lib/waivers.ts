@@ -144,6 +144,21 @@ export async function requireWorkspaceMember(
 	return { user, membership };
 }
 
+export async function requireWorkspaceOwner(
+	ctx: FunctionCtx,
+	workspaceId: Id<'workspaces'>
+): Promise<{ user: Doc<'users'>; membership: Doc<'workspace_memberships'> }> {
+	const access = await requireWorkspaceMember(ctx, workspaceId);
+	if (access.membership.role !== 'owner') {
+		throw new ConvexError({
+			code: 'forbidden',
+			message: 'Only workspace owners can manage integrations.'
+		});
+	}
+
+	return access;
+}
+
 export function assertWorkspaceRecord<
 	T extends {
 		workspaceId: Id<'workspaces'>;

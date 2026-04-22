@@ -2,6 +2,7 @@ import { ConvexError, v } from 'convex/values';
 import { mutation, query } from './_generated/server';
 import type { Doc, Id } from './_generated/dataModel';
 import type { MutationCtx, QueryCtx } from './_generated/server';
+import { bookingSnapshot, bookingSnapshotValidator } from './lib/bookings';
 import {
 	assertWorkspaceRecord,
 	minorInputValidator,
@@ -45,6 +46,24 @@ const publicWaiverValue = v.object({
 	title: v.string(),
 	introCopy: v.string(),
 	fields: v.array(waiverFieldValidator)
+});
+
+const publicBookingWaiverValue = v.object({
+	slug: v.string(),
+	versionId: v.id('waiver_versions'),
+	workspaceName: v.string(),
+	title: v.string(),
+	introCopy: v.string(),
+	fields: v.array(waiverFieldValidator),
+	booking: v.object({
+		lookupToken: v.string(),
+		title: v.string(),
+		startTime: v.union(v.string(), v.null()),
+		endTime: v.union(v.string(), v.null()),
+		leadCustomerName: v.union(v.string(), v.null()),
+		participantCount: v.number(),
+		signedCount: v.number()
+	})
 });
 
 async function getWorkspaceWaiverRecord(ctx: FunctionCtx, workspaceId: Id<'workspaces'>) {
@@ -262,7 +281,8 @@ export const getSubmission = query({
 			submittedAt: v.number(),
 			workspaceName: v.string(),
 			waiver: waiverDefinitionValidator,
-			minors: v.array(v.string())
+			minors: v.array(v.string()),
+			booking: v.union(v.null(), bookingSnapshotValidator)
 		})
 	),
 	handler: async (ctx, args) => {
@@ -298,7 +318,8 @@ export const getSubmission = query({
 				introCopy: version.introCopy,
 				fields: version.fields
 			},
-			minors: submission.minors.map((participant) => participant.fullName)
+			minors: submission.minors.map((participant) => participant.fullName),
+			booking: submission.bookingSnapshot ?? null
 		};
 	}
 });
@@ -314,6 +335,8 @@ export const listRecentSubmissions = query({
 			signerEmail: v.string(),
 			signerDateOfBirth: v.string(),
 			minorCount: v.number(),
+			bookingTitle: v.union(v.string(), v.null()),
+			bookingStartTime: v.union(v.string(), v.null()),
 			submittedAt: v.number()
 		})
 	),
@@ -332,6 +355,8 @@ export const listRecentSubmissions = query({
 			signerEmail: submission.signerEmail,
 			signerDateOfBirth: submission.signerDateOfBirth,
 			minorCount: submission.minors.length,
+			bookingTitle: submission.bookingSnapshot?.title ?? null,
+			bookingStartTime: submission.bookingSnapshot?.startTime ?? null,
 			submittedAt: submission.submittedAt
 		}));
 	}
@@ -375,10 +400,65 @@ export const getPublicWaiverBySlug = query({
 	}
 });
 
+export const getPublicWaiverForBooking = query({
+	args: {
+		slug: v.string(),
+		lookupToken: v.string()
+	},
+	returns: v.union(v.null(), publicBookingWaiverValue),
+	handler: async (ctx, args) => {
+		const waiver = await ctx.db
+			.query('workspace_waivers')
+			.withIndex('by_publicSlug', (q) => q.eq('publicSlug', args.slug))
+			.unique();
+		if (!waiver || !waiver.publishedVersionId) {
+			return null;
+		}
+
+		const booking = await ctx.db
+			.query('bookings')
+			.withIndex('by_lookupToken', (q) => q.eq('lookupToken', args.lookupToken))
+			.unique();
+		if (!booking || booking.workspaceId !== waiver.workspaceId || booking.status !== 'active') {
+			return null;
+		}
+
+		const [workspace, version] = await Promise.all([
+			ctx.db.get(waiver.workspaceId),
+			ctx.db.get(waiver.publishedVersionId)
+		]);
+		if (!workspace || !version || version.waiverId !== waiver._id) {
+			throw new ConvexError({
+				code: 'not_found',
+				message: 'This public waiver is no longer available.'
+			});
+		}
+
+		return {
+			slug: waiver.publicSlug,
+			versionId: version._id,
+			workspaceName: workspace.name,
+			title: version.title,
+			introCopy: version.introCopy,
+			fields: version.fields,
+			booking: {
+				lookupToken: booking.lookupToken,
+				title: booking.title,
+				startTime: booking.startTime ?? null,
+				endTime: booking.endTime ?? null,
+				leadCustomerName: booking.leadCustomerName ?? null,
+				participantCount: booking.participantCount,
+				signedCount: booking.signedCount
+			}
+		};
+	}
+});
+
 export const submitPublicWaiver = mutation({
 	args: {
 		slug: v.string(),
 		versionId: v.id('waiver_versions'),
+		bookingLookupToken: v.optional(v.string()),
 		signerName: v.string(),
 		signerEmail: v.string(),
 		signerDateOfBirth: v.string(),
@@ -445,11 +525,30 @@ export const submitPublicWaiver = mutation({
 
 		validateSubmissionAnswers(version, args.answers);
 		const minors = validateMinors(args.minors);
+		let booking: Doc<'bookings'> | null = null;
+		if (args.bookingLookupToken) {
+			booking = await ctx.db
+				.query('bookings')
+				.withIndex('by_lookupToken', (q) => q.eq('lookupToken', args.bookingLookupToken ?? ''))
+				.unique();
+			if (!booking || booking.workspaceId !== waiver.workspaceId || booking.status !== 'active') {
+				throw new ConvexError({
+					code: 'not_found',
+					message: 'This booking is no longer available for waiver signing.'
+				});
+			}
+		}
 
 		const submittedAt = Date.now();
 		const submissionId = await ctx.db.insert('waiver_submissions', {
 			workspaceId: waiver.workspaceId,
 			versionId: waiver.publishedVersionId,
+			...(booking
+				? {
+						bookingId: booking._id,
+						bookingSnapshot: bookingSnapshot(booking)
+					}
+				: {}),
 			signerName,
 			signerEmail,
 			signerDateOfBirth,
@@ -459,6 +558,13 @@ export const submitPublicWaiver = mutation({
 			status: 'submitted',
 			submittedAt
 		});
+
+		if (booking) {
+			await ctx.db.patch(booking._id, {
+				signedCount: booking.signedCount + 1,
+				updatedAt: submittedAt
+			});
+		}
 
 		return { submissionId };
 	}
