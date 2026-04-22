@@ -6,6 +6,7 @@
 	import { useAppContext } from '$lib/components/app/app-context.svelte';
 	import { useProtectedQuery } from '$lib/components/auth/convex-auth.svelte';
 	import SubmissionDetailSheet from '$lib/components/waivers/SubmissionDetailSheet.svelte';
+	import { Button } from '$lib/components/ui/button';
 	import {
 		Table,
 		TableBody,
@@ -15,19 +16,41 @@
 		TableRow
 	} from '$lib/components/ui/table';
 	import { Skeleton } from '$lib/components/ui/skeleton';
+	import ChevronLeftIcon from '@lucide/svelte/icons/chevron-left';
+	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
+	import FileTextIcon from '@lucide/svelte/icons/file-text';
+
+	const PAGE_SIZE = 20;
 
 	const appContext = useAppContext();
 	const currentWorkspace = $derived(
 		appContext.workspaces.find((workspace) => workspace.slug === page.params.workspaceSlug) ?? null
 	);
+
+	let cursor = $state<string | null>(null);
+	let cursorHistory = $state<Array<string | null>>([]);
+	let currentPage = $state(1);
+	let lastWorkspaceId = $state<string | null>(null);
+
 	const submissionsQuery = useProtectedQuery(
 		api.waivers.listRecentSubmissions,
-		() => (currentWorkspace ? { workspaceId: currentWorkspace.workspaceId } : 'skip'),
+		() =>
+			currentWorkspace
+				? {
+						workspaceId: currentWorkspace.workspaceId,
+						paginationOpts: {
+							numItems: PAGE_SIZE,
+							cursor
+						}
+					}
+				: 'skip',
 		() => ({ keepPreviousData: true })
 	);
 
-	type RecentSubmission = FunctionReturnType<typeof api.waivers.listRecentSubmissions>[number];
-	const recentSubmissions = $derived((submissionsQuery.data ?? []) as RecentSubmission[]);
+	type SubmissionPage = FunctionReturnType<typeof api.waivers.listRecentSubmissions>;
+	type RecentSubmission = SubmissionPage['submissions'][number];
+	const submissionPage = $derived((submissionsQuery.data ?? null) as SubmissionPage | null);
+	const recentSubmissions = $derived((submissionPage?.submissions ?? []) as RecentSubmission[]);
 	const isLoadingSubmissions = $derived(submissionsQuery.isLoading || appContext.isLoading);
 
 	// lastSubmissionId stays set after first open so the sheet stays mounted
@@ -68,6 +91,34 @@
 		if (Number.isNaN(date.getTime())) return null;
 		return new Intl.DateTimeFormat('en-US', { dateStyle: 'medium' }).format(date);
 	}
+
+	function resetPagination() {
+		cursor = null;
+		cursorHistory = [];
+		currentPage = 1;
+	}
+
+	$effect(() => {
+		const workspaceId = currentWorkspace?.workspaceId ?? null;
+		if (workspaceId === lastWorkspaceId) return;
+		lastWorkspaceId = workspaceId;
+		resetPagination();
+	});
+
+	function goNextPage() {
+		if (!submissionPage || submissionPage.isDone) return;
+		cursorHistory = [...cursorHistory, cursor];
+		cursor = submissionPage.continueCursor;
+		currentPage += 1;
+	}
+
+	function goPreviousPage() {
+		if (cursorHistory.length === 0) return;
+		const previousCursor = cursorHistory[cursorHistory.length - 1] ?? null;
+		cursorHistory = cursorHistory.slice(0, -1);
+		cursor = previousCursor;
+		currentPage = Math.max(1, currentPage - 1);
+	}
 </script>
 
 <svelte:head>
@@ -83,7 +134,7 @@
 {/if}
 
 <div class="w-full min-w-0 p-6">
-	<div class="mx-auto w-full max-w-5xl min-w-0 space-y-5">
+	<div class="mx-auto w-full max-w-6xl min-w-0 space-y-6">
 		<div class="space-y-1">
 			<p class="text-xs font-bold tracking-[0.16em] text-primary uppercase">Submissions</p>
 			<h1 class="text-2xl font-semibold tracking-tight">Signed waiver records</h1>
@@ -91,7 +142,7 @@
 		</div>
 
 		{#if isLoadingSubmissions}
-			<div class="rounded-xl border border-border">
+			<div class="overflow-hidden rounded-xl border border-border">
 				<Table class="table-fixed">
 					<colgroup>
 						<col class="w-[21.25%]" />
@@ -145,18 +196,28 @@
 			</div>
 		{:else if !currentWorkspace}
 			<div
-				class="rounded-2xl border border-dashed border-border bg-muted/20 px-4 py-16 text-center text-sm text-muted-foreground"
+				class="rounded-xl border border-dashed border-border p-12 text-center text-sm text-muted-foreground"
 			>
 				Workspace not found.
 			</div>
 		{:else if recentSubmissions.length === 0}
 			<div
-				class="rounded-2xl border border-dashed border-border bg-muted/20 px-4 py-16 text-center text-sm text-muted-foreground"
+				class="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border bg-card/30 px-4 py-16 text-center"
 			>
-				No submissions yet. Once guests sign the live waiver, records will appear here.
+				<div
+					class="flex size-10 items-center justify-center rounded-full bg-muted text-muted-foreground"
+				>
+					<FileTextIcon class="size-5" aria-hidden="true" />
+				</div>
+				<div class="space-y-1">
+					<p class="text-sm font-medium">No submissions yet</p>
+					<p class="text-xs text-muted-foreground">
+						Once guests sign the live waiver, records will appear here.
+					</p>
+				</div>
 			</div>
 		{:else}
-			<div class="rounded-xl border border-border">
+			<div class="overflow-hidden rounded-xl border border-border">
 				<Table class="table-fixed">
 					<colgroup>
 						<col class="w-[21.25%]" />
@@ -229,5 +290,29 @@
 				</Table>
 			</div>
 		{/if}
+
+		<div class="flex items-center justify-between gap-3">
+			<p class="text-xs text-muted-foreground">Page {currentPage}</p>
+			<div class="flex items-center gap-2">
+				<Button
+					size="sm"
+					variant="outline"
+					disabled={cursorHistory.length === 0}
+					onclick={goPreviousPage}
+				>
+					<ChevronLeftIcon class="size-4" aria-hidden="true" />
+					Previous
+				</Button>
+				<Button
+					size="sm"
+					variant="outline"
+					disabled={!submissionPage || submissionPage.isDone}
+					onclick={goNextPage}
+				>
+					Next
+					<ChevronRightIcon class="size-4" aria-hidden="true" />
+				</Button>
+			</div>
+		</div>
 	</div>
 </div>

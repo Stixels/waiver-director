@@ -1,6 +1,8 @@
+import { paginationOptsValidator } from 'convex/server';
 import { ConvexError, v } from 'convex/values';
 import { query } from './_generated/server';
 import type { Doc } from './_generated/dataModel';
+import type { QueryCtx } from './_generated/server';
 import { bookingProviderValidator, bookingStatusValidator, normalizeEmail } from './lib/bookings';
 import { requireWorkspaceMember } from './lib/waivers';
 
@@ -22,6 +24,12 @@ const bookingSummaryValue = v.object({
 	updatedAt: v.number()
 });
 
+const bookingPageValue = v.object({
+	bookings: v.array(bookingSummaryValue),
+	continueCursor: v.string(),
+	isDone: v.boolean()
+});
+
 const publicBookingMatchValue = v.object({
 	lookupToken: v.string(),
 	title: v.string(),
@@ -32,7 +40,16 @@ const publicBookingMatchValue = v.object({
 	signedCount: v.number()
 });
 
-function serializeBooking(booking: Doc<'bookings'>) {
+async function signedUserCountForBooking(ctx: QueryCtx, bookingId: Doc<'bookings'>['_id']) {
+	const submissions = await ctx.db
+		.query('waiver_submissions')
+		.withIndex('by_bookingId', (q) => q.eq('bookingId', bookingId))
+		.collect();
+
+	return submissions.reduce((total, submission) => total + 1 + submission.minors.length, 0);
+}
+
+function serializeBooking(booking: Doc<'bookings'>, signedCount: number) {
 	return {
 		bookingId: booking._id,
 		provider: booking.provider,
@@ -47,27 +64,53 @@ function serializeBooking(booking: Doc<'bookings'>) {
 		leadCustomerName: booking.leadCustomerName ?? null,
 		leadCustomerEmail: booking.leadCustomerEmail ?? null,
 		participantCount: booking.participantCount,
-		signedCount: booking.signedCount,
+		signedCount,
 		updatedAt: booking.updatedAt
 	};
 }
 
 export const listWorkspaceBookings = query({
 	args: {
-		workspaceId: v.id('workspaces')
+		workspaceId: v.id('workspaces'),
+		dayStartAt: v.number(),
+		dayEndAt: v.number(),
+		paginationOpts: paginationOptsValidator
 	},
-	returns: v.array(bookingSummaryValue),
+	returns: bookingPageValue,
 	handler: async (ctx, args) => {
 		await requireWorkspaceMember(ctx, args.workspaceId);
 
-		const bookings = await ctx.db
-			.query('bookings')
-			.withIndex('by_workspaceId', (q) => q.eq('workspaceId', args.workspaceId))
-			.take(100);
+		if (
+			!Number.isFinite(args.dayStartAt) ||
+			!Number.isFinite(args.dayEndAt) ||
+			args.dayEndAt <= args.dayStartAt
+		) {
+			throw new ConvexError({
+				code: 'invalid_argument',
+				message: 'Choose a valid booking date.'
+			});
+		}
 
-		return bookings
-			.sort((a, b) => (a.startAt ?? 0) - (b.startAt ?? 0))
-			.map((booking) => serializeBooking(booking));
+		const bookingPage = await ctx.db
+			.query('bookings')
+			.withIndex('by_workspaceId_and_startAt', (q) =>
+				q
+					.eq('workspaceId', args.workspaceId)
+					.gte('startAt', args.dayStartAt)
+					.lt('startAt', args.dayEndAt)
+			)
+			.paginate(args.paginationOpts);
+
+		const serialized = [];
+		for (const booking of bookingPage.page) {
+			serialized.push(serializeBooking(booking, await signedUserCountForBooking(ctx, booking._id)));
+		}
+
+		return {
+			bookings: serialized,
+			continueCursor: bookingPage.continueCursor,
+			isDone: bookingPage.isDone
+		};
 	}
 });
 
@@ -81,7 +124,7 @@ export const getWorkspaceBooking = query({
 		await requireWorkspaceMember(ctx, args.workspaceId);
 		const booking = await ctx.db.get(args.bookingId);
 		if (!booking || booking.workspaceId !== args.workspaceId) return null;
-		return serializeBooking(booking);
+		return serializeBooking(booking, await signedUserCountForBooking(ctx, booking._id));
 	}
 });
 
@@ -109,6 +152,7 @@ export const findPublicBooking = query({
 				)
 				.unique();
 			if (!booking || booking.status !== 'active') return [];
+			const signedCount = await signedUserCountForBooking(ctx, booking._id);
 			return [
 				{
 					lookupToken: booking.lookupToken,
@@ -117,7 +161,7 @@ export const findPublicBooking = query({
 					endTime: booking.endTime ?? null,
 					leadCustomerName: booking.leadCustomerName ?? null,
 					participantCount: booking.participantCount,
-					signedCount: booking.signedCount
+					signedCount
 				}
 			];
 		}
@@ -141,16 +185,19 @@ export const findPublicBooking = query({
 			)
 			.take(10);
 
-		return bookings
-			.filter((booking) => booking.status === 'active')
-			.map((booking) => ({
+		const matches = [];
+		for (const booking of bookings.filter((candidate) => candidate.status === 'active')) {
+			matches.push({
 				lookupToken: booking.lookupToken,
 				title: booking.title,
 				startTime: booking.startTime ?? null,
 				endTime: booking.endTime ?? null,
 				leadCustomerName: booking.leadCustomerName ?? null,
 				participantCount: booking.participantCount,
-				signedCount: booking.signedCount
-			}));
+				signedCount: await signedUserCountForBooking(ctx, booking._id)
+			});
+		}
+
+		return matches;
 	}
 });

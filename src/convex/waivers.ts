@@ -1,3 +1,4 @@
+import { paginationOptsValidator } from 'convex/server';
 import { ConvexError, v } from 'convex/values';
 import { mutation, query } from './_generated/server';
 import type { Doc, Id } from './_generated/dataModel';
@@ -65,6 +66,15 @@ const publicBookingWaiverValue = v.object({
 		signedCount: v.number()
 	})
 });
+
+async function signedUserCountForBooking(ctx: FunctionCtx, bookingId: Id<'bookings'>) {
+	const submissions = await ctx.db
+		.query('waiver_submissions')
+		.withIndex('by_bookingId', (q) => q.eq('bookingId', bookingId))
+		.collect();
+
+	return submissions.reduce((total, submission) => total + 1 + submission.minors.length, 0);
+}
 
 async function getWorkspaceWaiverRecord(ctx: FunctionCtx, workspaceId: Id<'workspaces'>) {
 	return await ctx.db
@@ -326,39 +336,48 @@ export const getSubmission = query({
 
 export const listRecentSubmissions = query({
 	args: {
-		workspaceId: v.id('workspaces')
+		workspaceId: v.id('workspaces'),
+		paginationOpts: paginationOptsValidator
 	},
-	returns: v.array(
-		v.object({
-			submissionId: v.id('waiver_submissions'),
-			signerName: v.string(),
-			signerEmail: v.string(),
-			signerDateOfBirth: v.string(),
-			minorCount: v.number(),
-			bookingTitle: v.union(v.string(), v.null()),
-			bookingStartTime: v.union(v.string(), v.null()),
-			submittedAt: v.number()
-		})
-	),
+	returns: v.object({
+		submissions: v.array(
+			v.object({
+				submissionId: v.id('waiver_submissions'),
+				signerName: v.string(),
+				signerEmail: v.string(),
+				signerDateOfBirth: v.string(),
+				minorCount: v.number(),
+				bookingTitle: v.union(v.string(), v.null()),
+				bookingStartTime: v.union(v.string(), v.null()),
+				submittedAt: v.number()
+			})
+		),
+		continueCursor: v.string(),
+		isDone: v.boolean()
+	}),
 	handler: async (ctx, args) => {
 		await requireWorkspaceMember(ctx, args.workspaceId);
 
-		const submissions = await ctx.db
+		const submissionPage = await ctx.db
 			.query('waiver_submissions')
 			.withIndex('by_workspaceId', (q) => q.eq('workspaceId', args.workspaceId))
 			.order('desc')
-			.take(25);
+			.paginate(args.paginationOpts);
 
-		return submissions.map((submission) => ({
-			submissionId: submission._id,
-			signerName: submission.signerName,
-			signerEmail: submission.signerEmail,
-			signerDateOfBirth: submission.signerDateOfBirth,
-			minorCount: submission.minors.length,
-			bookingTitle: submission.bookingSnapshot?.title ?? null,
-			bookingStartTime: submission.bookingSnapshot?.startTime ?? null,
-			submittedAt: submission.submittedAt
-		}));
+		return {
+			submissions: submissionPage.page.map((submission) => ({
+				submissionId: submission._id,
+				signerName: submission.signerName,
+				signerEmail: submission.signerEmail,
+				signerDateOfBirth: submission.signerDateOfBirth,
+				minorCount: submission.minors.length,
+				bookingTitle: submission.bookingSnapshot?.title ?? null,
+				bookingStartTime: submission.bookingSnapshot?.startTime ?? null,
+				submittedAt: submission.submittedAt
+			})),
+			continueCursor: submissionPage.continueCursor,
+			isDone: submissionPage.isDone
+		};
 	}
 });
 
@@ -433,6 +452,7 @@ export const getPublicWaiverForBooking = query({
 				message: 'This public waiver is no longer available.'
 			});
 		}
+		const signedCount = await signedUserCountForBooking(ctx, booking._id);
 
 		return {
 			slug: waiver.publicSlug,
@@ -448,7 +468,7 @@ export const getPublicWaiverForBooking = query({
 				endTime: booking.endTime ?? null,
 				leadCustomerName: booking.leadCustomerName ?? null,
 				participantCount: booking.participantCount,
-				signedCount: booking.signedCount
+				signedCount
 			}
 		};
 	}
@@ -561,7 +581,7 @@ export const submitPublicWaiver = mutation({
 
 		if (booking) {
 			await ctx.db.patch(booking._id, {
-				signedCount: booking.signedCount + 1,
+				signedCount: await signedUserCountForBooking(ctx, booking._id),
 				updatedAt: submittedAt
 			});
 		}

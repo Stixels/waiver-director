@@ -278,34 +278,54 @@ function customerName(customer: Record<string, unknown>): string | undefined {
 	return name || optionalString(customer, 'name') || optionalString(customer, 'fullName');
 }
 
-function normalizeParticipants(value: unknown): NormalizedBooking['participants'] {
-	if (!Array.isArray(value)) return [];
+function positiveNumber(value: unknown): number | undefined {
+	if (typeof value === 'number' && Number.isFinite(value) && value > 0) return value;
+	if (typeof value !== 'string') return undefined;
+	const parsed = Number(value);
+	return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+}
 
-	return value
+function normalizeParticipants(value: unknown): NormalizedBooking['participants'] {
+	const participantRecord = toRecord(value);
+	const participantDetails = Array.isArray(participantRecord.details)
+		? participantRecord.details
+		: Array.isArray(value)
+			? value
+			: [];
+
+	return participantDetails
 		.map((participant) => {
 			const record = toRecord(participant);
+			const personDetails = toRecord(record.personDetails);
 			const name =
+				customerName(personDetails) ||
 				customerName(record) ||
-				[optionalString(record, 'firstName'), optionalString(record, 'lastName')]
+				[optionalString(personDetails, 'firstName'), optionalString(personDetails, 'lastName')]
 					.filter(Boolean)
 					.join(' ')
 					.trim() ||
 				undefined;
+			const email = normalizeEmail(
+				optionalString(personDetails, 'emailAddress') ||
+					optionalString(personDetails, 'email') ||
+					optionalString(record, 'emailAddress') ||
+					optionalString(record, 'email')
+			);
+			const providerParticipantId =
+				optionalString(record, 'personId') ||
+				optionalString(record, 'id') ||
+				[
+					optionalString(record, 'peopleCategoryId'),
+					positiveNumber(record.categoryIndex)?.toString()
+				]
+					.filter(Boolean)
+					.join(':') ||
+				undefined;
 
 			return {
-				...(optionalString(record, 'id')
-					? { providerParticipantId: optionalString(record, 'id') }
-					: {}),
+				...(providerParticipantId ? { providerParticipantId } : {}),
 				...(name ? { name } : {}),
-				...(normalizeEmail(
-					optionalString(record, 'emailAddress') || optionalString(record, 'email')
-				)
-					? {
-							email: normalizeEmail(
-								optionalString(record, 'emailAddress') || optionalString(record, 'email')
-							)
-						}
-					: {}),
+				...(email ? { email } : {}),
 				...(optionalString(record, 'peopleCategoryId')
 					? { category: optionalString(record, 'peopleCategoryId') }
 					: {})
@@ -316,16 +336,30 @@ function normalizeParticipants(value: unknown): NormalizedBooking['participants'
 		);
 }
 
+function participantNumbersCount(value: unknown): number {
+	const participantRecord = toRecord(value);
+	const numbers = Array.isArray(participantRecord.numbers) ? participantRecord.numbers : [];
+
+	return numbers.reduce((total, entry) => {
+		const count = positiveNumber(toRecord(entry).number);
+		return count ? total + count : total;
+	}, 0);
+}
+
 function participantCount(
 	booking: BookeoBooking,
 	participants: NormalizedBooking['participants']
 ): number {
+	const numberCount = participantNumbersCount(booking.participants);
+	if (numberCount > 0) return numberCount;
+
 	if (participants.length > 0) return participants.length;
 
 	const participantRecord = toRecord(booking.participants);
 	for (const key of ['numParticipants', 'numberParticipants', 'totalParticipants', 'numPeople']) {
 		const value = participantRecord[key] ?? booking[key];
-		if (typeof value === 'number' && Number.isFinite(value) && value > 0) return value;
+		const count = positiveNumber(value);
+		if (count) return count;
 	}
 
 	return 1;
@@ -1014,22 +1048,6 @@ export const upsertProviderBooking = internalMutation({
 		}
 
 		return bookingId;
-	}
-});
-
-export const incrementBookingSignedCount = internalMutation({
-	args: {
-		bookingId: v.id('bookings')
-	},
-	returns: v.null(),
-	handler: async (ctx, args) => {
-		const booking = await ctx.db.get(args.bookingId);
-		if (!booking) return null;
-		await ctx.db.patch(booking._id, {
-			signedCount: booking.signedCount + 1,
-			updatedAt: Date.now()
-		});
-		return null;
 	}
 });
 
