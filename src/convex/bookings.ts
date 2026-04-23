@@ -1,4 +1,3 @@
-import { paginationOptsValidator } from 'convex/server';
 import { ConvexError, v } from 'convex/values';
 import { query } from './_generated/server';
 import type { Doc } from './_generated/dataModel';
@@ -26,8 +25,32 @@ const bookingSummaryValue = v.object({
 
 const bookingPageValue = v.object({
 	bookings: v.array(bookingSummaryValue),
-	continueCursor: v.string(),
-	isDone: v.boolean()
+	dayTotals: v.object({
+		bookingCount: v.number(),
+		canceledCount: v.number(),
+		expectedCount: v.number(),
+		signedCount: v.number(),
+		incompleteCount: v.number()
+	}),
+	pageIndex: v.number(),
+	pageSize: v.number(),
+	totalCount: v.number(),
+	nextUpcomingBookingId: v.union(v.id('bookings'), v.null()),
+	hasPreviousPage: v.boolean(),
+	hasNextPage: v.boolean()
+});
+
+const signedUserValue = v.object({
+	submissionId: v.id('waiver_submissions'),
+	name: v.string(),
+	email: v.union(v.string(), v.null()),
+	kind: v.union(v.literal('signer'), v.literal('minor')),
+	submittedAt: v.number()
+});
+
+const bookingDetailValue = v.object({
+	booking: bookingSummaryValue,
+	signedUsers: v.array(signedUserValue)
 });
 
 const publicBookingMatchValue = v.object({
@@ -41,12 +64,43 @@ const publicBookingMatchValue = v.object({
 });
 
 async function signedUserCountForBooking(ctx: QueryCtx, bookingId: Doc<'bookings'>['_id']) {
+	const submissions = await submissionsForBooking(ctx, bookingId);
+	return signedUserCountFromSubmissions(submissions);
+}
+
+async function submissionsForBooking(ctx: QueryCtx, bookingId: Doc<'bookings'>['_id']) {
 	const submissions = await ctx.db
 		.query('waiver_submissions')
 		.withIndex('by_bookingId', (q) => q.eq('bookingId', bookingId))
 		.collect();
+	return submissions.sort((a, b) => b.submittedAt - a.submittedAt);
+}
 
+function signedUserCountFromSubmissions(submissions: Array<Doc<'waiver_submissions'>>) {
 	return submissions.reduce((total, submission) => total + 1 + submission.minors.length, 0);
+}
+
+function signedUsersFromSubmissions(submissions: Array<Doc<'waiver_submissions'>>) {
+	return submissions.flatMap((submission) => [
+		{
+			submissionId: submission._id,
+			name: submission.signerName,
+			email: submission.signerEmail,
+			kind: 'signer' as const,
+			submittedAt: submission.submittedAt
+		},
+		...submission.minors.map((minor) => ({
+			submissionId: submission._id,
+			name: minor.fullName,
+			email: null,
+			kind: 'minor' as const,
+			submittedAt: submission.submittedAt
+		}))
+	]);
+}
+
+function normalizedMatchValue(value?: string | null) {
+	return value?.trim().toLowerCase().replace(/\s+/g, ' ') ?? '';
 }
 
 function serializeBooking(booking: Doc<'bookings'>, signedCount: number) {
@@ -74,7 +128,10 @@ export const listWorkspaceBookings = query({
 		workspaceId: v.id('workspaces'),
 		dayStartAt: v.number(),
 		dayEndAt: v.number(),
-		paginationOpts: paginationOptsValidator
+		pageIndex: v.number(),
+		pageSize: v.number(),
+		searchQuery: v.optional(v.string()),
+		hideCanceled: v.boolean()
 	},
 	returns: bookingPageValue,
 	handler: async (ctx, args) => {
@@ -91,7 +148,10 @@ export const listWorkspaceBookings = query({
 			});
 		}
 
-		const bookingPage = await ctx.db
+		const pageIndex = Math.max(0, Math.min(Math.floor(args.pageIndex), 100));
+		const pageSize = Math.max(1, Math.min(Math.floor(args.pageSize), 50));
+		const searchQuery = normalizedMatchValue(args.searchQuery);
+		const dayBookings = await ctx.db
 			.query('bookings')
 			.withIndex('by_workspaceId_and_startAt', (q) =>
 				q
@@ -99,17 +159,65 @@ export const listWorkspaceBookings = query({
 					.gte('startAt', args.dayStartAt)
 					.lt('startAt', args.dayEndAt)
 			)
-			.paginate(args.paginationOpts);
+			.collect();
 
 		const serialized = [];
-		for (const booking of bookingPage.page) {
+		for (const booking of dayBookings) {
 			serialized.push(serializeBooking(booking, await signedUserCountForBooking(ctx, booking._id)));
 		}
 
+		const activeBookings = serialized.filter((booking) => booking.status === 'active');
+		const dayTotals = {
+			bookingCount: activeBookings.length,
+			canceledCount: serialized.length - activeBookings.length,
+			expectedCount: activeBookings.reduce((total, booking) => total + booking.participantCount, 0),
+			signedCount: activeBookings.reduce((total, booking) => total + booking.signedCount, 0),
+			incompleteCount: activeBookings.filter(
+				(booking) => booking.signedCount < booking.participantCount
+			).length
+		};
+
+		const filteredBookings = serialized
+			.filter((booking) => !args.hideCanceled || booking.status !== 'canceled')
+			.filter((booking) => {
+				if (!searchQuery) return true;
+				return [
+					booking.title,
+					booking.productName,
+					booking.leadCustomerName,
+					booking.leadCustomerEmail,
+					booking.providerBookingId
+				].some((value) => normalizedMatchValue(value).includes(searchQuery));
+			})
+			.sort((a, b) => {
+				const aStart = a.startTime ? Date.parse(a.startTime) : Number.MAX_SAFE_INTEGER;
+				const bStart = b.startTime ? Date.parse(b.startTime) : Number.MAX_SAFE_INTEGER;
+				if (aStart !== bStart) return aStart - bStart;
+				return a.title.localeCompare(b.title);
+			});
+		const now = Date.now();
+		const nextUpcomingBooking =
+			filteredBookings
+				.filter((booking) => booking.status === 'active')
+				.map((booking) => ({
+					booking,
+					startAt: booking.startTime ? Date.parse(booking.startTime) : Number.NaN
+				}))
+				.filter((entry) => Number.isFinite(entry.startAt) && entry.startAt >= now)
+				.sort((a, b) => a.startAt - b.startAt)[0]?.booking ?? null;
+
+		const pageStart = pageIndex * pageSize;
+		const pageBookings = filteredBookings.slice(pageStart, pageStart + pageSize);
+
 		return {
-			bookings: serialized,
-			continueCursor: bookingPage.continueCursor,
-			isDone: bookingPage.isDone
+			bookings: pageBookings,
+			dayTotals,
+			pageIndex,
+			pageSize,
+			totalCount: filteredBookings.length,
+			nextUpcomingBookingId: nextUpcomingBooking?.bookingId ?? null,
+			hasPreviousPage: pageIndex > 0,
+			hasNextPage: filteredBookings.length > pageStart + pageSize
 		};
 	}
 });
@@ -125,6 +233,27 @@ export const getWorkspaceBooking = query({
 		const booking = await ctx.db.get(args.bookingId);
 		if (!booking || booking.workspaceId !== args.workspaceId) return null;
 		return serializeBooking(booking, await signedUserCountForBooking(ctx, booking._id));
+	}
+});
+
+export const getWorkspaceBookingDetail = query({
+	args: {
+		workspaceId: v.id('workspaces'),
+		bookingId: v.id('bookings')
+	},
+	returns: v.union(v.null(), bookingDetailValue),
+	handler: async (ctx, args) => {
+		await requireWorkspaceMember(ctx, args.workspaceId);
+		const booking = await ctx.db.get(args.bookingId);
+		if (!booking || booking.workspaceId !== args.workspaceId) return null;
+
+		const submissions = await submissionsForBooking(ctx, booking._id);
+		const signedUsers = signedUsersFromSubmissions(submissions);
+
+		return {
+			booking: serializeBooking(booking, signedUserCountFromSubmissions(submissions)),
+			signedUsers
+		};
 	}
 });
 
