@@ -599,7 +599,7 @@ export const connectBookeoManually = action({
 	returns: v.object({
 		integrationId: v.id('booking_integrations')
 	}),
-	handler: async (ctx, args) => {
+	handler: async (ctx, args): Promise<{ integrationId: Id<'booking_integrations'> }> => {
 		await ctx.runQuery(internal.integrations.getOwnerAccessForAction, {
 			workspaceId: args.workspaceId
 		});
@@ -621,19 +621,41 @@ export const connectBookeoManually = action({
 			});
 		}
 
-		const integrationId: Id<'booking_integrations'> = await ctx.runMutation(
-			internal.integrations.saveBookeoConnection,
-			{
-				workspaceId: args.workspaceId,
-				encryptedApiKey: await encryptSecret(apiKey),
-				apiKeyLast4: apiKey.slice(-4),
-				accountId: apiKeyInfo.accountId,
-				permissions: apiKeyInfo.permissions,
-				syncHorizonMonths: args.syncHorizonMonths
+		let integrationId: Id<'booking_integrations'> | null = null;
+		try {
+			const savedIntegrationId: Id<'booking_integrations'> = await ctx.runMutation(
+				internal.integrations.saveBookeoConnection,
+				{
+					workspaceId: args.workspaceId,
+					encryptedApiKey: await encryptSecret(apiKey),
+					apiKeyLast4: apiKey.slice(-4),
+					accountId: apiKeyInfo.accountId,
+					permissions: apiKeyInfo.permissions,
+					syncHorizonMonths: args.syncHorizonMonths
+				}
+			);
+			integrationId = savedIntegrationId;
+			await registerBookeoWebhooks(apiKey, savedIntegrationId);
+			await ctx.runMutation(internal.integrations.markBookeoConnectionReady, {
+				integrationId: savedIntegrationId
+			});
+		} catch (error) {
+			if (integrationId) {
+				await ctx.runMutation(internal.integrations.markBookeoConnectionSetupFailed, {
+					integrationId,
+					errorMessage:
+						error instanceof Error ? error.message : 'Unable to finish Bookeo connection setup.'
+				});
 			}
-		);
+			throw error;
+		}
+		if (!integrationId) {
+			throw new ConvexError({
+				code: 'invalid_state',
+				message: 'Bookeo connection was not saved.'
+			});
+		}
 
-		await registerBookeoWebhooks(apiKey, integrationId);
 		await ctx.scheduler.runAfter(0, internal.integrations.syncBookeoIntegration, {
 			integrationId,
 			syncType: 'initial'
@@ -653,6 +675,10 @@ export const syncBookeoNow = action({
 		await ctx.runQuery(internal.integrations.getOwnerAccessForAction, {
 			workspaceId: args.workspaceId
 		});
+		await ctx.runQuery(internal.integrations.assertBookeoIntegrationInWorkspace, {
+			workspaceId: args.workspaceId,
+			integrationId: args.integrationId
+		});
 		await ctx.scheduler.runAfter(0, internal.integrations.syncBookeoIntegration, {
 			integrationId: args.integrationId,
 			syncType: 'manual'
@@ -671,6 +697,28 @@ export const getOwnerAccessForAction = internalQuery({
 	handler: async (ctx, args) => {
 		const { user } = await requireWorkspaceOwner(ctx, args.workspaceId);
 		return { userId: user._id };
+	}
+});
+
+export const assertBookeoIntegrationInWorkspace = internalQuery({
+	args: {
+		workspaceId: v.id('workspaces'),
+		integrationId: v.id('booking_integrations')
+	},
+	returns: v.null(),
+	handler: async (ctx, args) => {
+		const integration = await ctx.db.get(args.integrationId);
+		if (
+			!integration ||
+			integration.workspaceId !== args.workspaceId ||
+			integration.provider !== 'bookeo'
+		) {
+			throw new ConvexError({
+				code: 'not_found',
+				message: 'Integration not found.'
+			});
+		}
+		return null;
 	}
 });
 
@@ -780,30 +828,73 @@ export const saveBookeoConnection = internalMutation({
 			return await ctx.db.insert('booking_integrations', {
 				workspaceId: args.workspaceId,
 				provider: 'bookeo',
-				status: 'connected',
+				status: 'syncing',
 				encryptedApiKey: args.encryptedApiKey,
 				apiKeyLast4: args.apiKeyLast4,
 				...(args.accountId ? { accountId: args.accountId } : {}),
 				permissions: args.permissions,
 				syncHorizonMonths: args.syncHorizonMonths,
-				connectedAt: now,
 				updatedAt: now
 			});
 		}
 
 		await ctx.db.patch(integration._id, {
-			status: 'connected',
+			status: 'syncing',
 			encryptedApiKey: args.encryptedApiKey,
 			apiKeyLast4: args.apiKeyLast4,
 			accountId: args.accountId,
 			permissions: args.permissions,
 			syncHorizonMonths: args.syncHorizonMonths,
 			lastSyncError: undefined,
-			connectedAt: integration.connectedAt ?? now,
 			disconnectedAt: undefined,
 			updatedAt: now
 		});
 		return integration._id;
+	}
+});
+
+export const markBookeoConnectionReady = internalMutation({
+	args: {
+		integrationId: v.id('booking_integrations')
+	},
+	returns: v.null(),
+	handler: async (ctx, args) => {
+		const integration = await ctx.db.get(args.integrationId);
+		if (!integration || integration.provider !== 'bookeo') {
+			throw new ConvexError({
+				code: 'not_found',
+				message: 'Integration not found.'
+			});
+		}
+		if (integration.status === 'disconnected') return null;
+		const now = Date.now();
+		await ctx.db.patch(integration._id, {
+			status: 'connected',
+			connectedAt: integration.connectedAt ?? now,
+			disconnectedAt: undefined,
+			lastSyncError: undefined,
+			updatedAt: now
+		});
+		return null;
+	}
+});
+
+export const markBookeoConnectionSetupFailed = internalMutation({
+	args: {
+		integrationId: v.id('booking_integrations'),
+		errorMessage: v.string()
+	},
+	returns: v.null(),
+	handler: async (ctx, args) => {
+		const integration = await ctx.db.get(args.integrationId);
+		if (!integration || integration.provider !== 'bookeo') return null;
+		if (integration.status === 'disconnected') return null;
+		await ctx.db.patch(integration._id, {
+			status: 'error',
+			lastSyncError: args.errorMessage,
+			updatedAt: Date.now()
+		});
+		return null;
 	}
 });
 
@@ -881,7 +972,7 @@ export const startSyncRun = internalMutation({
 		rangeStart: v.optional(v.string()),
 		rangeEnd: v.optional(v.string())
 	},
-	returns: v.id('booking_sync_runs'),
+	returns: v.union(v.null(), v.id('booking_sync_runs')),
 	handler: async (ctx, args) => {
 		const integration = await ctx.db.get(args.integrationId);
 		if (!integration) {
@@ -889,6 +980,9 @@ export const startSyncRun = internalMutation({
 				code: 'not_found',
 				message: 'Integration not found.'
 			});
+		}
+		if (integration.status === 'disconnected' || !integration.encryptedApiKey) {
+			return null;
 		}
 
 		const now = Date.now();
@@ -927,6 +1021,11 @@ export const finishSyncRun = internalMutation({
 			finishedAt: now,
 			...(args.errorMessage ? { errorMessage: args.errorMessage } : {})
 		});
+
+		const integration = await ctx.db.get(args.integrationId);
+		if (!integration || integration.status === 'disconnected') {
+			return null;
+		}
 
 		await ctx.db.patch(args.integrationId, {
 			status: args.status === 'succeeded' ? 'connected' : 'error',
@@ -1225,7 +1324,7 @@ export const syncBookeoIntegration = internalAction({
 
 		const horizon = assertValidSyncHorizon(integration.syncHorizonMonths);
 		const range = initialSyncRange(args.syncType === 'repair' ? 1 : horizon);
-		const syncRunId: Id<'booking_sync_runs'> = await ctx.runMutation(
+		const syncRunId: Id<'booking_sync_runs'> | null = await ctx.runMutation(
 			internal.integrations.startSyncRun,
 			{
 				integrationId: args.integrationId,
@@ -1234,6 +1333,7 @@ export const syncBookeoIntegration = internalAction({
 				rangeEnd: range.end.toISOString()
 			}
 		);
+		if (!syncRunId) return null;
 
 		try {
 			const apiKey = await decryptSecret(integration.encryptedApiKey);
@@ -1312,6 +1412,7 @@ export const completeBookeoCallback = internalAction({
 			return { redirectUrl: `${redirectBase}?bookeo=declined` };
 		}
 
+		let integrationId: Id<'booking_integrations'> | null = null;
 		try {
 			const apiKeyInfo = await getBookeoApiKeyInfo(args.apiKey);
 			const missing = missingBookeoRequiredPermissions(apiKeyInfo.permissions);
@@ -1322,7 +1423,7 @@ export const completeBookeoCallback = internalAction({
 				});
 			}
 
-			const integrationId: Id<'booking_integrations'> = await ctx.runMutation(
+			const savedIntegrationId: Id<'booking_integrations'> = await ctx.runMutation(
 				internal.integrations.saveBookeoConnection,
 				{
 					workspaceId: session.workspaceId,
@@ -1333,7 +1434,11 @@ export const completeBookeoCallback = internalAction({
 					syncHorizonMonths: assertValidSyncHorizon(session.syncHorizonMonths)
 				}
 			);
-			await registerBookeoWebhooks(args.apiKey, integrationId);
+			integrationId = savedIntegrationId;
+			await registerBookeoWebhooks(args.apiKey, savedIntegrationId);
+			await ctx.runMutation(internal.integrations.markBookeoConnectionReady, {
+				integrationId: savedIntegrationId
+			});
 			await ctx.runMutation(internal.integrations.markConnectionSession, {
 				sessionId: session.sessionId,
 				status: 'completed'
@@ -1344,6 +1449,13 @@ export const completeBookeoCallback = internalAction({
 			});
 			return { redirectUrl: `${redirectBase}?bookeo=connected` };
 		} catch (error) {
+			if (integrationId) {
+				await ctx.runMutation(internal.integrations.markBookeoConnectionSetupFailed, {
+					integrationId,
+					errorMessage:
+						error instanceof Error ? error.message : 'Unable to finish Bookeo connection setup.'
+				});
+			}
 			await ctx.runMutation(internal.integrations.markConnectionSession, {
 				sessionId: session.sessionId,
 				status: 'failed'

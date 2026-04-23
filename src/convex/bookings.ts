@@ -63,11 +63,6 @@ const publicBookingMatchValue = v.object({
 	signedCount: v.number()
 });
 
-async function signedUserCountForBooking(ctx: QueryCtx, bookingId: Doc<'bookings'>['_id']) {
-	const submissions = await submissionsForBooking(ctx, bookingId);
-	return signedUserCountFromSubmissions(submissions);
-}
-
 async function submissionsForBooking(ctx: QueryCtx, bookingId: Doc<'bookings'>['_id']) {
 	const submissions = await ctx.db
 		.query('waiver_submissions')
@@ -161,10 +156,7 @@ export const listWorkspaceBookings = query({
 			)
 			.collect();
 
-		const serialized = [];
-		for (const booking of dayBookings) {
-			serialized.push(serializeBooking(booking, await signedUserCountForBooking(ctx, booking._id)));
-		}
+		const serialized = dayBookings.map((booking) => serializeBooking(booking, booking.signedCount));
 
 		const activeBookings = serialized.filter((booking) => booking.status === 'active');
 		const dayTotals = {
@@ -232,7 +224,7 @@ export const getWorkspaceBooking = query({
 		await requireWorkspaceMember(ctx, args.workspaceId);
 		const booking = await ctx.db.get(args.bookingId);
 		if (!booking || booking.workspaceId !== args.workspaceId) return null;
-		return serializeBooking(booking, await signedUserCountForBooking(ctx, booking._id));
+		return serializeBooking(booking, booking.signedCount);
 	}
 });
 
@@ -281,7 +273,6 @@ export const findPublicBooking = query({
 				)
 				.unique();
 			if (!booking || booking.status !== 'active') return [];
-			const signedCount = await signedUserCountForBooking(ctx, booking._id);
 			return [
 				{
 					lookupToken: booking.lookupToken,
@@ -290,7 +281,7 @@ export const findPublicBooking = query({
 					endTime: booking.endTime ?? null,
 					leadCustomerName: booking.leadCustomerName ?? null,
 					participantCount: booking.participantCount,
-					signedCount
+					signedCount: booking.signedCount
 				}
 			];
 		}
@@ -323,7 +314,7 @@ export const findPublicBooking = query({
 				endTime: booking.endTime ?? null,
 				leadCustomerName: booking.leadCustomerName ?? null,
 				participantCount: booking.participantCount,
-				signedCount: await signedUserCountForBooking(ctx, booking._id)
+				signedCount: booking.signedCount
 			});
 		}
 
