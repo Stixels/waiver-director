@@ -65,7 +65,7 @@
 		{ value: 'failed', label: 'Failed' }
 	] as const;
 
-	let statusFilters = $state(new SvelteSet<string>(['queued']));
+	let statusFilters = $state(new SvelteSet<string>());
 
 	const followUpsQuery = useProtectedQuery(api.emails.listFollowUps, () => {
 		if (!currentWorkspace) return 'skip';
@@ -90,6 +90,14 @@
 	const followUps = $derived((followUpsQuery.data ?? []) as FollowUp[]);
 	const presets = $derived((presetsQuery.data ?? []) as TemplatePreset[]);
 	const isLoading = $derived(appContext.isLoading || templateQuery.isLoading);
+	const pageError = $derived(
+		appContext.error ??
+			templateQuery.error ??
+			statsQuery.error ??
+			followUpsQuery.error ??
+			presetsQuery.error ??
+			null
+	);
 
 	// ─── Template editor state ─────────────────────────────────────────────────
 
@@ -754,6 +762,22 @@
 			</p>
 		</div>
 
+		{#if pageError}
+			<div
+				class="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+			>
+				{getConvexErrorMessage(pageError, 'Unable to load email follow-ups.')}
+			</div>
+		{:else if !appContext.isLoading && !currentWorkspace}
+			<div
+				class="rounded-xl border border-border bg-muted/20 px-4 py-3 text-sm text-muted-foreground"
+			>
+				No workspace was found for <span class="font-medium text-foreground"
+					>{page.params.workspaceSlug}</span
+				>.
+			</div>
+		{/if}
+
 		<!-- Stats cards -->
 		<div class="grid grid-cols-3 gap-4">
 			<div class="rounded-xl border border-border bg-card p-5">
@@ -1014,9 +1038,9 @@
 					<div
 						class="rounded-2xl border border-dashed border-border bg-muted/20 px-4 py-16 text-center text-sm text-muted-foreground"
 					>
-						{searchQuery || dateFrom || dateTo
+						{searchQuery || dateFrom || dateTo || statusFilters.size > 0
 							? 'No follow-ups match your filters.'
-							: 'No follow-ups yet. They appear here after guests sign a waiver.'}
+							: `No follow-ups yet for ${currentWorkspace?.name ?? 'this workspace'}. They appear here after guests sign a waiver.`}
 					</div>
 				{:else}
 					<div class="rounded-xl border border-border">

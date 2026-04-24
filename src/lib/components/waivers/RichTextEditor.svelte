@@ -47,7 +47,6 @@
 
 	let editorElement = $state<HTMLDivElement | null>(null);
 	let editor = $state<Editor | null>(null);
-	let lastSyncedValue = $state('');
 	let hasFocus = $state(false);
 	let toolbarState = $state({
 		blockShortLabel: 'Text',
@@ -68,7 +67,6 @@
 	function applyEditorValue(nextValue: string) {
 		const sanitized = sanitizeRichTextHtml(nextValue);
 		value = sanitized;
-		lastSyncedValue = sanitized;
 	}
 
 	function command(action: (editor: Editor) => boolean) {
@@ -189,7 +187,6 @@
 				}
 			},
 			onCreate: ({ editor }) => {
-				lastSyncedValue = sanitizeRichTextHtml(editor.getHTML());
 				syncToolbarState(editor);
 			},
 			onUpdate: ({ editor }) => {
@@ -235,11 +232,10 @@
 	$effect(() => {
 		if (!editor) return;
 		const sanitized = currentHtml();
-		if (sanitizeRichTextHtml(editor.getHTML()) === sanitized || sanitized === lastSyncedValue) {
+		if (sanitizeRichTextHtml(editor.getHTML()) === sanitized) {
 			return;
 		}
 		editor.commands.setContent(sanitized, { emitUpdate: false });
-		lastSyncedValue = sanitizeRichTextHtml(editor.getHTML());
 	});
 </script>
 
