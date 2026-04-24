@@ -111,7 +111,7 @@
 			<DialogHeader class="border-b border-border px-5 py-4">
 				<DialogTitle>Booking QR code</DialogTitle>
 				<DialogDescription>
-					Scan to open the waiver for {detail.booking.productName ?? detail.booking.title}.
+					Scan to open the waiver for {detail.booking.activityName}.
 				</DialogDescription>
 			</DialogHeader>
 			<div class="flex flex-col items-center gap-4 p-6">
@@ -151,7 +151,7 @@
 								isCanceled && 'line-through decoration-muted-foreground/60'
 							)}
 						>
-							{detail.booking.productName ?? detail.booking.title}
+							{detail.booking.activityName}
 						</SheetTitle>
 						<SheetDescription class="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs">
 							<span class="inline-flex items-center gap-1">

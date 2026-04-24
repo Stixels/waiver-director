@@ -30,7 +30,7 @@
 
 	type BookingContext = {
 		lookupToken: string;
-		title: string;
+		activityName: string;
 		startTime: string | null;
 		endTime: string | null;
 		leadCustomerName: string | null;
@@ -159,7 +159,7 @@
 						<p class="text-xs font-bold tracking-[0.16em] text-muted-foreground uppercase">
 							Booking
 						</p>
-						<h2 class="mt-1 text-lg font-semibold tracking-tight">{booking.title}</h2>
+						<h2 class="mt-1 text-lg font-semibold tracking-tight">{booking.activityName}</h2>
 						<div class="mt-2 grid gap-1 text-sm text-muted-foreground sm:grid-cols-2">
 							{#if formatTimestamp(booking.startTime)}
 								<p>{formatTimestamp(booking.startTime)}</p>

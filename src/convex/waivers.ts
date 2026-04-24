@@ -58,7 +58,7 @@ const publicBookingWaiverValue = v.object({
 	fields: v.array(waiverFieldValidator),
 	booking: v.object({
 		lookupToken: v.string(),
-		title: v.string(),
+		activityName: v.string(),
 		startTime: v.union(v.string(), v.null()),
 		endTime: v.union(v.string(), v.null()),
 		leadCustomerName: v.union(v.string(), v.null()),
@@ -338,7 +338,7 @@ export const listRecentSubmissions = query({
 				signerEmail: v.string(),
 				signerDateOfBirth: v.string(),
 				minorCount: v.number(),
-				bookingTitle: v.union(v.string(), v.null()),
+				bookingActivityName: v.union(v.string(), v.null()),
 				bookingStartTime: v.union(v.string(), v.null()),
 				submittedAt: v.number()
 			})
@@ -362,7 +362,7 @@ export const listRecentSubmissions = query({
 				signerEmail: submission.signerEmail,
 				signerDateOfBirth: submission.signerDateOfBirth,
 				minorCount: submission.minors.length,
-				bookingTitle: submission.bookingSnapshot?.title ?? null,
+				bookingActivityName: submission.bookingSnapshot?.activityName ?? null,
 				bookingStartTime: submission.bookingSnapshot?.startTime ?? null,
 				submittedAt: submission.submittedAt
 			})),
@@ -452,7 +452,7 @@ export const getPublicWaiverForBooking = query({
 			fields: version.fields,
 			booking: {
 				lookupToken: booking.lookupToken,
-				title: booking.title,
+				activityName: booking.activityName,
 				startTime: booking.startTime ?? null,
 				endTime: booking.endTime ?? null,
 				leadCustomerName: booking.leadCustomerName ?? null,

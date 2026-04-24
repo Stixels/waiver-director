@@ -266,10 +266,10 @@
 											{submission.minorCount === 1 ? 'minor' : 'minors'}
 										</p>
 									{/if}
-									{#if submission.bookingTitle}
+									{#if submission.bookingActivityName}
 										{@const bookingDate = formatBookingTimestamp(submission.bookingStartTime)}
 										<p class="mt-0.5 truncate text-xs text-muted-foreground">
-											{submission.bookingTitle}
+											{submission.bookingActivityName}
 											{#if bookingDate}
 												- {bookingDate}
 											{/if}

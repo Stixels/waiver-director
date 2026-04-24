@@ -172,7 +172,7 @@
 						>
 							<div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
 								<div class="min-w-0">
-									<p class="truncate text-base font-semibold">{match.title}</p>
+									<p class="truncate text-base font-semibold">{match.activityName}</p>
 									<p class="mt-1 text-sm text-muted-foreground">
 										{formatTimestamp(match.startTime)}
 									</p>

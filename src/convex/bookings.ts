@@ -11,8 +11,8 @@ const bookingSummaryValue = v.object({
 	providerBookingId: v.string(),
 	lookupToken: v.string(),
 	status: bookingStatusValidator,
-	title: v.string(),
-	productName: v.union(v.string(), v.null()),
+	activityName: v.string(),
+	providerTitle: v.union(v.string(), v.null()),
 	startTime: v.union(v.string(), v.null()),
 	endTime: v.union(v.string(), v.null()),
 	serviceDate: v.union(v.string(), v.null()),
@@ -54,7 +54,7 @@ const bookingDetailValue = v.object({
 
 const publicBookingMatchValue = v.object({
 	lookupToken: v.string(),
-	title: v.string(),
+	activityName: v.string(),
 	startTime: v.union(v.string(), v.null()),
 	endTime: v.union(v.string(), v.null()),
 	leadCustomerName: v.union(v.string(), v.null()),
@@ -104,8 +104,8 @@ function serializeBooking(booking: Doc<'bookings'>, signedCount: number) {
 		providerBookingId: booking.providerBookingId,
 		lookupToken: booking.lookupToken,
 		status: booking.status,
-		title: booking.title,
-		productName: booking.productName ?? null,
+		activityName: booking.activityName,
+		providerTitle: booking.providerTitle ?? null,
 		startTime: booking.startTime ?? null,
 		endTime: booking.endTime ?? null,
 		serviceDate: booking.serviceDate ?? null,
@@ -120,7 +120,7 @@ function serializeBooking(booking: Doc<'bookings'>, signedCount: number) {
 function serializePublicBookingMatch(booking: Doc<'bookings'>) {
 	return {
 		lookupToken: booking.lookupToken,
-		title: booking.title,
+		activityName: booking.activityName,
 		startTime: booking.startTime ?? null,
 		endTime: booking.endTime ?? null,
 		leadCustomerName: booking.leadCustomerName ?? null,
@@ -205,8 +205,8 @@ export const listWorkspaceBookings = query({
 			.filter((booking) => {
 				if (!searchQuery) return true;
 				return [
-					booking.title,
-					booking.productName,
+					booking.activityName,
+					booking.providerTitle,
 					booking.leadCustomerName,
 					booking.leadCustomerEmail,
 					booking.providerBookingId
@@ -216,7 +216,7 @@ export const listWorkspaceBookings = query({
 				const aStart = a.startTime ? Date.parse(a.startTime) : Number.MAX_SAFE_INTEGER;
 				const bStart = b.startTime ? Date.parse(b.startTime) : Number.MAX_SAFE_INTEGER;
 				if (aStart !== bStart) return aStart - bStart;
-				return a.title.localeCompare(b.title);
+				return a.activityName.localeCompare(b.activityName);
 			});
 		const now = Date.now();
 		const nextUpcomingBooking =

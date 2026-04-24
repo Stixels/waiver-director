@@ -14,7 +14,8 @@ export const syncHorizonMonthsValidator = v.number();
 export const bookingSnapshotValidator = v.object({
 	provider: bookingProviderValidator,
 	providerBookingId: v.string(),
-	title: v.string(),
+	activityName: v.string(),
+	providerTitle: v.optional(v.string()),
 	startTime: v.optional(v.string()),
 	endTime: v.optional(v.string()),
 	leadCustomerName: v.optional(v.string()),
@@ -66,7 +67,8 @@ export function bookingSnapshot(booking: Doc<'bookings'>) {
 	return {
 		provider: booking.provider,
 		providerBookingId: booking.providerBookingId,
-		title: booking.title,
+		activityName: booking.activityName,
+		...(booking.providerTitle ? { providerTitle: booking.providerTitle } : {}),
 		...(booking.startTime ? { startTime: booking.startTime } : {}),
 		...(booking.endTime ? { endTime: booking.endTime } : {}),
 		...(booking.leadCustomerName ? { leadCustomerName: booking.leadCustomerName } : {}),

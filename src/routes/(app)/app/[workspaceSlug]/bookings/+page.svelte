@@ -210,10 +210,6 @@
 		}).format(date);
 	}
 
-	function activityName(booking: Booking) {
-		return booking.productName ?? booking.title;
-	}
-
 	function bookingPublicUrl(booking: Booking) {
 		if (!publicSlug) return '';
 		const baseUrl =
@@ -534,7 +530,7 @@
 											isCanceled && 'line-through decoration-muted-foreground/60'
 										)}
 									>
-										{activityName(booking)}
+										{booking.activityName}
 									</p>
 									<p class="mt-0.5 truncate text-sm text-muted-foreground">
 										{booking.leadCustomerName ?? 'Unknown customer'}
@@ -683,7 +679,7 @@
 											isCanceled && 'line-through decoration-muted-foreground/60'
 										)}
 									>
-										{activityName(booking)}
+										{booking.activityName}
 									</p>
 								</TableCell>
 								<TableCell class="align-top">

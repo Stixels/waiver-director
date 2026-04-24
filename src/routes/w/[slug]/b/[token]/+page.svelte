@@ -12,7 +12,7 @@
 </script>
 
 <svelte:head>
-	<title>{waiver.title} | {waiver.booking.title}</title>
+	<title>{waiver.title} | {waiver.booking.activityName}</title>
 </svelte:head>
 
 <PublicWaiverForm {waiver} booking={waiver.booking} />

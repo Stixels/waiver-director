@@ -39,8 +39,8 @@ type BookeoWebhook = {
 type NormalizedBooking = {
 	providerBookingId: string;
 	status: 'active' | 'canceled';
-	title: string;
-	productName?: string;
+	activityName: string;
+	providerTitle?: string;
 	startTime?: string;
 	endTime?: string;
 	startAt?: number;
@@ -370,7 +370,8 @@ function normalizeBookeoBooking(booking: BookeoBooking): NormalizedBooking | nul
 	const endAt = parseDateTime(endTime);
 	const serviceDate = serviceDateFromDateTime(startTime);
 	const productName = optionalString(booking, 'productName');
-	const title = optionalString(booking, 'title') || productName || `Booking ${providerBookingId}`;
+	const providerTitle = optionalString(booking, 'title');
+	const activityName = productName || 'Unknown activity';
 	const leadCustomerName = customerName(customer);
 	const leadCustomerEmail = normalizeEmail(
 		optionalString(customer, 'emailAddress') || optionalString(customer, 'email')
@@ -379,8 +380,8 @@ function normalizeBookeoBooking(booking: BookeoBooking): NormalizedBooking | nul
 	return {
 		providerBookingId,
 		status: booking.canceled === true ? 'canceled' : 'active',
-		title,
-		...(productName ? { productName } : {}),
+		activityName,
+		...(providerTitle ? { providerTitle } : {}),
 		...(startTime ? { startTime } : {}),
 		...(endTime ? { endTime } : {}),
 		...(startAt !== undefined ? { startAt } : {}),
@@ -1045,8 +1046,8 @@ export const upsertProviderBooking = internalMutation({
 		booking: v.object({
 			providerBookingId: v.string(),
 			status: v.union(v.literal('active'), v.literal('canceled')),
-			title: v.string(),
-			productName: v.optional(v.string()),
+			activityName: v.string(),
+			providerTitle: v.optional(v.string()),
 			startTime: v.optional(v.string()),
 			endTime: v.optional(v.string()),
 			startAt: v.optional(v.number()),
@@ -1084,8 +1085,8 @@ export const upsertProviderBooking = internalMutation({
 			provider: integration.provider,
 			providerBookingId: args.booking.providerBookingId,
 			status: args.booking.status,
-			title: args.booking.title,
-			productName: args.booking.productName,
+			activityName: args.booking.activityName,
+			providerTitle: args.booking.providerTitle,
 			startTime: args.booking.startTime,
 			endTime: args.booking.endTime,
 			startAt: args.booking.startAt,

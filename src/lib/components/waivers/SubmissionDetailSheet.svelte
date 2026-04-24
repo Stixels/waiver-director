@@ -99,7 +99,7 @@
 				<DialogDescription class="text-xs text-muted-foreground">
 					Submitted {formatTimestamp(submission.submittedAt)}
 					{#if submission.booking}
-						for {submission.booking.title}
+						for {submission.booking.activityName}
 						{#if formatBookingTimestamp(submission.booking.startTime)}
 							on {formatBookingTimestamp(submission.booking.startTime)}
 						{/if}
