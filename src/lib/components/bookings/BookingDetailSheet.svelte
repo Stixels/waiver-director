@@ -5,7 +5,15 @@
 	import { toast } from 'svelte-sonner';
 	import { useProtectedQuery } from '$lib/components/auth/convex-auth.svelte';
 	import SubmissionDetailSheet from '$lib/components/waivers/SubmissionDetailSheet.svelte';
+	import QrCodePreview from '$lib/components/waivers/QrCodePreview.svelte';
 	import { Button } from '$lib/components/ui/button';
+	import {
+		Dialog,
+		DialogContent,
+		DialogDescription,
+		DialogHeader,
+		DialogTitle
+	} from '$lib/components/ui/dialog';
 	import {
 		Sheet,
 		SheetContent,
@@ -19,6 +27,7 @@
 	import CircleCheckIcon from '@lucide/svelte/icons/circle-check';
 	import ClockIcon from '@lucide/svelte/icons/clock';
 	import LinkIcon from '@lucide/svelte/icons/link';
+	import QrCodeIcon from '@lucide/svelte/icons/qr-code';
 	import UserIcon from '@lucide/svelte/icons/user';
 	import UsersIcon from '@lucide/svelte/icons/users';
 
@@ -32,6 +41,7 @@
 	let { open = $bindable(), workspaceId, bookingId, publicSlug }: Props = $props();
 	let selectedSubmissionId = $state<Id<'waiver_submissions'> | null>(null);
 	let submissionDetailOpen = $state(false);
+	let qrDialogOpen = $state(false);
 
 	type BookingDetail = NonNullable<
 		FunctionReturnType<typeof api.bookings.getWorkspaceBookingDetail>
@@ -93,6 +103,26 @@
 		{workspaceId}
 		submissionId={selectedSubmissionId}
 	/>
+{/if}
+
+{#if detail && canShare}
+	<Dialog bind:open={qrDialogOpen}>
+		<DialogContent class="max-w-xs gap-0 overflow-hidden p-0">
+			<DialogHeader class="border-b border-border px-5 py-4">
+				<DialogTitle>Booking QR code</DialogTitle>
+				<DialogDescription>
+					Scan to open the waiver for {detail.booking.productName ?? detail.booking.title}.
+				</DialogDescription>
+			</DialogHeader>
+			<div class="flex flex-col items-center gap-4 p-6">
+				<QrCodePreview text={bookingPublicUrl()} size={200} />
+				<Button variant="outline" class="w-full" onclick={copyBookingLink}>
+					<LinkIcon class="size-3.5" aria-hidden="true" />
+					Copy link
+				</Button>
+			</div>
+		</DialogContent>
+	</Dialog>
 {/if}
 
 <Sheet bind:open>
@@ -174,19 +204,35 @@
 								{/if}
 							</p>
 						</div>
-						<Button
-							size="sm"
-							onclick={copyBookingLink}
-							disabled={!canShare}
-							title={isCanceled
-								? 'Canceled bookings cannot be shared'
-								: !publicSlug
-									? 'Publish a waiver to share links'
-									: 'Copy booking waiver link'}
-						>
-							<LinkIcon class="size-3" aria-hidden="true" />
-							Share link
-						</Button>
+						<div class="flex shrink-0 flex-col gap-2 sm:flex-row">
+							<Button
+								size="sm"
+								variant="outline"
+								onclick={() => (qrDialogOpen = true)}
+								disabled={!canShare}
+								title={isCanceled
+									? 'Canceled bookings cannot be shared'
+									: !publicSlug
+										? 'Publish a waiver to share QR codes'
+										: 'Show booking QR code'}
+							>
+								<QrCodeIcon class="size-3" aria-hidden="true" />
+								QR code
+							</Button>
+							<Button
+								size="sm"
+								onclick={copyBookingLink}
+								disabled={!canShare}
+								title={isCanceled
+									? 'Canceled bookings cannot be shared'
+									: !publicSlug
+										? 'Publish a waiver to share links'
+										: 'Copy booking waiver link'}
+							>
+								<LinkIcon class="size-3" aria-hidden="true" />
+								Copy link
+							</Button>
+						</div>
 					</div>
 				</section>
 
