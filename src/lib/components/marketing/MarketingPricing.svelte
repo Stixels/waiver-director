@@ -52,7 +52,7 @@
 					</p>
 				</div>
 				<ul class="flex flex-1 flex-col gap-2.5">
-					{#each ['1 workspace', '25 waivers / month', '1 waiver template', 'Basic dashboard', 'Email support'] as item (item)}
+					{#each ['1 workspace', '25 submissions / month', '1 public waiver', 'Basic dashboard', 'Email support'] as item (item)}
 						<li class="flex items-center gap-2 text-[13px]" style="color: var(--muted-foreground);">
 							<Check class="size-3.5 shrink-0" style="color: var(--m-green);" aria-hidden="true" />
 							{item}
@@ -96,7 +96,7 @@
 					</p>
 				</div>
 				<ul class="flex flex-1 flex-col gap-2.5">
-					{#each ['Unlimited waivers', 'Unlimited templates', 'Bookeo · Resova · Xola sync', 'Follow-up email automation', 'Full analytics', 'Team access', 'PDF export', 'Audit trail'] as item (item)}
+					{#each ['Unlimited submissions', 'Version history', 'Bookeo · Resova · Xola sync', 'Follow-up email automation', 'Full analytics', 'Team access', 'PDF export', 'Audit trail'] as item (item)}
 						<li class="flex items-center gap-2 text-[13px]" style="color: var(--muted-foreground);">
 							<Check class="size-3.5 shrink-0" style="color: var(--m-green);" aria-hidden="true" />
 							{item}

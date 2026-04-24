@@ -42,22 +42,17 @@ export default defineSchema({
 		.index('by_userId_and_workspaceId', ['userId', 'workspaceId'])
 		.index('by_workspaceId_and_userId', ['workspaceId', 'userId']),
 
-	waiver_templates: defineTable({
+	workspace_waivers: defineTable({
 		workspaceId: v.id('workspaces'),
+		publicSlug: v.string(),
+		publishedVersionId: v.optional(v.id('waiver_versions')),
 		title: v.string(),
 		introCopy: v.string(),
 		fields: v.array(
 			v.union(
 				v.object({
 					id: v.string(),
-					type: v.literal('shortText'),
-					label: v.string(),
-					required: v.boolean(),
-					placeholder: v.optional(v.string())
-				}),
-				v.object({
-					id: v.string(),
-					type: v.literal('longText'),
+					type: v.literal('text'),
 					label: v.string(),
 					required: v.boolean(),
 					placeholder: v.optional(v.string())
@@ -87,14 +82,14 @@ export default defineSchema({
 					required: v.boolean()
 				})
 			)
-		),
-		lastPublishedVersionId: v.optional(v.id('waiver_template_versions')),
-		archivedAt: v.optional(v.number())
-	}).index('by_workspaceId', ['workspaceId']),
+		)
+	})
+		.index('by_workspaceId', ['workspaceId'])
+		.index('by_publicSlug', ['publicSlug']),
 
-	waiver_template_versions: defineTable({
+	waiver_versions: defineTable({
 		workspaceId: v.id('workspaces'),
-		templateId: v.id('waiver_templates'),
+		waiverId: v.id('workspace_waivers'),
 		versionNumber: v.number(),
 		title: v.string(),
 		introCopy: v.string(),
@@ -102,14 +97,7 @@ export default defineSchema({
 			v.union(
 				v.object({
 					id: v.string(),
-					type: v.literal('shortText'),
-					label: v.string(),
-					required: v.boolean(),
-					placeholder: v.optional(v.string())
-				}),
-				v.object({
-					id: v.string(),
-					type: v.literal('longText'),
+					type: v.literal('text'),
 					label: v.string(),
 					required: v.boolean(),
 					placeholder: v.optional(v.string())
@@ -143,25 +131,12 @@ export default defineSchema({
 		publishedAt: v.number()
 	})
 		.index('by_workspaceId', ['workspaceId'])
-		.index('by_templateId', ['templateId'])
-		.index('by_templateId_and_versionNumber', ['templateId', 'versionNumber']),
-
-	public_waiver_links: defineTable({
-		workspaceId: v.id('workspaces'),
-		versionId: v.id('waiver_template_versions'),
-		slug: v.string(),
-		status: v.union(v.literal('active'), v.literal('inactive'))
-	})
-		.index('by_slug', ['slug'])
-		.index('by_workspaceId', ['workspaceId'])
-		.index('by_versionId', ['versionId'])
-		.index('by_workspaceId_and_status', ['workspaceId', 'status']),
+		.index('by_waiverId', ['waiverId'])
+		.index('by_waiverId_and_versionNumber', ['waiverId', 'versionNumber']),
 
 	waiver_submissions: defineTable({
 		workspaceId: v.id('workspaces'),
-		publicLinkId: v.id('public_waiver_links'),
-		templateId: v.id('waiver_templates'),
-		versionId: v.id('waiver_template_versions'),
+		versionId: v.id('waiver_versions'),
 		signerName: v.string(),
 		signerEmail: v.string(),
 		signerDateOfBirth: v.string(),
@@ -176,9 +151,7 @@ export default defineSchema({
 		submittedAt: v.number()
 	})
 		.index('by_workspaceId', ['workspaceId'])
-		.index('by_publicLinkId', ['publicLinkId'])
-		.index('by_versionId', ['versionId'])
-		.index('by_templateId', ['templateId']),
+		.index('by_versionId', ['versionId']),
 
 	email_templates: defineTable({
 		workspaceId: v.id('workspaces'),

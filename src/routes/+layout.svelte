@@ -18,6 +18,6 @@
 <ClerkProvider>
 	<div class="min-h-screen bg-background text-foreground antialiased">
 		{@render children()}
-		<Toaster richColors position="top-right" />
+		<Toaster richColors position="top-right" closeButton />
 	</div>
 </ClerkProvider>

@@ -23,7 +23,7 @@
 			<div class="grid grid-cols-1 items-center gap-10 md:grid-cols-2">
 				<div>
 					<div class="landing-how-it-works__step-number" aria-hidden="true">01</div>
-					<h3 class="landing-how-it-works__step-title">Build your waiver template once.</h3>
+					<h3 class="landing-how-it-works__step-title">Build your waiver once.</h3>
 					<p class="text-[15px] leading-relaxed text-muted-foreground">
 						Create structured waivers with custom fields, signature blocks, and your branding.
 						Publish a version and it&apos;s locked, so past submissions are never altered when you

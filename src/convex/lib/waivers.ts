@@ -4,21 +4,27 @@ import type { MutationCtx, QueryCtx } from '../_generated/server';
 import { getCurrentUser } from './auth';
 import { getWorkspaceMembership } from './workspaces';
 import { sanitizeRichTextHtml } from '../../lib/utils/rich-text';
+import {
+	MAX_MINOR_NAME_LENGTH,
+	MAX_MINORS,
+	MAX_SELECT_OPTION_LABEL_LENGTH,
+	MAX_SELECT_OPTIONS,
+	MAX_WAIVER_FIELD_LABEL_LENGTH,
+	MAX_WAIVER_FIELDS,
+	MAX_WAIVER_TITLE_LENGTH,
+	MIN_MINOR_NAME_LENGTH,
+	MIN_SELECT_OPTION_LABEL_LENGTH,
+	MIN_SELECT_OPTIONS,
+	MIN_WAIVER_FIELD_LABEL_LENGTH,
+	MIN_WAIVER_TITLE_LENGTH
+} from '../../lib/domain/waiver-constraints';
 
 type FunctionCtx = QueryCtx | MutationCtx;
-export type TemplateUsageState = 'unusedDraft' | 'publishedNoSubmissions' | 'used';
 
 export const waiverFieldValidator = v.union(
 	v.object({
 		id: v.string(),
-		type: v.literal('shortText'),
-		label: v.string(),
-		required: v.boolean(),
-		placeholder: v.optional(v.string())
-	}),
-	v.object({
-		id: v.string(),
-		type: v.literal('longText'),
+		type: v.literal('text'),
 		label: v.string(),
 		required: v.boolean(),
 		placeholder: v.optional(v.string())
@@ -67,7 +73,7 @@ export type WaiverDefinition = {
 	fields: Array<
 		| {
 				id: string;
-				type: 'shortText' | 'longText';
+				type: 'text';
 				label: string;
 				required: boolean;
 				placeholder?: string;
@@ -102,9 +108,18 @@ export type MinorInput = {
 };
 
 const PUBLIC_SLUG_REGEX = /^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])$/;
-const MAX_FIELDS = 25;
-const MAX_SELECT_OPTIONS = 12;
-const MAX_MINORS = 50;
+
+export function createDefaultWaiverDefinition(workspaceName: string): WaiverDefinition {
+	return normalizeWaiverDefinition({
+		title: `${workspaceName} Waiver`,
+		introCopy: '<p></p>',
+		fields: []
+	});
+}
+
+export function createDefaultPublicWaiverSlug(workspaceSlug: string): string {
+	return normalizePublicSlug(`${workspaceSlug}-waiver`);
+}
 
 export async function requireWorkspaceMember(
 	ctx: FunctionCtx,
@@ -148,17 +163,17 @@ export function normalizeWaiverDefinition(definition: WaiverDefinition): WaiverD
 	const title = definition.title.trim();
 	const introCopy = sanitizeRichTextHtml(definition.introCopy);
 
-	if (title.length < 3 || title.length > 120) {
+	if (title.length < MIN_WAIVER_TITLE_LENGTH || title.length > MAX_WAIVER_TITLE_LENGTH) {
 		throw new ConvexError({
 			code: 'invalid_argument',
-			message: 'Waiver title must be between 3 and 120 characters.'
+			message: `Waiver title must be between ${MIN_WAIVER_TITLE_LENGTH} and ${MAX_WAIVER_TITLE_LENGTH} characters.`
 		});
 	}
 
-	if (definition.fields.length > MAX_FIELDS) {
+	if (definition.fields.length > MAX_WAIVER_FIELDS) {
 		throw new ConvexError({
 			code: 'invalid_argument',
-			message: `Limit waivers to ${MAX_FIELDS} custom fields in this release.`
+			message: `Limit waivers to ${MAX_WAIVER_FIELDS} custom fields in this release.`
 		});
 	}
 
@@ -180,18 +195,21 @@ export function normalizeWaiverDefinition(definition: WaiverDefinition): WaiverD
 		seenIds.add(id);
 
 		const label = field.label.trim();
-		if (label.length < 2 || label.length > 120) {
+		if (
+			label.length < MIN_WAIVER_FIELD_LABEL_LENGTH ||
+			label.length > MAX_WAIVER_FIELD_LABEL_LENGTH
+		) {
 			throw new ConvexError({
 				code: 'invalid_argument',
-				message: 'Each field label must be between 2 and 120 characters.'
+				message: `Each field label must be between ${MIN_WAIVER_FIELD_LABEL_LENGTH} and ${MAX_WAIVER_FIELD_LABEL_LENGTH} characters.`
 			});
 		}
 
 		if (field.type === 'select') {
-			if (field.options.length < 1 || field.options.length > MAX_SELECT_OPTIONS) {
+			if (field.options.length < MIN_SELECT_OPTIONS || field.options.length > MAX_SELECT_OPTIONS) {
 				throw new ConvexError({
 					code: 'invalid_argument',
-					message: `Select fields require 1-${MAX_SELECT_OPTIONS} options.`
+					message: `Select fields require ${MIN_SELECT_OPTIONS}-${MAX_SELECT_OPTIONS} options.`
 				});
 			}
 
@@ -215,10 +233,13 @@ export function normalizeWaiverDefinition(definition: WaiverDefinition): WaiverD
 							message: 'Select option ids must be unique within a field.'
 						});
 					}
-					if (optionLabel.length < 1 || optionLabel.length > 80) {
+					if (
+						optionLabel.length < MIN_SELECT_OPTION_LABEL_LENGTH ||
+						optionLabel.length > MAX_SELECT_OPTION_LABEL_LENGTH
+					) {
 						throw new ConvexError({
 							code: 'invalid_argument',
-							message: 'Select option labels must be between 1 and 80 characters.'
+							message: `Select option labels must be between ${MIN_SELECT_OPTION_LABEL_LENGTH} and ${MAX_SELECT_OPTION_LABEL_LENGTH} characters.`
 						});
 					}
 					optionIds.add(optionId);
@@ -292,57 +313,6 @@ export function waiverDefinitionsEqual(a: WaiverDefinition, b: WaiverDefinition)
 	);
 }
 
-export function getTemplateUsageState(args: {
-	lastPublishedVersionId?: Id<'waiver_template_versions'>;
-	hasSubmissions: boolean;
-}): TemplateUsageState {
-	if (args.hasSubmissions) {
-		return 'used';
-	}
-
-	if (args.lastPublishedVersionId) {
-		return 'publishedNoSubmissions';
-	}
-
-	return 'unusedDraft';
-}
-
-export function buildTemplateLifecycle(args: {
-	template: Doc<'waiver_templates'>;
-	activeLink: Doc<'public_waiver_links'> | null;
-	hasSubmissions: boolean;
-	hasUnpublishedChanges: boolean;
-}) {
-	const usageState = getTemplateUsageState({
-		lastPublishedVersionId: args.template.lastPublishedVersionId,
-		hasSubmissions: args.hasSubmissions
-	});
-	const canDelete = !args.hasSubmissions;
-	const isReadOnly = !!args.template.archivedAt;
-	const status = isReadOnly
-		? 'archived'
-		: args.template.lastPublishedVersionId
-			? 'published'
-			: 'draft';
-
-	return {
-		templateId: args.template._id,
-		title: args.template.title,
-		introCopy: args.template.introCopy,
-		status,
-		fields: args.template.fields,
-		lastPublishedVersionId: args.template.lastPublishedVersionId ?? null,
-		isActivePublic:
-			!!args.template.lastPublishedVersionId &&
-			args.activeLink?.versionId === args.template.lastPublishedVersionId,
-		hasUnpublishedChanges: args.hasUnpublishedChanges,
-		usageState,
-		canDelete,
-		canArchive: args.hasSubmissions && !isReadOnly,
-		isReadOnly
-	};
-}
-
 export function validateSubmissionAnswers(
 	definition: Pick<WaiverDefinition, 'fields'>,
 	answers: Record<string, string | boolean | null>
@@ -394,10 +364,10 @@ export function validateMinors(minors: MinorInput[]): MinorInput[] {
 
 	return minors.map((minor) => {
 		const fullName = minor.fullName.trim();
-		if (fullName.length < 2 || fullName.length > 120) {
+		if (fullName.length < MIN_MINOR_NAME_LENGTH || fullName.length > MAX_MINOR_NAME_LENGTH) {
 			throw new ConvexError({
 				code: 'invalid_argument',
-				message: 'Each minor name must be between 2 and 120 characters.'
+				message: `Each minor name must be between ${MIN_MINOR_NAME_LENGTH} and ${MAX_MINOR_NAME_LENGTH} characters.`
 			});
 		}
 		return { fullName };

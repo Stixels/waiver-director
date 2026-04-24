@@ -42,8 +42,7 @@ export const appMainNavItems = [
 ] as const;
 
 /**
- * Workspace configuration items — shown in a separate section below
- * main nav. Can be migrated to workspace settings in a future pass.
+ * Workspace configuration items shown separately from the main workflow nav.
  */
 export const appConfigNavItems = [
 	{
