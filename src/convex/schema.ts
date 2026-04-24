@@ -177,11 +177,8 @@ export default defineSchema({
 		encryptedApiKey: v.optional(v.string()),
 		apiKeyLast4: v.optional(v.string()),
 		accountId: v.optional(v.string()),
-		accountName: v.optional(v.string()),
 		permissions: v.array(v.string()),
 		syncHorizonMonths: v.number(),
-		lastSyncStartedAt: v.optional(v.number()),
-		lastSyncAt: v.optional(v.number()),
 		lastSyncError: v.optional(v.string()),
 		connectedAt: v.optional(v.number()),
 		disconnectedAt: v.optional(v.number()),
@@ -216,7 +213,6 @@ export default defineSchema({
 		lookupToken: v.string(),
 		status: v.union(v.literal('active'), v.literal('canceled')),
 		title: v.string(),
-		productId: v.optional(v.string()),
 		productName: v.optional(v.string()),
 		startTime: v.optional(v.string()),
 		endTime: v.optional(v.string()),
@@ -227,9 +223,6 @@ export default defineSchema({
 		leadCustomerEmail: v.optional(v.string()),
 		participantCount: v.number(),
 		signedCount: v.number(),
-		providerCreatedAt: v.optional(v.string()),
-		providerUpdatedAt: v.optional(v.string()),
-		raw: v.optional(v.string()),
 		updatedAt: v.number()
 	})
 		.index('by_workspaceId', ['workspaceId'])
@@ -243,29 +236,11 @@ export default defineSchema({
 			'serviceDate'
 		]),
 
-	booking_participants: defineTable({
-		workspaceId: v.id('workspaces'),
-		bookingId: v.id('bookings'),
-		provider: v.union(v.literal('bookeo'), v.literal('resova'), v.literal('xola')),
-		providerParticipantId: v.optional(v.string()),
-		name: v.optional(v.string()),
-		email: v.optional(v.string()),
-		category: v.optional(v.string()),
-		updatedAt: v.number()
-	})
-		.index('by_workspaceId', ['workspaceId'])
-		.index('by_bookingId', ['bookingId']),
-
 	booking_sync_runs: defineTable({
 		workspaceId: v.id('workspaces'),
 		integrationId: v.id('booking_integrations'),
 		provider: v.union(v.literal('bookeo'), v.literal('resova'), v.literal('xola')),
-		syncType: v.union(
-			v.literal('initial'),
-			v.literal('manual'),
-			v.literal('webhook'),
-			v.literal('repair')
-		),
+		syncType: v.union(v.literal('initial'), v.literal('webhook'), v.literal('repair')),
 		status: v.union(v.literal('running'), v.literal('succeeded'), v.literal('failed')),
 		rangeStart: v.optional(v.string()),
 		rangeEnd: v.optional(v.string()),

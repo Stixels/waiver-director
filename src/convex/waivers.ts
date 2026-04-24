@@ -67,15 +67,6 @@ const publicBookingWaiverValue = v.object({
 	})
 });
 
-async function signedUserCountForBooking(ctx: FunctionCtx, bookingId: Id<'bookings'>) {
-	const submissions = await ctx.db
-		.query('waiver_submissions')
-		.withIndex('by_bookingId', (q) => q.eq('bookingId', bookingId))
-		.collect();
-
-	return submissions.reduce((total, submission) => total + 1 + submission.minors.length, 0);
-}
-
 async function getWorkspaceWaiverRecord(ctx: FunctionCtx, workspaceId: Id<'workspaces'>) {
 	return await ctx.db
 		.query('workspace_waivers')
@@ -452,8 +443,6 @@ export const getPublicWaiverForBooking = query({
 				message: 'This public waiver is no longer available.'
 			});
 		}
-		const signedCount = await signedUserCountForBooking(ctx, booking._id);
-
 		return {
 			slug: waiver.publicSlug,
 			versionId: version._id,
@@ -468,7 +457,7 @@ export const getPublicWaiverForBooking = query({
 				endTime: booking.endTime ?? null,
 				leadCustomerName: booking.leadCustomerName ?? null,
 				participantCount: booking.participantCount,
-				signedCount
+				signedCount: booking.signedCount
 			}
 		};
 	}
@@ -581,7 +570,7 @@ export const submitPublicWaiver = mutation({
 
 		if (booking) {
 			await ctx.db.patch(booking._id, {
-				signedCount: await signedUserCountForBooking(ctx, booking._id),
+				signedCount: booking.signedCount + 1 + minors.length,
 				updatedAt: submittedAt
 			});
 		}

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { FunctionReturnType } from 'convex/server';
 	import { useConvexClient } from 'convex-svelte';
+	import { dev } from '$app/environment';
 	import { page } from '$app/state';
 	import { toast } from 'svelte-sonner';
 	import { api } from '$convex/_generated/api';
@@ -8,23 +9,59 @@
 	import { useProtectedQuery } from '$lib/components/auth/convex-auth.svelte';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
-	import { Card, CardContent, CardHeader } from '$lib/components/ui/card';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
-	import { Separator } from '$lib/components/ui/separator';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { cn } from '$lib/utils';
 	import { getConvexErrorMessage } from '$lib/utils/convex-errors';
-	import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
-	import ClockIcon from '@lucide/svelte/icons/clock';
+	import CircleCheckIcon from '@lucide/svelte/icons/circle-check';
 	import ExternalLinkIcon from '@lucide/svelte/icons/external-link';
 	import KeyRoundIcon from '@lucide/svelte/icons/key-round';
 	import LinkIcon from '@lucide/svelte/icons/link';
-	import RefreshCwIcon from '@lucide/svelte/icons/refresh-cw';
 	import ShieldAlertIcon from '@lucide/svelte/icons/shield-alert';
+	import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
 	import UnplugIcon from '@lucide/svelte/icons/unplug';
 	import UserIcon from '@lucide/svelte/icons/user';
+
+	const BOOKING_PROVIDERS = [
+		{
+			key: 'bookeo',
+			name: 'Bookeo',
+			initial: 'B',
+			status: 'Available',
+			description: 'Sync bookings and customers.',
+			enabled: true,
+			color: '#77bc1f'
+		},
+		{
+			key: 'resova',
+			name: 'Resova',
+			initial: 'R',
+			status: 'Planned',
+			description: 'Booking sync support planned.',
+			enabled: false,
+			color: '#64748b'
+		},
+		{
+			key: 'xola',
+			name: 'Xola',
+			initial: 'X',
+			status: 'Planned',
+			description: 'Booking sync support planned.',
+			enabled: false,
+			color: '#64748b'
+		},
+		{
+			key: 'fareharbor',
+			name: 'FareHarbor',
+			initial: 'F',
+			status: 'Planned',
+			description: 'Booking sync support planned.',
+			enabled: false,
+			color: '#64748b'
+		}
+	];
 
 	const appContext = useAppContext();
 	const convex = useConvexClient();
@@ -50,21 +87,12 @@
 		status === 'connected' || status === 'syncing' || status === 'error'
 	);
 
-	let syncHorizonMonths = $state<3 | 6 | 12>(6);
+	let syncHorizonMonths = $state(12);
 	let manualApiKey = $state('');
 	let isStartingConnect = $state(false);
 	let isConnectingManually = $state(false);
-	let isSyncing = $state(false);
 	let isDisconnecting = $state(false);
 	let showManualFallback = $state(false);
-
-	function formatTimestamp(timestamp: number | null) {
-		if (!timestamp) return 'Never';
-		return new Intl.DateTimeFormat('en-US', {
-			dateStyle: 'medium',
-			timeStyle: 'short'
-		}).format(new Date(timestamp));
-	}
 
 	function statusLabel(value: Integration['status']) {
 		if (value === 'connected') return 'Connected';
@@ -84,6 +112,32 @@
 		if (value === 'error') return 'destructive' as const;
 		if (value === 'connected') return 'secondary' as const;
 		return 'outline' as const;
+	}
+
+	function statusCopy(value: Integration['status']) {
+		if (value === 'connected') return 'Bookeo is connected and ready to sync booking data.';
+		if (value === 'syncing') return 'Initial booking import is running in the background.';
+		if (value === 'error') return 'Bookeo is connected, but sync needs attention.';
+		return 'Connect Bookeo to organize waiver submissions by booking.';
+	}
+
+	function formatTimestamp(timestamp: number | null) {
+		if (!timestamp) return 'Not recorded';
+		return new Intl.DateTimeFormat('en-US', {
+			dateStyle: 'medium',
+			timeStyle: 'short'
+		}).format(new Date(timestamp));
+	}
+
+	function normalizeSyncHorizon(value: number) {
+		if (!Number.isFinite(value)) return 12;
+		return Math.min(12, Math.max(1, Math.round(value)));
+	}
+
+	function handleSyncHorizonInput(event: Event) {
+		syncHorizonMonths = normalizeSyncHorizon(
+			Number((event.currentTarget as HTMLInputElement).value)
+		);
 	}
 
 	async function startBookeoConnect() {
@@ -120,22 +174,6 @@
 		}
 	}
 
-	async function syncNow() {
-		if (!currentWorkspace || !bookeoIntegration || convex.disabled) return;
-		isSyncing = true;
-		try {
-			await convex.action(api.integrations.syncBookeoNow, {
-				workspaceId: currentWorkspace.workspaceId,
-				integrationId: bookeoIntegration.integrationId
-			});
-			toast.success('Bookeo sync queued.');
-		} catch (error) {
-			toast.error(getConvexErrorMessage(error, 'Unable to queue Bookeo sync.'));
-		} finally {
-			isSyncing = false;
-		}
-	}
-
 	async function disconnect() {
 		if (!currentWorkspace || !bookeoIntegration || convex.disabled) return;
 		isDisconnecting = true;
@@ -159,25 +197,35 @@
 
 <div class="w-full min-w-0 p-6">
 	<div class="mx-auto w-full max-w-6xl min-w-0 space-y-6">
-		<div class="space-y-1">
-			<p class="text-xs font-bold tracking-[0.16em] text-primary uppercase">Integrations</p>
-			<h1 class="text-2xl font-semibold tracking-tight">Booking provider connections</h1>
-			<p class="text-sm text-muted-foreground">
-				Connect one booking provider per workspace to pull bookings and group waiver submissions
-				automatically. Bookeo is available in this release.
-			</p>
-		</div>
+		<header class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+			<div class="min-w-0 space-y-1">
+				<p class="text-xs font-bold tracking-[0.16em] text-primary uppercase">Integrations</p>
+				<h1 class="text-2xl font-semibold tracking-tight">Booking provider connections</h1>
+				<p class="max-w-2xl text-sm text-muted-foreground">
+					Choose a booking provider for this workspace. Bookeo can be connected now; Resova, Xola,
+					and FareHarbor are planned provider options.
+				</p>
+			</div>
+		</header>
 
 		{#if isLoading}
-			<Card>
-				<CardHeader>
-					<Skeleton class="h-5 w-36" />
-					<Skeleton class="mt-2 h-4 w-64" />
-				</CardHeader>
-				<CardContent>
-					<Skeleton class="h-24 w-full" />
-				</CardContent>
-			</Card>
+			<section class="overflow-hidden rounded-xl border border-border">
+				<div class="border-b border-border/70 p-5">
+					<Skeleton class="h-6 w-40" />
+					<Skeleton class="mt-3 h-4 w-full max-w-lg" />
+				</div>
+				<div class="border-b border-border/70 bg-card/30 p-3">
+					<div class="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+						<Skeleton class="h-20 w-full rounded-lg" />
+						<Skeleton class="h-20 w-full rounded-lg" />
+						<Skeleton class="h-20 w-full rounded-lg" />
+						<Skeleton class="h-20 w-full rounded-lg" />
+					</div>
+				</div>
+				<div class="p-5">
+					<Skeleton class="h-44 w-full rounded-lg" />
+				</div>
+			</section>
 		{:else if !currentWorkspace}
 			<div
 				class="rounded-xl border border-dashed border-border p-12 text-center text-sm text-muted-foreground"
@@ -185,65 +233,81 @@
 				Workspace not found.
 			</div>
 		{:else}
-			<Card class="overflow-hidden">
-				<CardHeader class="border-b border-border/60">
-					<div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-						<div class="flex min-w-0 items-start gap-3">
+			<article class="overflow-hidden rounded-xl border border-border">
+				<div class="border-b border-border/70 bg-card/30 p-5">
+					<div class="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+						<div>
+							<h2 class="text-sm font-semibold tracking-tight">Booking providers</h2>
+							<p class="text-xs text-muted-foreground">
+								Select one provider per workspace. More providers will unlock as they become
+								available.
+							</p>
+						</div>
+					</div>
+
+					<div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+						{#each BOOKING_PROVIDERS as provider (provider.key)}
 							<div
-								class="flex size-11 shrink-0 items-center justify-center rounded-xl text-base font-black text-white shadow-sm"
-								style="background: linear-gradient(135deg, #8BC635 0%, #77BC1F 100%);"
-								aria-hidden="true"
+								class={cn(
+									'min-h-18 rounded-lg border bg-background p-3 transition-colors',
+									provider.enabled ? 'border-primary/50' : 'border-border opacity-70'
+								)}
 							>
-								B
-							</div>
-							<div class="min-w-0 space-y-1">
-								<div class="flex flex-wrap items-center gap-2">
-									<h2 class="text-base font-semibold tracking-tight">Bookeo</h2>
-									<Badge variant={statusBadgeVariant(status)} class="capitalize">
-										<span
-											class={cn('size-1.5 rounded-full', statusDotClass(status))}
-											aria-hidden="true"
-										></span>
-										{statusLabel(status)}
-									</Badge>
+								<div class="flex h-full items-center gap-3">
+									<div
+										class="flex size-8 shrink-0 items-center justify-center rounded-md text-xs font-black text-white"
+										style={`background: ${provider.color};`}
+										aria-hidden="true"
+									>
+										{provider.initial}
+									</div>
+									<div class="flex min-w-0 flex-1 flex-col gap-1">
+										<div class="flex min-w-0 items-center gap-2">
+											<p class="truncate text-sm font-medium">{provider.name}</p>
+											<Badge
+												variant={provider.enabled ? statusBadgeVariant(status) : 'outline'}
+												class="h-5 shrink-0 capitalize"
+											>
+												{#if provider.enabled}
+													<span
+														class={cn('size-1.5 rounded-full', statusDotClass(status))}
+														aria-hidden="true"
+													></span>
+													{statusLabel(status)}
+												{:else}
+													{provider.status}
+												{/if}
+											</Badge>
+										</div>
+										<p class="truncate text-xs text-muted-foreground">
+											{provider.description}
+										</p>
+									</div>
 								</div>
-								<p class="text-xs leading-relaxed text-muted-foreground sm:text-sm">
-									Sync bookings and customers into Waiver Director, then group waiver submissions by
-									booking automatically.
-								</p>
 							</div>
+						{/each}
+					</div>
+				</div>
+
+				<div class="space-y-4 p-5">
+					{#if bookeoIntegration && isConnected}
+						<div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+							<div class="min-w-0 space-y-1">
+								<h3 class="text-sm font-semibold">Connected provider</h3>
+								<p class="text-sm text-muted-foreground">{statusCopy(status)}</p>
+							</div>
+							<Button
+								size="sm"
+								variant="ghost"
+								class="self-start"
+								onclick={disconnect}
+								disabled={convex.disabled || !canManage || isDisconnecting}
+							>
+								<UnplugIcon class="size-3.5" aria-hidden="true" />
+								{isDisconnecting ? 'Disconnecting...' : 'Disconnect'}
+							</Button>
 						</div>
 
-						{#if isConnected}
-							<div class="flex shrink-0 flex-wrap gap-2">
-								<Button
-									size="sm"
-									variant="outline"
-									onclick={syncNow}
-									disabled={!canManage || isSyncing || status === 'syncing'}
-								>
-									<RefreshCwIcon
-										class={cn('size-3.5', (isSyncing || status === 'syncing') && 'animate-spin')}
-										aria-hidden="true"
-									/>
-									{status === 'syncing' ? 'Syncing...' : isSyncing ? 'Queueing...' : 'Sync now'}
-								</Button>
-								<Button
-									size="sm"
-									variant="ghost"
-									onclick={disconnect}
-									disabled={!canManage || isDisconnecting}
-								>
-									<UnplugIcon class="size-3.5" aria-hidden="true" />
-									{isDisconnecting ? 'Disconnecting...' : 'Disconnect'}
-								</Button>
-							</div>
-						{/if}
-					</div>
-				</CardHeader>
-
-				<CardContent class="space-y-5 pt-4 pb-5">
-					{#if bookeoIntegration && isConnected}
 						<div class="grid gap-3 sm:grid-cols-3">
 							<div class="rounded-lg border border-border bg-card/40 p-3">
 								<div class="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
@@ -251,13 +315,13 @@
 									<span class="tracking-wide uppercase">Account</span>
 								</div>
 								<p class="mt-1.5 truncate text-sm font-medium">
-									{bookeoIntegration.accountName ?? bookeoIntegration.accountId ?? 'Connected'}
+									{bookeoIntegration.accountId ?? 'Connected'}
 								</p>
 							</div>
 							<div class="rounded-lg border border-border bg-card/40 p-3">
 								<div class="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
-									<ClockIcon class="size-3.5" aria-hidden="true" />
-									<span class="tracking-wide uppercase">Sync horizon</span>
+									<CircleCheckIcon class="size-3.5" aria-hidden="true" />
+									<span class="tracking-wide uppercase">Booking window</span>
 								</div>
 								<p class="mt-1.5 text-sm font-medium">
 									{bookeoIntegration.syncHorizonMonths} months future
@@ -265,11 +329,11 @@
 							</div>
 							<div class="rounded-lg border border-border bg-card/40 p-3">
 								<div class="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
-									<RefreshCwIcon class="size-3.5" aria-hidden="true" />
-									<span class="tracking-wide uppercase">Last sync</span>
+									<LinkIcon class="size-3.5" aria-hidden="true" />
+									<span class="tracking-wide uppercase">Connected</span>
 								</div>
 								<p class="mt-1.5 text-sm font-medium">
-									{formatTimestamp(bookeoIntegration.lastSyncAt)}
+									{formatTimestamp(bookeoIntegration.connectedAt)}
 								</p>
 							</div>
 						</div>
@@ -298,7 +362,7 @@
 									aria-hidden="true"
 								/>
 								<div class="min-w-0 space-y-1">
-									<p class="text-sm font-semibold text-destructive">Last sync failed</p>
+									<p class="text-sm font-semibold text-destructive">Integration needs attention</p>
 									<p class="text-xs leading-relaxed break-words text-destructive/90">
 										{bookeoIntegration.lastSyncError}
 									</p>
@@ -306,102 +370,143 @@
 							</div>
 						{/if}
 					{:else if !canManage}
-						<div class="rounded-lg border border-dashed border-border bg-muted/20 p-5 text-center">
-							<p class="text-sm text-muted-foreground">
+						<div
+							class="rounded-xl border border-dashed border-border bg-card/30 px-4 py-12 text-center"
+						>
+							<p class="text-sm font-medium">Owner access required</p>
+							<p class="mt-1 text-xs text-muted-foreground">
 								Only workspace owners can connect booking providers.
 							</p>
 						</div>
 					{:else}
-						<div class="space-y-2">
-							<Label for="sync-horizon">Initial sync horizon</Label>
-							<p class="text-xs text-muted-foreground">
-								How far into the future to pull bookings on the first sync. Future syncs use the
-								same window.
-							</p>
-							<select
-								id="sync-horizon"
-								class="h-9 w-full max-w-xs rounded-md border border-input bg-background px-3 text-sm transition-colors outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
-								bind:value={syncHorizonMonths}
-							>
-								<option value={3}>3 months future</option>
-								<option value={6}>6 months future</option>
-								<option value={12}>12 months future</option>
-							</select>
-						</div>
-
-						<Separator />
-
 						<div class="space-y-4">
-							<div class="space-y-1">
-								<h3 class="flex items-center gap-2 text-sm font-semibold">
-									<LinkIcon class="size-3.5 text-primary" aria-hidden="true" />
-									Connect with Bookeo
-								</h3>
-								<p class="text-xs text-muted-foreground">
-									Recommended — you'll be redirected to Bookeo to authorize access.
-								</p>
-							</div>
-							<Button onclick={startBookeoConnect} disabled={isStartingConnect}>
-								{#if isStartingConnect}
-									Opening Bookeo...
-								{:else}
-									Connect with Bookeo
-									<ExternalLinkIcon class="size-3.5" aria-hidden="true" />
-								{/if}
-							</Button>
-						</div>
-
-						<div class="pt-1">
-							<button
-								type="button"
-								class="group flex items-center gap-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
-								onclick={() => (showManualFallback = !showManualFallback)}
-								aria-expanded={showManualFallback}
-							>
-								<ChevronDownIcon
-									class={cn('size-3.5 transition-transform', showManualFallback && 'rotate-180')}
-									aria-hidden="true"
-								/>
-								<KeyRoundIcon class="size-3.5" aria-hidden="true" />
-								Advanced — connect with an API key instead
-							</button>
-
-							{#if showManualFallback}
-								<form
-									class="mt-3 space-y-3 rounded-lg border border-border bg-muted/20 p-4"
-									onsubmit={(event) => {
-										event.preventDefault();
-										void connectManually();
-									}}
-								>
-									<div class="space-y-1.5">
-										<Label for="manual-api-key" class="text-xs">Bookeo API key</Label>
-										<Input
-											id="manual-api-key"
-											type="password"
-											bind:value={manualApiKey}
-											placeholder="Paste Bookeo API key"
-											autocomplete="off"
-										/>
-										<p class="text-xs text-muted-foreground">
-											Find your key under Bookeo → Settings → API access. OAuth is preferred — use
-											this only if authorization is blocked.
-										</p>
+							<div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-stretch">
+								<div class="rounded-lg border border-border bg-card/30 p-4">
+									<div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+										<div class="space-y-1">
+											<p id="sync-horizon-label" class="text-sm font-medium">Booking window</p>
+											<p class="text-xs leading-relaxed text-muted-foreground">
+												Backfill this far ahead now. New and updated bookings continue syncing
+												automatically.
+											</p>
+										</div>
+										<div
+											class="shrink-0 rounded-lg border border-border bg-background px-3 py-2 text-right"
+										>
+											<p class="text-lg font-semibold tabular-nums">{syncHorizonMonths}</p>
+											<p class="text-[11px] text-muted-foreground">
+												{syncHorizonMonths === 1 ? 'month' : 'months'}
+											</p>
+										</div>
 									</div>
-									<Button
-										type="submit"
-										size="sm"
-										variant="outline"
-										disabled={manualApiKey.trim().length === 0 || isConnectingManually}
+
+									<div class="mt-4 space-y-2">
+										<input
+											type="range"
+											min="1"
+											max="12"
+											step="1"
+											value={syncHorizonMonths}
+											oninput={handleSyncHorizonInput}
+											class="w-full accent-primary"
+											aria-labelledby="sync-horizon-label"
+										/>
+										<div
+											class="flex items-center justify-between text-[11px] text-muted-foreground"
+										>
+											<span>1 month</span>
+											<span>12 months</span>
+										</div>
+									</div>
+								</div>
+
+								<div class="rounded-lg border border-border bg-card/30 p-4">
+									<div class="flex h-full flex-col justify-between gap-4">
+										<div class="min-w-0 space-y-1">
+											<h3 class="flex items-center gap-2 text-sm font-semibold">
+												<LinkIcon class="size-3.5 text-primary" aria-hidden="true" />
+												Connect Bookeo
+											</h3>
+											<p class="text-xs leading-relaxed text-muted-foreground">
+												Authorize access in Bookeo with the required permissions. Future booking
+												changes sync automatically.
+											</p>
+										</div>
+										<Button
+											class="w-full"
+											onclick={startBookeoConnect}
+											disabled={convex.disabled || isStartingConnect}
+										>
+											{#if isStartingConnect}
+												Opening Bookeo...
+											{:else}
+												Connect with Bookeo
+												<ExternalLinkIcon class="size-3.5" aria-hidden="true" />
+											{/if}
+										</Button>
+									</div>
+								</div>
+							</div>
+
+							{#if dev}
+								<div class="border-t border-border/70 pt-4">
+									<button
+										type="button"
+										class="group flex items-center gap-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:text-foreground focus-visible:outline-none"
+										onclick={() => (showManualFallback = !showManualFallback)}
+										aria-expanded={showManualFallback}
 									>
-										{isConnectingManually ? 'Connecting...' : 'Connect with API key'}
-									</Button>
-								</form>
+										<ChevronDownIcon
+											class={cn(
+												'size-3.5 transition-transform',
+												showManualFallback && 'rotate-180'
+											)}
+											aria-hidden="true"
+										/>
+										<KeyRoundIcon class="size-3.5" aria-hidden="true" />
+										Development: connect with an API key
+									</button>
+
+									{#if showManualFallback}
+										<form
+											class="mt-3 space-y-3 rounded-lg border border-border bg-muted/20 p-4"
+											onsubmit={(event) => {
+												event.preventDefault();
+												void connectManually();
+											}}
+										>
+											<div class="space-y-1.5">
+												<Label for="manual-api-key" class="text-xs">Bookeo API key</Label>
+												<Input
+													id="manual-api-key"
+													type="password"
+													bind:value={manualApiKey}
+													placeholder="Paste Bookeo API key"
+													autocomplete="off"
+												/>
+												<p class="text-xs leading-relaxed text-muted-foreground">
+													Development only. Production setup should use Bookeo authorization so
+													required permissions are requested consistently.
+												</p>
+											</div>
+											<Button
+												type="submit"
+												size="sm"
+												variant="outline"
+												disabled={convex.disabled ||
+													manualApiKey.trim().length === 0 ||
+													isConnectingManually}
+											>
+												{isConnectingManually ? 'Connecting...' : 'Connect with API key'}
+											</Button>
+										</form>
+									{/if}
+								</div>
 							{/if}
 						</div>
 					{/if}
-				</CardContent>
-			</Card>
+				</div>
+			</article>
 		{/if}
 	</div>
 </div>

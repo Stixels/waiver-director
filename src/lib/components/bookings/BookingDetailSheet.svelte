@@ -4,6 +4,7 @@
 	import { api } from '$convex/_generated/api';
 	import { toast } from 'svelte-sonner';
 	import { useProtectedQuery } from '$lib/components/auth/convex-auth.svelte';
+	import SubmissionDetailSheet from '$lib/components/waivers/SubmissionDetailSheet.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import {
 		Sheet,
@@ -29,6 +30,8 @@
 	}
 
 	let { open = $bindable(), workspaceId, bookingId, publicSlug }: Props = $props();
+	let selectedSubmissionId = $state<Id<'waiver_submissions'> | null>(null);
+	let submissionDetailOpen = $state(false);
 
 	type BookingDetail = NonNullable<
 		FunctionReturnType<typeof api.bookings.getWorkspaceBookingDetail>
@@ -80,7 +83,20 @@
 	function formatSignedUser(user: SignedUser) {
 		return user.kind === 'minor' ? `${user.name} (minor)` : user.name;
 	}
+
+	function openSubmission(submissionId: Id<'waiver_submissions'>) {
+		selectedSubmissionId = submissionId;
+		submissionDetailOpen = true;
+	}
 </script>
+
+{#if selectedSubmissionId}
+	<SubmissionDetailSheet
+		bind:open={submissionDetailOpen}
+		{workspaceId}
+		submissionId={selectedSubmissionId}
+	/>
+{/if}
 
 <Sheet bind:open>
 	<SheetContent side="right" class="w-full gap-0 overflow-hidden p-0 sm:max-w-xl">
@@ -231,8 +247,10 @@
 					{:else}
 						<div class="overflow-hidden rounded-xl border border-border">
 							{#each detail.signedUsers as user, index (`${user.submissionId}-${user.name}-${index}`)}
-								<div
-									class="flex items-center justify-between gap-3 border-b border-border px-3 py-2.5 last:border-b-0"
+								<button
+									type="button"
+									class="flex w-full items-center justify-between gap-3 border-b border-border px-3 py-2.5 text-left transition-colors last:border-b-0 hover:bg-muted/40 focus-visible:bg-muted/40 focus-visible:outline-none"
+									onclick={() => openSubmission(user.submissionId)}
 								>
 									<div class="flex min-w-0 items-center gap-3">
 										<span
@@ -251,7 +269,7 @@
 									<p class="shrink-0 text-xs text-muted-foreground tabular-nums">
 										{formatTimestamp(user.submittedAt)}
 									</p>
-								</div>
+								</button>
 							{/each}
 
 							{#if remainingCount > 0}

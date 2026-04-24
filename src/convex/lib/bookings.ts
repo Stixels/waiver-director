@@ -9,7 +9,7 @@ export const bookingProviderValidator = v.union(
 
 export const bookingStatusValidator = v.union(v.literal('active'), v.literal('canceled'));
 
-export const syncHorizonMonthsValidator = v.union(v.literal(3), v.literal(6), v.literal(12));
+export const syncHorizonMonthsValidator = v.number();
 
 export const bookingSnapshotValidator = v.object({
 	provider: bookingProviderValidator,
@@ -22,14 +22,9 @@ export const bookingSnapshotValidator = v.object({
 });
 
 export type BookingProvider = 'bookeo' | 'resova' | 'xola';
-export type SyncHorizonMonths = 3 | 6 | 12;
+export type SyncHorizonMonths = number;
 
 export const BOOKEO_REQUIRED_PERMISSIONS = ['bookings_r_all', 'customers_r_all'] as const;
-export const BOOKEO_OPTIONAL_PERMISSIONS = [
-	'availability_r',
-	'blocks_r_all',
-	'payments_r_all'
-] as const;
 
 export function normalizeEmail(value: string | undefined): string | undefined {
 	const email = value?.trim().toLowerCase();
@@ -53,10 +48,10 @@ export function serviceDateFromDateTime(value: string | undefined): string | und
 }
 
 export function assertValidSyncHorizon(value: number): SyncHorizonMonths {
-	if (value === 3 || value === 6 || value === 12) return value;
+	if (Number.isInteger(value) && value >= 1 && value <= 12) return value;
 	throw new ConvexError({
 		code: 'invalid_argument',
-		message: 'Choose a sync horizon of 3, 6, or 12 months.'
+		message: 'Choose a booking sync window from 1 to 12 months.'
 	});
 }
 

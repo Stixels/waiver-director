@@ -27,7 +27,6 @@ const BOOKEO_WEBHOOK_TYPES = ['created', 'updated', 'deleted'] as const;
 const CONNECT_STATE_TTL_MS = 30 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const BOOKEO_WINDOW_MS = 31 * DAY_MS;
-const MAX_RAW_BOOKING_CHARS = 16_000;
 
 type BookeoBooking = Record<string, unknown>;
 
@@ -35,7 +34,6 @@ type NormalizedBooking = {
 	providerBookingId: string;
 	status: 'active' | 'canceled';
 	title: string;
-	productId?: string;
 	productName?: string;
 	startTime?: string;
 	endTime?: string;
@@ -45,15 +43,6 @@ type NormalizedBooking = {
 	leadCustomerName?: string;
 	leadCustomerEmail?: string;
 	participantCount: number;
-	providerCreatedAt?: string;
-	providerUpdatedAt?: string;
-	raw?: string;
-	participants: Array<{
-		providerParticipantId?: string;
-		name?: string;
-		email?: string;
-		category?: string;
-	}>;
 };
 
 const integrationSummaryValue = v.object({
@@ -67,12 +56,9 @@ const integrationSummaryValue = v.object({
 		v.literal('disconnected')
 	),
 	accountId: v.union(v.string(), v.null()),
-	accountName: v.union(v.string(), v.null()),
 	permissions: v.array(v.string()),
 	missingRequiredPermissions: v.array(v.string()),
 	syncHorizonMonths: v.number(),
-	lastSyncStartedAt: v.union(v.number(), v.null()),
-	lastSyncAt: v.union(v.number(), v.null()),
 	lastSyncError: v.union(v.string(), v.null()),
 	connectedAt: v.union(v.number(), v.null()),
 	canManage: v.boolean()
@@ -285,55 +271,14 @@ function positiveNumber(value: unknown): number | undefined {
 	return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
 }
 
-function normalizeParticipants(value: unknown): NormalizedBooking['participants'] {
+function participantDetailsCount(value: unknown): number {
 	const participantRecord = toRecord(value);
 	const participantDetails = Array.isArray(participantRecord.details)
 		? participantRecord.details
 		: Array.isArray(value)
 			? value
 			: [];
-
-	return participantDetails
-		.map((participant) => {
-			const record = toRecord(participant);
-			const personDetails = toRecord(record.personDetails);
-			const name =
-				customerName(personDetails) ||
-				customerName(record) ||
-				[optionalString(personDetails, 'firstName'), optionalString(personDetails, 'lastName')]
-					.filter(Boolean)
-					.join(' ')
-					.trim() ||
-				undefined;
-			const email = normalizeEmail(
-				optionalString(personDetails, 'emailAddress') ||
-					optionalString(personDetails, 'email') ||
-					optionalString(record, 'emailAddress') ||
-					optionalString(record, 'email')
-			);
-			const providerParticipantId =
-				optionalString(record, 'personId') ||
-				optionalString(record, 'id') ||
-				[
-					optionalString(record, 'peopleCategoryId'),
-					positiveNumber(record.categoryIndex)?.toString()
-				]
-					.filter(Boolean)
-					.join(':') ||
-				undefined;
-
-			return {
-				...(providerParticipantId ? { providerParticipantId } : {}),
-				...(name ? { name } : {}),
-				...(email ? { email } : {}),
-				...(optionalString(record, 'peopleCategoryId')
-					? { category: optionalString(record, 'peopleCategoryId') }
-					: {})
-			};
-		})
-		.filter(
-			(participant) => participant.name || participant.email || participant.providerParticipantId
-		);
+	return participantDetails.length;
 }
 
 function participantNumbersCount(value: unknown): number {
@@ -346,14 +291,12 @@ function participantNumbersCount(value: unknown): number {
 	}, 0);
 }
 
-function participantCount(
-	booking: BookeoBooking,
-	participants: NormalizedBooking['participants']
-): number {
+function participantCount(booking: BookeoBooking): number {
 	const numberCount = participantNumbersCount(booking.participants);
 	if (numberCount > 0) return numberCount;
 
-	if (participants.length > 0) return participants.length;
+	const detailsCount = participantDetailsCount(booking.participants);
+	if (detailsCount > 0) return detailsCount;
 
 	const participantRecord = toRecord(booking.participants);
 	for (const key of ['numParticipants', 'numberParticipants', 'totalParticipants', 'numPeople']) {
@@ -370,20 +313,15 @@ function normalizeBookeoBooking(booking: BookeoBooking): NormalizedBooking | nul
 	if (!providerBookingId) return null;
 
 	const customer = toRecord(booking.customer);
-	const participants = normalizeParticipants(booking.participants);
 	const startTime = optionalString(booking, 'startTime');
 	const endTime = optionalString(booking, 'endTime');
 	const productName = optionalString(booking, 'productName');
 	const title = optionalString(booking, 'title') || productName || `Booking ${providerBookingId}`;
-	const raw = JSON.stringify(booking);
 
 	return {
 		providerBookingId,
 		status: booking.canceled === true ? 'canceled' : 'active',
 		title,
-		...(optionalString(booking, 'productId')
-			? { productId: optionalString(booking, 'productId') }
-			: {}),
 		...(productName ? { productName } : {}),
 		...(startTime ? { startTime } : {}),
 		...(endTime ? { endTime } : {}),
@@ -402,15 +340,7 @@ function normalizeBookeoBooking(booking: BookeoBooking): NormalizedBooking | nul
 					)
 				}
 			: {}),
-		participantCount: participantCount(booking, participants),
-		...(optionalString(booking, 'creationTime')
-			? { providerCreatedAt: optionalString(booking, 'creationTime') }
-			: {}),
-		...(optionalString(booking, 'lastChangeTime')
-			? { providerUpdatedAt: optionalString(booking, 'lastChangeTime') }
-			: {}),
-		raw: raw.length > MAX_RAW_BOOKING_CHARS ? raw.slice(0, MAX_RAW_BOOKING_CHARS) : raw,
-		participants
+		participantCount: participantCount(booking)
 	};
 }
 
@@ -517,15 +447,12 @@ export const listWorkspaceIntegrations = query({
 			provider: integration.provider,
 			status: integration.status,
 			accountId: integration.accountId ?? null,
-			accountName: integration.accountName ?? null,
 			permissions: integration.permissions,
 			missingRequiredPermissions:
 				integration.provider === 'bookeo'
 					? missingBookeoRequiredPermissions(integration.permissions)
 					: [],
 			syncHorizonMonths: integration.syncHorizonMonths,
-			lastSyncStartedAt: integration.lastSyncStartedAt ?? null,
-			lastSyncAt: integration.lastSyncAt ?? null,
 			lastSyncError: integration.lastSyncError ?? null,
 			connectedAt: integration.connectedAt ?? null,
 			canManage: membership.role === 'owner'
@@ -569,6 +496,7 @@ export const startBookeoConnect = action({
 		authorizationUrl: v.string()
 	}),
 	handler: async (ctx, args) => {
+		const syncHorizonMonths = assertValidSyncHorizon(args.syncHorizonMonths);
 		const access: { userId: Id<'users'> } = await ctx.runQuery(
 			internal.integrations.getOwnerAccessForAction,
 			{
@@ -581,7 +509,7 @@ export const startBookeoConnect = action({
 			provider: 'bookeo',
 			requestedByUserId: access.userId,
 			state,
-			syncHorizonMonths: args.syncHorizonMonths
+			syncHorizonMonths
 		});
 
 		return {
@@ -600,6 +528,7 @@ export const connectBookeoManually = action({
 		integrationId: v.id('booking_integrations')
 	}),
 	handler: async (ctx, args): Promise<{ integrationId: Id<'booking_integrations'> }> => {
+		const syncHorizonMonths = assertValidSyncHorizon(args.syncHorizonMonths);
 		await ctx.runQuery(internal.integrations.getOwnerAccessForAction, {
 			workspaceId: args.workspaceId
 		});
@@ -631,7 +560,7 @@ export const connectBookeoManually = action({
 					apiKeyLast4: apiKey.slice(-4),
 					accountId: apiKeyInfo.accountId,
 					permissions: apiKeyInfo.permissions,
-					syncHorizonMonths: args.syncHorizonMonths
+					syncHorizonMonths
 				}
 			);
 			integrationId = savedIntegrationId;
@@ -665,28 +594,6 @@ export const connectBookeoManually = action({
 	}
 });
 
-export const syncBookeoNow = action({
-	args: {
-		workspaceId: v.id('workspaces'),
-		integrationId: v.id('booking_integrations')
-	},
-	returns: v.null(),
-	handler: async (ctx, args) => {
-		await ctx.runQuery(internal.integrations.getOwnerAccessForAction, {
-			workspaceId: args.workspaceId
-		});
-		await ctx.runQuery(internal.integrations.assertBookeoIntegrationInWorkspace, {
-			workspaceId: args.workspaceId,
-			integrationId: args.integrationId
-		});
-		await ctx.scheduler.runAfter(0, internal.integrations.syncBookeoIntegration, {
-			integrationId: args.integrationId,
-			syncType: 'manual'
-		});
-		return null;
-	}
-});
-
 export const getOwnerAccessForAction = internalQuery({
 	args: {
 		workspaceId: v.id('workspaces')
@@ -700,28 +607,6 @@ export const getOwnerAccessForAction = internalQuery({
 	}
 });
 
-export const assertBookeoIntegrationInWorkspace = internalQuery({
-	args: {
-		workspaceId: v.id('workspaces'),
-		integrationId: v.id('booking_integrations')
-	},
-	returns: v.null(),
-	handler: async (ctx, args) => {
-		const integration = await ctx.db.get(args.integrationId);
-		if (
-			!integration ||
-			integration.workspaceId !== args.workspaceId ||
-			integration.provider !== 'bookeo'
-		) {
-			throw new ConvexError({
-				code: 'not_found',
-				message: 'Integration not found.'
-			});
-		}
-		return null;
-	}
-});
-
 export const createConnectionSession = internalMutation({
 	args: {
 		workspaceId: v.id('workspaces'),
@@ -732,13 +617,14 @@ export const createConnectionSession = internalMutation({
 	},
 	returns: v.null(),
 	handler: async (ctx, args) => {
+		const syncHorizonMonths = assertValidSyncHorizon(args.syncHorizonMonths);
 		await ctx.db.insert('booking_connection_sessions', {
 			workspaceId: args.workspaceId,
 			provider: args.provider,
 			requestedByUserId: args.requestedByUserId,
 			state: args.state,
 			status: 'pending',
-			syncHorizonMonths: args.syncHorizonMonths,
+			syncHorizonMonths,
 			createdAt: Date.now(),
 			expiresAt: Date.now() + CONNECT_STATE_TTL_MS
 		});
@@ -807,6 +693,7 @@ export const saveBookeoConnection = internalMutation({
 	},
 	returns: v.id('booking_integrations'),
 	handler: async (ctx, args) => {
+		const syncHorizonMonths = assertValidSyncHorizon(args.syncHorizonMonths);
 		const now = Date.now();
 		const existing = await ctx.db
 			.query('booking_integrations')
@@ -833,7 +720,7 @@ export const saveBookeoConnection = internalMutation({
 				apiKeyLast4: args.apiKeyLast4,
 				...(args.accountId ? { accountId: args.accountId } : {}),
 				permissions: args.permissions,
-				syncHorizonMonths: args.syncHorizonMonths,
+				syncHorizonMonths,
 				updatedAt: now
 			});
 		}
@@ -844,7 +731,7 @@ export const saveBookeoConnection = internalMutation({
 			apiKeyLast4: args.apiKeyLast4,
 			accountId: args.accountId,
 			permissions: args.permissions,
-			syncHorizonMonths: args.syncHorizonMonths,
+			syncHorizonMonths,
 			lastSyncError: undefined,
 			disconnectedAt: undefined,
 			updatedAt: now
@@ -963,12 +850,7 @@ export const getWebhookIntegration = internalQuery({
 export const startSyncRun = internalMutation({
 	args: {
 		integrationId: v.id('booking_integrations'),
-		syncType: v.union(
-			v.literal('initial'),
-			v.literal('manual'),
-			v.literal('webhook'),
-			v.literal('repair')
-		),
+		syncType: v.union(v.literal('initial'), v.literal('webhook'), v.literal('repair')),
 		rangeStart: v.optional(v.string()),
 		rangeEnd: v.optional(v.string())
 	},
@@ -988,7 +870,6 @@ export const startSyncRun = internalMutation({
 		const now = Date.now();
 		await ctx.db.patch(integration._id, {
 			status: 'syncing',
-			lastSyncStartedAt: now,
 			lastSyncError: undefined,
 			updatedAt: now
 		});
@@ -1029,7 +910,7 @@ export const finishSyncRun = internalMutation({
 
 		await ctx.db.patch(args.integrationId, {
 			status: args.status === 'succeeded' ? 'connected' : 'error',
-			...(args.status === 'succeeded' ? { lastSyncAt: now, lastSyncError: undefined } : {}),
+			...(args.status === 'succeeded' ? { lastSyncError: undefined } : {}),
 			...(args.errorMessage ? { lastSyncError: args.errorMessage } : {}),
 			updatedAt: now
 		});
@@ -1045,7 +926,6 @@ export const upsertProviderBooking = internalMutation({
 			providerBookingId: v.string(),
 			status: v.union(v.literal('active'), v.literal('canceled')),
 			title: v.string(),
-			productId: v.optional(v.string()),
 			productName: v.optional(v.string()),
 			startTime: v.optional(v.string()),
 			endTime: v.optional(v.string()),
@@ -1054,18 +934,7 @@ export const upsertProviderBooking = internalMutation({
 			serviceDate: v.optional(v.string()),
 			leadCustomerName: v.optional(v.string()),
 			leadCustomerEmail: v.optional(v.string()),
-			participantCount: v.number(),
-			providerCreatedAt: v.optional(v.string()),
-			providerUpdatedAt: v.optional(v.string()),
-			raw: v.optional(v.string()),
-			participants: v.array(
-				v.object({
-					providerParticipantId: v.optional(v.string()),
-					name: v.optional(v.string()),
-					email: v.optional(v.string()),
-					category: v.optional(v.string())
-				})
-			)
+			participantCount: v.number()
 		})
 	},
 	returns: v.id('bookings'),
@@ -1095,7 +964,6 @@ export const upsertProviderBooking = internalMutation({
 			providerBookingId: args.booking.providerBookingId,
 			status: args.booking.status,
 			title: args.booking.title,
-			productId: args.booking.productId,
 			productName: args.booking.productName,
 			startTime: args.booking.startTime,
 			endTime: args.booking.endTime,
@@ -1105,9 +973,6 @@ export const upsertProviderBooking = internalMutation({
 			leadCustomerName: args.booking.leadCustomerName,
 			leadCustomerEmail: args.booking.leadCustomerEmail,
 			participantCount: args.booking.participantCount,
-			providerCreatedAt: args.booking.providerCreatedAt,
-			providerUpdatedAt: args.booking.providerUpdatedAt,
-			raw: args.booking.raw,
 			updatedAt: now
 		};
 
@@ -1121,29 +986,6 @@ export const upsertProviderBooking = internalMutation({
 
 		if (existing) {
 			await ctx.db.patch(existing._id, bookingFields);
-		}
-
-		const oldParticipants = await ctx.db
-			.query('booking_participants')
-			.withIndex('by_bookingId', (q) => q.eq('bookingId', bookingId))
-			.take(100);
-		for (const participant of oldParticipants) {
-			await ctx.db.delete(participant._id);
-		}
-
-		for (const participant of args.booking.participants.slice(0, 100)) {
-			await ctx.db.insert('booking_participants', {
-				workspaceId: integration.workspaceId,
-				bookingId,
-				provider: integration.provider,
-				...(participant.providerParticipantId
-					? { providerParticipantId: participant.providerParticipantId }
-					: {}),
-				...(participant.name ? { name: participant.name } : {}),
-				...(participant.email ? { email: participant.email } : {}),
-				...(participant.category ? { category: participant.category } : {}),
-				updatedAt: now
-			});
 		}
 
 		return bookingId;
@@ -1298,12 +1140,7 @@ export const processBookeoWebhookEvent = internalAction({
 export const syncBookeoIntegration = internalAction({
 	args: {
 		integrationId: v.id('booking_integrations'),
-		syncType: v.union(
-			v.literal('initial'),
-			v.literal('manual'),
-			v.literal('webhook'),
-			v.literal('repair')
-		)
+		syncType: v.union(v.literal('initial'), v.literal('webhook'), v.literal('repair'))
 	},
 	returns: v.null(),
 	handler: async (ctx, args) => {

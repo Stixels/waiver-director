@@ -25,16 +25,7 @@ const bookingSummaryValue = v.object({
 
 const bookingPageValue = v.object({
 	bookings: v.array(bookingSummaryValue),
-	dayTotals: v.object({
-		bookingCount: v.number(),
-		canceledCount: v.number(),
-		expectedCount: v.number(),
-		signedCount: v.number(),
-		incompleteCount: v.number()
-	}),
 	pageIndex: v.number(),
-	pageSize: v.number(),
-	totalCount: v.number(),
 	nextUpcomingBookingId: v.union(v.id('bookings'), v.null()),
 	hasPreviousPage: v.boolean(),
 	hasNextPage: v.boolean()
@@ -126,7 +117,12 @@ export const listWorkspaceBookings = query({
 		pageIndex: v.number(),
 		pageSize: v.number(),
 		searchQuery: v.optional(v.string()),
-		hideCanceled: v.boolean()
+		statusFilter: v.union(
+			v.literal('all'),
+			v.literal('active'),
+			v.literal('attention'),
+			v.literal('canceled')
+		)
 	},
 	returns: bookingPageValue,
 	handler: async (ctx, args) => {
@@ -158,19 +154,15 @@ export const listWorkspaceBookings = query({
 
 		const serialized = dayBookings.map((booking) => serializeBooking(booking, booking.signedCount));
 
-		const activeBookings = serialized.filter((booking) => booking.status === 'active');
-		const dayTotals = {
-			bookingCount: activeBookings.length,
-			canceledCount: serialized.length - activeBookings.length,
-			expectedCount: activeBookings.reduce((total, booking) => total + booking.participantCount, 0),
-			signedCount: activeBookings.reduce((total, booking) => total + booking.signedCount, 0),
-			incompleteCount: activeBookings.filter(
-				(booking) => booking.signedCount < booking.participantCount
-			).length
-		};
-
 		const filteredBookings = serialized
-			.filter((booking) => !args.hideCanceled || booking.status !== 'canceled')
+			.filter((booking) => {
+				if (args.statusFilter === 'active') return booking.status === 'active';
+				if (args.statusFilter === 'attention') {
+					return booking.status === 'active' && booking.signedCount < booking.participantCount;
+				}
+				if (args.statusFilter === 'canceled') return booking.status === 'canceled';
+				return true;
+			})
 			.filter((booking) => {
 				if (!searchQuery) return true;
 				return [
@@ -203,10 +195,7 @@ export const listWorkspaceBookings = query({
 
 		return {
 			bookings: pageBookings,
-			dayTotals,
 			pageIndex,
-			pageSize,
-			totalCount: filteredBookings.length,
 			nextUpcomingBookingId: nextUpcomingBooking?.bookingId ?? null,
 			hasPreviousPage: pageIndex > 0,
 			hasNextPage: filteredBookings.length > pageStart + pageSize

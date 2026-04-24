@@ -267,10 +267,11 @@
 										</p>
 									{/if}
 									{#if submission.bookingTitle}
+										{@const bookingDate = formatBookingTimestamp(submission.bookingStartTime)}
 										<p class="mt-0.5 truncate text-xs text-muted-foreground">
 											{submission.bookingTitle}
-											{#if formatBookingTimestamp(submission.bookingStartTime)}
-												- {formatBookingTimestamp(submission.bookingStartTime)}
+											{#if bookingDate}
+												- {bookingDate}
 											{/if}
 										</p>
 									{/if}
@@ -291,28 +292,25 @@
 			</div>
 		{/if}
 
-		<div class="flex items-center justify-between gap-3">
-			<p class="text-xs text-muted-foreground">Page {currentPage}</p>
-			<div class="flex items-center gap-2">
-				<Button
-					size="sm"
-					variant="outline"
-					disabled={cursorHistory.length === 0}
-					onclick={goPreviousPage}
-				>
-					<ChevronLeftIcon class="size-4" aria-hidden="true" />
-					Previous
-				</Button>
-				<Button
-					size="sm"
-					variant="outline"
-					disabled={!submissionPage || submissionPage.isDone}
-					onclick={goNextPage}
-				>
-					Next
-					<ChevronRightIcon class="size-4" aria-hidden="true" />
-				</Button>
+		{#if submissionPage && (cursorHistory.length > 0 || !submissionPage.isDone)}
+			<div class="flex items-center justify-between gap-3">
+				<p class="text-xs text-muted-foreground">Page {currentPage}</p>
+				<div class="flex items-center gap-2">
+					<Button
+						size="sm"
+						variant="outline"
+						disabled={cursorHistory.length === 0}
+						onclick={goPreviousPage}
+					>
+						<ChevronLeftIcon class="size-4" aria-hidden="true" />
+						Previous
+					</Button>
+					<Button size="sm" variant="outline" disabled={submissionPage.isDone} onclick={goNextPage}>
+						Next
+						<ChevronRightIcon class="size-4" aria-hidden="true" />
+					</Button>
+				</div>
 			</div>
-		</div>
+		{/if}
 	</div>
 </div>

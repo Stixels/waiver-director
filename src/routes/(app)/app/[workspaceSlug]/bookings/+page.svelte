@@ -61,9 +61,6 @@
 	});
 
 	const dayRange = $derived(dayRangeForDate(selectedDate));
-	// Only ask the server to drop canceled rows when the filter absolutely
-	// excludes them. 'canceled' needs them returned so the client can isolate them.
-	const hideCanceledServerArg = $derived(statusFilter === 'active' || statusFilter === 'attention');
 	const bookingsQuery = useProtectedQuery(
 		api.bookings.listWorkspaceBookings,
 		() =>
@@ -75,7 +72,7 @@
 						pageIndex,
 						pageSize: PAGE_SIZE,
 						searchQuery,
-						hideCanceled: hideCanceledServerArg
+						statusFilter
 					}
 				: 'skip',
 		() => ({ keepPreviousData: true })
@@ -91,19 +88,6 @@
 
 	const bookingPage = $derived((bookingsQuery.data ?? null) as BookingPage | null);
 	const bookings = $derived(bookingPage?.bookings ?? []);
-	// Client-side filter layer for states the server doesn't model directly.
-	// Kept client-side so new filter options stay additive without schema churn.
-	const displayedBookings = $derived.by(() => {
-		if (statusFilter === 'attention') {
-			return bookings.filter(
-				(booking) => booking.status === 'active' && booking.signedCount < booking.participantCount
-			);
-		}
-		if (statusFilter === 'canceled') {
-			return bookings.filter((booking) => booking.status === 'canceled');
-		}
-		return bookings;
-	});
 	const publicSlug = $derived(waiverQuery.data?.publicSlug ?? null);
 	const isLoading = $derived(
 		bookingsQuery.isLoading || waiverQuery.isLoading || appContext.isLoading
@@ -427,7 +411,7 @@
 			>
 				Workspace not found.
 			</div>
-		{:else if displayedBookings.length === 0}
+		{:else if bookings.length === 0}
 			<div
 				class="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border bg-card/30 px-4 py-16 text-center"
 			>
@@ -446,7 +430,7 @@
 						{#if searchQuery || statusFilter !== 'all'}
 							Adjust search or filters for {formatSelectedDate(selectedDate)}.
 						{:else}
-							Try a different date or trigger a sync from this page.
+							Try a different date or check the booking integration.
 						{/if}
 					</p>
 				</div>
@@ -489,7 +473,7 @@
 						</TableRow>
 					</TableHeader>
 					<TableBody>
-						{#each displayedBookings as booking (booking.bookingId)}
+						{#each bookings as booking (booking.bookingId)}
 							{@const isCanceled = booking.status === 'canceled'}
 							{@const isNextUpcoming = booking.bookingId === bookingPage?.nextUpcomingBookingId}
 							{@const percent = signedPercent(booking)}
@@ -543,9 +527,6 @@
 									>
 										{activityName(booking)}
 									</p>
-									{#if booking.productName && booking.title !== booking.productName}
-										<p class="mt-0.5 truncate text-xs text-muted-foreground">{booking.title}</p>
-									{/if}
 								</TableCell>
 								<TableCell class="align-top">
 									<p class="truncate text-sm font-medium">
@@ -621,7 +602,7 @@
 
 		<div class={cn('flex items-center gap-3', hasPagination ? 'justify-between' : 'justify-end')}>
 			{#if bookingPage}
-				{@const visibleCount = displayedBookings.length}
+				{@const visibleCount = bookings.length}
 				<p class="text-xs text-muted-foreground tabular-nums">
 					{#if hasPagination}Page {currentPage} ·
 					{/if}{visibleCount}
