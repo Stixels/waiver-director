@@ -5,6 +5,10 @@
 	import { page } from '$app/state';
 	import { toast } from 'svelte-sonner';
 	import { api } from '$convex/_generated/api';
+	import bookeoIcon from '$lib/assets/providers/bookeo-icon.webp';
+	import fareharborIcon from '$lib/assets/providers/fareharbor-icon.webp';
+	import resovaIcon from '$lib/assets/providers/resova-icon.webp';
+	import xolaIcon from '$lib/assets/providers/xola-icon.webp';
 	import { useAppContext } from '$lib/components/app/app-context.svelte';
 	import { useProtectedQuery } from '$lib/components/auth/convex-auth.svelte';
 	import { Badge } from '$lib/components/ui/badge';
@@ -28,38 +32,34 @@
 		{
 			key: 'bookeo',
 			name: 'Bookeo',
-			initial: 'B',
 			status: 'Available',
 			description: 'Sync bookings and customers.',
 			enabled: true,
-			color: '#77bc1f'
+			logo: bookeoIcon
 		},
 		{
 			key: 'resova',
 			name: 'Resova',
-			initial: 'R',
 			status: 'Planned',
 			description: 'Booking sync support planned.',
 			enabled: false,
-			color: '#64748b'
+			logo: resovaIcon
 		},
 		{
 			key: 'xola',
 			name: 'Xola',
-			initial: 'X',
 			status: 'Planned',
 			description: 'Booking sync support planned.',
 			enabled: false,
-			color: '#64748b'
+			logo: xolaIcon
 		},
 		{
 			key: 'fareharbor',
 			name: 'FareHarbor',
-			initial: 'F',
 			status: 'Planned',
 			description: 'Booking sync support planned.',
 			enabled: false,
-			color: '#64748b'
+			logo: fareharborIcon
 		}
 	];
 
@@ -255,11 +255,15 @@
 							>
 								<div class="flex h-full items-center gap-3">
 									<div
-										class="flex size-8 shrink-0 items-center justify-center rounded-md text-xs font-black text-white"
-										style={`background: ${provider.color};`}
-										aria-hidden="true"
+										class="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-md bg-white"
 									>
-										{provider.initial}
+										<img
+											src={provider.logo}
+											alt=""
+											width="24"
+											height="24"
+											class="size-full object-cover"
+										/>
 									</div>
 									<div class="flex min-w-0 flex-1 flex-col gap-1">
 										<div class="flex min-w-0 items-center gap-2">
