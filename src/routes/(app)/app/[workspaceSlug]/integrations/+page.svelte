@@ -13,6 +13,14 @@
 	import { useProtectedQuery } from '$lib/components/auth/convex-auth.svelte';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
+	import {
+		Dialog,
+		DialogContent,
+		DialogDescription,
+		DialogFooter,
+		DialogHeader,
+		DialogTitle
+	} from '$lib/components/ui/dialog';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
 	import { Skeleton } from '$lib/components/ui/skeleton';
@@ -93,6 +101,12 @@
 	let isConnectingManually = $state(false);
 	let isDisconnecting = $state(false);
 	let showManualFallback = $state(false);
+	let disconnectDialogOpen = $state(false);
+	let disconnectConfirmation = $state('');
+	const disconnectConfirmationPhrase = 'DISCONNECT';
+	const canConfirmDisconnect = $derived(
+		disconnectConfirmation.trim().toUpperCase() === disconnectConfirmationPhrase
+	);
 
 	function statusLabel(value: Integration['status']) {
 		if (value === 'connected') return 'Connected';
@@ -174,14 +188,21 @@
 		}
 	}
 
+	function requestDisconnect() {
+		disconnectConfirmation = '';
+		disconnectDialogOpen = true;
+	}
+
 	async function disconnect() {
-		if (!currentWorkspace || !bookeoIntegration || convex.disabled) return;
+		if (!currentWorkspace || !bookeoIntegration || convex.disabled || !canConfirmDisconnect) return;
 		isDisconnecting = true;
 		try {
 			await convex.mutation(api.integrations.disconnectBookingIntegration, {
 				workspaceId: currentWorkspace.workspaceId,
 				integrationId: bookeoIntegration.integrationId
 			});
+			disconnectDialogOpen = false;
+			disconnectConfirmation = '';
 			toast.success('Bookeo disconnected.');
 		} catch (error) {
 			toast.error(getConvexErrorMessage(error, 'Unable to disconnect Bookeo.'));
@@ -194,6 +215,51 @@
 <svelte:head>
 	<title>{currentWorkspace?.name ?? 'Workspace'} Integrations | Waiver Director</title>
 </svelte:head>
+
+{#if bookeoIntegration && isConnected}
+	<Dialog bind:open={disconnectDialogOpen}>
+		<DialogContent class="max-w-md">
+			<DialogHeader>
+				<DialogTitle>Disconnect Bookeo?</DialogTitle>
+				<DialogDescription>
+					Waiver Director will stop receiving booking updates from Bookeo for this workspace.
+					Existing bookings and signed waiver records remain in Waiver Director.
+				</DialogDescription>
+			</DialogHeader>
+
+			<div class="space-y-2">
+				<Label for="disconnect-confirmation" class="text-xs">
+					Type <span class="font-semibold text-foreground">{disconnectConfirmationPhrase}</span> to disconnect.
+				</Label>
+				<Input
+					id="disconnect-confirmation"
+					bind:value={disconnectConfirmation}
+					autocomplete="off"
+					disabled={isDisconnecting}
+				/>
+			</div>
+
+			<DialogFooter>
+				<Button
+					type="button"
+					variant="outline"
+					onclick={() => (disconnectDialogOpen = false)}
+					disabled={isDisconnecting}
+				>
+					Cancel
+				</Button>
+				<Button
+					type="button"
+					variant="destructive"
+					onclick={disconnect}
+					disabled={convex.disabled || !canConfirmDisconnect || isDisconnecting}
+				>
+					{isDisconnecting ? 'Disconnecting...' : 'Disconnect Bookeo'}
+				</Button>
+			</DialogFooter>
+		</DialogContent>
+	</Dialog>
+{/if}
 
 <div class="w-full min-w-0 p-6">
 	<div class="mx-auto w-full max-w-6xl min-w-0 space-y-6">
@@ -302,13 +368,13 @@
 							</div>
 							<Button
 								size="sm"
-								variant="ghost"
+								variant="outline"
 								class="self-start"
-								onclick={disconnect}
+								onclick={requestDisconnect}
 								disabled={convex.disabled || !canManage || isDisconnecting}
 							>
 								<UnplugIcon class="size-3.5" aria-hidden="true" />
-								{isDisconnecting ? 'Disconnecting...' : 'Disconnect'}
+								Disconnect
 							</Button>
 						</div>
 
