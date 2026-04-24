@@ -1,5 +1,6 @@
 import { defineSchema, defineTable } from 'convex/server';
 import { v } from 'convex/values';
+import { bookingProviderValidator, bookingSnapshotValidator } from './lib/bookings';
 
 export default defineSchema({
 	users: defineTable({
@@ -138,17 +139,7 @@ export default defineSchema({
 		workspaceId: v.id('workspaces'),
 		versionId: v.id('waiver_versions'),
 		bookingId: v.optional(v.id('bookings')),
-		bookingSnapshot: v.optional(
-			v.object({
-				provider: v.union(v.literal('bookeo'), v.literal('resova'), v.literal('xola')),
-				providerBookingId: v.string(),
-				activityName: v.string(),
-				startTime: v.optional(v.string()),
-				endTime: v.optional(v.string()),
-				leadCustomerName: v.optional(v.string()),
-				leadCustomerEmail: v.optional(v.string())
-			})
-		),
+		bookingSnapshot: v.optional(bookingSnapshotValidator),
 		signerName: v.string(),
 		signerEmail: v.string(),
 		signerDateOfBirth: v.string(),
@@ -167,7 +158,7 @@ export default defineSchema({
 
 	booking_integrations: defineTable({
 		workspaceId: v.id('workspaces'),
-		provider: v.union(v.literal('bookeo'), v.literal('resova'), v.literal('xola')),
+		provider: bookingProviderValidator,
 		status: v.union(
 			v.literal('connected'),
 			v.literal('syncing'),
@@ -189,7 +180,7 @@ export default defineSchema({
 
 	booking_connection_sessions: defineTable({
 		workspaceId: v.id('workspaces'),
-		provider: v.union(v.literal('bookeo'), v.literal('resova'), v.literal('xola')),
+		provider: bookingProviderValidator,
 		requestedByUserId: v.id('users'),
 		state: v.string(),
 		status: v.union(
@@ -203,12 +194,14 @@ export default defineSchema({
 		expiresAt: v.number()
 	})
 		.index('by_state', ['state'])
-		.index('by_workspaceId', ['workspaceId']),
+		.index('by_workspaceId', ['workspaceId'])
+		.index('by_status_and_expiresAt', ['status', 'expiresAt'])
+		.index('by_status_and_createdAt', ['status', 'createdAt']),
 
 	bookings: defineTable({
 		workspaceId: v.id('workspaces'),
 		integrationId: v.id('booking_integrations'),
-		provider: v.union(v.literal('bookeo'), v.literal('resova'), v.literal('xola')),
+		provider: bookingProviderValidator,
 		providerBookingId: v.string(),
 		lookupToken: v.string(),
 		status: v.union(v.literal('active'), v.literal('canceled')),
@@ -221,6 +214,7 @@ export default defineSchema({
 		leadCustomerName: v.optional(v.string()),
 		leadCustomerEmail: v.optional(v.string()),
 		participantCount: v.number(),
+		signedCount: v.number(),
 		updatedAt: v.number()
 	})
 		.index('by_workspaceId', ['workspaceId'])
@@ -244,7 +238,7 @@ export default defineSchema({
 	booking_webhook_events: defineTable({
 		workspaceId: v.id('workspaces'),
 		integrationId: v.id('booking_integrations'),
-		provider: v.union(v.literal('bookeo'), v.literal('resova'), v.literal('xola')),
+		provider: bookingProviderValidator,
 		messageId: v.string(),
 		eventType: v.string(),
 		itemId: v.string(),

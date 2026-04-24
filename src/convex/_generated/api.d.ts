@@ -10,6 +10,7 @@
 
 import type * as app from "../app.js";
 import type * as bookings from "../bookings.js";
+import type * as crons from "../crons.js";
 import type * as http from "../http.js";
 import type * as integrations from "../integrations.js";
 import type * as lib_auth from "../lib/auth.js";
@@ -30,6 +31,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   app: typeof app;
   bookings: typeof bookings;
+  crons: typeof crons;
   http: typeof http;
   integrations: typeof integrations;
   "lib/auth": typeof lib_auth;

@@ -47,6 +47,8 @@
 	let selectedDate = $state(toDateInputValue(new Date()));
 	let pageIndex = $state(0);
 	let searchQuery = $state('');
+	let debouncedSearchQuery = $state('');
+	let lastDebouncedSearchQuery = $state('');
 	let statusFilter = $state<StatusFilter>('all');
 	let lastWorkspaceId = $state<string | null>(null);
 	let selectedBookingId = $state<Id<'bookings'> | null>(null);
@@ -71,7 +73,7 @@
 						dayEndAt: dayRange.endAt,
 						pageIndex,
 						pageSize: PAGE_SIZE,
-						searchQuery,
+						searchQuery: debouncedSearchQuery,
 						statusFilter
 					}
 				: 'skip',
@@ -88,16 +90,7 @@
 
 	const bookingPage = $derived((bookingsQuery.data ?? null) as BookingPage | null);
 	const bookings = $derived(bookingPage?.bookings ?? []);
-	const summary = $derived(
-		bookingPage?.summary ?? {
-			totalCount: bookings.length,
-			activeCount: bookings.filter((booking) => booking.status === 'active').length,
-			incompleteCount: bookings.filter(
-				(booking) => booking.status !== 'canceled' && booking.signedCount < booking.participantCount
-			).length,
-			canceledCount: bookings.filter((booking) => booking.status === 'canceled').length
-		}
-	);
+	const summary = $derived(bookingPage?.summary ?? null);
 	const publicSlug = $derived(waiverQuery.data?.publicSlug ?? null);
 	const isLoading = $derived(
 		bookingsQuery.isLoading || waiverQuery.isLoading || appContext.isLoading
@@ -142,6 +135,21 @@
 		resetPagination();
 	});
 
+	$effect(() => {
+		const query = searchQuery;
+		const timeout = setTimeout(() => {
+			debouncedSearchQuery = query;
+		}, 250);
+
+		return () => clearTimeout(timeout);
+	});
+
+	$effect(() => {
+		if (debouncedSearchQuery === lastDebouncedSearchQuery) return;
+		lastDebouncedSearchQuery = debouncedSearchQuery;
+		resetPagination();
+	});
+
 	function changeDate(days: number) {
 		const [year, month, day] = selectedDate.split('-').map(Number);
 		selectedDate = toDateInputValue(new Date(year, month - 1, day + days));
@@ -170,12 +178,12 @@
 
 	function handleSearchInput(event: Event) {
 		searchQuery = (event.currentTarget as HTMLInputElement).value;
-		resetPagination();
 	}
 
 	function clearSearch() {
 		if (!searchQuery) return;
 		searchQuery = '';
+		debouncedSearchQuery = '';
 		resetPagination();
 	}
 
@@ -186,6 +194,7 @@
 	}
 
 	function statusFilterCount(value: StatusFilter) {
+		if (!summary) return null;
 		if (value === 'active') return summary.activeCount;
 		if (value === 'attention') return summary.incompleteCount;
 		if (value === 'canceled') return summary.canceledCount;
@@ -369,6 +378,7 @@
 				>
 					{#each STATUS_FILTERS as filter (filter.value)}
 						{@const active = statusFilter === filter.value}
+						{@const filterCount = statusFilterCount(filter.value)}
 						<button
 							type="button"
 							role="tab"
@@ -390,8 +400,10 @@
 							>
 								{#if isInitialLoading}
 									<Skeleton class="h-2.5 w-2.5" />
+								{:else if filterCount === null}
+									&mdash;
 								{:else}
-									{statusFilterCount(filter.value)}
+									{filterCount}
 								{/if}
 							</span>
 						</button>

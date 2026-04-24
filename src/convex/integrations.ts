@@ -28,6 +28,8 @@ const CONNECT_STATE_TTL_MS = 30 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const BOOKEO_WINDOW_MS = 31 * DAY_MS;
 const BOOKEO_FETCH_TIMEOUT_MS = 20_000;
+const BOOKEO_SYNC_MAX_PAGES = 200;
+const CONNECTION_SESSION_RETENTION_MS = 30 * DAY_MS;
 
 type BookeoBooking = Record<string, unknown>;
 
@@ -83,12 +85,30 @@ function requiredEnv(name: string): string {
 }
 
 function appUrl(): string {
-	return (
+	const configuredUrl =
 		process.env.APP_URL?.trim() ||
 		process.env.PUBLIC_APP_URL?.trim() ||
 		process.env.SITE_URL?.trim() ||
-		'http://localhost:5173'
-	);
+		'http://localhost:5173';
+
+	let url: URL;
+	try {
+		url = new URL(configuredUrl);
+	} catch {
+		throw new ConvexError({
+			code: 'invalid_configuration',
+			message: 'APP_URL, PUBLIC_APP_URL, or SITE_URL must be an absolute URL.'
+		});
+	}
+
+	if (!url.protocol || !url.hostname || !['http:', 'https:'].includes(url.protocol)) {
+		throw new ConvexError({
+			code: 'invalid_configuration',
+			message: 'Application URL must include an http(s) scheme and hostname.'
+		});
+	}
+
+	return url.origin;
 }
 
 function convexSiteUrl(): string {
@@ -481,7 +501,17 @@ async function syncBookeoWindow(
 		pageNavigationToken = response.info?.pageNavigationToken;
 		totalPages = response.info?.totalPages ?? 1;
 		pageNumber += 1;
-	} while (pageNavigationToken && pageNumber <= totalPages);
+		if (pageNavigationToken && pageNumber > BOOKEO_SYNC_MAX_PAGES) {
+			console.warn('[bookeo/sync] reached page cap; sync window may be truncated', {
+				integrationId: args.integrationId,
+				pageNumber,
+				pageNavigationToken,
+				totalPages,
+				maxPages: BOOKEO_SYNC_MAX_PAGES
+			});
+			break;
+		}
+	} while (pageNavigationToken && pageNumber <= totalPages && pageNumber <= BOOKEO_SYNC_MAX_PAGES);
 }
 
 function initialSyncRange(syncHorizonMonths: number) {
@@ -836,6 +866,52 @@ export const markConnectionSession = internalMutation({
 	}
 });
 
+export const markExpiredBookingConnectionSessionsCron = internalMutation({
+	args: {},
+	returns: v.object({
+		expiredCount: v.number()
+	}),
+	handler: async (ctx) => {
+		const now = Date.now();
+		const sessions = await ctx.db
+			.query('booking_connection_sessions')
+			.withIndex('by_status_and_expiresAt', (q) => q.eq('status', 'pending').lt('expiresAt', now))
+			.take(100);
+
+		for (const session of sessions) {
+			await ctx.db.patch(session._id, { status: 'expired' });
+		}
+
+		return { expiredCount: sessions.length };
+	}
+});
+
+export const pruneOldBookingConnectionSessionsCron = internalMutation({
+	args: {},
+	returns: v.object({
+		deletedCount: v.number()
+	}),
+	handler: async (ctx) => {
+		const cutoff = Date.now() - CONNECTION_SESSION_RETENTION_MS;
+		const terminalStatuses = ['expired', 'completed', 'failed'] as const;
+		let deletedCount = 0;
+
+		for (const status of terminalStatuses) {
+			const sessions = await ctx.db
+				.query('booking_connection_sessions')
+				.withIndex('by_status_and_createdAt', (q) => q.eq('status', status).lt('createdAt', cutoff))
+				.take(100);
+
+			for (const session of sessions) {
+				await ctx.db.delete(session._id);
+				deletedCount += 1;
+			}
+		}
+
+		return { deletedCount };
+	}
+});
+
 export const saveBookeoConnection = internalMutation({
 	args: {
 		workspaceId: v.id('workspaces'),
@@ -1117,7 +1193,8 @@ export const upsertProviderBooking = internalMutation({
 			? existing._id
 			: await ctx.db.insert('bookings', {
 					...bookingFields,
-					lookupToken: args.lookupToken
+					lookupToken: args.lookupToken,
+					signedCount: 0
 				});
 
 		if (existing) {

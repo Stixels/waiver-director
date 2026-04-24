@@ -4,7 +4,6 @@ import { mutation, query } from './_generated/server';
 import type { Doc, Id } from './_generated/dataModel';
 import type { MutationCtx, QueryCtx } from './_generated/server';
 import { bookingSnapshot, bookingSnapshotValidator } from './lib/bookings';
-import { signedCountForBooking } from './lib/bookingSignatures';
 import {
 	assertWorkspaceRecord,
 	minorInputValidator,
@@ -458,7 +457,7 @@ export const getPublicWaiverForBooking = query({
 				endTime: booking.endTime ?? null,
 				leadCustomerName: booking.leadCustomerName ?? null,
 				participantCount: booking.participantCount,
-				signedCount: await signedCountForBooking(ctx, booking._id)
+				signedCount: booking.signedCount
 			}
 		};
 	}
@@ -569,6 +568,11 @@ export const submitPublicWaiver = mutation({
 			status: 'submitted',
 			submittedAt
 		});
+		if (booking) {
+			await ctx.db.patch(booking._id, {
+				signedCount: booking.signedCount + 1 + minors.length
+			});
+		}
 		return { submissionId };
 	}
 });

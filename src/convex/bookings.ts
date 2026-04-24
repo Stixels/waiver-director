@@ -2,14 +2,11 @@ import { ConvexError, v } from 'convex/values';
 import { query } from './_generated/server';
 import type { Doc } from './_generated/dataModel';
 import { bookingProviderValidator, bookingStatusValidator } from './lib/bookings';
-import {
-	signedCountForBooking,
-	signedUserCountFromSubmissions,
-	submissionsForBooking
-} from './lib/bookingSignatures';
+import { submissionsForBooking } from './lib/bookingSignatures';
 import { requireWorkspaceMember } from './lib/waivers';
 
 const MAX_BOOKING_LIST_SPAN_MS = 48 * 60 * 60 * 1000;
+const MAX_BOOKINGS_PER_LIST_WINDOW = 5_000;
 
 const bookingSummaryValue = v.object({
 	bookingId: v.id('bookings'),
@@ -82,7 +79,7 @@ function normalizedMatchValue(value?: string | null) {
 	return value?.trim().toLowerCase().replace(/\s+/g, ' ') ?? '';
 }
 
-function serializeBooking(booking: Doc<'bookings'>, signedCount: number) {
+function serializeBooking(booking: Doc<'bookings'>) {
 	return {
 		bookingId: booking._id,
 		provider: booking.provider,
@@ -96,7 +93,7 @@ function serializeBooking(booking: Doc<'bookings'>, signedCount: number) {
 		leadCustomerName: booking.leadCustomerName ?? null,
 		leadCustomerEmail: booking.leadCustomerEmail ?? null,
 		participantCount: booking.participantCount,
-		signedCount,
+		signedCount: booking.signedCount,
 		updatedAt: booking.updatedAt
 	};
 }
@@ -143,13 +140,9 @@ export const listWorkspaceBookings = query({
 					.gte('startAt', args.dayStartAt)
 					.lt('startAt', dayEndAt)
 			)
-			.collect();
+			.take(MAX_BOOKINGS_PER_LIST_WINDOW);
 
-		const serialized = await Promise.all(
-			dayBookings.map(async (booking) =>
-				serializeBooking(booking, await signedCountForBooking(ctx, booking._id))
-			)
-		);
+		const serialized = dayBookings.map((booking) => serializeBooking(booking));
 		const summary = serialized.reduce(
 			(total, booking) => {
 				const isCanceled = booking.status === 'canceled';
@@ -229,7 +222,7 @@ export const getWorkspaceBooking = query({
 		await requireWorkspaceMember(ctx, args.workspaceId);
 		const booking = await ctx.db.get(args.bookingId);
 		if (!booking || booking.workspaceId !== args.workspaceId) return null;
-		return serializeBooking(booking, await signedCountForBooking(ctx, booking._id));
+		return serializeBooking(booking);
 	}
 });
 
@@ -248,7 +241,7 @@ export const getWorkspaceBookingDetail = query({
 		const signedUsers = signedUsersFromSubmissions(submissions);
 
 		return {
-			booking: serializeBooking(booking, signedUserCountFromSubmissions(submissions)),
+			booking: serializeBooking(booking),
 			signedUsers
 		};
 	}

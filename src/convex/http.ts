@@ -5,6 +5,10 @@ import type { Id } from './_generated/dataModel';
 
 const http = httpRouter();
 
+function callbackErrorRedirectUrl(request: Request) {
+	return new URL('/app?bookeo=callback-error', request.url).toString();
+}
+
 http.route({
 	path: '/bookeo/callback',
 	method: 'GET',
@@ -14,14 +18,21 @@ http.route({
 		const state = url.searchParams.get('state') ?? '';
 		const apiKey = url.searchParams.get('apiKey') ?? undefined;
 
-		const result: { redirectUrl: string } = await ctx.runAction(
-			internal.integrations.completeBookeoCallback,
-			{
+		let result: { redirectUrl: string };
+		try {
+			result = await ctx.runAction(internal.integrations.completeBookeoCallback, {
 				success,
 				state,
 				...(apiKey ? { apiKey } : {})
-			}
-		);
+			});
+		} catch (error) {
+			console.error('[bookeo/callback] unable to complete callback', {
+				error,
+				state,
+				hasApiKey: Boolean(apiKey)
+			});
+			return Response.redirect(callbackErrorRedirectUrl(request), 303);
+		}
 
 		return Response.redirect(result.redirectUrl, 303);
 	})

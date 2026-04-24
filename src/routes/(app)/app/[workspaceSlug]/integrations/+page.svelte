@@ -96,7 +96,11 @@
 	const connectedProviderName = $derived(
 		connectedIntegration ? providerNameFor(connectedIntegration.provider) : 'booking provider'
 	);
-	const canManage = $derived(connectedIntegration?.canManage ?? currentWorkspace?.role === 'owner');
+	const canManage = $derived(
+		connectedIntegration?.canManage !== undefined
+			? connectedIntegration.canManage
+			: currentWorkspace?.role === 'owner'
+	);
 	const isLoading = $derived(integrationsQuery.isLoading || appContext.isLoading);
 
 	let syncHorizonMonths = $state(12);
