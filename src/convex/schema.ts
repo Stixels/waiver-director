@@ -1,5 +1,6 @@
 import { defineSchema, defineTable } from 'convex/server';
 import { v } from 'convex/values';
+import { bookingProviderValidator, bookingSnapshotValidator } from './lib/bookings';
 
 export default defineSchema({
 	users: defineTable({
@@ -137,6 +138,8 @@ export default defineSchema({
 	waiver_submissions: defineTable({
 		workspaceId: v.id('workspaces'),
 		versionId: v.id('waiver_versions'),
+		bookingId: v.optional(v.id('bookings')),
+		bookingSnapshot: v.optional(bookingSnapshotValidator),
 		signerName: v.string(),
 		signerEmail: v.string(),
 		signerDateOfBirth: v.string(),
@@ -149,5 +152,108 @@ export default defineSchema({
 		),
 		status: v.union(v.literal('submitted')),
 		submittedAt: v.number()
-	}).index('by_workspaceId', ['workspaceId'])
+	})
+		.index('by_workspaceId', ['workspaceId'])
+		.index('by_bookingId', ['bookingId']),
+
+	booking_integrations: defineTable({
+		workspaceId: v.id('workspaces'),
+		provider: bookingProviderValidator,
+		status: v.union(
+			v.literal('connected'),
+			v.literal('syncing'),
+			v.literal('error'),
+			v.literal('disconnected')
+		),
+		encryptedApiKey: v.optional(v.string()),
+		apiKeyLast4: v.optional(v.string()),
+		accountId: v.optional(v.string()),
+		permissions: v.array(v.string()),
+		syncHorizonMonths: v.number(),
+		lastSyncError: v.optional(v.string()),
+		connectedAt: v.optional(v.number()),
+		disconnectedAt: v.optional(v.number()),
+		updatedAt: v.number()
+	})
+		.index('by_workspaceId', ['workspaceId'])
+		.index('by_workspaceId_and_provider', ['workspaceId', 'provider']),
+
+	booking_connection_sessions: defineTable({
+		workspaceId: v.id('workspaces'),
+		provider: bookingProviderValidator,
+		requestedByUserId: v.id('users'),
+		state: v.string(),
+		status: v.union(
+			v.literal('pending'),
+			v.literal('completed'),
+			v.literal('failed'),
+			v.literal('expired')
+		),
+		syncHorizonMonths: v.number(),
+		createdAt: v.number(),
+		expiresAt: v.number()
+	})
+		.index('by_state', ['state'])
+		.index('by_workspaceId', ['workspaceId'])
+		.index('by_status_and_expiresAt', ['status', 'expiresAt'])
+		.index('by_status_and_createdAt', ['status', 'createdAt']),
+
+	bookings: defineTable({
+		workspaceId: v.id('workspaces'),
+		integrationId: v.id('booking_integrations'),
+		provider: bookingProviderValidator,
+		providerBookingId: v.string(),
+		lookupToken: v.string(),
+		status: v.union(v.literal('active'), v.literal('canceled')),
+		activityName: v.string(),
+		startTime: v.optional(v.string()),
+		endTime: v.optional(v.string()),
+		startAt: v.optional(v.number()),
+		endAt: v.optional(v.number()),
+		serviceDate: v.optional(v.string()),
+		leadCustomerName: v.optional(v.string()),
+		leadCustomerEmail: v.optional(v.string()),
+		participantCount: v.number(),
+		signedCount: v.number(),
+		updatedAt: v.number()
+	})
+		.index('by_workspaceId', ['workspaceId'])
+		.index('by_integrationId', ['integrationId'])
+		.index('by_lookupToken', ['lookupToken'])
+		// Public booking lookup intentionally matches providerBookingId within a workspace.
+		// A workspace may only connect one booking provider integration at a time.
+		.index('by_workspaceId_and_providerBookingId', ['workspaceId', 'providerBookingId'])
+		.index('by_workspaceId_and_provider_and_providerBookingId', [
+			'workspaceId',
+			'provider',
+			'providerBookingId'
+		])
+		.index('by_workspaceId_and_startAt', ['workspaceId', 'startAt'])
+		.index('by_workspaceId_and_leadCustomerEmail_and_serviceDate', [
+			'workspaceId',
+			'leadCustomerEmail',
+			'serviceDate'
+		]),
+
+	booking_webhook_events: defineTable({
+		workspaceId: v.id('workspaces'),
+		integrationId: v.id('booking_integrations'),
+		provider: bookingProviderValidator,
+		messageId: v.string(),
+		eventType: v.string(),
+		itemId: v.string(),
+		rawBody: v.string(),
+		status: v.union(
+			v.literal('received'),
+			v.literal('processed'),
+			v.literal('ignored'),
+			v.literal('failed')
+		),
+		receivedAt: v.number(),
+		processedAt: v.optional(v.number()),
+		errorMessage: v.optional(v.string())
+	})
+		.index('by_workspaceId', ['workspaceId'])
+		.index('by_integrationId', ['integrationId'])
+		.index('by_integrationId_and_messageId', ['integrationId', 'messageId'])
 });
