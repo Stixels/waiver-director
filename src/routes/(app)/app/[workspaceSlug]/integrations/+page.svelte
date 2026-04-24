@@ -85,15 +85,20 @@
 
 	type Integration = FunctionReturnType<typeof api.integrations.listWorkspaceIntegrations>[number];
 	const integrations = $derived((integrationsQuery.data ?? []) as Integration[]);
-	const bookeoIntegration = $derived(
-		integrations.find((integration) => integration.provider === 'bookeo') ?? null
+	const connectedIntegration = $derived(
+		integrations.find(
+			(integration) =>
+				integration.status === 'connected' ||
+				integration.status === 'syncing' ||
+				integration.status === 'error'
+		) ?? null
 	);
-	const canManage = $derived(bookeoIntegration?.canManage ?? currentWorkspace?.role === 'owner');
+	const connectedProviderName = $derived(
+		connectedIntegration ? providerNameFor(connectedIntegration.provider) : 'booking provider'
+	);
+	const canManage = $derived(connectedIntegration?.canManage ?? currentWorkspace?.role === 'owner');
 	const isLoading = $derived(integrationsQuery.isLoading || appContext.isLoading);
-	const status = $derived(bookeoIntegration?.status ?? 'disconnected');
-	const isConnected = $derived(
-		status === 'connected' || status === 'syncing' || status === 'error'
-	);
+	const isConnected = $derived(!!connectedIntegration);
 
 	let syncHorizonMonths = $state(12);
 	let manualApiKey = $state('');
@@ -128,11 +133,26 @@
 		return 'outline' as const;
 	}
 
-	function statusCopy(value: Integration['status']) {
-		if (value === 'connected') return 'Bookeo is connected and ready to sync booking data.';
-		if (value === 'syncing') return 'Initial booking import is running in the background.';
-		if (value === 'error') return 'Bookeo is connected, but sync needs attention.';
-		return 'Connect Bookeo to organize waiver submissions by booking.';
+	function integrationForProvider(providerKey: string) {
+		return integrations.find((integration) => integration.provider === providerKey) ?? null;
+	}
+
+	function providerNameFor(providerKey: string) {
+		return BOOKING_PROVIDERS.find((provider) => provider.key === providerKey)?.name ?? providerKey;
+	}
+
+	function statusCopy(integration: Integration) {
+		const providerName = providerNameFor(integration.provider);
+		if (integration.status === 'connected') {
+			return `${providerName} is connected and ready to sync booking data.`;
+		}
+		if (integration.status === 'syncing') {
+			return `${providerName} initial booking import is running in the background.`;
+		}
+		if (integration.status === 'error') {
+			return `${providerName} is connected, but sync needs attention.`;
+		}
+		return `Connect ${providerName} to organize waiver submissions by booking.`;
 	}
 
 	function formatTimestamp(timestamp: number | null) {
@@ -194,18 +214,20 @@
 	}
 
 	async function disconnect() {
-		if (!currentWorkspace || !bookeoIntegration || convex.disabled || !canConfirmDisconnect) return;
+		if (!currentWorkspace || !connectedIntegration || convex.disabled || !canConfirmDisconnect)
+			return;
+		const providerName = providerNameFor(connectedIntegration.provider);
 		isDisconnecting = true;
 		try {
 			await convex.mutation(api.integrations.disconnectBookingIntegration, {
 				workspaceId: currentWorkspace.workspaceId,
-				integrationId: bookeoIntegration.integrationId
+				integrationId: connectedIntegration.integrationId
 			});
 			disconnectDialogOpen = false;
 			disconnectConfirmation = '';
-			toast.success('Bookeo disconnected.');
+			toast.success(`${providerName} disconnected.`);
 		} catch (error) {
-			toast.error(getConvexErrorMessage(error, 'Unable to disconnect Bookeo.'));
+			toast.error(getConvexErrorMessage(error, `Unable to disconnect ${providerName}.`));
 		} finally {
 			isDisconnecting = false;
 		}
@@ -216,13 +238,13 @@
 	<title>{currentWorkspace?.name ?? 'Workspace'} Integrations | Waiver Director</title>
 </svelte:head>
 
-{#if bookeoIntegration && isConnected}
+{#if connectedIntegration && isConnected}
 	<Dialog bind:open={disconnectDialogOpen}>
 		<DialogContent class="max-w-md">
 			<DialogHeader>
-				<DialogTitle>Disconnect Bookeo?</DialogTitle>
+				<DialogTitle>Disconnect {connectedProviderName}?</DialogTitle>
 				<DialogDescription>
-					Waiver Director will stop receiving booking updates from Bookeo for this workspace.
+					Waiver Director will stop receiving booking updates from {connectedProviderName} for this workspace.
 					Existing bookings and signed waiver records remain in Waiver Director.
 				</DialogDescription>
 			</DialogHeader>
@@ -254,7 +276,7 @@
 					onclick={disconnect}
 					disabled={convex.disabled || !canConfirmDisconnect || isDisconnecting}
 				>
-					{isDisconnecting ? 'Disconnecting...' : 'Disconnect Bookeo'}
+					{isDisconnecting ? 'Disconnecting...' : `Disconnect ${connectedProviderName}`}
 				</Button>
 			</DialogFooter>
 		</DialogContent>
@@ -313,6 +335,8 @@
 
 					<div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
 						{#each BOOKING_PROVIDERS as provider (provider.key)}
+							{@const providerIntegration = integrationForProvider(provider.key)}
+							{@const providerStatus = providerIntegration?.status ?? 'disconnected'}
 							<div
 								class={cn(
 									'min-h-18 rounded-lg border bg-background p-3 transition-colors',
@@ -335,15 +359,15 @@
 										<div class="flex min-w-0 items-center gap-2">
 											<p class="truncate text-sm font-medium">{provider.name}</p>
 											<Badge
-												variant={provider.enabled ? statusBadgeVariant(status) : 'outline'}
+												variant={provider.enabled ? statusBadgeVariant(providerStatus) : 'outline'}
 												class="h-5 shrink-0 capitalize"
 											>
 												{#if provider.enabled}
 													<span
-														class={cn('size-1.5 rounded-full', statusDotClass(status))}
+														class={cn('size-1.5 rounded-full', statusDotClass(providerStatus))}
 														aria-hidden="true"
 													></span>
-													{statusLabel(status)}
+													{statusLabel(providerStatus)}
 												{:else}
 													{provider.status}
 												{/if}
@@ -360,11 +384,11 @@
 				</div>
 
 				<div class="space-y-4 p-5">
-					{#if bookeoIntegration && isConnected}
+					{#if connectedIntegration && isConnected}
 						<div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
 							<div class="min-w-0 space-y-1">
 								<h3 class="text-sm font-semibold">Connected provider</h3>
-								<p class="text-sm text-muted-foreground">{statusCopy(status)}</p>
+								<p class="text-sm text-muted-foreground">{statusCopy(connectedIntegration)}</p>
 							</div>
 							<Button
 								size="sm"
@@ -385,7 +409,7 @@
 									<span class="tracking-wide uppercase">Account</span>
 								</div>
 								<p class="mt-1.5 truncate text-sm font-medium">
-									{bookeoIntegration.accountId ?? 'Connected'}
+									{connectedIntegration.accountId ?? 'Connected'}
 								</p>
 							</div>
 							<div class="rounded-lg border border-border bg-card/40 p-3">
@@ -394,7 +418,7 @@
 									<span class="tracking-wide uppercase">Booking window</span>
 								</div>
 								<p class="mt-1.5 text-sm font-medium">
-									{bookeoIntegration.syncHorizonMonths} months future
+									{connectedIntegration.syncHorizonMonths} months future
 								</p>
 							</div>
 							<div class="rounded-lg border border-border bg-card/40 p-3">
@@ -403,12 +427,12 @@
 									<span class="tracking-wide uppercase">Connected</span>
 								</div>
 								<p class="mt-1.5 text-sm font-medium">
-									{formatTimestamp(bookeoIntegration.connectedAt)}
+									{formatTimestamp(connectedIntegration.connectedAt)}
 								</p>
 							</div>
 						</div>
 
-						{#if bookeoIntegration.missingRequiredPermissions.length > 0}
+						{#if connectedIntegration.missingRequiredPermissions.length > 0}
 							<div class="flex gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-4">
 								<ShieldAlertIcon
 									class="mt-0.5 size-4 shrink-0 text-destructive"
@@ -417,15 +441,15 @@
 								<div class="min-w-0 space-y-1">
 									<p class="text-sm font-semibold text-destructive">Missing required permissions</p>
 									<p class="text-xs leading-relaxed text-destructive/90">
-										Bookeo has not granted: {bookeoIntegration.missingRequiredPermissions.join(
+										{connectedProviderName} has not granted: {connectedIntegration.missingRequiredPermissions.join(
 											', '
-										)}. Reconnect from Bookeo's API settings to restore full sync.
+										)}. Reconnect from {connectedProviderName}'s settings to restore full sync.
 									</p>
 								</div>
 							</div>
 						{/if}
 
-						{#if bookeoIntegration.lastSyncError}
+						{#if connectedIntegration.lastSyncError}
 							<div class="flex gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-4">
 								<TriangleAlertIcon
 									class="mt-0.5 size-4 shrink-0 text-destructive"
@@ -434,7 +458,7 @@
 								<div class="min-w-0 space-y-1">
 									<p class="text-sm font-semibold text-destructive">Integration needs attention</p>
 									<p class="text-xs leading-relaxed break-words text-destructive/90">
-										{bookeoIntegration.lastSyncError}
+										{connectedIntegration.lastSyncError}
 									</p>
 								</div>
 							</div>
