@@ -117,6 +117,18 @@ function serializeBooking(booking: Doc<'bookings'>, signedCount: number) {
 	};
 }
 
+function serializePublicBookingMatch(booking: Doc<'bookings'>) {
+	return {
+		lookupToken: booking.lookupToken,
+		title: booking.title,
+		startTime: booking.startTime ?? null,
+		endTime: booking.endTime ?? null,
+		leadCustomerName: booking.leadCustomerName ?? null,
+		participantCount: booking.participantCount,
+		signedCount: booking.signedCount
+	};
+}
+
 export const listWorkspaceBookings = query({
 	args: {
 		workspaceId: v.id('workspaces'),
@@ -283,24 +295,15 @@ export const findPublicBooking = query({
 
 		const bookingNumber = args.bookingNumber?.trim();
 		if (bookingNumber) {
-			const booking = await ctx.db
+			const bookings = await ctx.db
 				.query('bookings')
 				.withIndex('by_workspaceId_and_providerBookingId', (q) =>
 					q.eq('workspaceId', waiver.workspaceId).eq('providerBookingId', bookingNumber)
 				)
-				.unique();
-			if (!booking || booking.status !== 'active') return [];
-			return [
-				{
-					lookupToken: booking.lookupToken,
-					title: booking.title,
-					startTime: booking.startTime ?? null,
-					endTime: booking.endTime ?? null,
-					leadCustomerName: booking.leadCustomerName ?? null,
-					participantCount: booking.participantCount,
-					signedCount: booking.signedCount
-				}
-			];
+				.take(10);
+			return bookings
+				.filter((booking) => booking.status === 'active')
+				.map((booking) => serializePublicBookingMatch(booking));
 		}
 
 		const email = normalizeEmail(args.leadEmail);
@@ -322,19 +325,8 @@ export const findPublicBooking = query({
 			)
 			.take(10);
 
-		const matches = [];
-		for (const booking of bookings.filter((candidate) => candidate.status === 'active')) {
-			matches.push({
-				lookupToken: booking.lookupToken,
-				title: booking.title,
-				startTime: booking.startTime ?? null,
-				endTime: booking.endTime ?? null,
-				leadCustomerName: booking.leadCustomerName ?? null,
-				participantCount: booking.participantCount,
-				signedCount: booking.signedCount
-			});
-		}
-
-		return matches;
+		return bookings
+			.filter((booking) => booking.status === 'active')
+			.map((booking) => serializePublicBookingMatch(booking));
 	}
 });

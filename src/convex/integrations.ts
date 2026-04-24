@@ -249,18 +249,43 @@ async function unregisterBookeoWebhooks(apiKey: string, integrationId: Id<'booki
 		data?: BookeoWebhook[];
 	};
 	const webhooks = Array.isArray(result.data) ? result.data : [];
-	const matchingWebhooks = webhooks.filter(
-		(webhook) =>
-			webhook.id &&
-			webhook.domain === 'bookings' &&
-			BOOKEO_WEBHOOK_TYPES.includes(webhook.type as (typeof BOOKEO_WEBHOOK_TYPES)[number]) &&
-			webhook.url?.includes(`/bookeo/webhook?integrationId=${integrationId}`)
+	const matchingWebhooks = webhooks.filter((webhook) =>
+		isRegisteredBookeoWebhook(webhook, integrationId)
 	);
 
 	for (const webhook of matchingWebhooks) {
-		await bookeoFetch(apiKey, `/webhooks/${encodeURIComponent(webhook.id!)}`, {
+		await bookeoFetch(apiKey, `/webhooks/${encodeURIComponent(webhook.id)}`, {
 			method: 'DELETE'
 		});
+	}
+}
+
+function isRegisteredBookeoWebhook(
+	webhook: BookeoWebhook,
+	integrationId: Id<'booking_integrations'>
+): webhook is BookeoWebhook & {
+	id: string;
+	url: string;
+	type: (typeof BOOKEO_WEBHOOK_TYPES)[number];
+} {
+	if (
+		!webhook.id ||
+		!webhook.url ||
+		webhook.domain !== 'bookings' ||
+		!BOOKEO_WEBHOOK_TYPES.includes(webhook.type as (typeof BOOKEO_WEBHOOK_TYPES)[number])
+	) {
+		return false;
+	}
+
+	try {
+		const url = new URL(webhook.url);
+		return (
+			url.pathname === '/bookeo/webhook' &&
+			url.searchParams.get('integrationId') === integrationId &&
+			url.searchParams.get('type') === webhook.type
+		);
+	} catch {
+		return false;
 	}
 }
 
@@ -341,8 +366,15 @@ function normalizeBookeoBooking(booking: BookeoBooking): NormalizedBooking | nul
 	const customer = toRecord(booking.customer);
 	const startTime = optionalString(booking, 'startTime');
 	const endTime = optionalString(booking, 'endTime');
+	const startAt = parseDateTime(startTime);
+	const endAt = parseDateTime(endTime);
+	const serviceDate = serviceDateFromDateTime(startTime);
 	const productName = optionalString(booking, 'productName');
 	const title = optionalString(booking, 'title') || productName || `Booking ${providerBookingId}`;
+	const leadCustomerName = customerName(customer);
+	const leadCustomerEmail = normalizeEmail(
+		optionalString(customer, 'emailAddress') || optionalString(customer, 'email')
+	);
 
 	return {
 		providerBookingId,
@@ -351,21 +383,11 @@ function normalizeBookeoBooking(booking: BookeoBooking): NormalizedBooking | nul
 		...(productName ? { productName } : {}),
 		...(startTime ? { startTime } : {}),
 		...(endTime ? { endTime } : {}),
-		...(parseDateTime(startTime) ? { startAt: parseDateTime(startTime) } : {}),
-		...(parseDateTime(endTime) ? { endAt: parseDateTime(endTime) } : {}),
-		...(serviceDateFromDateTime(startTime)
-			? { serviceDate: serviceDateFromDateTime(startTime) }
-			: {}),
-		...(customerName(customer) ? { leadCustomerName: customerName(customer) } : {}),
-		...(normalizeEmail(
-			optionalString(customer, 'emailAddress') || optionalString(customer, 'email')
-		)
-			? {
-					leadCustomerEmail: normalizeEmail(
-						optionalString(customer, 'emailAddress') || optionalString(customer, 'email')
-					)
-				}
-			: {}),
+		...(startAt !== undefined ? { startAt } : {}),
+		...(endAt !== undefined ? { endAt } : {}),
+		...(serviceDate ? { serviceDate } : {}),
+		...(leadCustomerName ? { leadCustomerName } : {}),
+		...(leadCustomerEmail ? { leadCustomerEmail } : {}),
 		participantCount: participantCount(booking)
 	};
 }
@@ -1048,9 +1070,10 @@ export const upsertProviderBooking = internalMutation({
 		const now = Date.now();
 		const existing = await ctx.db
 			.query('bookings')
-			.withIndex('by_workspaceId_and_providerBookingId', (q) =>
+			.withIndex('by_workspaceId_and_provider_and_providerBookingId', (q) =>
 				q
 					.eq('workspaceId', integration.workspaceId)
+					.eq('provider', integration.provider)
 					.eq('providerBookingId', args.booking.providerBookingId)
 			)
 			.unique();

@@ -46,7 +46,7 @@ export function serviceDateFromDateTime(value: string | undefined): string | und
 	if (localDate) return localDate;
 
 	const timestamp = parseDateTime(value);
-	if (!timestamp) return undefined;
+	if (timestamp === undefined) return undefined;
 	return new Date(timestamp).toISOString().slice(0, 10);
 }
 

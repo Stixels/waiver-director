@@ -229,6 +229,11 @@ export default defineSchema({
 		.index('by_integrationId', ['integrationId'])
 		.index('by_lookupToken', ['lookupToken'])
 		.index('by_workspaceId_and_providerBookingId', ['workspaceId', 'providerBookingId'])
+		.index('by_workspaceId_and_provider_and_providerBookingId', [
+			'workspaceId',
+			'provider',
+			'providerBookingId'
+		])
 		.index('by_workspaceId_and_startAt', ['workspaceId', 'startAt'])
 		.index('by_workspaceId_and_leadCustomerEmail_and_serviceDate', [
 			'workspaceId',
