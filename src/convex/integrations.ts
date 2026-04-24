@@ -4,7 +4,6 @@ import {
 	internalAction,
 	internalMutation,
 	internalQuery,
-	mutation,
 	query
 } from './_generated/server';
 import { internal } from './_generated/api';
@@ -29,6 +28,13 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const BOOKEO_WINDOW_MS = 31 * DAY_MS;
 
 type BookeoBooking = Record<string, unknown>;
+
+type BookeoWebhook = {
+	id?: string;
+	url?: string;
+	domain?: string;
+	type?: string;
+};
 
 type NormalizedBooking = {
 	providerBookingId: string;
@@ -238,6 +244,26 @@ async function registerBookeoWebhooks(apiKey: string, integrationId: Id<'booking
 	}
 }
 
+async function unregisterBookeoWebhooks(apiKey: string, integrationId: Id<'booking_integrations'>) {
+	const result = (await bookeoFetch(apiKey, '/webhooks')) as {
+		data?: BookeoWebhook[];
+	};
+	const webhooks = Array.isArray(result.data) ? result.data : [];
+	const matchingWebhooks = webhooks.filter(
+		(webhook) =>
+			webhook.id &&
+			webhook.domain === 'bookings' &&
+			BOOKEO_WEBHOOK_TYPES.includes(webhook.type as (typeof BOOKEO_WEBHOOK_TYPES)[number]) &&
+			webhook.url?.includes(`/bookeo/webhook?integrationId=${integrationId}`)
+	);
+
+	for (const webhook of matchingWebhooks) {
+		await bookeoFetch(apiKey, `/webhooks/${encodeURIComponent(webhook.id!)}`, {
+			method: 'DELETE'
+		});
+	}
+}
+
 function buildBookeoAuthorizationUrl(state: string): string {
 	const configuredUrl = requiredEnv('BOOKEO_AUTHORIZATION_URL');
 	const url = new URL(configuredUrl);
@@ -424,7 +450,7 @@ function chunkRanges(start: Date, end: Date): Array<{ start: Date; end: Date }> 
 	while (cursor < end.getTime()) {
 		const next = Math.min(cursor + BOOKEO_WINDOW_MS, end.getTime());
 		chunks.push({ start: new Date(cursor), end: new Date(next) });
-		cursor = next + 1000;
+		cursor = next;
 	}
 	return chunks;
 }
@@ -460,27 +486,37 @@ export const listWorkspaceIntegrations = query({
 	}
 });
 
-export const disconnectBookingIntegration = mutation({
+export const disconnectBookingIntegration = action({
 	args: {
 		workspaceId: v.id('workspaces'),
 		integrationId: v.id('booking_integrations')
 	},
 	returns: v.null(),
 	handler: async (ctx, args) => {
-		await requireWorkspaceOwner(ctx, args.workspaceId);
-		const integration = await ctx.db.get(args.integrationId);
-		if (!integration || integration.workspaceId !== args.workspaceId) {
-			throw new ConvexError({
-				code: 'not_found',
-				message: 'Integration not found.'
-			});
+		const integration: {
+			integrationId: Id<'booking_integrations'>;
+			provider: 'bookeo' | 'resova' | 'xola';
+			status: 'connected' | 'syncing' | 'error' | 'disconnected';
+			encryptedApiKey: string | null;
+		} = await ctx.runQuery(internal.integrations.getIntegrationForDisconnect, {
+			workspaceId: args.workspaceId,
+			integrationId: args.integrationId
+		});
+
+		if (
+			integration.provider === 'bookeo' &&
+			integration.status !== 'disconnected' &&
+			integration.encryptedApiKey
+		) {
+			await unregisterBookeoWebhooks(
+				await decryptSecret(integration.encryptedApiKey),
+				integration.integrationId
+			);
 		}
 
-		await ctx.db.patch(integration._id, {
-			status: 'disconnected',
-			encryptedApiKey: undefined,
-			disconnectedAt: Date.now(),
-			updatedAt: Date.now()
+		await ctx.runMutation(internal.integrations.markBookingIntegrationDisconnected, {
+			workspaceId: args.workspaceId,
+			integrationId: args.integrationId
 		});
 
 		return null;
@@ -604,6 +640,68 @@ export const getOwnerAccessForAction = internalQuery({
 	handler: async (ctx, args) => {
 		const { user } = await requireWorkspaceOwner(ctx, args.workspaceId);
 		return { userId: user._id };
+	}
+});
+
+export const getIntegrationForDisconnect = internalQuery({
+	args: {
+		workspaceId: v.id('workspaces'),
+		integrationId: v.id('booking_integrations')
+	},
+	returns: v.object({
+		integrationId: v.id('booking_integrations'),
+		provider: bookingProviderValidator,
+		status: v.union(
+			v.literal('connected'),
+			v.literal('syncing'),
+			v.literal('error'),
+			v.literal('disconnected')
+		),
+		encryptedApiKey: v.union(v.string(), v.null())
+	}),
+	handler: async (ctx, args) => {
+		await requireWorkspaceOwner(ctx, args.workspaceId);
+		const integration = await ctx.db.get(args.integrationId);
+		if (!integration || integration.workspaceId !== args.workspaceId) {
+			throw new ConvexError({
+				code: 'not_found',
+				message: 'Integration not found.'
+			});
+		}
+
+		return {
+			integrationId: integration._id,
+			provider: integration.provider,
+			status: integration.status,
+			encryptedApiKey: integration.encryptedApiKey ?? null
+		};
+	}
+});
+
+export const markBookingIntegrationDisconnected = internalMutation({
+	args: {
+		workspaceId: v.id('workspaces'),
+		integrationId: v.id('booking_integrations')
+	},
+	returns: v.null(),
+	handler: async (ctx, args) => {
+		const integration = await ctx.db.get(args.integrationId);
+		if (!integration || integration.workspaceId !== args.workspaceId) {
+			throw new ConvexError({
+				code: 'not_found',
+				message: 'Integration not found.'
+			});
+		}
+
+		const now = Date.now();
+		await ctx.db.patch(integration._id, {
+			status: 'disconnected',
+			encryptedApiKey: undefined,
+			disconnectedAt: now,
+			updatedAt: now
+		});
+
+		return null;
 	}
 });
 

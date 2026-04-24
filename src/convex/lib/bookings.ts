@@ -42,6 +42,9 @@ export function parseDateTime(value: string | undefined): number | undefined {
 }
 
 export function serviceDateFromDateTime(value: string | undefined): string | undefined {
+	const localDate = value?.match(/^(\d{4}-\d{2}-\d{2})(?:[T\s]|$)/)?.[1];
+	if (localDate) return localDate;
+
 	const timestamp = parseDateTime(value);
 	if (!timestamp) return undefined;
 	return new Date(timestamp).toISOString().slice(0, 10);

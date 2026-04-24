@@ -219,7 +219,7 @@
 		const providerName = providerNameFor(connectedIntegration.provider);
 		isDisconnecting = true;
 		try {
-			await convex.mutation(api.integrations.disconnectBookingIntegration, {
+			await convex.action(api.integrations.disconnectBookingIntegration, {
 				workspaceId: currentWorkspace.workspaceId,
 				integrationId: connectedIntegration.integrationId
 			});
