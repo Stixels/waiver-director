@@ -12,6 +12,7 @@
 	} from '$lib/components/ui/dialog';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import WaiverReadonlyDocument from '$lib/components/waivers/WaiverReadonlyDocument.svelte';
+	import { formatBookingTimestamp } from '$lib/utils/date';
 
 	interface Props {
 		open: boolean;
@@ -36,13 +37,6 @@
 		return new Intl.DateTimeFormat('en-US', { dateStyle: 'long', timeStyle: 'short' }).format(
 			new Date(ts)
 		);
-	}
-
-	function formatBookingTimestamp(timestamp: string | undefined) {
-		if (!timestamp) return null;
-		const date = new Date(timestamp);
-		if (Number.isNaN(date.getTime())) return null;
-		return new Intl.DateTimeFormat('en-US', { dateStyle: 'long', timeStyle: 'short' }).format(date);
 	}
 </script>
 
@@ -100,8 +94,12 @@
 					Submitted {formatTimestamp(submission.submittedAt)}
 					{#if submission.booking}
 						for {submission.booking.activityName}
-						{#if formatBookingTimestamp(submission.booking.startTime)}
-							on {formatBookingTimestamp(submission.booking.startTime)}
+						{@const formattedStart = formatBookingTimestamp(submission.booking.startTime, {
+							dateStyle: 'long',
+							timeStyle: 'short'
+						})}
+						{#if formattedStart}
+							on {formattedStart}
 						{/if}
 					{/if}
 				</DialogDescription>

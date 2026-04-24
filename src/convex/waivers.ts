@@ -4,6 +4,7 @@ import { mutation, query } from './_generated/server';
 import type { Doc, Id } from './_generated/dataModel';
 import type { MutationCtx, QueryCtx } from './_generated/server';
 import { bookingSnapshot, bookingSnapshotValidator } from './lib/bookings';
+import { signedCountForBooking } from './lib/bookingSignatures';
 import {
 	assertWorkspaceRecord,
 	minorInputValidator,
@@ -457,7 +458,7 @@ export const getPublicWaiverForBooking = query({
 				endTime: booking.endTime ?? null,
 				leadCustomerName: booking.leadCustomerName ?? null,
 				participantCount: booking.participantCount,
-				signedCount: booking.signedCount
+				signedCount: await signedCountForBooking(ctx, booking._id)
 			}
 		};
 	}
@@ -535,10 +536,11 @@ export const submitPublicWaiver = mutation({
 		validateSubmissionAnswers(version, args.answers);
 		const minors = validateMinors(args.minors);
 		let booking: Doc<'bookings'> | null = null;
-		if (args.bookingLookupToken) {
+		const bookingLookupToken = args.bookingLookupToken;
+		if (bookingLookupToken) {
 			booking = await ctx.db
 				.query('bookings')
-				.withIndex('by_lookupToken', (q) => q.eq('lookupToken', args.bookingLookupToken ?? ''))
+				.withIndex('by_lookupToken', (q) => q.eq('lookupToken', bookingLookupToken))
 				.unique();
 			if (!booking || booking.workspaceId !== waiver.workspaceId || booking.status !== 'active') {
 				throw new ConvexError({
@@ -567,14 +569,6 @@ export const submitPublicWaiver = mutation({
 			status: 'submitted',
 			submittedAt
 		});
-
-		if (booking) {
-			await ctx.db.patch(booking._id, {
-				signedCount: booking.signedCount + 1 + minors.length,
-				updatedAt: submittedAt
-			});
-		}
-
 		return { submissionId };
 	}
 });

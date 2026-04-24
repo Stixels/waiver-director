@@ -46,9 +46,9 @@ http.route({
 			return new Response('Bad request', { status: 400 });
 		}
 
-		const result: { status: 'accepted' | 'duplicate' | 'rejected' } = await ctx.runAction(
-			internal.integrations.verifyAndRecordBookeoWebhook,
-			{
+		let result: { status: 'accepted' | 'duplicate' | 'rejected' };
+		try {
+			result = await ctx.runAction(internal.integrations.verifyAndRecordBookeoWebhook, {
 				integrationId,
 				eventType,
 				url: request.url,
@@ -57,8 +57,18 @@ http.route({
 				messageId,
 				signature,
 				previousMessageLost
+			});
+		} catch (error) {
+			if (
+				error instanceof Error &&
+				(error.name === 'ArgumentValidationError' ||
+					error.message.includes('ArgumentValidationError'))
+			) {
+				return new Response('Bad request', { status: 400 });
 			}
-		);
+			console.error('[bookeo/webhook] unexpected webhook error', error);
+			return new Response('Internal server error', { status: 500 });
+		}
 
 		if (result.status === 'rejected') {
 			return new Response('Rejected', { status: 401 });

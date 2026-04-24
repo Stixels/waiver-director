@@ -18,6 +18,7 @@
 	} from '$lib/components/waivers/waiver-public-form-classes';
 	import type { WaiverField, WaiverMinor } from '$lib/domain/waivers';
 	import { getConvexErrorMessage } from '$lib/utils/convex-errors';
+	import { formatBookingTimestamp } from '$lib/utils/date';
 
 	type PublicWaiver = {
 		slug: string;
@@ -37,6 +38,7 @@
 		participantCount: number;
 		signedCount: number;
 	};
+	type MinorFormState = WaiverMinor & { _uid: string };
 
 	interface Props {
 		waiver: PublicWaiver;
@@ -52,13 +54,13 @@
 	let signerDateOfBirth = $state('');
 	let signatureDataUrl = $state('');
 	let answers = $state<Record<string, string | boolean | null>>({});
-	let minors = $state<WaiverMinor[]>([]);
+	let minors = $state<MinorFormState[]>([]);
 	let isSubmitting = $state(false);
 	let submitError = $state<string | null>(null);
 	let isSubmitted = $state(false);
 
 	function addMinor() {
-		minors.push({ fullName: '' });
+		minors.push({ _uid: crypto.randomUUID(), fullName: '' });
 	}
 
 	function removeMinor(index: number) {
@@ -78,16 +80,6 @@
 		return answers[fieldId] === true;
 	}
 
-	function formatTimestamp(timestamp: string | null) {
-		if (!timestamp) return null;
-		const date = new Date(timestamp);
-		if (Number.isNaN(date.getTime())) return null;
-		return new Intl.DateTimeFormat('en-US', {
-			dateStyle: 'medium',
-			timeStyle: 'short'
-		}).format(date);
-	}
-
 	async function handleSubmit(event: SubmitEvent) {
 		event.preventDefault();
 
@@ -96,8 +88,14 @@
 			return;
 		}
 
+		if (!signatureDataUrl || !signatureDataUrl.startsWith('data:image/')) {
+			submitError = 'Please provide a signature.';
+			return;
+		}
+
 		isSubmitting = true;
 		submitError = null;
+		const minorsPayload = minors.map((minor) => ({ fullName: minor.fullName }));
 
 		try {
 			await convex.mutation(api.waivers.submitPublicWaiver, {
@@ -109,7 +107,7 @@
 				signerDateOfBirth,
 				signatureDataUrl,
 				answers,
-				minors
+				minors: minorsPayload
 			});
 
 			isSubmitted = true;
@@ -155,14 +153,18 @@
 		{:else}
 			<div class="space-y-6">
 				{#if booking}
+					{@const formattedStart = formatBookingTimestamp(booking.startTime, {
+						dateStyle: 'medium',
+						timeStyle: 'short'
+					})}
 					<section class="border border-border bg-muted/20 p-4">
 						<p class="text-xs font-bold tracking-[0.16em] text-muted-foreground uppercase">
 							Booking
 						</p>
 						<h2 class="mt-1 text-lg font-semibold tracking-tight">{booking.activityName}</h2>
 						<div class="mt-2 grid gap-1 text-sm text-muted-foreground sm:grid-cols-2">
-							{#if formatTimestamp(booking.startTime)}
-								<p>{formatTimestamp(booking.startTime)}</p>
+							{#if formattedStart}
+								<p>{formattedStart}</p>
 							{/if}
 							{#if booking.leadCustomerName}
 								<p>Booked by {booking.leadCustomerName}</p>
@@ -222,7 +224,7 @@
 							{#snippet body()}
 								{#if minors.length > 0}
 									<div class="space-y-6">
-										{#each minors as minor, index (index)}
+										{#each minors as minor, index (minor._uid)}
 											<div>
 												<div class="mb-3 flex items-center justify-between gap-3">
 													<p

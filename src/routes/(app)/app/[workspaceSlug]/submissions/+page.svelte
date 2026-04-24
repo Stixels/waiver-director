@@ -16,6 +16,7 @@
 		TableRow
 	} from '$lib/components/ui/table';
 	import { Skeleton } from '$lib/components/ui/skeleton';
+	import { formatBookingTimestamp } from '$lib/utils/date';
 	import ChevronLeftIcon from '@lucide/svelte/icons/chevron-left';
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 	import FileTextIcon from '@lucide/svelte/icons/file-text';
@@ -83,13 +84,6 @@
 	function formatDob(dob: string) {
 		const [y, m, d] = dob.split('-').map(Number);
 		return new Intl.DateTimeFormat('en-US', { dateStyle: 'medium' }).format(new Date(y, m - 1, d));
-	}
-
-	function formatBookingTimestamp(timestamp: string | null) {
-		if (!timestamp) return null;
-		const date = new Date(timestamp);
-		if (Number.isNaN(date.getTime())) return null;
-		return new Intl.DateTimeFormat('en-US', { dateStyle: 'medium' }).format(date);
 	}
 
 	function resetPagination() {

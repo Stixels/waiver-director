@@ -98,7 +98,6 @@
 	);
 	const canManage = $derived(connectedIntegration?.canManage ?? currentWorkspace?.role === 'owner');
 	const isLoading = $derived(integrationsQuery.isLoading || appContext.isLoading);
-	const isConnected = $derived(!!connectedIntegration);
 
 	let syncHorizonMonths = $state(12);
 	let manualApiKey = $state('');
@@ -192,11 +191,12 @@
 
 	async function connectManually() {
 		if (!currentWorkspace || convex.disabled) return;
+		const apiKeyTrimmed = manualApiKey.trim();
 		isConnectingManually = true;
 		try {
 			await convex.action(api.integrations.connectBookeoManually, {
 				workspaceId: currentWorkspace.workspaceId,
-				apiKey: manualApiKey,
+				apiKey: apiKeyTrimmed,
 				syncHorizonMonths
 			});
 			manualApiKey = '';
@@ -238,7 +238,7 @@
 	<title>{currentWorkspace?.name ?? 'Workspace'} Integrations | Waiver Director</title>
 </svelte:head>
 
-{#if connectedIntegration && isConnected}
+{#if connectedIntegration}
 	<Dialog bind:open={disconnectDialogOpen}>
 		<DialogContent class="max-w-md">
 			<DialogHeader>
@@ -384,7 +384,7 @@
 				</div>
 
 				<div class="space-y-4 p-5">
-					{#if connectedIntegration && isConnected}
+					{#if connectedIntegration}
 						<div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
 							<div class="min-w-0 space-y-1">
 								<h3 class="text-sm font-semibold">Connected provider</h3>

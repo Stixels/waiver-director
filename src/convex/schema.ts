@@ -221,12 +221,13 @@ export default defineSchema({
 		leadCustomerName: v.optional(v.string()),
 		leadCustomerEmail: v.optional(v.string()),
 		participantCount: v.number(),
-		signedCount: v.number(),
 		updatedAt: v.number()
 	})
 		.index('by_workspaceId', ['workspaceId'])
 		.index('by_integrationId', ['integrationId'])
 		.index('by_lookupToken', ['lookupToken'])
+		// Public booking lookup intentionally matches providerBookingId within a workspace.
+		// A workspace may only connect one booking provider integration at a time.
 		.index('by_workspaceId_and_providerBookingId', ['workspaceId', 'providerBookingId'])
 		.index('by_workspaceId_and_provider_and_providerBookingId', [
 			'workspaceId',

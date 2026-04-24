@@ -27,6 +27,7 @@ const BOOKEO_WEBHOOK_TYPES = ['created', 'updated', 'deleted'] as const;
 const CONNECT_STATE_TTL_MS = 30 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const BOOKEO_WINDOW_MS = 31 * DAY_MS;
+const BOOKEO_FETCH_TIMEOUT_MS = 20_000;
 
 type BookeoBooking = Record<string, unknown>;
 
@@ -183,15 +184,31 @@ function timingSafeEqual(a: string, b: string): boolean {
 }
 
 async function bookeoFetch(apiKey: string, path: string, init: RequestInit = {}) {
-	const response = await fetch(`${BOOKEO_API_BASE_URL}${path}`, {
-		...init,
-		headers: {
-			'Content-Type': 'application/json',
-			'X-Bookeo-apiKey': apiKey,
-			'X-Bookeo-secretKey': requiredEnv('BOOKEO_SECRET_KEY'),
-			...init.headers
+	const controller = new AbortController();
+	const timeout = setTimeout(() => controller.abort(), BOOKEO_FETCH_TIMEOUT_MS);
+	let response: Response;
+	try {
+		response = await fetch(`${BOOKEO_API_BASE_URL}${path}`, {
+			...init,
+			signal: controller.signal,
+			headers: {
+				'Content-Type': 'application/json',
+				'X-Bookeo-apiKey': apiKey,
+				'X-Bookeo-secretKey': requiredEnv('BOOKEO_SECRET_KEY'),
+				...init.headers
+			}
+		});
+	} catch (error) {
+		if (error instanceof Error && error.name === 'AbortError') {
+			throw new ConvexError({
+				code: 'provider_error',
+				message: 'Bookeo request timed out.'
+			});
 		}
-	});
+		throw error;
+	} finally {
+		clearTimeout(timeout);
+	}
 
 	if (!response.ok) {
 		let message = `Bookeo request failed with ${response.status}.`;
@@ -231,16 +248,25 @@ async function registerBookeoWebhooks(apiKey: string, integrationId: Id<'booking
 			message: 'Missing Convex site URL required to register Bookeo webhooks.'
 		});
 	}
-	for (const type of BOOKEO_WEBHOOK_TYPES) {
-		const url = `${siteUrl}/bookeo/webhook?integrationId=${integrationId}&type=${type}`;
-		await bookeoFetch(apiKey, '/webhooks', {
-			method: 'POST',
-			body: JSON.stringify({
-				domain: 'bookings',
-				type,
-				url
-			})
-		});
+	try {
+		for (const type of BOOKEO_WEBHOOK_TYPES) {
+			const url = `${siteUrl}/bookeo/webhook?integrationId=${integrationId}&type=${type}`;
+			await bookeoFetch(apiKey, '/webhooks', {
+				method: 'POST',
+				body: JSON.stringify({
+					domain: 'bookings',
+					type,
+					url
+				})
+			});
+		}
+	} catch (error) {
+		try {
+			await unregisterBookeoWebhooks(apiKey, integrationId);
+		} catch {
+			// Best-effort cleanup only; preserve the original registration error.
+		}
+		throw error;
 	}
 }
 
@@ -524,20 +550,27 @@ export const disconnectBookingIntegration = action({
 			integrationId: args.integrationId
 		});
 
+		let remoteCleanupError: string | undefined;
 		if (
 			integration.provider === 'bookeo' &&
 			integration.status !== 'disconnected' &&
 			integration.encryptedApiKey
 		) {
-			await unregisterBookeoWebhooks(
-				await decryptSecret(integration.encryptedApiKey),
-				integration.integrationId
-			);
+			try {
+				await unregisterBookeoWebhooks(
+					await decryptSecret(integration.encryptedApiKey),
+					integration.integrationId
+				);
+			} catch (error) {
+				remoteCleanupError =
+					error instanceof Error ? error.message : 'Unable to unregister Bookeo webhooks.';
+			}
 		}
 
 		await ctx.runMutation(internal.integrations.markBookingIntegrationDisconnected, {
 			workspaceId: args.workspaceId,
-			integrationId: args.integrationId
+			integrationId: args.integrationId,
+			...(remoteCleanupError ? { remoteCleanupError } : {})
 		});
 
 		return null;
@@ -702,7 +735,8 @@ export const getIntegrationForDisconnect = internalQuery({
 export const markBookingIntegrationDisconnected = internalMutation({
 	args: {
 		workspaceId: v.id('workspaces'),
-		integrationId: v.id('booking_integrations')
+		integrationId: v.id('booking_integrations'),
+		remoteCleanupError: v.optional(v.string())
 	},
 	returns: v.null(),
 	handler: async (ctx, args) => {
@@ -718,6 +752,7 @@ export const markBookingIntegrationDisconnected = internalMutation({
 		await ctx.db.patch(integration._id, {
 			status: 'disconnected',
 			encryptedApiKey: undefined,
+			...(args.remoteCleanupError ? { lastSyncError: args.remoteCleanupError } : {}),
 			disconnectedAt: now,
 			updatedAt: now
 		});
@@ -1082,8 +1117,7 @@ export const upsertProviderBooking = internalMutation({
 			? existing._id
 			: await ctx.db.insert('bookings', {
 					...bookingFields,
-					lookupToken: args.lookupToken,
-					signedCount: 0
+					lookupToken: args.lookupToken
 				});
 
 		if (existing) {
@@ -1338,7 +1372,8 @@ export const completeBookeoCallback = internalAction({
 		);
 		const redirectBase: string = `${appUrl()}/app/${workspace.slug}/integrations`;
 
-		if (!args.success || !args.apiKey) {
+		const apiKey = args.apiKey?.trim() ?? '';
+		if (!args.success || apiKey.length < 6) {
 			await ctx.runMutation(internal.integrations.markConnectionSession, {
 				sessionId: session.sessionId,
 				status: 'failed'
@@ -1348,7 +1383,7 @@ export const completeBookeoCallback = internalAction({
 
 		let integrationId: Id<'booking_integrations'> | null = null;
 		try {
-			const apiKeyInfo = await getBookeoApiKeyInfo(args.apiKey);
+			const apiKeyInfo = await getBookeoApiKeyInfo(apiKey);
 			const missing = missingBookeoRequiredPermissions(apiKeyInfo.permissions);
 			if (missing.length > 0) {
 				throw new ConvexError({
@@ -1361,15 +1396,15 @@ export const completeBookeoCallback = internalAction({
 				internal.integrations.saveBookeoConnection,
 				{
 					workspaceId: session.workspaceId,
-					encryptedApiKey: await encryptSecret(args.apiKey),
-					apiKeyLast4: args.apiKey.slice(-4),
+					encryptedApiKey: await encryptSecret(apiKey),
+					apiKeyLast4: apiKey.slice(-4),
 					accountId: apiKeyInfo.accountId,
 					permissions: apiKeyInfo.permissions,
 					syncHorizonMonths: assertValidSyncHorizon(session.syncHorizonMonths)
 				}
 			);
 			integrationId = savedIntegrationId;
-			await registerBookeoWebhooks(args.apiKey, savedIntegrationId);
+			await registerBookeoWebhooks(apiKey, savedIntegrationId);
 			await ctx.runMutation(internal.integrations.markBookeoConnectionReady, {
 				integrationId: savedIntegrationId
 			});
@@ -1462,8 +1497,8 @@ export const verifyAndRecordBookeoWebhook = internalAction({
 		try {
 			const body = JSON.parse(args.body) as { itemId?: string };
 			if (body.itemId) itemId = body.itemId;
-		} catch {
-			return { status: 'rejected' };
+		} catch (error) {
+			console.error('[bookeo/webhook] unable to parse webhook body', error);
 		}
 
 		const result: { duplicate: boolean } = await ctx.runMutation(

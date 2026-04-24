@@ -221,8 +221,13 @@
 		event?.stopPropagation();
 		const url = bookingPublicUrl(booking);
 		if (!url) return;
-		await navigator.clipboard.writeText(url);
-		toast.success('Booking waiver link copied.');
+		try {
+			await navigator.clipboard.writeText(url);
+			toast.success('Booking waiver link copied.');
+		} catch (error) {
+			console.error('[bookings] unable to copy booking link', error);
+			toast.error('Unable to copy booking link.');
+		}
 	}
 
 	function openBooking(bookingId: Id<'bookings'>) {
