@@ -143,7 +143,6 @@ export default defineSchema({
 				provider: v.union(v.literal('bookeo'), v.literal('resova'), v.literal('xola')),
 				providerBookingId: v.string(),
 				activityName: v.string(),
-				providerTitle: v.optional(v.string()),
 				startTime: v.optional(v.string()),
 				endTime: v.optional(v.string()),
 				leadCustomerName: v.optional(v.string()),
@@ -214,7 +213,6 @@ export default defineSchema({
 		lookupToken: v.string(),
 		status: v.union(v.literal('active'), v.literal('canceled')),
 		activityName: v.string(),
-		providerTitle: v.optional(v.string()),
 		startTime: v.optional(v.string()),
 		endTime: v.optional(v.string()),
 		startAt: v.optional(v.number()),
@@ -241,21 +239,6 @@ export default defineSchema({
 			'leadCustomerEmail',
 			'serviceDate'
 		]),
-
-	booking_sync_runs: defineTable({
-		workspaceId: v.id('workspaces'),
-		integrationId: v.id('booking_integrations'),
-		provider: v.union(v.literal('bookeo'), v.literal('resova'), v.literal('xola')),
-		syncType: v.union(v.literal('initial'), v.literal('webhook'), v.literal('repair')),
-		status: v.union(v.literal('running'), v.literal('succeeded'), v.literal('failed')),
-		rangeStart: v.optional(v.string()),
-		rangeEnd: v.optional(v.string()),
-		startedAt: v.number(),
-		finishedAt: v.optional(v.number()),
-		errorMessage: v.optional(v.string())
-	})
-		.index('by_workspaceId', ['workspaceId'])
-		.index('by_integrationId', ['integrationId']),
 
 	booking_webhook_events: defineTable({
 		workspaceId: v.id('workspaces'),

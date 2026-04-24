@@ -15,7 +15,6 @@ export const bookingSnapshotValidator = v.object({
 	provider: bookingProviderValidator,
 	providerBookingId: v.string(),
 	activityName: v.string(),
-	providerTitle: v.optional(v.string()),
 	startTime: v.optional(v.string()),
 	endTime: v.optional(v.string()),
 	leadCustomerName: v.optional(v.string()),
@@ -26,6 +25,7 @@ export type BookingProvider = 'bookeo' | 'resova' | 'xola';
 export type SyncHorizonMonths = number;
 
 export const BOOKEO_REQUIRED_PERMISSIONS = ['bookings_r_all', 'customers_r_all'] as const;
+export const UNKNOWN_ACTIVITY_NAME = 'Unknown activity';
 
 export function normalizeEmail(value: string | undefined): string | undefined {
 	const email = value?.trim().toLowerCase();
@@ -68,7 +68,6 @@ export function bookingSnapshot(booking: Doc<'bookings'>) {
 		provider: booking.provider,
 		providerBookingId: booking.providerBookingId,
 		activityName: booking.activityName,
-		...(booking.providerTitle ? { providerTitle: booking.providerTitle } : {}),
 		...(booking.startTime ? { startTime: booking.startTime } : {}),
 		...(booking.endTime ? { endTime: booking.endTime } : {}),
 		...(booking.leadCustomerName ? { leadCustomerName: booking.leadCustomerName } : {}),

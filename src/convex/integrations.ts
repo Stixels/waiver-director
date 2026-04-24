@@ -17,7 +17,8 @@ import {
 	normalizeNullableString,
 	parseDateTime,
 	serviceDateFromDateTime,
-	syncHorizonMonthsValidator
+	syncHorizonMonthsValidator,
+	UNKNOWN_ACTIVITY_NAME
 } from './lib/bookings';
 import { requireWorkspaceMember, requireWorkspaceOwner } from './lib/waivers';
 
@@ -40,7 +41,6 @@ type NormalizedBooking = {
 	providerBookingId: string;
 	status: 'active' | 'canceled';
 	activityName: string;
-	providerTitle?: string;
 	startTime?: string;
 	endTime?: string;
 	startAt?: number;
@@ -370,8 +370,7 @@ function normalizeBookeoBooking(booking: BookeoBooking): NormalizedBooking | nul
 	const endAt = parseDateTime(endTime);
 	const serviceDate = serviceDateFromDateTime(startTime);
 	const productName = optionalString(booking, 'productName');
-	const providerTitle = optionalString(booking, 'title');
-	const activityName = productName || 'Unknown activity';
+	const activityName = productName || UNKNOWN_ACTIVITY_NAME;
 	const leadCustomerName = customerName(customer);
 	const leadCustomerEmail = normalizeEmail(
 		optionalString(customer, 'emailAddress') || optionalString(customer, 'email')
@@ -381,7 +380,6 @@ function normalizeBookeoBooking(booking: BookeoBooking): NormalizedBooking | nul
 		providerBookingId,
 		status: booking.canceled === true ? 'canceled' : 'active',
 		activityName,
-		...(providerTitle ? { providerTitle } : {}),
 		...(startTime ? { startTime } : {}),
 		...(endTime ? { endTime } : {}),
 		...(startAt !== undefined ? { startAt } : {}),
@@ -968,14 +966,11 @@ export const getWebhookIntegration = internalQuery({
 	}
 });
 
-export const startSyncRun = internalMutation({
+export const markBookeoSyncStarted = internalMutation({
 	args: {
-		integrationId: v.id('booking_integrations'),
-		syncType: v.union(v.literal('initial'), v.literal('webhook'), v.literal('repair')),
-		rangeStart: v.optional(v.string()),
-		rangeEnd: v.optional(v.string())
+		integrationId: v.id('booking_integrations')
 	},
-	returns: v.union(v.null(), v.id('booking_sync_runs')),
+	returns: v.boolean(),
 	handler: async (ctx, args) => {
 		const integration = await ctx.db.get(args.integrationId);
 		if (!integration) {
@@ -985,7 +980,7 @@ export const startSyncRun = internalMutation({
 			});
 		}
 		if (integration.status === 'disconnected' || !integration.encryptedApiKey) {
-			return null;
+			return false;
 		}
 
 		const now = Date.now();
@@ -994,36 +989,19 @@ export const startSyncRun = internalMutation({
 			lastSyncError: undefined,
 			updatedAt: now
 		});
-
-		return await ctx.db.insert('booking_sync_runs', {
-			workspaceId: integration.workspaceId,
-			integrationId: integration._id,
-			provider: integration.provider,
-			syncType: args.syncType,
-			status: 'running',
-			...(args.rangeStart ? { rangeStart: args.rangeStart } : {}),
-			...(args.rangeEnd ? { rangeEnd: args.rangeEnd } : {}),
-			startedAt: now
-		});
+		return true;
 	}
 });
 
-export const finishSyncRun = internalMutation({
+export const markBookeoSyncFinished = internalMutation({
 	args: {
 		integrationId: v.id('booking_integrations'),
-		syncRunId: v.id('booking_sync_runs'),
 		status: v.union(v.literal('succeeded'), v.literal('failed')),
 		errorMessage: v.optional(v.string())
 	},
 	returns: v.null(),
 	handler: async (ctx, args) => {
 		const now = Date.now();
-		await ctx.db.patch(args.syncRunId, {
-			status: args.status,
-			finishedAt: now,
-			...(args.errorMessage ? { errorMessage: args.errorMessage } : {})
-		});
-
 		const integration = await ctx.db.get(args.integrationId);
 		if (!integration || integration.status === 'disconnected') {
 			return null;
@@ -1047,7 +1025,6 @@ export const upsertProviderBooking = internalMutation({
 			providerBookingId: v.string(),
 			status: v.union(v.literal('active'), v.literal('canceled')),
 			activityName: v.string(),
-			providerTitle: v.optional(v.string()),
 			startTime: v.optional(v.string()),
 			endTime: v.optional(v.string()),
 			startAt: v.optional(v.number()),
@@ -1079,14 +1056,17 @@ export const upsertProviderBooking = internalMutation({
 			)
 			.unique();
 
+		const activityName =
+			args.booking.activityName === UNKNOWN_ACTIVITY_NAME && existing
+				? existing.activityName
+				: args.booking.activityName;
 		const bookingFields = {
 			workspaceId: integration.workspaceId,
 			integrationId: integration._id,
 			provider: integration.provider,
 			providerBookingId: args.booking.providerBookingId,
 			status: args.booking.status,
-			activityName: args.booking.activityName,
-			providerTitle: args.booking.providerTitle,
+			activityName,
 			startTime: args.booking.startTime,
 			endTime: args.booking.endTime,
 			startAt: args.booking.startAt,
@@ -1283,16 +1263,13 @@ export const syncBookeoIntegration = internalAction({
 
 		const horizon = assertValidSyncHorizon(integration.syncHorizonMonths);
 		const range = initialSyncRange(args.syncType === 'repair' ? 1 : horizon);
-		const syncRunId: Id<'booking_sync_runs'> | null = await ctx.runMutation(
-			internal.integrations.startSyncRun,
+		const syncStarted: boolean = await ctx.runMutation(
+			internal.integrations.markBookeoSyncStarted,
 			{
-				integrationId: args.integrationId,
-				syncType: args.syncType,
-				rangeStart: range.start.toISOString(),
-				rangeEnd: range.end.toISOString()
+				integrationId: args.integrationId
 			}
 		);
-		if (!syncRunId) return null;
+		if (!syncStarted) return null;
 
 		try {
 			const apiKey = await decryptSecret(integration.encryptedApiKey);
@@ -1304,15 +1281,13 @@ export const syncBookeoIntegration = internalAction({
 					end: chunk.end
 				});
 			}
-			await ctx.runMutation(internal.integrations.finishSyncRun, {
+			await ctx.runMutation(internal.integrations.markBookeoSyncFinished, {
 				integrationId: args.integrationId,
-				syncRunId,
 				status: 'succeeded'
 			});
 		} catch (error) {
-			await ctx.runMutation(internal.integrations.finishSyncRun, {
+			await ctx.runMutation(internal.integrations.markBookeoSyncFinished, {
 				integrationId: args.integrationId,
-				syncRunId,
 				status: 'failed',
 				errorMessage: error instanceof Error ? error.message : 'Unable to sync Bookeo bookings.'
 			});

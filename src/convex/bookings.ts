@@ -12,7 +12,6 @@ const bookingSummaryValue = v.object({
 	lookupToken: v.string(),
 	status: bookingStatusValidator,
 	activityName: v.string(),
-	providerTitle: v.union(v.string(), v.null()),
 	startTime: v.union(v.string(), v.null()),
 	endTime: v.union(v.string(), v.null()),
 	serviceDate: v.union(v.string(), v.null()),
@@ -105,7 +104,6 @@ function serializeBooking(booking: Doc<'bookings'>, signedCount: number) {
 		lookupToken: booking.lookupToken,
 		status: booking.status,
 		activityName: booking.activityName,
-		providerTitle: booking.providerTitle ?? null,
 		startTime: booking.startTime ?? null,
 		endTime: booking.endTime ?? null,
 		serviceDate: booking.serviceDate ?? null,
@@ -206,7 +204,6 @@ export const listWorkspaceBookings = query({
 				if (!searchQuery) return true;
 				return [
 					booking.activityName,
-					booking.providerTitle,
 					booking.leadCustomerName,
 					booking.leadCustomerEmail,
 					booking.providerBookingId
