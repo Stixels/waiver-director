@@ -178,5 +178,50 @@ export default defineSchema({
 		.index('by_workspaceId', ['workspaceId'])
 		.index('by_publicLinkId', ['publicLinkId'])
 		.index('by_versionId', ['versionId'])
-		.index('by_templateId', ['templateId'])
+		.index('by_templateId', ['templateId']),
+
+	email_templates: defineTable({
+		workspaceId: v.id('workspaces'),
+		subject: v.string(),
+		body: v.string(),
+		sendAfterHours: v.number(),
+		updatedAt: v.number()
+	}).index('by_workspaceId', ['workspaceId']),
+
+	email_template_presets: defineTable({
+		workspaceId: v.id('workspaces'),
+		name: v.string(),
+		subject: v.string(),
+		body: v.string(),
+		sendAfterHours: v.number(),
+		createdAt: v.number()
+	}).index('by_workspaceId', ['workspaceId']),
+
+	email_follow_ups: defineTable({
+		workspaceId: v.id('workspaces'),
+		submissionId: v.id('waiver_submissions'),
+		signerName: v.string(),
+		signerEmail: v.string(),
+		subjectTemplate: v.optional(v.string()),
+		bodyTemplate: v.optional(v.string()),
+		submittedAt: v.number(),
+		scheduledAt: v.number(),
+		status: v.union(
+			v.literal('queued'),
+			v.literal('sent'),
+			v.literal('cancelled'),
+			v.literal('paused'),
+			v.literal('failed')
+		),
+		scheduledFunctionId: v.optional(v.id('_scheduled_functions')),
+		sentAt: v.optional(v.number()),
+		sentSubject: v.optional(v.string()),
+		sentBodyHtml: v.optional(v.string()),
+		failedAt: v.optional(v.number()),
+		failureReason: v.optional(v.string()),
+		cancelledAt: v.optional(v.number())
+	})
+		.index('by_workspaceId', ['workspaceId'])
+		.index('by_workspaceId_and_status', ['workspaceId', 'status'])
+		.index('by_submissionId', ['submissionId'])
 });

@@ -2,6 +2,7 @@ import { ConvexError, v } from 'convex/values';
 import { mutation, query } from './_generated/server';
 import type { Doc, Id } from './_generated/dataModel';
 import type { MutationCtx, QueryCtx } from './_generated/server';
+import { internal } from './_generated/api';
 import {
 	assertWorkspaceRecord,
 	buildTemplateLifecycle,
@@ -620,6 +621,15 @@ export const submitPublicWaiver = mutation({
 			answers: args.answers,
 			minors,
 			status: 'submitted',
+			submittedAt
+		});
+
+		// Hook that connects to the email scheduler to send a follow-up email to the signer after a certain amount of time.
+		await ctx.scheduler.runAfter(0, internal.emails.scheduleFollowUpOnSubmission, {
+			workspaceId: link.workspaceId,
+			submissionId,
+			signerName,
+			signerEmail,
 			submittedAt
 		});
 

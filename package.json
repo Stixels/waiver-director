@@ -64,6 +64,7 @@
 		"convex-svelte": "0.0.12",
 		"mode-watcher": "^1.1.0",
 		"qrcode": "^1.5.4",
+		"resend": "^6.12.0",
 		"sanitize-html": "^2.17.3",
 		"svelte-clerk": "^1.1.1"
 	}

@@ -88,6 +88,10 @@
 		event.preventDefault();
 	}
 
+	export function insertText(text: string) {
+		editor?.chain().focus().insertContent(text).run();
+	}
+
 	function setLink() {
 		if (!editor || disabled) return;
 
@@ -249,7 +253,7 @@
 		<div
 			class="editor-toolbar flex flex-nowrap items-center gap-1.5 overflow-x-auto pb-1"
 			role="toolbar"
-			aria-label="Waiver copy formatting"
+			aria-label="Rich text formatting"
 			tabindex="-1"
 			onmousedown={keepToolbarFocus}
 		>
@@ -457,7 +461,7 @@
 	<div
 		class="rich-text-editor-viewport min-h-0 shrink-0 overflow-y-auto overscroll-y-contain px-3 py-3"
 		role="region"
-		aria-label="Waiver copy editing area"
+		aria-label="Rich text editing area"
 	>
 		<div bind:this={editorElement}></div>
 	</div>
@@ -592,6 +596,14 @@
 		text-underline-offset: 0.15em;
 	}
 
+	:global(.waiver-editor img[data-email-image='true']) {
+		border-radius: 0.75rem;
+	}
+
+	:global(.waiver-editor p[data-email-button='true']) {
+		margin: 0 0 1rem;
+	}
+
 	:global(.waiver-editor strong) {
 		font-weight: 700;
 	}
@@ -602,6 +614,11 @@
 
 	:global(.waiver-editor.ProseMirror) {
 		outline: none;
+	}
+
+	:global(.waiver-editor .ProseMirror-selectednode) {
+		outline: 2px solid color-mix(in srgb, var(--ring) 55%, transparent);
+		outline-offset: 2px;
 	}
 
 	:global(.waiver-editor.ProseMirror[contenteditable='false']) {

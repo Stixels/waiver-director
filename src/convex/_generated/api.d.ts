@@ -9,6 +9,7 @@
  */
 
 import type * as app from "../app.js";
+import type * as emails from "../emails.js";
 import type * as lib_auth from "../lib/auth.js";
 import type * as lib_waivers from "../lib/waivers.js";
 import type * as lib_workspaces from "../lib/workspaces.js";
@@ -24,6 +25,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   app: typeof app;
+  emails: typeof emails;
   "lib/auth": typeof lib_auth;
   "lib/waivers": typeof lib_waivers;
   "lib/workspaces": typeof lib_workspaces;
