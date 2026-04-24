@@ -23,10 +23,18 @@ const bookingSummaryValue = v.object({
 	updatedAt: v.number()
 });
 
+const bookingDaySummaryValue = v.object({
+	totalCount: v.number(),
+	activeCount: v.number(),
+	incompleteCount: v.number(),
+	canceledCount: v.number()
+});
+
 const bookingPageValue = v.object({
 	bookings: v.array(bookingSummaryValue),
 	pageIndex: v.number(),
 	nextUpcomingBookingId: v.union(v.id('bookings'), v.null()),
+	summary: bookingDaySummaryValue,
 	hasPreviousPage: v.boolean(),
 	hasNextPage: v.boolean()
 });
@@ -153,6 +161,25 @@ export const listWorkspaceBookings = query({
 			.collect();
 
 		const serialized = dayBookings.map((booking) => serializeBooking(booking, booking.signedCount));
+		const summary = serialized.reduce(
+			(total, booking) => {
+				const isCanceled = booking.status === 'canceled';
+				const isIncomplete = !isCanceled && booking.signedCount < booking.participantCount;
+
+				return {
+					totalCount: total.totalCount + 1,
+					activeCount: total.activeCount + (booking.status === 'active' ? 1 : 0),
+					incompleteCount: total.incompleteCount + (isIncomplete ? 1 : 0),
+					canceledCount: total.canceledCount + (isCanceled ? 1 : 0)
+				};
+			},
+			{
+				totalCount: 0,
+				activeCount: 0,
+				incompleteCount: 0,
+				canceledCount: 0
+			}
+		);
 
 		const filteredBookings = serialized
 			.filter((booking) => {
@@ -197,6 +224,7 @@ export const listWorkspaceBookings = query({
 			bookings: pageBookings,
 			pageIndex,
 			nextUpcomingBookingId: nextUpcomingBooking?.bookingId ?? null,
+			summary,
 			hasPreviousPage: pageIndex > 0,
 			hasNextPage: filteredBookings.length > pageStart + pageSize
 		};

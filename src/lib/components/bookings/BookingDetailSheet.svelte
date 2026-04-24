@@ -50,9 +50,6 @@
 	const signedCount = $derived(detail?.booking.signedCount ?? 0);
 	const expectedCount = $derived(detail?.booking.participantCount ?? 0);
 	const remainingCount = $derived(Math.max(0, expectedCount - signedCount));
-	const percent = $derived(
-		expectedCount === 0 ? 0 : Math.min(100, Math.round((signedCount / expectedCount) * 100))
-	);
 	const isComplete = $derived(expectedCount > 0 && signedCount >= expectedCount);
 	const canShare = $derived(!!publicSlug && !isCanceled && !!detail);
 
@@ -99,7 +96,7 @@
 {/if}
 
 <Sheet bind:open>
-	<SheetContent side="right" class="w-full gap-0 overflow-hidden p-0 sm:max-w-xl">
+	<SheetContent side="right" class="w-full! gap-0 overflow-hidden p-0 sm:max-w-xl!">
 		{#if isLoading}
 			<SheetHeader class="shrink-0 border-b border-border px-6 py-5">
 				<SheetTitle><Skeleton class="h-5 w-48" /></SheetTitle>
@@ -126,20 +123,19 @@
 						>
 							{detail.booking.productName ?? detail.booking.title}
 						</SheetTitle>
-						<SheetDescription class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
+						<SheetDescription class="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs">
 							<span class="inline-flex items-center gap-1">
 								<UserIcon class="size-3" aria-hidden="true" />
 								{detail.booking.leadCustomerName ?? 'Unknown customer'}
 							</span>
 							{#if detail.booking.startTime && formatTimestamp(detail.booking.startTime)}
-								<span class="text-muted-foreground/50" aria-hidden="true">·</span>
 								<span class="inline-flex items-center gap-1">
 									<ClockIcon class="size-3" aria-hidden="true" />
 									{formatTimestamp(detail.booking.startTime)}
 								</span>
 							{/if}
+							<span>Booking #{detail.booking.providerBookingId}</span>
 							{#if isCanceled}
-								<span class="text-muted-foreground/50" aria-hidden="true">·</span>
 								<span class="font-medium text-destructive">Canceled</span>
 							{/if}
 						</SheetDescription>
@@ -191,28 +187,6 @@
 							<LinkIcon class="size-3" aria-hidden="true" />
 							Share link
 						</Button>
-					</div>
-					<div
-						class="mt-4 h-1.5 w-full overflow-hidden rounded-full bg-muted"
-						role="progressbar"
-						aria-valuenow={percent}
-						aria-valuemin="0"
-						aria-valuemax="100"
-						aria-label="Signed waiver progress"
-					>
-						<div
-							class={cn(
-								'h-full rounded-full transition-all',
-								isCanceled
-									? 'bg-muted-foreground/40'
-									: isComplete
-										? 'bg-emerald-500'
-										: signedCount === 0
-											? 'bg-muted-foreground/60'
-											: 'bg-primary'
-							)}
-							style="width: {percent}%"
-						></div>
 					</div>
 				</section>
 
