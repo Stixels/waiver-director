@@ -130,7 +130,6 @@
 <div class="w-full min-w-0 p-6">
 	<div class="mx-auto w-full max-w-6xl min-w-0 space-y-6">
 		<div class="space-y-1">
-			<p class="text-xs font-bold tracking-[0.16em] text-primary uppercase">Submissions</p>
 			<h1 class="text-2xl font-semibold tracking-tight">Signed waiver records</h1>
 			<p class="text-sm text-muted-foreground">Click any row to view the full signed waiver.</p>
 		</div>

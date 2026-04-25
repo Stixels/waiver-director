@@ -4,6 +4,7 @@ import { mutation, query } from './_generated/server';
 import type { Doc, Id } from './_generated/dataModel';
 import type { MutationCtx, QueryCtx } from './_generated/server';
 import { bookingSnapshot, bookingSnapshotValidator } from './lib/bookings';
+import { upsertSignerCustomer } from './lib/customers';
 import {
 	assertWorkspaceRecord,
 	minorInputValidator,
@@ -550,9 +551,17 @@ export const submitPublicWaiver = mutation({
 		}
 
 		const submittedAt = Date.now();
+		const customerId = await upsertSignerCustomer(ctx, {
+			workspaceId: waiver.workspaceId,
+			signerName,
+			signerEmail,
+			submittedAt,
+			bookingId: booking?._id ?? null
+		});
 		const submissionId = await ctx.db.insert('waiver_submissions', {
 			workspaceId: waiver.workspaceId,
 			versionId: waiver.publishedVersionId,
+			customerId,
 			...(booking
 				? {
 						bookingId: booking._id,
@@ -567,6 +576,9 @@ export const submitPublicWaiver = mutation({
 			minors,
 			status: 'submitted',
 			submittedAt
+		});
+		await ctx.db.patch(customerId, {
+			latestSubmissionId: submissionId
 		});
 		if (booking) {
 			await ctx.db.patch(booking._id, {

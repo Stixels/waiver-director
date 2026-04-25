@@ -298,7 +298,6 @@
 	<div class="mx-auto w-full max-w-6xl min-w-0 space-y-6">
 		<div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
 			<div class="min-w-0 space-y-1">
-				<p class="text-xs font-bold tracking-[0.16em] text-primary uppercase">Bookings</p>
 				<h1 class="text-2xl font-semibold tracking-tight">Check-ins</h1>
 				<p class="text-sm text-muted-foreground">
 					{formatSelectedDate(selectedDate)} · Front desk check-in coverage.

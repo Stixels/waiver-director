@@ -291,7 +291,6 @@
 	<div class="mx-auto w-full max-w-6xl min-w-0 space-y-6">
 		<header class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
 			<div class="min-w-0 space-y-1">
-				<p class="text-xs font-bold tracking-[0.16em] text-primary uppercase">Integrations</p>
 				<h1 class="text-2xl font-semibold tracking-tight">Booking provider connections</h1>
 				<p class="max-w-2xl text-sm text-muted-foreground">
 					Choose a booking provider for this workspace. Bookeo can be connected now; Resova, Xola,
