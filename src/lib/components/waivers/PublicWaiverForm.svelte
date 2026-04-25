@@ -9,7 +9,6 @@
 	import WaiverPublicAboutSignerCard from '$lib/components/waivers/WaiverPublicAboutSignerCard.svelte';
 	import WaiverPublicAdditionalInfoSection from '$lib/components/waivers/WaiverPublicAdditionalInfoSection.svelte';
 	import WaiverPublicMinorsBlock from '$lib/components/waivers/WaiverPublicMinorsBlock.svelte';
-	import WaiverPublicSignatureCard from '$lib/components/waivers/WaiverPublicSignatureCard.svelte';
 	import {
 		waiverAddMinorButtonClass,
 		waiverFieldLabelClass,
@@ -118,6 +117,17 @@
 			isSubmitting = false;
 		}
 	}
+
+	function resetForm() {
+		signerName = '';
+		signerEmail = '';
+		signerDateOfBirth = '';
+		signatureDataUrl = '';
+		answers = {};
+		minors = [];
+		submitError = null;
+		isSubmitted = false;
+	}
 </script>
 
 <div class="min-h-screen bg-background">
@@ -149,6 +159,15 @@
 				<p class="max-w-sm text-base leading-relaxed text-muted-foreground">
 					Thank you. Your signed waiver has been recorded for {waiver.workspaceName}.
 				</p>
+				{#if booking}
+					<button
+						type="button"
+						class="mt-8 h-12 bg-foreground px-8 text-sm font-semibold tracking-wide text-background transition-opacity hover:opacity-85"
+						onclick={resetForm}
+					>
+						Sign another waiver
+					</button>
+				{/if}
 			</div>
 		{:else}
 			<div class="space-y-6">
@@ -359,11 +378,14 @@
 								{/each}
 							</WaiverPublicAdditionalInfoSection>
 						{/if}
-					</WaiverPublicAboutSignerCard>
 
-					<WaiverPublicSignatureCard>
-						<SignaturePad bind:value={signatureDataUrl} canvasId="signature-pad" />
-					</WaiverPublicSignatureCard>
+						<div class="mt-8 border-t border-border pt-8">
+							<div class="mb-7">
+								<h3 class="text-lg font-semibold tracking-tight">Signature</h3>
+							</div>
+							<SignaturePad bind:value={signatureDataUrl} canvasId="signature-pad" />
+						</div>
+					</WaiverPublicAboutSignerCard>
 
 					{#if submitError}
 						<p class="text-sm text-destructive">
