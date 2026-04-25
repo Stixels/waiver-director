@@ -9,7 +9,7 @@ import {
 import { Resend } from 'resend';
 import { internal } from './_generated/api';
 import { requireWorkspaceMember } from './lib/waivers';
-import { sanitizeRichTextHtml } from '../lib/utils/rich-text';
+import { escapeHtml, sanitizeRichTextHtml } from '../lib/utils/rich-text';
 
 const DEFAULT_SEND_AFTER_HOURS = 2;
 const DEFAULT_SUBJECT = 'Thank you for visiting, {customer_name}!';
@@ -80,6 +80,7 @@ export const upsertEmailTemplate = mutation({
 	},
 	handler: async (ctx, args) => {
 		await requireWorkspaceMember(ctx, args.workspaceId);
+		const subject = args.subject.trim();
 		const body = validateEmailTemplateInput(args);
 
 		const existing = await ctx.db
@@ -91,7 +92,7 @@ export const upsertEmailTemplate = mutation({
 
 		if (existing) {
 			await ctx.db.patch(existing._id, {
-				subject: args.subject,
+				subject,
 				body,
 				sendAfterHours: args.sendAfterHours,
 				updatedAt: now
@@ -99,7 +100,7 @@ export const upsertEmailTemplate = mutation({
 		} else {
 			await ctx.db.insert('email_templates', {
 				workspaceId: args.workspaceId,
-				subject: args.subject,
+				subject,
 				body,
 				sendAfterHours: args.sendAfterHours,
 				updatedAt: now
@@ -130,6 +131,7 @@ export const saveTemplatePreset = mutation({
 	},
 	handler: async (ctx, args) => {
 		await requireWorkspaceMember(ctx, args.workspaceId);
+		const subject = args.subject.trim();
 		const body = validateEmailTemplateInput(args);
 
 		if (args.name.trim().length === 0) {
@@ -139,7 +141,7 @@ export const saveTemplatePreset = mutation({
 		await ctx.db.insert('email_template_presets', {
 			workspaceId: args.workspaceId,
 			name: args.name.trim(),
-			subject: args.subject,
+			subject,
 			body,
 			sendAfterHours: args.sendAfterHours,
 			createdAt: Date.now()
@@ -181,16 +183,25 @@ export const getFollowUpStats = query({
 
 		const sent = await ctx.db
 			.query('email_follow_ups')
-			.withIndex('by_workspaceId_and_status', (q) =>
+			.withIndex('by_workspaceId_and_status_and_sentAt', (q) =>
 				q.eq('workspaceId', args.workspaceId).eq('status', 'sent')
 			)
+			.order('desc')
 			.take(FOLLOW_UP_STATS_LIMIT);
 
-		const sentToday = sent.filter((f) => f.sentAt && f.sentAt >= todayStart.getTime());
+		const todayStartTime = todayStart.getTime();
+		let sentToday = 0;
+		for (const followUp of sent) {
+			if (!followUp.sentAt) continue;
+			if (followUp.sentAt < todayStartTime) break;
+			sentToday++;
+		}
 
 		return {
-			sentToday: sentToday.length,
+			sentToday,
 			pendingCount: queued.length + paused.length,
+			// This total is capped by FOLLOW_UP_STATS_LIMIT. Use a persisted counter if this needs
+			// to stay exact after a workspace has more sent follow-ups than the read limit.
 			totalSent: sent.length
 		};
 	}
@@ -310,7 +321,8 @@ export const resumeFollowUp = mutation({
 
 		const now = Date.now();
 		// If the original scheduled time has passed, send in 5 minutes
-		const delay = Math.max(followUp.scheduledAt - now, 5 * 60 * 1000);
+		const delay = followUp.scheduledAt > now ? followUp.scheduledAt - now : 5 * 60 * 1000;
+		const scheduledAt = now + delay;
 
 		const scheduledFunctionId = await ctx.scheduler.runAfter(
 			delay,
@@ -320,6 +332,7 @@ export const resumeFollowUp = mutation({
 
 		await ctx.db.patch(args.followUpId, {
 			status: 'queued',
+			scheduledAt,
 			scheduledFunctionId
 		});
 	}
@@ -495,7 +508,7 @@ export const markFollowUpSent = internalMutation({
 	},
 	handler: async (ctx, args) => {
 		const followUp = await ctx.db.get(args.followUpId);
-		if (!followUp || followUp.status !== 'queued') return;
+		if (!followUp || followUp.status === 'sent' || followUp.status === 'failed') return;
 
 		await ctx.db.patch(args.followUpId, {
 			status: 'sent',
@@ -513,7 +526,7 @@ export const markFollowUpFailed = internalMutation({
 	},
 	handler: async (ctx, args) => {
 		const followUp = await ctx.db.get(args.followUpId);
-		if (!followUp || followUp.status !== 'queued') return;
+		if (!followUp || followUp.status === 'sent' || followUp.status === 'failed') return;
 
 		await ctx.db.patch(args.followUpId, {
 			status: 'failed',
@@ -530,17 +543,7 @@ function resolveVariables(
 	return template
 		.replace(/\{customer_name\}/g, vars.signerName)
 		.replace(/\{booking_id\}/g, vars.bookingId)
-		.replace(/\{activity_date\}/g, vars.activityDate)
-		.replace(/\{waiver_link\}/g, '');
-}
-
-function escapeHtml(value: string): string {
-	return value
-		.replaceAll('&', '&amp;')
-		.replaceAll('<', '&lt;')
-		.replaceAll('>', '&gt;')
-		.replaceAll('"', '&quot;')
-		.replaceAll("'", '&#39;');
+		.replace(/\{activity_date\}/g, vars.activityDate);
 }
 
 function resolveHtmlVariables(
@@ -688,13 +691,22 @@ export const deliverFollowUpEmail = internalAction({
 </html>`;
 
 		const apiKey = process.env.RESEND_API_KEY;
-		const fromAddress = process.env.RESEND_FROM_EMAIL ?? 'no-reply@example.com';
+		const fromAddress = process.env.RESEND_FROM_EMAIL;
 
 		if (!apiKey) {
 			console.warn('[EMAIL] RESEND_API_KEY is not set — skipping delivery.');
 			await ctx.runMutation(internal.emails.markFollowUpFailed, {
 				followUpId: args.followUpId,
 				reason: 'RESEND_API_KEY is not set.'
+			});
+			return;
+		}
+
+		if (!fromAddress) {
+			console.warn('[EMAIL] RESEND_FROM_EMAIL is not set — skipping delivery.');
+			await ctx.runMutation(internal.emails.markFollowUpFailed, {
+				followUpId: args.followUpId,
+				reason: 'RESEND_FROM_EMAIL is not set.'
 			});
 			return;
 		}

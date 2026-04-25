@@ -42,7 +42,7 @@
 		value = $bindable('<p></p>'),
 		id = 'rich-text-editor',
 		disabled = false,
-		placeholder = 'Write the waiver copy guests should read before signing.'
+		placeholder = 'Write your content here...'
 	}: Props = $props();
 
 	let editorElement = $state<HTMLDivElement | null>(null);

@@ -196,5 +196,6 @@ export default defineSchema({
 	})
 		.index('by_workspaceId', ['workspaceId'])
 		.index('by_workspaceId_and_status', ['workspaceId', 'status'])
+		.index('by_workspaceId_and_status_and_sentAt', ['workspaceId', 'status', 'sentAt'])
 		.index('by_submissionId', ['submissionId'])
 });

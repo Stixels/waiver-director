@@ -9,6 +9,7 @@
 	import { useAppContext } from '$lib/components/app/app-context.svelte';
 	import { useProtectedQuery } from '$lib/components/auth/convex-auth.svelte';
 	import { getConvexErrorMessage } from '$lib/utils/convex-errors';
+	import { escapeHtml } from '$lib/utils/rich-text';
 
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
@@ -249,17 +250,20 @@
 		}
 	});
 
-	async function loadPreset(preset: TemplatePreset) {
-		await persistTemplate({
-			subject: preset.subject,
-			body: preset.body,
-			sendAfterHours: preset.sendAfterHours,
-			successMessage: `Loaded and saved "${preset.name}".`
-		});
-		if (currentWorkspace) {
-			loadPresetOpen = false;
-			selectedPreset = null;
+	function loadPreset(preset: TemplatePreset) {
+		if (
+			isDirty &&
+			!confirm('Loading this preset will replace your unsaved email template changes. Continue?')
+		) {
+			return;
 		}
+
+		subject = preset.subject;
+		body = preset.body;
+		sendAfterHours = preset.sendAfterHours;
+		loadPresetOpen = false;
+		selectedPreset = null;
+		toast.success(`Loaded "${preset.name}". Save changes to apply it.`);
 	}
 
 	async function deletePreset(presetId: TemplatePreset['_id']) {
@@ -304,8 +308,16 @@
 		return template
 			.replace(/\{customer_name\}/g, vars.signerName)
 			.replace(/\{booking_id\}/g, vars.bookingId)
-			.replace(/\{activity_date\}/g, vars.activityDate)
-			.replace(/\{waiver_link\}/g, '');
+			.replace(/\{activity_date\}/g, vars.activityDate);
+	}
+
+	function resolveHtmlTemplate(template: string, vars: NonNullable<typeof previewVars>) {
+		return resolveTemplate(template, {
+			...vars,
+			signerName: escapeHtml(vars.signerName),
+			bookingId: escapeHtml(vars.bookingId),
+			activityDate: escapeHtml(vars.activityDate)
+		});
 	}
 
 	const previewSubjectTemplate = $derived(
@@ -320,7 +332,7 @@
 	const resolvedBodyHtml = $derived.by(() => {
 		if (!previewVars) return '';
 		if (lastPreviewFollowUp?.sentBodyHtml) return lastPreviewFollowUp.sentBodyHtml;
-		return resolveTemplate(previewBodyTemplate, previewVars);
+		return resolveHtmlTemplate(previewBodyTemplate, previewVars);
 	});
 
 	// ─── Search/filter/pagination state ───────────────────────────────────────
@@ -507,7 +519,6 @@
 	const VARIABLES = [
 		{ label: '{customer_name}', value: '{customer_name}' },
 		{ label: '{booking_id}', value: '{booking_id}' },
-		{ label: '{waiver_link}', value: '{waiver_link}' },
 		{ label: '{activity_date}', value: '{activity_date}' }
 	];
 
