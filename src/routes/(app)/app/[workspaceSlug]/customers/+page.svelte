@@ -133,16 +133,16 @@
 	type Frequency = { label: string; tone: FrequencyTone };
 
 	function frequencyTier(visitCount: number): Frequency {
-		if (visitCount >= 10) return { label: 'VIP', tone: 'vip' };
+		if (visitCount >= 6) return { label: 'VIP', tone: 'vip' };
 		if (visitCount >= 4) return { label: 'Regular', tone: 'regular' };
 		if (visitCount >= 2) return { label: 'Returning', tone: 'returning' };
 		return { label: 'New', tone: 'new' };
 	}
 
 	function frequencyClass(tone: FrequencyTone) {
-		if (tone === 'vip') return 'bg-amber-500/15 text-amber-700 dark:text-amber-400';
-		if (tone === 'regular') return 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400';
-		if (tone === 'returning') return 'bg-primary/15 text-primary';
+		if (tone === 'vip') return 'bg-amber-500/15 text-amber-800 dark:text-amber-400';
+		if (tone === 'regular') return 'bg-emerald-500/15 text-emerald-800 dark:text-emerald-400';
+		if (tone === 'returning') return 'bg-violet-500/15 text-violet-800 dark:text-violet-400';
 		return 'bg-muted text-muted-foreground';
 	}
 
