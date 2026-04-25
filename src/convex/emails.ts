@@ -1,4 +1,5 @@
 import { ConvexError, v } from 'convex/values';
+import { paginationOptsValidator } from 'convex/server';
 import {
 	internalAction,
 	internalMutation,
@@ -17,6 +18,14 @@ const DEFAULT_BODY =
 	"<p>Hi {customer_name},</p><p>We wanted to take a moment to thank you for your recent visit. It was a pleasure having you with us!</p><p>As a reminder, you can always access your signed waivers and activity history through your personal dashboard using your Booking ID: #{booking_id}.</p><p>Would you mind taking 30 seconds to share your experience with us? We'd love to hear how we did.</p>";
 const TEMPLATE_PRESET_LIMIT = 100;
 const FOLLOW_UP_STATS_LIMIT = 1000;
+
+const followUpStatusValue = v.union(
+	v.literal('queued'),
+	v.literal('sent'),
+	v.literal('cancelled'),
+	v.literal('paused'),
+	v.literal('failed')
+);
 
 function validateEmailTemplateInput(args: {
 	subject: string;
@@ -210,31 +219,63 @@ export const getFollowUpStats = query({
 export const listFollowUps = query({
 	args: {
 		workspaceId: v.id('workspaces'),
-		limit: v.optional(v.number()),
-		status: v.optional(
-			v.union(
-				v.literal('queued'),
-				v.literal('sent'),
-				v.literal('cancelled'),
-				v.literal('paused'),
-				v.literal('failed')
-			)
-		)
+		paginationOpts: paginationOptsValidator,
+		statuses: v.optional(v.array(followUpStatusValue)),
+		searchQuery: v.optional(v.string()),
+		dateFrom: v.optional(v.number()),
+		dateTo: v.optional(v.number())
 	},
 	handler: async (ctx, args) => {
 		await requireWorkspaceMember(ctx, args.workspaceId);
+		const statuses = args.statuses ?? [];
+		const searchQuery = args.searchQuery?.trim();
+		const dateFrom = args.dateFrom;
+		const dateTo = args.dateTo;
 
-		const q = args.status
-			? ctx.db
-					.query('email_follow_ups')
-					.withIndex('by_workspaceId_and_status', (q) =>
-						q.eq('workspaceId', args.workspaceId).eq('status', args.status!)
-					)
-			: ctx.db
-					.query('email_follow_ups')
-					.withIndex('by_workspaceId', (q) => q.eq('workspaceId', args.workspaceId));
+		if (searchQuery) {
+			let q = ctx.db
+				.query('email_follow_ups')
+				.withSearchIndex('search_follow_ups', (q) =>
+					q.search('searchText', searchQuery).eq('workspaceId', args.workspaceId)
+				);
 
-		return await q.order('desc').take(args.limit ?? 50);
+			if (statuses.length > 0) {
+				q = q.filter((q) => q.or(...statuses.map((status) => q.eq(q.field('status'), status))));
+			}
+			if (dateFrom !== undefined) {
+				q = q.filter((q) => q.gte(q.field('submittedAt'), dateFrom));
+			}
+			if (dateTo !== undefined) {
+				q = q.filter((q) => q.lt(q.field('submittedAt'), dateTo));
+			}
+
+			return await q.paginate(args.paginationOpts);
+		}
+
+		const followUpsQuery =
+			statuses.length === 1
+				? ctx.db
+						.query('email_follow_ups')
+						.withIndex('by_workspaceId_and_status', (q) =>
+							q.eq('workspaceId', args.workspaceId).eq('status', statuses[0])
+						)
+				: ctx.db
+						.query('email_follow_ups')
+						.withIndex('by_workspaceId', (q) => q.eq('workspaceId', args.workspaceId));
+
+		let q = followUpsQuery.order('desc');
+
+		if (statuses.length > 1) {
+			q = q.filter((q) => q.or(...statuses.map((status) => q.eq(q.field('status'), status))));
+		}
+		if (dateFrom !== undefined) {
+			q = q.filter((q) => q.gte(q.field('submittedAt'), dateFrom));
+		}
+		if (dateTo !== undefined) {
+			q = q.filter((q) => q.lt(q.field('submittedAt'), dateTo));
+		}
+
+		return await q.paginate(args.paginationOpts);
 	}
 });
 
@@ -460,6 +501,7 @@ export const scheduleFollowUpOnSubmission = internalMutation({
 			submissionId: args.submissionId,
 			signerName: args.signerName,
 			signerEmail: args.signerEmail,
+			searchText: `${args.signerName} ${args.signerEmail} #BK-${args.submissionId.slice(-5).toUpperCase()}`,
 			subjectTemplate,
 			bodyTemplate,
 			submittedAt: args.submittedAt,

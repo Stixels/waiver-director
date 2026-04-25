@@ -67,16 +67,48 @@
 	] as const;
 
 	let statusFilters = $state(new SvelteSet<string>());
+	let searchQuery = $state('');
+	let dateFrom = $state('');
+	let dateTo = $state('');
+	let currentPage = $state(0);
+	let pageCursors = $state<(string | null)[]>([null]);
+
+	const currentCursor = $derived(pageCursors[currentPage] ?? null);
+	const dateFromMillis = $derived(dateFrom ? parseLocalDateStart(dateFrom) : null);
+	const dateToMillis = $derived(dateTo ? parseLocalDateEnd(dateTo) : null);
+
+	function parseLocalDateStart(value: string) {
+		const [year, month, day] = value.split('-').map(Number);
+		return new Date(year, month - 1, day).getTime();
+	}
+
+	function parseLocalDateEnd(value: string) {
+		const [year, month, day] = value.split('-').map(Number);
+		return new Date(year, month - 1, day + 1).getTime();
+	}
 
 	const followUpsQuery = useProtectedQuery(api.emails.listFollowUps, () => {
 		if (!currentWorkspace) return 'skip';
-		const singleStatus = statusFilters.size === 1 ? [...statusFilters][0] : undefined;
 		return {
 			workspaceId: currentWorkspace.workspaceId,
-			limit: 500,
-			...(singleStatus
-				? { status: singleStatus as 'queued' | 'sent' | 'cancelled' | 'paused' | 'failed' }
-				: {})
+			paginationOpts: {
+				numItems: PAGE_SIZE,
+				cursor: currentCursor
+			},
+			...(statusFilters.size > 0
+				? {
+						statuses: [...statusFilters] as (
+							| 'queued'
+							| 'sent'
+							| 'cancelled'
+							| 'paused'
+							| 'failed'
+						)[]
+					}
+				: {}),
+			...(searchQuery.trim() ? { searchQuery: searchQuery.trim() } : {}),
+			...(dateFromMillis !== null ? { dateFrom: dateFromMillis } : {}),
+			...(dateToMillis !== null ? { dateTo: dateToMillis } : {})
 		};
 	});
 
@@ -84,11 +116,12 @@
 		currentWorkspace ? { workspaceId: currentWorkspace.workspaceId } : 'skip'
 	);
 
-	type FollowUp = FunctionReturnType<typeof api.emails.listFollowUps>[number];
+	type FollowUp = FunctionReturnType<typeof api.emails.listFollowUps>['page'][number];
 	type TemplatePreset = FunctionReturnType<typeof api.emails.listTemplatePresets>[number];
 
 	const stats = $derived(statsQuery.data);
-	const followUps = $derived((followUpsQuery.data ?? []) as FollowUp[]);
+	const followUpsPage = $derived(followUpsQuery.data);
+	const followUps = $derived((followUpsPage?.page ?? []) as FollowUp[]);
 	const presets = $derived((presetsQuery.data ?? []) as TemplatePreset[]);
 	const isLoading = $derived(appContext.isLoading || templateQuery.isLoading);
 	const pageError = $derived(
@@ -281,11 +314,22 @@
 	// ─── Follow-up preview modal ───────────────────────────────────────────────
 
 	let previewOpen = $state(false);
-	let lastPreviewFollowUp = $state<FollowUp | null>(null);
+	let previewFollowUpId = $state<FollowUp['_id'] | null>(null);
 
 	function openPreview(followUp: FollowUp) {
-		lastPreviewFollowUp = followUp;
+		previewFollowUpId = followUp._id;
 		previewOpen = true;
+	}
+
+	const lastPreviewFollowUp = $derived.by(
+		() => followUps.find((followUp) => followUp._id === previewFollowUpId) ?? null
+	);
+
+	function isInteractiveEventTarget(event: Event) {
+		const target = event.target;
+		return target instanceof HTMLElement
+			? Boolean(target.closest('a,button,input,select,textarea'))
+			: false;
 	}
 
 	const previewVars = $derived.by(() => {
@@ -337,34 +381,8 @@
 
 	// ─── Search/filter/pagination state ───────────────────────────────────────
 
-	let searchQuery = $state('');
-	let dateFrom = $state('');
-	let dateTo = $state('');
-	let currentPage = $state(0);
-
-	const filteredFollowUps = $derived(
-		followUps.filter((f) => {
-			if (statusFilters.size > 0 && !statusFilters.has(f.status)) return false;
-			if (searchQuery) {
-				const q = searchQuery.toLowerCase();
-				const bookingId = displayBookingId(f).toLowerCase();
-				if (
-					!f.signerName.toLowerCase().includes(q) &&
-					!f.signerEmail.toLowerCase().includes(q) &&
-					!bookingId.includes(q)
-				)
-					return false;
-			}
-			if (dateFrom && f.submittedAt < new Date(dateFrom).getTime()) return false;
-			if (dateTo && f.submittedAt > new Date(dateTo).getTime() + 86400000) return false;
-			return true;
-		})
-	);
-
-	const totalPages = $derived(Math.max(1, Math.ceil(filteredFollowUps.length / PAGE_SIZE)));
-	const pagedFollowUps = $derived(
-		filteredFollowUps.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE)
-	);
+	const hasNextPage = $derived(Boolean(followUpsPage && !followUpsPage.isDone));
+	const pagedFollowUps = $derived(followUps);
 
 	// ─── Selection state ──────────────────────────────────────────────────────
 
@@ -376,7 +394,7 @@
 	);
 	const someVisibleSelected = $derived(pagedFollowUps.some((f) => selectedIds.has(f._id)));
 
-	const selectedFollowUps = $derived(filteredFollowUps.filter((f) => selectedIds.has(f._id)));
+	const selectedFollowUps = $derived(followUps.filter((f) => selectedIds.has(f._id)));
 	const canSendSelected = $derived(
 		selectedFollowUps.some((f) => ['queued', 'paused', 'cancelled', 'failed'].includes(f.status))
 	);
@@ -398,22 +416,58 @@
 		void statusFilters.size;
 		selectedIds = new SvelteSet();
 		currentPage = 0;
+		pageCursors = [null];
 	});
 
-	function toggleRow(id: string, e: Event) {
-		e.stopPropagation();
+	function toggleRowSelection(id: string) {
 		const next = new SvelteSet(selectedIds);
 		if (next.has(id)) next.delete(id);
 		else next.add(id);
 		selectedIds = next;
 	}
 
+	function toggleRow(id: string, e: Event) {
+		e.stopPropagation();
+		toggleRowSelection(id);
+	}
+
+	function handleRowCheckboxKeydown(id: string, e: KeyboardEvent) {
+		e.stopPropagation();
+		if (e.key === 'Enter') {
+			e.preventDefault();
+			toggleRowSelection(id);
+		}
+	}
+
 	function toggleAll() {
 		if (allVisibleSelected) {
 			selectedIds = new SvelteSet();
 		} else {
-			selectedIds = new SvelteSet(filteredFollowUps.map((f) => f._id));
+			selectedIds = new SvelteSet(pagedFollowUps.map((f) => f._id));
 		}
+	}
+
+	function handleHeaderCheckboxKeydown(e: KeyboardEvent) {
+		e.stopPropagation();
+		if (e.key === 'Enter') {
+			e.preventDefault();
+			toggleAll();
+		}
+	}
+
+	function goToNextPage() {
+		if (!followUpsPage || followUpsPage.isDone) return;
+		const nextCursors = [...pageCursors];
+		nextCursors[currentPage + 1] = followUpsPage.continueCursor;
+		pageCursors = nextCursors;
+		selectedIds = new SvelteSet();
+		currentPage += 1;
+	}
+
+	function goToPreviousPage() {
+		if (currentPage === 0) return;
+		selectedIds = new SvelteSet();
+		currentPage -= 1;
 	}
 
 	// ─── Bulk / selection actions ──────────────────────────────────────────────
@@ -1045,7 +1099,7 @@
 							</TableBody>
 						</Table>
 					</div>
-				{:else if filteredFollowUps.length === 0}
+				{:else if followUps.length === 0}
 					<div
 						class="rounded-2xl border border-dashed border-border bg-muted/20 px-4 py-16 text-center text-sm text-muted-foreground"
 					>
@@ -1069,6 +1123,7 @@
 											class="size-4 cursor-pointer rounded accent-primary"
 											checked={allVisibleSelected}
 											onchange={toggleAll}
+											onkeydown={handleHeaderCheckboxKeydown}
 										/>
 									</TableHead>
 									<TableHead
@@ -1103,20 +1158,29 @@
 											: ''}"
 										role="button"
 										tabindex={0}
-										onclick={() => openPreview(followUp)}
+										onclick={(e) => {
+											if (isInteractiveEventTarget(e)) return;
+											openPreview(followUp);
+										}}
 										onkeydown={(e) => {
+											if (isInteractiveEventTarget(e)) return;
 											if (e.key === 'Enter' || e.key === ' ') {
 												e.preventDefault();
 												openPreview(followUp);
 											}
 										}}
 									>
-										<TableCell class="pl-4" onclick={(e) => e.stopPropagation()}>
+										<TableCell
+											class="pl-4"
+											onclick={(e) => e.stopPropagation()}
+											onkeydown={(e) => e.stopPropagation()}
+										>
 											<input
 												type="checkbox"
 												class="size-4 cursor-pointer rounded accent-primary"
 												checked={selectedIds.has(followUp._id)}
 												onchange={(e) => toggleRow(followUp._id, e)}
+												onkeydown={(e) => handleRowCheckboxKeydown(followUp._id, e)}
 											/>
 										</TableCell>
 										<TableCell>
@@ -1159,41 +1223,28 @@
 
 						<div class="flex items-center justify-between border-t border-border px-5 py-3">
 							<p class="text-xs text-muted-foreground">
-								{#if filteredFollowUps.length === 0}
+								{#if followUps.length === 0}
 									No entries
 								{:else}
-									{currentPage * PAGE_SIZE + 1}–{Math.min(
-										(currentPage + 1) * PAGE_SIZE,
-										filteredFollowUps.length
-									)} of {filteredFollowUps.length}
-									{filteredFollowUps.length < followUps.length
-										? `(filtered from ${followUps.length})`
-										: ''}
+									Page {currentPage + 1} · Showing {followUps.length}
+									{followUps.length === 1 ? 'entry' : 'entries'}
 								{/if}
 							</p>
 							<div class="flex items-center gap-1">
 								<button
 									class="rounded px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
 									disabled={currentPage === 0}
-									onclick={() => (currentPage -= 1)}
+									onclick={goToPreviousPage}
 								>
 									← Prev
 								</button>
-								{#each Array.from({ length: totalPages }, (_, i) => i) as page (page)}
-									<button
-										class="min-w-[28px] rounded px-2 py-1 text-xs transition-colors {page ===
-										currentPage
-											? 'bg-primary text-primary-foreground'
-											: 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'}"
-										onclick={() => (currentPage = page)}
-									>
-										{page + 1}
-									</button>
-								{/each}
+								<span class="min-w-[64px] px-2 py-1 text-center text-xs text-muted-foreground">
+									Page {currentPage + 1}
+								</span>
 								<button
 									class="rounded px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
-									disabled={currentPage >= totalPages - 1}
-									onclick={() => (currentPage += 1)}
+									disabled={!hasNextPage}
+									onclick={goToNextPage}
 								>
 									Next →
 								</button>

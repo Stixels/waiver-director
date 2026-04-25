@@ -175,6 +175,7 @@ export default defineSchema({
 		submissionId: v.id('waiver_submissions'),
 		signerName: v.string(),
 		signerEmail: v.string(),
+		searchText: v.optional(v.string()),
 		subjectTemplate: v.optional(v.string()),
 		bodyTemplate: v.optional(v.string()),
 		submittedAt: v.number(),
@@ -198,4 +199,8 @@ export default defineSchema({
 		.index('by_workspaceId_and_status', ['workspaceId', 'status'])
 		.index('by_workspaceId_and_status_and_sentAt', ['workspaceId', 'status', 'sentAt'])
 		.index('by_submissionId', ['submissionId'])
+		.searchIndex('search_follow_ups', {
+			searchField: 'searchText',
+			filterFields: ['workspaceId']
+		})
 });
