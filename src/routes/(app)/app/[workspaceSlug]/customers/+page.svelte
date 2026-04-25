@@ -81,10 +81,6 @@
 	const customerDetail = $derived((customerDetailQuery.data ?? null) as CustomerDetail | null);
 	const isLoadingDetail = $derived(customerDetailQuery.isLoading && Boolean(selectedCustomerId));
 
-	const lifetimeMinorSeats = $derived(
-		customerDetail?.visits.reduce((acc, visit) => acc + visit.minorCount, 0) ?? 0
-	);
-
 	$effect(() => {
 		const workspaceId = currentWorkspace?.workspaceId ?? null;
 		if (workspaceId === lastWorkspaceId) return;
@@ -454,10 +450,6 @@
 									<dd class="font-medium tabular-nums">
 										{customerDetail.customer.visitCount}
 									</dd>
-								</div>
-								<div class="flex items-baseline justify-between gap-3">
-									<dt class="text-xs text-muted-foreground">Minors</dt>
-									<dd class="font-medium tabular-nums">{lifetimeMinorSeats}</dd>
 								</div>
 								<div class="flex items-baseline justify-between gap-3">
 									<dt class="text-xs text-muted-foreground">First seen</dt>
