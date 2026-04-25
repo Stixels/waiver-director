@@ -158,7 +158,7 @@
 			{#if initials}
 				<span class="text-xs font-extrabold tracking-[-0.02em]">{initials}</span>
 			{:else}
-				<Building2Icon class="size-[1.125rem] text-primary/60" aria-hidden="true" />
+				<Building2Icon class="size-4.5 text-primary/60" aria-hidden="true" />
 			{/if}
 		</div>
 
@@ -226,7 +226,7 @@
 					type="text"
 					autocomplete="off"
 					placeholder="atlas-escape"
-					class="h-11 rounded-lg border-border/70 bg-background/70 px-3 pl-[4.25rem] font-mono text-sm shadow-none placeholder:text-muted-foreground/70 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20 md:text-sm"
+					class="h-11 rounded-lg border-border/70 bg-background/70 px-3 pl-17 font-mono text-sm shadow-none placeholder:text-muted-foreground/70 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20 md:text-sm"
 					value={slug}
 					required
 					minlength={2}

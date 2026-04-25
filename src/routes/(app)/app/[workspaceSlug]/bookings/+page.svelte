@@ -620,22 +620,22 @@
 					<TableHeader>
 						<TableRow class="border-border hover:bg-transparent">
 							<TableHead
-								class="text-xs font-semibold tracking-[0.1em] text-muted-foreground uppercase"
+								class="text-xs font-semibold tracking-widest text-muted-foreground uppercase"
 							>
 								Time
 							</TableHead>
 							<TableHead
-								class="text-xs font-semibold tracking-[0.1em] text-muted-foreground uppercase"
+								class="text-xs font-semibold tracking-widest text-muted-foreground uppercase"
 							>
 								Activity
 							</TableHead>
 							<TableHead
-								class="text-xs font-semibold tracking-[0.1em] text-muted-foreground uppercase"
+								class="text-xs font-semibold tracking-widest text-muted-foreground uppercase"
 							>
 								Customer
 							</TableHead>
 							<TableHead
-								class="text-xs font-semibold tracking-[0.1em] text-muted-foreground uppercase"
+								class="text-xs font-semibold tracking-widest text-muted-foreground uppercase"
 							>
 								Signed
 							</TableHead>

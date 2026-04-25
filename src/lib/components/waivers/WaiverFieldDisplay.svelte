@@ -76,7 +76,7 @@
 		</div>
 	{:else if field.type === 'text'}
 		<div
-			class={`${waiverUnderlineTextareaClass} ${preview ? 'pointer-events-none min-h-[3.25rem] whitespace-pre-wrap text-muted-foreground/45 select-none' : 'min-h-[3.25rem] whitespace-pre-wrap'}`}
+			class={`${waiverUnderlineTextareaClass} ${preview ? 'pointer-events-none min-h-13 whitespace-pre-wrap text-muted-foreground/45 select-none' : 'min-h-13 whitespace-pre-wrap'}`}
 			aria-hidden={preview}
 		>
 			{preview ? sampleValue(field) : answerDisplay(field)}

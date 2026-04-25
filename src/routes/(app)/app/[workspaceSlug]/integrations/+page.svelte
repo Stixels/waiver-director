@@ -461,7 +461,7 @@
 								/>
 								<div class="min-w-0 space-y-1">
 									<p class="text-sm font-semibold text-destructive">Integration needs attention</p>
-									<p class="text-xs leading-relaxed break-words text-destructive/90">
+									<p class="text-xs leading-relaxed wrap-break-word text-destructive/90">
 										{connectedIntegration.lastSyncError}
 									</p>
 								</div>

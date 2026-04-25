@@ -695,7 +695,7 @@
 							<div class="space-y-1.5">
 								{#each [0, 1, 2] as index (index)}
 									<div
-										class="flex min-w-0 overflow-hidden rounded-[0.55rem] border border-border bg-card/20"
+										class="flex min-w-0 overflow-hidden rounded-3xl border border-border bg-card/20"
 									>
 										<Skeleton class="w-6 shrink-0 rounded-none bg-muted/30" />
 										<div class="min-w-0 flex-1 px-2.5 py-1.5">

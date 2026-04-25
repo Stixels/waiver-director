@@ -147,22 +147,22 @@
 					<TableHeader>
 						<TableRow class="border-border hover:bg-transparent">
 							<TableHead
-								class="text-xs font-semibold tracking-[0.1em] text-muted-foreground uppercase"
+								class="text-xs font-semibold tracking-widest text-muted-foreground uppercase"
 							>
 								Name
 							</TableHead>
 							<TableHead
-								class="text-xs font-semibold tracking-[0.1em] text-muted-foreground uppercase"
+								class="text-xs font-semibold tracking-widest text-muted-foreground uppercase"
 							>
 								Email
 							</TableHead>
 							<TableHead
-								class="text-xs font-semibold tracking-[0.1em] text-muted-foreground uppercase"
+								class="text-xs font-semibold tracking-widest text-muted-foreground uppercase"
 							>
 								Date of birth
 							</TableHead>
 							<TableHead
-								class="text-xs font-semibold tracking-[0.1em] text-muted-foreground uppercase"
+								class="text-xs font-semibold tracking-widest text-muted-foreground uppercase"
 							>
 								Submitted
 							</TableHead>
@@ -222,22 +222,22 @@
 					<TableHeader>
 						<TableRow class="border-border hover:bg-transparent">
 							<TableHead
-								class="text-xs font-semibold tracking-[0.1em] text-muted-foreground uppercase"
+								class="text-xs font-semibold tracking-widest text-muted-foreground uppercase"
 							>
 								Name
 							</TableHead>
 							<TableHead
-								class="text-xs font-semibold tracking-[0.1em] text-muted-foreground uppercase"
+								class="text-xs font-semibold tracking-widest text-muted-foreground uppercase"
 							>
 								Email
 							</TableHead>
 							<TableHead
-								class="text-xs font-semibold tracking-[0.1em] text-muted-foreground uppercase"
+								class="text-xs font-semibold tracking-widest text-muted-foreground uppercase"
 							>
 								Date of birth
 							</TableHead>
 							<TableHead
-								class="text-xs font-semibold tracking-[0.1em] text-muted-foreground uppercase"
+								class="text-xs font-semibold tracking-widest text-muted-foreground uppercase"
 							>
 								Submitted
 							</TableHead>
