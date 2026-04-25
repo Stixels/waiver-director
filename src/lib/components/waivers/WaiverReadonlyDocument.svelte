@@ -7,7 +7,6 @@
 	import WaiverPublicAdditionalInfoSection from '$lib/components/waivers/WaiverPublicAdditionalInfoSection.svelte';
 	import WaiverPublicMinorsBlock from '$lib/components/waivers/WaiverPublicMinorsBlock.svelte';
 	import WaiverPublicSignatureAreaPreview from '$lib/components/waivers/WaiverPublicSignatureAreaPreview.svelte';
-	import WaiverPublicSignatureCard from '$lib/components/waivers/WaiverPublicSignatureCard.svelte';
 	import {
 		waiverAddMinorButtonClass,
 		waiverFieldLabelClass,
@@ -124,31 +123,32 @@
 						{/each}
 					</WaiverPublicAdditionalInfoSection>
 				{/if}
-			</WaiverPublicAboutSignerCard>
-		</div>
 
-		<div class="mt-6">
-			<WaiverPublicSignatureCard>
-				{#if preview}
-					<WaiverPublicSignatureAreaPreview />
-				{:else}
-					<div class="space-y-5">
-						<div class="overflow-hidden rounded-2xl border border-border bg-white p-4">
-							<img
-								src={signatureDataUrl}
-								alt="Signature"
-								class="mx-auto max-h-28 w-full object-contain"
-							/>
-						</div>
-
-						{#if submittedAt}
-							<p class="text-xs text-muted-foreground">
-								Signed and submitted on {formatTimestamp(submittedAt)}
-							</p>
-						{/if}
+				<div class="mt-8 border-t border-border pt-8">
+					<div class="mb-7">
+						<h3 class="text-lg font-semibold tracking-tight">Signature</h3>
 					</div>
-				{/if}
-			</WaiverPublicSignatureCard>
+					{#if preview}
+						<WaiverPublicSignatureAreaPreview />
+					{:else}
+						<div class="space-y-5">
+							<div class="overflow-hidden rounded-2xl border border-border bg-white p-4">
+								<img
+									src={signatureDataUrl}
+									alt="Signature"
+									class="mx-auto max-h-28 w-full object-contain"
+								/>
+							</div>
+
+							{#if submittedAt}
+								<p class="text-xs text-muted-foreground">
+									Signed and submitted on {formatTimestamp(submittedAt)}
+								</p>
+							{/if}
+						</div>
+					{/if}
+				</div>
+			</WaiverPublicAboutSignerCard>
 		</div>
 	</WaiverDocumentShell>
 </div>

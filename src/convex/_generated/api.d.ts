@@ -9,8 +9,14 @@
  */
 
 import type * as app from "../app.js";
+import type * as bookings from "../bookings.js";
+import type * as crons from "../crons.js";
 import type * as emails from "../emails.js";
+import type * as http from "../http.js";
+import type * as integrations from "../integrations.js";
 import type * as lib_auth from "../lib/auth.js";
+import type * as lib_bookingSignatures from "../lib/bookingSignatures.js";
+import type * as lib_bookings from "../lib/bookings.js";
 import type * as lib_waivers from "../lib/waivers.js";
 import type * as lib_workspaces from "../lib/workspaces.js";
 import type * as users from "../users.js";
@@ -25,8 +31,14 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   app: typeof app;
+  bookings: typeof bookings;
+  crons: typeof crons;
   emails: typeof emails;
+  http: typeof http;
+  integrations: typeof integrations;
   "lib/auth": typeof lib_auth;
+  "lib/bookingSignatures": typeof lib_bookingSignatures;
+  "lib/bookings": typeof lib_bookings;
   "lib/waivers": typeof lib_waivers;
   "lib/workspaces": typeof lib_workspaces;
   users: typeof users;

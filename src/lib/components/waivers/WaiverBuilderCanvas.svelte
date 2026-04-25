@@ -29,7 +29,6 @@
 	import WaiverPublicAdditionalInfoSection from '$lib/components/waivers/WaiverPublicAdditionalInfoSection.svelte';
 	import WaiverPublicMinorsBlock from '$lib/components/waivers/WaiverPublicMinorsBlock.svelte';
 	import WaiverPublicSignatureAreaPreview from '$lib/components/waivers/WaiverPublicSignatureAreaPreview.svelte';
-	import WaiverPublicSignatureCard from '$lib/components/waivers/WaiverPublicSignatureCard.svelte';
 	import {
 		waiverAddMinorButtonClass,
 		waiverFieldLabelClass,
@@ -588,13 +587,14 @@
 							{/each}
 						</WaiverPublicAdditionalInfoSection>
 					{/if}
-				</WaiverPublicAboutSignerCard>
-			</div>
 
-			<div class="mt-6">
-				<WaiverPublicSignatureCard>
-					<WaiverPublicSignatureAreaPreview />
-				</WaiverPublicSignatureCard>
+					<div class="mt-8 border-t border-border pt-8">
+						<div class="mb-7">
+							<h3 class="text-lg font-semibold tracking-tight">Signature</h3>
+						</div>
+						<WaiverPublicSignatureAreaPreview />
+					</div>
+				</WaiverPublicAboutSignerCard>
 			</div>
 
 			<p class="mt-6 text-center text-[10px] tracking-[0.18em] text-muted-foreground/45 uppercase">

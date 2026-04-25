@@ -12,6 +12,7 @@
 	} from '$lib/components/ui/dialog';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import WaiverReadonlyDocument from '$lib/components/waivers/WaiverReadonlyDocument.svelte';
+	import { formatBookingTimestamp } from '$lib/utils/date';
 
 	interface Props {
 		open: boolean;
@@ -91,6 +92,16 @@
 				<DialogTitle class="text-base font-semibold">{submission.signerName}</DialogTitle>
 				<DialogDescription class="text-xs text-muted-foreground">
 					Submitted {formatTimestamp(submission.submittedAt)}
+					{#if submission.booking}
+						for {submission.booking.activityName}
+						{@const formattedStart = formatBookingTimestamp(submission.booking.startTime, {
+							dateStyle: 'long',
+							timeStyle: 'short'
+						})}
+						{#if formattedStart}
+							on {formattedStart}
+						{/if}
+					{/if}
 				</DialogDescription>
 			</DialogHeader>
 
