@@ -42,6 +42,8 @@
 
 	const convex = useConvexClient();
 	const appContext = useAppContext();
+	const MIN_SEND_AFTER_HOURS = 1;
+	const MAX_SEND_AFTER_HOURS = 168;
 
 	const currentWorkspace = $derived(
 		appContext.workspaces.find((w) => w.slug === page.params.workspaceSlug) ?? null
@@ -146,6 +148,13 @@
 	let editorRef = $state<{ insertText: (text: string) => void } | null>(null);
 	let loadedTemplateWorkspaceId = $state<Id<'workspaces'> | null>(null);
 
+	const normalizedSendAfterHours = $derived(clampSendAfterHours(sendAfterHours));
+	const isSendAfterHoursValid = $derived(
+		Number.isInteger(sendAfterHours) &&
+			sendAfterHours >= MIN_SEND_AFTER_HOURS &&
+			sendAfterHours <= MAX_SEND_AFTER_HOURS
+	);
+
 	$effect(() => {
 		const workspaceId = currentWorkspace?.workspaceId ?? null;
 
@@ -192,6 +201,20 @@
 			(subject !== savedSubject || body !== savedBody || sendAfterHours !== savedSendAfterHours)
 	);
 
+	function clampSendAfterHours(value: unknown) {
+		return Math.trunc(
+			Math.max(MIN_SEND_AFTER_HOURS, Math.min(MAX_SEND_AFTER_HOURS, Number(value) || 1))
+		);
+	}
+
+	function sanitizeSendAfterHours(e: Event) {
+		const input = e.currentTarget;
+		if (!(input instanceof HTMLInputElement)) return;
+		const nextValue = clampSendAfterHours(input.value);
+		sendAfterHours = nextValue;
+		input.value = String(nextValue);
+	}
+
 	function insertVariable(variable: string) {
 		editorRef?.insertText(variable);
 	}
@@ -206,7 +229,7 @@
 		const templateToSave = {
 			subject: nextTemplate?.subject ?? subject,
 			body: nextTemplate?.body ?? body,
-			sendAfterHours: nextTemplate?.sendAfterHours ?? sendAfterHours
+			sendAfterHours: clampSendAfterHours(nextTemplate?.sendAfterHours ?? sendAfterHours)
 		};
 		isSavingTemplate = true;
 		try {
@@ -236,6 +259,7 @@
 	}
 
 	async function saveTemplate() {
+		if (!isSendAfterHoursValid) return;
 		await persistTemplate();
 	}
 
@@ -251,7 +275,7 @@
 	}
 
 	async function confirmSavePreset() {
-		if (!currentWorkspace || !presetName.trim()) return;
+		if (!currentWorkspace || !presetName.trim() || !isSendAfterHoursValid) return;
 		isSavingPreset = true;
 		try {
 			await convex.mutation(api.emails.saveTemplatePreset, {
@@ -259,7 +283,7 @@
 				name: presetName.trim(),
 				subject,
 				body,
-				sendAfterHours
+				sendAfterHours: normalizedSendAfterHours
 			});
 			savePresetOpen = false;
 			presetName = '';
@@ -705,7 +729,9 @@
 				bind:value={presetName}
 				placeholder="e.g. Summer promotion, Default thank-you…"
 				onkeydown={(e) => {
-					if (e.key === 'Enter' && presetName.trim()) confirmSavePreset();
+					if (e.key === 'Enter' && presetName.trim() && isSendAfterHoursValid) {
+						confirmSavePreset();
+					}
 				}}
 			/>
 		</div>
@@ -713,7 +739,10 @@
 			<Button variant="outline" onclick={() => (savePresetOpen = false)} disabled={isSavingPreset}>
 				Cancel
 			</Button>
-			<Button onclick={confirmSavePreset} disabled={isSavingPreset || !presetName.trim()}>
+			<Button
+				onclick={confirmSavePreset}
+				disabled={isSavingPreset || !presetName.trim() || !isSendAfterHoursValid}
+			>
 				{isSavingPreset ? 'Saving…' : 'Save template'}
 			</Button>
 		</div>
@@ -916,19 +945,34 @@
 				<div class="space-y-1.5">
 					<h2 class="text-xl font-semibold tracking-tight">Follow-up email</h2>
 					<div class="flex items-center justify-between gap-4">
-						<div class="flex flex-wrap items-center gap-1.5 text-sm text-muted-foreground">
-							<span>Sent to every signer</span>
-							<Input
-								type="number"
-								min="1"
-								max="168"
-								bind:value={sendAfterHours}
-								class="h-6 w-12 px-1 text-center text-sm"
-							/>
-							<span>hours after they sign.</span>
+						<div class="space-y-1">
+							<div class="flex flex-wrap items-center gap-1.5 text-sm text-muted-foreground">
+								<span>Sent to every signer</span>
+								<Input
+									type="number"
+									min="1"
+									max="168"
+									value={sendAfterHours}
+									oninput={sanitizeSendAfterHours}
+									onblur={sanitizeSendAfterHours}
+									class="h-6 w-12 px-1 text-center text-sm"
+									aria-invalid={!isSendAfterHoursValid}
+									aria-describedby="send-after-hours-error"
+								/>
+								<span>hours after they sign.</span>
+							</div>
+							{#if !isSendAfterHoursValid}
+								<p id="send-after-hours-error" class="text-xs text-destructive">
+									Enter a whole number from {MIN_SEND_AFTER_HOURS} to {MAX_SEND_AFTER_HOURS}.
+								</p>
+							{/if}
 						</div>
 						<div class="flex shrink-0 items-center gap-1.5">
-							<Button size="sm" onclick={saveTemplate} disabled={!isDirty || isSavingTemplate}>
+							<Button
+								size="sm"
+								onclick={saveTemplate}
+								disabled={!isDirty || isSavingTemplate || !isSendAfterHoursValid}
+							>
 								{isSavingTemplate ? 'Saving…' : 'Save changes'}
 							</Button>
 							<DropdownMenu>

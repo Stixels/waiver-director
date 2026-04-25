@@ -599,6 +599,49 @@ function resolveHtmlVariables(
 	});
 }
 
+function decodeHtmlEntities(value: string): string {
+	return value.replace(
+		/&(#(\d+)|#x([\da-f]+)|amp|lt|gt|quot|apos);/gi,
+		(entity, _match, dec, hex) => {
+			if (dec) return String.fromCodePoint(Number(dec));
+			if (hex) return String.fromCodePoint(Number.parseInt(hex, 16));
+
+			switch (entity.toLowerCase()) {
+				case '&amp;':
+					return '&';
+				case '&lt;':
+					return '<';
+				case '&gt;':
+					return '>';
+				case '&quot;':
+					return '"';
+				case '&apos;':
+					return "'";
+				default:
+					return entity;
+			}
+		}
+	);
+}
+
+function htmlTemplateToText(template: string): string {
+	return decodeHtmlEntities(
+		template
+			.replace(/<[^>]+>/g, ' ')
+			.replace(/\s{2,}/g, ' ')
+			.trim()
+	);
+}
+
+function plainTextTemplateWithVariables(
+	template: string,
+	vars: { signerName: string; bookingId: string; activityDate: string }
+): string {
+	return resolveVariables(htmlTemplateToText(template), vars)
+		.replace(/\s{2,}/g, ' ')
+		.trim();
+}
+
 function mergeInlineStyleAttributes(attributes: string | undefined, styles: string): string {
 	const nextStyles = styles.trim().replace(/;$/, '');
 	const sourceAttributes = attributes ?? '';
@@ -707,12 +750,7 @@ export const deliverFollowUpEmail = internalAction({
 		);
 		const subject = resolveVariables(subjectTemplate, vars);
 		const bodyHtml = resolveHtmlVariables(bodyTemplate, vars);
-
-		// Strip HTML tags for plain-text fallback
-		const bodyText = bodyHtml
-			.replace(/<[^>]+>/g, ' ')
-			.replace(/\s{2,}/g, ' ')
-			.trim();
+		const bodyText = plainTextTemplateWithVariables(bodyTemplate, vars);
 
 		const styledBodyHtml = applyEmailClientStyles(bodyHtml);
 
