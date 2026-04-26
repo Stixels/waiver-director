@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 	import type { FunctionReturnType } from 'convex/server';
 	import { page } from '$app/state';
 	import { toast } from 'svelte-sonner';
@@ -18,6 +20,7 @@
 		TableRow
 	} from '$lib/components/ui/table';
 	import { publicEnv } from '$lib/config/public';
+	import { parseConvexId, queryString } from '$lib/utils/url';
 	import { cn } from '$lib/utils';
 	import { onMount } from 'svelte';
 	import ChevronLeftIcon from '@lucide/svelte/icons/chevron-left';
@@ -26,6 +29,7 @@
 	import CalendarDaysIcon from '@lucide/svelte/icons/calendar-days';
 	import CalendarOffIcon from '@lucide/svelte/icons/calendar-off';
 	import CircleCheckIcon from '@lucide/svelte/icons/circle-check';
+	import EyeOffIcon from '@lucide/svelte/icons/eye-off';
 	import SearchIcon from '@lucide/svelte/icons/search';
 	import XIcon from '@lucide/svelte/icons/x';
 
@@ -44,13 +48,17 @@
 		{ value: 'canceled', label: 'Canceled' }
 	];
 
-	let selectedDate = $state(toDateInputValue(new Date()));
+	let selectedDate = $state(initialSelectedDate());
 	let pageIndex = $state(0);
 	let searchQuery = $state('');
 	let debouncedSearchQuery = $state('');
 	let lastDebouncedSearchQuery = $state('');
 	let statusFilter = $state<StatusFilter>('all');
+	let hideDone = $state(true);
 	let lastWorkspaceId = $state<string | null>(null);
+	let lastAppliedSearchDate: string | null = null;
+	let lastOpenedSearchBookingKey: string | null = null;
+	let isClearingWorkspaceUrl = $state(false);
 	let selectedBookingId = $state<Id<'bookings'> | null>(null);
 	let detailOpen = $state(false);
 	let now = $state(Date.now());
@@ -74,6 +82,7 @@
 						pageIndex,
 						pageSize: PAGE_SIZE,
 						searchQuery: debouncedSearchQuery,
+						hideDone: hideDone && isToday,
 						statusFilter
 					}
 				: 'skip',
@@ -101,6 +110,10 @@
 		!!bookingPage && (bookingPage.hasPreviousPage || bookingPage.hasNextPage)
 	);
 	const isInitialLoading = $derived(isLoading && !bookingPage);
+	const searchDateParam = $derived(page.url.searchParams.get('date'));
+	const searchBookingIdParam = $derived(
+		parseConvexId<'bookings'>(page.url.searchParams.get('bookingId'))
+	);
 
 	function toDateInputValue(date: Date) {
 		const year = date.getFullYear();
@@ -112,6 +125,23 @@
 	function dateFromInputValue(value: string) {
 		const [year, month, day] = value.split('-').map(Number);
 		return new Date(year, month - 1, day);
+	}
+
+	function isDateInputValue(value: string | null): value is string {
+		if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+		const date = dateFromInputValue(value);
+		const [year, month, day] = value.split('-').map(Number);
+		return (
+			!Number.isNaN(date.getTime()) &&
+			date.getFullYear() === year &&
+			date.getMonth() === month - 1 &&
+			date.getDate() === day
+		);
+	}
+
+	function initialSelectedDate() {
+		const urlDate = page.url.searchParams.get('date');
+		return isDateInputValue(urlDate) ? urlDate : toDateInputValue(new Date());
 	}
 
 	function dayRangeForDate(value: string) {
@@ -128,11 +158,77 @@
 		pageIndex = 0;
 	}
 
+	async function updateBookingsUrl(args: {
+		date?: string | null;
+		bookingId?: Id<'bookings'> | null;
+		replaceState?: boolean;
+	}) {
+		const nextDate = args.date ?? null;
+		lastAppliedSearchDate = nextDate;
+		const query = queryString([
+			['date', nextDate],
+			['bookingId', args.bookingId ?? null]
+		]);
+
+		const pathname = `/app/${page.params.workspaceSlug}/bookings` as `/app/${string}/bookings`;
+		const href = (query ? `${pathname}?${query}` : pathname) as
+			| `/app/${string}/bookings`
+			| `/app/${string}/bookings?${string}`;
+
+		await goto(resolve(href), {
+			replaceState: args.replaceState ?? true,
+			noScroll: true,
+			keepFocus: true
+		});
+	}
+
+	function setSelectedDate(
+		value: string,
+		options: { updateUrl?: boolean; clearBooking?: boolean } = {}
+	) {
+		if (!isDateInputValue(value)) return;
+		selectedDate = value;
+		resetPagination();
+		if (options.clearBooking) {
+			selectedBookingId = null;
+			detailOpen = false;
+		}
+		if (options.updateUrl) {
+			void updateBookingsUrl({
+				date: value,
+				bookingId: options.clearBooking ? null : selectedBookingId,
+				replaceState: true
+			});
+		}
+	}
+
 	$effect(() => {
 		const workspaceId = currentWorkspace?.workspaceId ?? null;
+		if (!workspaceId) {
+			lastOpenedSearchBookingKey = null;
+			selectedBookingId = null;
+			detailOpen = false;
+			resetPagination();
+			return;
+		}
 		if (workspaceId === lastWorkspaceId) return;
+		const isWorkspaceChange = lastWorkspaceId !== null;
 		lastWorkspaceId = workspaceId;
+		lastAppliedSearchDate = null;
+		lastOpenedSearchBookingKey = null;
+		selectedBookingId = null;
+		detailOpen = false;
 		resetPagination();
+		if (isWorkspaceChange) {
+			isClearingWorkspaceUrl = true;
+			void updateBookingsUrl({
+				date: null,
+				bookingId: null,
+				replaceState: true
+			}).finally(() => {
+				isClearingWorkspaceUrl = false;
+			});
+		}
 	});
 
 	$effect(() => {
@@ -150,20 +246,57 @@
 		resetPagination();
 	});
 
+	$effect(() => {
+		if (isClearingWorkspaceUrl) return;
+		if (!searchDateParam) {
+			lastAppliedSearchDate = null;
+			return;
+		}
+		if (searchDateParam === lastAppliedSearchDate || !isDateInputValue(searchDateParam)) return;
+		lastAppliedSearchDate = searchDateParam;
+		setSelectedDate(searchDateParam);
+	});
+
+	$effect(() => {
+		if (isClearingWorkspaceUrl) return;
+		if (!searchBookingIdParam) {
+			if (detailOpen) detailOpen = false;
+			lastOpenedSearchBookingKey = null;
+			return;
+		}
+		if (searchBookingIdParam === lastOpenedSearchBookingKey) return;
+		lastOpenedSearchBookingKey = searchBookingIdParam;
+		selectedBookingId = searchBookingIdParam;
+		detailOpen = true;
+	});
+
+	$effect(() => {
+		if (isClearingWorkspaceUrl) return;
+		if (detailOpen || !searchBookingIdParam) return;
+		void updateBookingsUrl({
+			date: selectedDate,
+			bookingId: null,
+			replaceState: true
+		});
+	});
+
 	function changeDate(days: number) {
 		const [year, month, day] = selectedDate.split('-').map(Number);
-		selectedDate = toDateInputValue(new Date(year, month - 1, day + days));
-		resetPagination();
+		setSelectedDate(toDateInputValue(new Date(year, month - 1, day + days)), {
+			updateUrl: true,
+			clearBooking: true
+		});
 	}
 
 	function goToday() {
-		selectedDate = toDateInputValue(new Date());
-		resetPagination();
+		setSelectedDate(toDateInputValue(new Date()), { updateUrl: true, clearBooking: true });
 	}
 
 	function handleDateInput(event: Event) {
-		selectedDate = (event.currentTarget as HTMLInputElement).value;
-		resetPagination();
+		setSelectedDate((event.currentTarget as HTMLInputElement).value, {
+			updateUrl: true,
+			clearBooking: true
+		});
 	}
 
 	function goNextPage() {
@@ -190,6 +323,11 @@
 	function setStatusFilter(value: StatusFilter) {
 		if (statusFilter === value) return;
 		statusFilter = value;
+		resetPagination();
+	}
+
+	function handleHideDoneChange(event: Event) {
+		hideDone = (event.currentTarget as HTMLInputElement).checked;
 		resetPagination();
 	}
 
@@ -242,6 +380,11 @@
 	function openBooking(bookingId: Id<'bookings'>) {
 		selectedBookingId = bookingId;
 		detailOpen = true;
+		void updateBookingsUrl({
+			date: selectedDate,
+			bookingId,
+			replaceState: false
+		});
 	}
 
 	function handleBookingRowKeydown(event: KeyboardEvent, bookingId: Id<'bookings'>) {
@@ -252,8 +395,10 @@
 
 	type TimeStatus = {
 		label: string;
-		tone: 'now' | 'soon' | 'upcoming' | 'past';
+		tone: 'now' | 'soon' | 'past';
 	};
+
+	const UPCOMING_BOOKING_CHIP_WINDOW_MINUTES = 60;
 
 	// Only meaningful when viewing today: gives each row a scannable "when is this"
 	// hint so operators don't have to mentally subtract times.
@@ -261,22 +406,21 @@
 		if (!isToday || !booking.startTime) return null;
 		const startAt = Date.parse(booking.startTime);
 		if (Number.isNaN(startAt)) return null;
-		const endAt = booking.endTime ? Date.parse(booking.endTime) : startAt + 2 * 60 * 60 * 1000;
+		const endAt = booking.endTime ? Date.parse(booking.endTime) : startAt + 1 * 60 * 60 * 1000;
 		const diffMs = startAt - now;
 		const diffMinutes = Math.round(diffMs / 60_000);
 
 		if (now >= startAt && now <= endAt) return { label: 'Now', tone: 'now' };
 		if (now > endAt) return { label: 'Done', tone: 'past' };
-		if (diffMinutes <= 60) return { label: `In ${diffMinutes}m`, tone: 'soon' };
-		const diffHours = Math.round(diffMinutes / 60);
-		if (diffHours <= 12) return { label: `In ${diffHours}h`, tone: 'upcoming' };
+		if (diffMinutes <= UPCOMING_BOOKING_CHIP_WINDOW_MINUTES) {
+			return { label: `In ${diffMinutes}m`, tone: 'soon' };
+		}
 		return null;
 	}
 
 	function timeStatusClass(tone: TimeStatus['tone']) {
 		if (tone === 'now') return 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400';
 		if (tone === 'soon') return 'bg-amber-500/15 text-amber-700 dark:text-amber-400';
-		if (tone === 'upcoming') return 'bg-muted text-muted-foreground';
 		return 'bg-muted/60 text-muted-foreground/70';
 	}
 </script>
@@ -298,7 +442,6 @@
 	<div class="mx-auto w-full max-w-6xl min-w-0 space-y-6">
 		<div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
 			<div class="min-w-0 space-y-1">
-				<p class="text-xs font-bold tracking-[0.16em] text-primary uppercase">Bookings</p>
 				<h1 class="text-2xl font-semibold tracking-tight">Check-ins</h1>
 				<p class="text-sm text-muted-foreground">
 					{formatSelectedDate(selectedDate)} · Front desk check-in coverage.
@@ -352,7 +495,7 @@
 				/>
 				<input
 					type="text"
-					placeholder="Search customer, activity, or booking number"
+					placeholder="Search by customer, activity, or booking number"
 					value={searchQuery}
 					oninput={handleSearchInput}
 					class="h-10 w-full rounded-lg border border-input bg-card/50 pr-10 pl-11 text-sm shadow-xs transition-all placeholder:text-muted-foreground/70 hover:bg-card focus-visible:border-ring focus-visible:bg-background focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
@@ -371,6 +514,24 @@
 			</div>
 
 			<div class="flex w-full flex-wrap items-center gap-3 lg:w-auto">
+				{#if isToday}
+					<label
+						class="inline-flex h-10 w-full cursor-pointer items-center rounded-lg border border-input bg-card/50 p-0.5 shadow-xs lg:w-auto"
+					>
+						<input
+							type="checkbox"
+							checked={hideDone}
+							onchange={handleHideDoneChange}
+							class="peer sr-only"
+						/>
+						<span
+							class="inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-md px-3 text-xs font-medium whitespace-nowrap text-muted-foreground transition-all peer-checked:bg-background peer-checked:text-foreground peer-checked:shadow-sm peer-focus-visible:ring-2 peer-focus-visible:ring-ring/30 peer-focus-visible:outline-none hover:text-foreground lg:h-8"
+						>
+							<EyeOffIcon class="size-3.5" aria-hidden="true" />
+							Hide done
+						</span>
+					</label>
+				{/if}
 				<div
 					class="grid h-10 w-full grid-cols-4 items-center rounded-lg border border-input bg-card/50 p-0.5 shadow-xs lg:inline-flex lg:w-auto"
 					role="tablist"
@@ -480,11 +641,15 @@
 					<p class="text-sm font-medium">
 						{searchQuery || statusFilter !== 'all'
 							? 'No matching bookings'
-							: 'No bookings synced for this day'}
+							: hideDone && isToday
+								? 'No unfinished bookings'
+								: 'No bookings synced for this day'}
 					</p>
 					<p class="text-xs text-muted-foreground">
 						{#if searchQuery || statusFilter !== 'all'}
 							Adjust search or filters for {formatSelectedDate(selectedDate)}.
+						{:else if hideDone && isToday}
+							Show done bookings to review rooms that have already ended.
 						{:else}
 							Try a different date or check the booking integration.
 						{/if}

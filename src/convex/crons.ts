@@ -4,16 +4,16 @@ import { internal } from './_generated/api';
 const crons = cronJobs();
 
 crons.interval(
-	'mark expired booking connection sessions',
-	{ hours: 6 },
-	internal.integrations.markExpiredBookingConnectionSessionsCron,
+	'prune old booking connection sessions',
+	{ hours: 24 },
+	internal.integrations.pruneOldBookingConnectionSessionsCron,
 	{}
 );
 
 crons.interval(
-	'prune old booking connection sessions',
+	'prune old Bookeo webhook events',
 	{ hours: 24 },
-	internal.integrations.pruneOldBookingConnectionSessionsCron,
+	internal.integrations.pruneOldBookeoWebhookEventsCron,
 	{}
 );
 

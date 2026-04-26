@@ -411,7 +411,12 @@
 
 			<DropdownMenu>
 				<DropdownMenuTrigger class="inline-flex">
-					<button type="button" class="toolbar-button" disabled={!editor || disabled} aria-label="Alignment">
+					<button
+						type="button"
+						class="toolbar-button"
+						disabled={!editor || disabled}
+						aria-label="Alignment"
+					>
 						{#if toolbarState.alignment === 'center'}
 							<AlignCenterIcon class="size-3.5" />
 						{:else if toolbarState.alignment === 'right'}
@@ -433,16 +438,14 @@
 					</DropdownMenuItem>
 					<DropdownMenuItem
 						class={toolbarState.alignment === 'center' ? 'font-semibold' : undefined}
-						onclick={() =>
-							command((editor) => editor.chain().focus().setTextAlign('center').run())}
+						onclick={() => command((editor) => editor.chain().focus().setTextAlign('center').run())}
 					>
 						<AlignCenterIcon class="size-4" />
 						<span>Center</span>
 					</DropdownMenuItem>
 					<DropdownMenuItem
 						class={toolbarState.alignment === 'right' ? 'font-semibold' : undefined}
-						onclick={() =>
-							command((editor) => editor.chain().focus().setTextAlign('right').run())}
+						onclick={() => command((editor) => editor.chain().focus().setTextAlign('right').run())}
 					>
 						<AlignRightIcon class="size-4" />
 						<span>Right</span>

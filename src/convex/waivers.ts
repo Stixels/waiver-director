@@ -5,6 +5,8 @@ import type { Doc, Id } from './_generated/dataModel';
 import type { MutationCtx, QueryCtx } from './_generated/server';
 import { internal } from './_generated/api';
 import { bookingSnapshot, bookingSnapshotValidator } from './lib/bookings';
+import { upsertSignerCustomer } from './lib/customers';
+import { submissionSearchText } from './lib/submissions';
 import {
 	assertWorkspaceRecord,
 	minorInputValidator,
@@ -329,7 +331,8 @@ export const getSubmission = query({
 export const listRecentSubmissions = query({
 	args: {
 		workspaceId: v.id('workspaces'),
-		paginationOpts: paginationOptsValidator
+		paginationOpts: paginationOptsValidator,
+		searchQuery: v.optional(v.string())
 	},
 	returns: v.object({
 		submissions: v.array(
@@ -349,12 +352,20 @@ export const listRecentSubmissions = query({
 	}),
 	handler: async (ctx, args) => {
 		await requireWorkspaceMember(ctx, args.workspaceId);
+		const searchQuery = args.searchQuery?.trim().toLowerCase().replace(/\s+/g, ' ') ?? '';
 
-		const submissionPage = await ctx.db
-			.query('waiver_submissions')
-			.withIndex('by_workspaceId', (q) => q.eq('workspaceId', args.workspaceId))
-			.order('desc')
-			.paginate(args.paginationOpts);
+		const submissionPage = searchQuery
+			? await ctx.db
+					.query('waiver_submissions')
+					.withSearchIndex('search_submissionText', (q) =>
+						q.search('searchText', searchQuery).eq('workspaceId', args.workspaceId)
+					)
+					.paginate(args.paginationOpts)
+			: await ctx.db
+					.query('waiver_submissions')
+					.withIndex('by_workspaceId', (q) => q.eq('workspaceId', args.workspaceId))
+					.order('desc')
+					.paginate(args.paginationOpts);
 
 		return {
 			submissions: submissionPage.page.map((submission) => ({
@@ -506,7 +517,8 @@ export const submitPublicWaiver = mutation({
 		}
 
 		const signerName = args.signerName.trim();
-		const signerEmail = args.signerEmail.trim().toLowerCase();
+		const originalSignerEmail = args.signerEmail.trim();
+		const signerEmail = originalSignerEmail.toLowerCase();
 		const signerDateOfBirth = args.signerDateOfBirth.trim();
 		if (signerName.length < 2 || signerName.length > 120) {
 			throw new ConvexError({
@@ -561,7 +573,12 @@ export const submitPublicWaiver = mutation({
 					}
 				: {}),
 			signerName,
-			signerEmail,
+			signerEmail: originalSignerEmail,
+			searchText: submissionSearchText({
+				signerName,
+				signerEmail: originalSignerEmail,
+				booking
+			}),
 			signerDateOfBirth,
 			signatureDataUrl: args.signatureDataUrl,
 			answers: args.answers,
@@ -569,13 +586,21 @@ export const submitPublicWaiver = mutation({
 			status: 'submitted',
 			submittedAt
 		});
+		const customerId = await upsertSignerCustomer(ctx, {
+			workspaceId: waiver.workspaceId,
+			signerName,
+			signerEmail: originalSignerEmail,
+			submittedAt,
+			bookingId: booking?._id ?? null,
+			latestSubmissionId: submissionId
+		});
+		await ctx.db.patch(submissionId, { customerId });
 
-		// Hook that connects to the email scheduler to send a follow-up email to the signer after a certain amount of time.
 		await ctx.scheduler.runAfter(0, internal.emails.scheduleFollowUpOnSubmission, {
 			workspaceId: waiver.workspaceId,
 			submissionId,
 			signerName,
-			signerEmail,
+			signerEmail: originalSignerEmail,
 			submittedAt
 		});
 

@@ -1,6 +1,7 @@
 import LayoutDashboardIcon from '@lucide/svelte/icons/layout-dashboard';
 import CalendarCheckIcon from '@lucide/svelte/icons/calendar-check';
 import ScrollTextIcon from '@lucide/svelte/icons/scroll-text';
+import UsersRoundIcon from '@lucide/svelte/icons/users-round';
 import LayersIcon from '@lucide/svelte/icons/layers';
 import MailIcon from '@lucide/svelte/icons/mail';
 import PlugZapIcon from '@lucide/svelte/icons/plug-zap';
@@ -26,6 +27,12 @@ export const appMainNavItems = [
 		href: '/app/[workspaceSlug]/submissions',
 		icon: ScrollTextIcon,
 		description: 'Signed waiver records and submission activity.'
+	},
+	{
+		label: 'Customers',
+		href: '/app/[workspaceSlug]/customers',
+		icon: UsersRoundIcon,
+		description: 'Signer contacts and repeat-visit history.'
 	},
 	{
 		label: 'Waiver',
