@@ -352,7 +352,7 @@
 				/>
 				<input
 					type="text"
-					placeholder="Search customer, activity, or booking number"
+					placeholder="Search by customer, activity, or booking number"
 					value={searchQuery}
 					oninput={handleSearchInput}
 					class="h-10 w-full rounded-lg border border-input bg-card/50 pr-10 pl-11 text-sm shadow-xs transition-all placeholder:text-muted-foreground/70 hover:bg-card focus-visible:border-ring focus-visible:bg-background focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
