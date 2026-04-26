@@ -374,34 +374,42 @@
 		{onNavigate}
 	/>
 
+	<!-- ─── Search trigger ─── -->
+	<div class="shrink-0 px-2 pb-2">
+		<button
+			type="button"
+			class="search-pill group flex w-full items-center gap-2 rounded-lg bg-sidebar-accent/40 px-2.5 py-1.5 text-left ring-1 ring-sidebar-border/50 transition-all ring-inset hover:bg-sidebar-accent hover:ring-sidebar-border focus-visible:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none"
+			title={isCollapsed ? 'Search workspace' : undefined}
+			aria-label={isCollapsed ? 'Search customers and bookings' : 'Open workspace search'}
+			aria-keyshortcuts={`${searchShortcutModifier === '⌘' ? 'Meta' : 'Control'}+K`}
+			onclick={openSearchDialog}
+		>
+			<SearchIcon
+				class="size-[15px] shrink-0 text-muted-foreground/80 transition-colors group-hover:text-sidebar-foreground"
+				aria-hidden="true"
+			/>
+			<span
+				class="sidebar-copy search-pill-label flex-1 truncate text-[12.5px] text-muted-foreground/80 transition-colors group-hover:text-sidebar-foreground"
+			>
+				Search workspace
+			</span>
+			<span class="sidebar-copy search-pill-kbd flex items-center gap-0.5" aria-hidden="true">
+				<Kbd
+					class="h-[18px] min-w-[18px] border-sidebar-border/70 bg-background/40 px-1 text-[9.5px] text-muted-foreground/80"
+				>
+					{searchShortcutModifier}
+				</Kbd>
+				<Kbd
+					class="h-[18px] min-w-[18px] border-sidebar-border/70 bg-background/40 px-1 text-[9.5px] text-muted-foreground/80"
+				>
+					K
+				</Kbd>
+			</span>
+		</button>
+	</div>
+
 	<!-- ─── Navigation ─── -->
 	<nav class="flex flex-1 flex-col overflow-y-auto px-2 pb-2" aria-label="Primary navigation">
-		<div class="pb-2">
-			<button
-				type="button"
-				class="nav-item group flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left transition-colors"
-				title={isCollapsed ? 'Search' : undefined}
-				aria-label={isCollapsed ? 'Search customers and bookings' : undefined}
-				onclick={openSearchDialog}
-			>
-				<SearchIcon
-					class="size-[17px] shrink-0 text-muted-foreground transition-colors group-hover:text-sidebar-foreground"
-					aria-hidden="true"
-				/>
-				<span
-					class="sidebar-copy nav-item-label text-[13px] leading-none text-muted-foreground transition-colors group-hover:text-sidebar-foreground"
-				>
-					Search
-				</span>
-				<span class="sidebar-copy ml-auto flex items-center gap-1" aria-hidden="true">
-					<Kbd class="bg-sidebar-accent/50 text-muted-foreground/70">
-						{searchShortcutModifier}
-					</Kbd>
-					<Kbd class="bg-sidebar-accent/50 text-muted-foreground/70">K</Kbd>
-				</span>
-			</button>
-		</div>
-
 		<!-- Main workflow items -->
 		<div class="flex flex-col gap-0.5">
 			{#each appMainNavItems as item (item.href)}
@@ -596,6 +604,21 @@
 
 	.nav-item.is-active {
 		background: var(--sidebar-accent);
+	}
+
+	.search-pill {
+		min-height: 2rem;
+		transition:
+			padding 0.22s cubic-bezier(0.4, 0, 0.2, 1),
+			gap 0.22s cubic-bezier(0.4, 0, 0.2, 1),
+			background-color 0.15s ease,
+			box-shadow 0.15s ease;
+	}
+
+	.sidebar-root[data-collapsed='true'] .search-pill {
+		gap: 0;
+		padding-inline: 0.5rem;
+		justify-content: center;
 	}
 
 	.sidebar-header,

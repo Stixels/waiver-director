@@ -6,19 +6,14 @@
 	import type { Id } from '$convex/_generated/dataModel';
 	import { api } from '$convex/_generated/api';
 	import { useProtectedQuery } from '$lib/components/auth/convex-auth.svelte';
-	import {
-		Dialog,
-		DialogContent,
-		DialogDescription,
-		DialogHeader,
-		DialogTitle
-	} from '$lib/components/ui/dialog';
-	import { Skeleton } from '$lib/components/ui/skeleton';
+	import { Dialog, DialogContent, DialogDescription, DialogTitle } from '$lib/components/ui/dialog';
 	import { cn } from '$lib/utils';
-	import { tick } from 'svelte';
+	import { tick, untrack } from 'svelte';
 	import CalendarDaysIcon from '@lucide/svelte/icons/calendar-days';
+	import CornerDownLeftIcon from '@lucide/svelte/icons/corner-down-left';
 	import SearchIcon from '@lucide/svelte/icons/search';
 	import UserRoundIcon from '@lucide/svelte/icons/user-round';
+	import XIcon from '@lucide/svelte/icons/x';
 
 	interface Props {
 		open: boolean;
@@ -29,20 +24,44 @@
 
 	let { open = $bindable(), workspaceId, workspaceSlug, onNavigate }: Props = $props();
 
+	type SearchResults = FunctionReturnType<typeof api.search.globalWorkspaceSearch>;
+	type CustomerResult = SearchResults['customers'][number];
+	type BookingResult = SearchResults['bookings'][number];
+	type SearchTarget = {
+		pathname: `/app/${string}`;
+		query: string;
+	};
+	type FlatItem =
+		| { kind: 'customer'; key: string; data: CustomerResult; target: SearchTarget | null }
+		| { kind: 'booking'; key: string; data: BookingResult; target: SearchTarget | null };
+
+	const componentId = $props.id();
+	const optionId = (index: number) => `wd-search-${componentId}-result-${index}`;
+	const listboxId = `wd-search-${componentId}-listbox`;
+
 	let searchInput = $state('');
 	let debouncedSearchInput = $state('');
 	let searchInputElement = $state<HTMLInputElement | null>(null);
+	let listElement = $state<HTMLDivElement | null>(null);
+	let selectedIndex = $state(0);
 
 	$effect(() => {
-		if (!open) return;
+		if (!open) {
+			untrack(() => {
+				searchInput = '';
+				debouncedSearchInput = '';
+				selectedIndex = 0;
+			});
+			return;
+		}
 		void tick().then(() => searchInputElement?.focus());
 	});
 
 	$effect(() => {
-		const nextSearchInput = searchInput.trim();
+		const next = searchInput.trim();
 		const timeout = setTimeout(() => {
-			debouncedSearchInput = nextSearchInput;
-		}, 180);
+			debouncedSearchInput = next;
+		}, 160);
 		return () => clearTimeout(timeout);
 	});
 
@@ -58,19 +77,60 @@
 		() => ({ keepPreviousData: true })
 	);
 
-	type SearchResults = FunctionReturnType<typeof api.search.globalWorkspaceSearch>;
-	type BookingResult = SearchResults['bookings'][number];
-	type SearchTarget = {
-		pathname: `/app/${string}`;
-		query: string;
-	};
-
 	const searchResults = $derived((searchResultsQuery.data ?? null) as SearchResults | null);
 	const customerResults = $derived(searchResults?.customers ?? []);
 	const bookingResults = $derived(searchResults?.bookings ?? []);
-	const hasQuery = $derived(searchInput.trim().length > 0);
+	const trimmedQuery = $derived(searchInput.trim());
+	const hasQuery = $derived(trimmedQuery.length > 0);
 	const isSearching = $derived(searchResultsQuery.isLoading && debouncedSearchInput.length > 0);
 	const hasResults = $derived(customerResults.length > 0 || bookingResults.length > 0);
+
+	const flatItems = $derived.by<FlatItem[]>(() => {
+		const items: FlatItem[] = [];
+		for (const customer of customerResults) {
+			items.push({
+				kind: 'customer',
+				key: `customer:${customer.customerId}`,
+				data: customer,
+				target: customerTarget(customer.customerId)
+			});
+		}
+		for (const booking of bookingResults) {
+			items.push({
+				kind: 'booking',
+				key: `booking:${booking.bookingId}`,
+				data: booking,
+				target: bookingTarget(booking)
+			});
+		}
+		return items;
+	});
+
+	$effect(() => {
+		const itemCount = flatItems.length;
+		untrack(() => {
+			if (selectedIndex >= itemCount) {
+				selectedIndex = 0;
+			}
+		});
+	});
+
+	$effect(() => {
+		const query = debouncedSearchInput;
+		untrack(() => {
+			if (query === undefined) return;
+			selectedIndex = 0;
+		});
+	});
+
+	$effect(() => {
+		const nextSelectedIndex = selectedIndex;
+		void tick().then(() => {
+			const id = optionId(nextSelectedIndex);
+			const node = listElement?.querySelector<HTMLElement>(`[data-result-id="${id}"]`);
+			node?.scrollIntoView({ block: 'nearest' });
+		});
+	});
 
 	function queryString(entries: Array<[string, string | null]>) {
 		return entries
@@ -100,7 +160,7 @@
 		return new Intl.DateTimeFormat('en-US', options).format(date);
 	}
 
-	function bookingTarget(booking: BookingResult) {
+	function bookingTarget(booking: BookingResult): SearchTarget | null {
 		if (!workspaceSlug) return null;
 		return {
 			pathname: `/app/${workspaceSlug}/bookings` as `/app/${string}`,
@@ -111,12 +171,23 @@
 		};
 	}
 
-	function customerTarget(customerId: Id<'customers'>) {
+	function customerTarget(customerId: Id<'customers'>): SearchTarget | null {
 		if (!workspaceSlug) return null;
 		return {
 			pathname: `/app/${workspaceSlug}/customers` as `/app/${string}`,
 			query: queryString([['customerId', customerId]])
 		};
+	}
+
+	function getInitials(name: string): string {
+		return (
+			name
+				.split(/\s+/)
+				.filter(Boolean)
+				.slice(0, 2)
+				.map((w) => w[0]?.toUpperCase() ?? '')
+				.join('') || '?'
+		);
 	}
 
 	async function goToResult(target: SearchTarget | null) {
@@ -125,82 +196,247 @@
 		onNavigate?.();
 		await goto(resolve(`${target.pathname}?${target.query}` as Pathname), { noScroll: true });
 	}
+
+	function activateSelected() {
+		const item = flatItems[selectedIndex];
+		if (!item) return;
+		void goToResult(item.target);
+	}
+
+	function handleKeydown(event: KeyboardEvent) {
+		if (!flatItems.length) {
+			if (event.key === 'Enter') event.preventDefault();
+			return;
+		}
+		const lastIndex = flatItems.length - 1;
+		switch (event.key) {
+			case 'ArrowDown':
+				event.preventDefault();
+				selectedIndex = selectedIndex >= lastIndex ? 0 : selectedIndex + 1;
+				break;
+			case 'ArrowUp':
+				event.preventDefault();
+				selectedIndex = selectedIndex <= 0 ? lastIndex : selectedIndex - 1;
+				break;
+			case 'Home':
+				event.preventDefault();
+				selectedIndex = 0;
+				break;
+			case 'End':
+				event.preventDefault();
+				selectedIndex = lastIndex;
+				break;
+			case 'PageDown':
+				event.preventDefault();
+				selectedIndex = Math.min(lastIndex, selectedIndex + 5);
+				break;
+			case 'PageUp':
+				event.preventDefault();
+				selectedIndex = Math.max(0, selectedIndex - 5);
+				break;
+			case 'Enter':
+				event.preventDefault();
+				activateSelected();
+				break;
+		}
+	}
+
+	function clearQuery() {
+		searchInput = '';
+		debouncedSearchInput = '';
+		selectedIndex = 0;
+		void tick().then(() => searchInputElement?.focus());
+	}
+
+	const bookingStartIndex = $derived(customerResults.length);
 </script>
 
 <Dialog bind:open>
-	<DialogContent class="w-[calc(100vw-1.5rem)] gap-0 overflow-hidden p-0 sm:max-w-xl">
-		<DialogHeader class="border-b border-border px-5 py-4">
-			<DialogTitle>Search workspace</DialogTitle>
-			<DialogDescription>Find customers and bookings in this workspace.</DialogDescription>
-		</DialogHeader>
+	<DialogContent
+		showCloseButton={false}
+		style="top: 12vh; translate: -50% 0;"
+		class="grid h-[min(34rem,calc(100vh-8rem))] w-[calc(100vw-1.5rem)] max-w-2xl grid-rows-[auto_1fr_auto] gap-0 overflow-hidden rounded-2xl border border-border/80 bg-popover p-0 shadow-2xl ring-1 shadow-black/10 ring-foreground/5 sm:max-w-2xl"
+	>
+		<DialogTitle class="sr-only">Search workspace</DialogTitle>
+		<DialogDescription class="sr-only">
+			Search by customer name, email, activity, or booking number. Use arrow keys to navigate
+			results and Enter to open.
+		</DialogDescription>
 
-		<div class="border-b border-border px-4 py-3">
-			<label class="relative block">
-				<SearchIcon
-					class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+		<!-- Search input row - always pinned at top -->
+		<div class="flex h-14 shrink-0 items-center gap-3 border-b border-border/70 bg-popover px-4">
+			<SearchIcon
+				class={cn(
+					'size-[18px] shrink-0 transition-colors',
+					isSearching ? 'text-primary' : 'text-muted-foreground'
+				)}
+				aria-hidden="true"
+			/>
+			<input
+				bind:this={searchInputElement}
+				type="text"
+				bind:value={searchInput}
+				onkeydown={handleKeydown}
+				placeholder="Search customers, bookings, emails, activity, booking #…"
+				autocomplete="off"
+				autocapitalize="off"
+				autocorrect="off"
+				spellcheck="false"
+				role="combobox"
+				aria-expanded={hasResults}
+				aria-controls={listboxId}
+				aria-activedescendant={hasResults ? optionId(selectedIndex) : undefined}
+				aria-autocomplete="list"
+				aria-label="Search customers and bookings"
+				class="h-10 min-w-0 flex-1 bg-transparent text-[15px] tracking-tight text-foreground outline-none placeholder:font-normal placeholder:text-muted-foreground/60"
+			/>
+			{#if hasQuery}
+				<button
+					type="button"
+					onclick={clearQuery}
+					class="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground/70 transition-colors hover:bg-muted hover:text-foreground focus-visible:bg-muted focus-visible:text-foreground focus-visible:outline-none"
+					aria-label="Clear search"
+				>
+					<XIcon class="size-4" aria-hidden="true" />
+				</button>
+			{/if}
+			{#if isSearching}
+				<span
+					class="wd-search-spinner pointer-events-none size-3.5 shrink-0 rounded-full border-2 border-primary/25 border-t-primary"
 					aria-hidden="true"
-				/>
-				<input
-					bind:this={searchInputElement}
-					type="search"
-					bind:value={searchInput}
-					placeholder="Search by name, email, activity, or booking number"
-					class="h-10 w-full rounded-lg border border-input bg-background pr-3 pl-10 text-sm transition-colors outline-none placeholder:text-muted-foreground/70 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
-					aria-label="Search customers and bookings"
-				/>
-			</label>
+				></span>
+			{/if}
 		</div>
 
-		<div class="max-h-[min(34rem,calc(100vh-14rem))] overflow-y-auto px-2 py-2">
+		<!-- Results region - scrollable, fixed height -->
+		<div
+			bind:this={listElement}
+			id={listboxId}
+			role="listbox"
+			aria-label="Search results"
+			class="min-h-0 overflow-y-auto bg-popover"
+		>
 			{#if !hasQuery}
-				<div class="px-3 py-10 text-center text-sm text-muted-foreground">
-					Enter a customer, email, activity, or booking number.
+				<div class="flex h-full flex-col items-center justify-center gap-3 px-6 py-12 text-center">
+					<div
+						class="flex size-11 items-center justify-center rounded-2xl bg-muted/60 ring-1 ring-border/60"
+						aria-hidden="true"
+					>
+						<SearchIcon class="size-5 text-muted-foreground/70" />
+					</div>
+					<div class="space-y-1">
+						<p class="text-[13px] font-medium text-foreground">Search this workspace</p>
+						<p class="max-w-xs text-[12px] leading-relaxed text-muted-foreground">
+							Find customers by name or email, bookings by activity, or jump to a booking by its
+							number.
+						</p>
+					</div>
+					<div
+						class="mt-1 flex flex-wrap items-center justify-center gap-1.5 text-[11px] text-muted-foreground/80"
+					>
+						<span class="rounded-md bg-muted/70 px-2 py-1 ring-1 ring-border/60 ring-inset"
+							>Try a name</span
+						>
+						<span class="text-muted-foreground/30">·</span>
+						<span class="rounded-md bg-muted/70 px-2 py-1 ring-1 ring-border/60 ring-inset"
+							>or an activity</span
+						>
+						<span class="text-muted-foreground/30">·</span>
+						<span class="rounded-md bg-muted/70 px-2 py-1 ring-1 ring-border/60 ring-inset"
+							>or a booking number</span
+						>
+					</div>
 				</div>
-			{:else if isSearching && !searchResults}
-				<div class="space-y-2 p-2">
+			{:else if isSearching && !hasResults}
+				<div class="space-y-1 p-2" aria-busy="true">
 					{#each [0, 1, 2, 3] as item (item)}
-						<div class="flex items-center gap-3 rounded-lg px-2 py-2.5">
-							<Skeleton class="size-8 rounded-md" />
+						<div class="flex items-center gap-3 px-3 py-2.5">
+							<div class="size-9 shrink-0 animate-pulse rounded-xl bg-muted/70"></div>
 							<div class="min-w-0 flex-1 space-y-1.5">
-								<Skeleton class="h-3.5 w-44" />
-								<Skeleton class="h-3 w-56" />
+								<div class="h-3 w-48 animate-pulse rounded bg-muted/70"></div>
+								<div class="h-2.5 w-64 animate-pulse rounded bg-muted/50"></div>
 							</div>
 						</div>
 					{/each}
 				</div>
 			{:else if !hasResults}
-				<div class="px-3 py-10 text-center text-sm text-muted-foreground">
-					No customers or bookings found.
+				<div
+					class="flex h-full flex-col items-center justify-center gap-2.5 px-6 py-10 text-center"
+				>
+					<div
+						class="flex size-10 items-center justify-center rounded-2xl bg-muted/50 ring-1 ring-border/50"
+						aria-hidden="true"
+					>
+						<SearchIcon class="size-4 text-muted-foreground/50" />
+					</div>
+					<div class="space-y-0.5">
+						<p class="text-[13px] font-medium text-foreground">Nothing matched</p>
+						<p class="text-[11.5px] leading-relaxed text-muted-foreground">
+							No customers or bookings found for
+							<span class="text-foreground/80">“{trimmedQuery}”</span>.
+						</p>
+					</div>
 				</div>
 			{:else}
 				{#if customerResults.length > 0}
-					<section class="py-1">
+					<section class="px-2 pt-2 pb-1">
 						<h3
-							class="px-2 py-1.5 text-[10px] font-semibold tracking-widest text-muted-foreground/70 uppercase"
+							class="px-2 pt-1 pb-1.5 text-[10px] font-semibold tracking-[0.14em] text-muted-foreground/70 uppercase"
 						>
 							Customers
+							<span class="ml-1 font-medium tracking-normal text-muted-foreground/40 normal-case">
+								{customerResults.length}
+							</span>
 						</h3>
-						<div class="space-y-0.5">
-							{#each customerResults as customer (customer.customerId)}
+						<div class="flex flex-col gap-0.5">
+							{#each customerResults as customer, idx (customer.customerId)}
+								{@const flatIndex = idx}
+								{@const isSelected = flatIndex === selectedIndex}
+								{@const id = optionId(flatIndex)}
 								<button
 									type="button"
-									class="group flex w-full items-center gap-3 rounded-lg px-2 py-2.5 text-left transition-colors hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-none"
+									data-result-id={id}
+									{id}
+									role="option"
+									aria-selected={isSelected}
+									tabindex="-1"
+									onmousemove={() => (selectedIndex = flatIndex)}
 									onclick={() => void goToResult(customerTarget(customer.customerId))}
+									class={cn(
+										'wd-result group flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-left outline-none',
+										isSelected && 'wd-result-selected'
+									)}
 								>
 									<span
-										class="flex size-8 shrink-0 items-center justify-center rounded-md border border-border bg-background text-muted-foreground"
+										class="wd-result-avatar customer-avatar flex size-9 shrink-0 items-center justify-center rounded-xl text-[11px] font-semibold tracking-tight"
+										aria-hidden="true"
 									>
-										<UserRoundIcon class="size-4" aria-hidden="true" />
+										{getInitials(customer.displayName)}
 									</span>
 									<span class="min-w-0 flex-1">
-										<span class="block truncate text-sm font-medium">{customer.displayName}</span>
-										<span class="block truncate text-xs text-muted-foreground">
-											{customer.primaryEmail}
+										<span class="flex items-center gap-2">
+											<span class="truncate text-[13px] font-medium text-foreground">
+												{customer.displayName}
+											</span>
+										</span>
+										<span
+											class="mt-0.5 flex items-center gap-1.5 text-[11.5px] text-muted-foreground"
+										>
+											<UserRoundIcon class="size-3 shrink-0 opacity-60" aria-hidden="true" />
+											<span class="truncate">{customer.primaryEmail}</span>
 										</span>
 									</span>
-									<span class="shrink-0 text-xs text-muted-foreground tabular-nums">
-										{customer.visitCount}
-										{customer.visitCount === 1 ? 'visit' : 'visits'}
+									<span class="flex shrink-0 items-center gap-2">
+										<span
+											class="rounded-md bg-muted/70 px-1.5 py-0.5 text-[10.5px] font-medium text-muted-foreground tabular-nums ring-1 ring-border/40 ring-inset"
+										>
+											{customer.visitCount}
+											{customer.visitCount === 1 ? 'visit' : 'visits'}
+										</span>
+										<CornerDownLeftIcon
+											class="wd-result-enter size-3.5 text-muted-foreground/0"
+											aria-hidden="true"
+										/>
 									</span>
 								</button>
 							{/each}
@@ -209,50 +445,87 @@
 				{/if}
 
 				{#if bookingResults.length > 0}
-					<section class="py-1">
+					<section class="px-2 pt-1 pb-2">
 						<h3
-							class="px-2 py-1.5 text-[10px] font-semibold tracking-widest text-muted-foreground/70 uppercase"
+							class="px-2 pt-2 pb-1.5 text-[10px] font-semibold tracking-[0.14em] text-muted-foreground/70 uppercase"
 						>
 							Bookings
+							<span class="ml-1 font-medium tracking-normal text-muted-foreground/40 normal-case">
+								{bookingResults.length}
+							</span>
 						</h3>
-						<div class="space-y-0.5">
-							{#each bookingResults as booking (booking.bookingId)}
+						<div class="flex flex-col gap-0.5">
+							{#each bookingResults as booking, idx (booking.bookingId)}
+								{@const flatIndex = bookingStartIndex + idx}
+								{@const isSelected = flatIndex === selectedIndex}
+								{@const isCanceled = booking.status === 'canceled'}
 								{@const bookingStart = formatTimestamp(booking.startTime, {
 									dateStyle: 'medium',
 									timeStyle: 'short'
 								})}
+								{@const id = optionId(flatIndex)}
 								<button
 									type="button"
-									class="group flex w-full items-center gap-3 rounded-lg px-2 py-2.5 text-left transition-colors hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-none"
+									data-result-id={id}
+									{id}
+									role="option"
+									aria-selected={isSelected}
+									tabindex="-1"
+									onmousemove={() => (selectedIndex = flatIndex)}
 									onclick={() => void goToResult(bookingTarget(booking))}
+									class={cn(
+										'wd-result group flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-left outline-none',
+										isSelected && 'wd-result-selected'
+									)}
 								>
 									<span
 										class={cn(
-											'flex size-8 shrink-0 items-center justify-center rounded-md border border-border bg-background text-muted-foreground',
-											booking.status === 'canceled' && 'opacity-60'
+											'wd-result-avatar booking-avatar flex size-9 shrink-0 items-center justify-center rounded-xl',
+											isCanceled && 'is-canceled'
 										)}
+										aria-hidden="true"
 									>
-										<CalendarDaysIcon class="size-4" aria-hidden="true" />
+										<CalendarDaysIcon class="size-[17px]" />
 									</span>
 									<span class="min-w-0 flex-1">
-										<span
-											class={cn(
-												'block truncate text-sm font-medium',
-												booking.status === 'canceled' &&
-													'line-through decoration-muted-foreground/60'
-											)}
-										>
-											{booking.activityName}
+										<span class="flex items-center gap-2">
+											<span
+												class={cn(
+													'truncate text-[13px] font-medium text-foreground',
+													isCanceled &&
+														'text-muted-foreground line-through decoration-muted-foreground/60'
+												)}
+											>
+												{booking.activityName}
+											</span>
+											{#if isCanceled}
+												<span
+													class="shrink-0 rounded-md bg-destructive/10 px-1.5 py-0.5 text-[9.5px] font-semibold tracking-[0.08em] text-destructive uppercase ring-1 ring-destructive/20 ring-inset"
+												>
+													Canceled
+												</span>
+											{/if}
 										</span>
-										<span class="block truncate text-xs text-muted-foreground">
-											{booking.leadCustomerName ?? 'Unknown customer'}
+										<span
+											class="mt-0.5 flex min-w-0 items-center gap-1.5 text-[11.5px] text-muted-foreground"
+										>
+											<span class="truncate">{booking.leadCustomerName ?? 'Unknown customer'}</span>
 											{#if bookingStart}
-												· {bookingStart}
+												<span class="text-muted-foreground/40">·</span>
+												<span class="shrink-0 tabular-nums">{bookingStart}</span>
 											{/if}
 										</span>
 									</span>
-									<span class="shrink-0 text-xs text-muted-foreground tabular-nums">
-										#{booking.providerBookingId}
+									<span class="flex shrink-0 items-center gap-2">
+										<span
+											class="rounded-md bg-muted/70 px-1.5 py-0.5 font-mono text-[10.5px] font-medium text-muted-foreground tabular-nums ring-1 ring-border/40 ring-inset"
+										>
+											#{booking.providerBookingId}
+										</span>
+										<CornerDownLeftIcon
+											class="wd-result-enter size-3.5 text-muted-foreground/0"
+											aria-hidden="true"
+										/>
 									</span>
 								</button>
 							{/each}
@@ -261,5 +534,147 @@
 				{/if}
 			{/if}
 		</div>
+
+		<!-- Footer hint bar - always visible, fixed height -->
+		<div
+			class="flex h-10 shrink-0 items-center justify-between gap-3 border-t border-border/70 bg-muted/30 px-3 text-[11px] text-muted-foreground/80"
+		>
+			<div class="flex items-center gap-3">
+				<span class="flex items-center gap-1.5">
+					<kbd class="wd-search-kbd">↑</kbd>
+					<kbd class="wd-search-kbd">↓</kbd>
+					<span class="text-muted-foreground/70">Navigate</span>
+				</span>
+				<span class="flex items-center gap-1.5">
+					<kbd class="wd-search-kbd">↵</kbd>
+					<span class="text-muted-foreground/70">Open</span>
+				</span>
+				<span class="hidden items-center gap-1.5 sm:flex">
+					<kbd class="wd-search-kbd">esc</kbd>
+					<span class="text-muted-foreground/70">Close</span>
+				</span>
+			</div>
+			<div class="flex items-center gap-1.5">
+				{#if hasResults}
+					<span class="text-muted-foreground/70 tabular-nums">
+						{flatItems.length}
+						{flatItems.length === 1 ? 'result' : 'results'}
+					</span>
+				{:else}
+					<span class="hidden text-muted-foreground/50 sm:inline">Workspace search</span>
+				{/if}
+			</div>
+		</div>
 	</DialogContent>
 </Dialog>
+
+<style>
+	.wd-result {
+		transition:
+			background-color 110ms ease,
+			color 110ms ease;
+	}
+
+	:global(.wd-result-selected) {
+		background: color-mix(in oklch, var(--primary) 10%, transparent);
+		box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--primary) 28%, transparent);
+	}
+
+	:global(.dark .wd-result-selected) {
+		background: color-mix(in oklch, var(--primary) 18%, transparent);
+		box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--primary) 38%, transparent);
+	}
+
+	:global(.wd-result-selected .wd-result-enter) {
+		color: color-mix(in oklch, var(--primary) 65%, var(--muted-foreground));
+	}
+
+	:global(.wd-result-avatar) {
+		transition:
+			background-color 120ms ease,
+			color 120ms ease,
+			transform 160ms cubic-bezier(0.16, 1, 0.3, 1);
+	}
+
+	:global(.customer-avatar) {
+		background: color-mix(in oklch, var(--primary) 14%, var(--muted));
+		color: color-mix(in oklch, var(--primary) 70%, var(--foreground));
+		box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--primary) 18%, transparent);
+	}
+
+	:global(.dark .customer-avatar) {
+		background: color-mix(in oklch, var(--primary) 22%, var(--card));
+		color: color-mix(in oklch, var(--primary-foreground) 90%, white);
+		box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--primary) 38%, transparent);
+	}
+
+	:global(.booking-avatar) {
+		background: color-mix(in oklch, var(--foreground) 5%, var(--muted));
+		color: var(--muted-foreground);
+		box-shadow: inset 0 0 0 1px var(--border);
+	}
+
+	:global(.booking-avatar.is-canceled) {
+		opacity: 0.55;
+	}
+
+	:global(.wd-result-selected .customer-avatar),
+	:global(.wd-result-selected .booking-avatar) {
+		transform: scale(1.03);
+	}
+
+	:global(.wd-result-selected .booking-avatar:not(.is-canceled)) {
+		background: color-mix(in oklch, var(--primary) 12%, var(--muted));
+		color: color-mix(in oklch, var(--primary) 70%, var(--foreground));
+		box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--primary) 24%, transparent);
+	}
+
+	:global(.dark .wd-result-selected .booking-avatar:not(.is-canceled)) {
+		background: color-mix(in oklch, var(--primary) 22%, var(--card));
+		color: color-mix(in oklch, var(--primary-foreground) 90%, white);
+		box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--primary) 38%, transparent);
+	}
+
+	.wd-search-spinner {
+		animation: wd-search-spin 720ms linear infinite;
+	}
+
+	@keyframes wd-search-spin {
+		to {
+			transform: rotate(360deg);
+		}
+	}
+
+	:global(.wd-search-kbd) {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		min-width: 1.125rem;
+		height: 1.125rem;
+		padding: 0 0.25rem;
+		border-radius: 0.3125rem;
+		background: color-mix(in oklch, var(--foreground) 4%, var(--popover));
+		color: var(--muted-foreground);
+		font-family:
+			ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New',
+			monospace;
+		font-size: 10px;
+		line-height: 1;
+		font-weight: 500;
+		box-shadow: inset 0 0 0 1px var(--border);
+	}
+
+	:global(.dark .wd-search-kbd) {
+		background: color-mix(in oklch, var(--foreground) 8%, var(--popover));
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.wd-result,
+		:global(.wd-result-avatar) {
+			transition: none;
+		}
+		.wd-search-spinner {
+			animation: none;
+		}
+	}
+</style>
