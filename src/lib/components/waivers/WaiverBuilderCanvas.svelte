@@ -531,7 +531,7 @@
 		<WaiverDocumentShell {workspaceName}>
 			<!-- Editable waiver copy — just the body, no eyebrow/title/separator -->
 			<section class="{waiverSectionCardClass} canvas-document-card" class:is-focused={hasFocus}>
-				<div class="canvas-editor-wrapper">
+				<div class="canvas-editor-wrapper" data-waiver-canvas-editor>
 					<div bind:this={editorElement}></div>
 				</div>
 			</section>

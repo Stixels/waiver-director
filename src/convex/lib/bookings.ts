@@ -78,13 +78,10 @@ export function bookingSearchText(args: {
 	leadCustomerName?: string;
 	leadCustomerEmail?: string;
 }) {
-	return [
-		args.providerBookingId,
-		args.activityName,
-		args.leadCustomerName,
-		args.leadCustomerEmail,
-		args.leadCustomerEmail?.trim().toLowerCase()
-	]
-		.filter((value): value is string => Boolean(value && value.trim()))
+	const normalizeSearchValue = (value: string | undefined) => value?.trim().toLowerCase() ?? '';
+
+	return [args.providerBookingId, args.activityName, args.leadCustomerName, args.leadCustomerEmail]
+		.map(normalizeSearchValue)
+		.filter((value) => value.length > 0)
 		.join(' ');
 }

@@ -3,7 +3,6 @@
 	import { resolve } from '$app/paths';
 	import type { FunctionReturnType } from 'convex/server';
 	import { page } from '$app/state';
-	import type { Pathname } from '$app/types';
 	import { toast } from 'svelte-sonner';
 	import { api } from '$convex/_generated/api';
 	import type { Id } from '$convex/_generated/dataModel';
@@ -21,6 +20,7 @@
 		TableRow
 	} from '$lib/components/ui/table';
 	import { publicEnv } from '$lib/config/public';
+	import { queryString } from '$lib/utils/url';
 	import { cn } from '$lib/utils';
 	import { onMount } from 'svelte';
 	import ChevronLeftIcon from '@lucide/svelte/icons/chevron-left';
@@ -126,7 +126,13 @@
 	function isDateInputValue(value: string | null): value is string {
 		if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
 		const date = dateFromInputValue(value);
-		return !Number.isNaN(date.getTime());
+		const [year, month, day] = value.split('-').map(Number);
+		return (
+			!Number.isNaN(date.getTime()) &&
+			date.getFullYear() === year &&
+			date.getMonth() === month - 1 &&
+			date.getDate() === day
+		);
 	}
 
 	function initialSelectedDate() {
@@ -148,13 +154,6 @@
 		pageIndex = 0;
 	}
 
-	function queryString(entries: Array<[string, string | null]>) {
-		return entries
-			.filter((entry): entry is [string, string] => entry[1] !== null)
-			.map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
-			.join('&');
-	}
-
 	async function updateBookingsUrl(args: {
 		date: string;
 		bookingId?: Id<'bookings'> | null;
@@ -166,7 +165,9 @@
 			['bookingId', args.bookingId ?? null]
 		]);
 
-		await goto(resolve(`${page.url.pathname}?${query}` as Pathname), {
+		const href = `${page.url.pathname}?${query}` as `/app/${string}/bookings?${string}`;
+
+		await goto(resolve(href), {
 			replaceState: args.replaceState ?? true,
 			noScroll: true,
 			keepFocus: true

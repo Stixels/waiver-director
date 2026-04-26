@@ -62,26 +62,26 @@ export const globalWorkspaceSearch = query({
 			};
 		}
 
-		const customers = await ctx.db
-			.query('customers')
-			.withSearchIndex('search_customerText', (q) =>
-				q.search('searchText', searchQuery).eq('workspaceId', args.workspaceId)
-			)
-			.take(MAX_SEARCH_RESULTS_PER_GROUP);
-
-		const bookings = await ctx.db
-			.query('bookings')
-			.withSearchIndex('search_bookingText', (q) =>
-				q.search('searchText', searchQuery).eq('workspaceId', args.workspaceId)
-			)
-			.take(MAX_SEARCH_RESULTS_PER_GROUP);
-
-		const submissions = await ctx.db
-			.query('waiver_submissions')
-			.withSearchIndex('search_submissionText', (q) =>
-				q.search('searchText', searchQuery).eq('workspaceId', args.workspaceId)
-			)
-			.take(MAX_SEARCH_RESULTS_PER_GROUP);
+		const [customers, bookings, submissions] = await Promise.all([
+			ctx.db
+				.query('customers')
+				.withSearchIndex('search_customerText', (q) =>
+					q.search('searchText', searchQuery).eq('workspaceId', args.workspaceId)
+				)
+				.take(MAX_SEARCH_RESULTS_PER_GROUP),
+			ctx.db
+				.query('bookings')
+				.withSearchIndex('search_bookingText', (q) =>
+					q.search('searchText', searchQuery).eq('workspaceId', args.workspaceId)
+				)
+				.take(MAX_SEARCH_RESULTS_PER_GROUP),
+			ctx.db
+				.query('waiver_submissions')
+				.withSearchIndex('search_submissionText', (q) =>
+					q.search('searchText', searchQuery).eq('workspaceId', args.workspaceId)
+				)
+				.take(MAX_SEARCH_RESULTS_PER_GROUP)
+		]);
 
 		return {
 			customers: customers.map((customer) => ({

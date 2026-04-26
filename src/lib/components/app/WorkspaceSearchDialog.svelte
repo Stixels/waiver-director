@@ -1,13 +1,13 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import type { Pathname } from '$app/types';
 	import type { FunctionReturnType } from 'convex/server';
 	import type { Id } from '$convex/_generated/dataModel';
 	import { api } from '$convex/_generated/api';
 	import { useProtectedQuery } from '$lib/components/auth/convex-auth.svelte';
 	import { Dialog, DialogContent, DialogDescription, DialogTitle } from '$lib/components/ui/dialog';
 	import { cn } from '$lib/utils';
+	import { queryString } from '$lib/utils/url';
 	import { tick, untrack } from 'svelte';
 	import CalendarDaysIcon from '@lucide/svelte/icons/calendar-days';
 	import CalendarCheckIcon from '@lucide/svelte/icons/calendar-check';
@@ -48,6 +48,17 @@
 		aliases: string[];
 		icon: typeof SearchIcon;
 	};
+	type ActionDefinition = Omit<ActionItem, 'href'> & {
+		path:
+			| ''
+			| 'bookings'
+			| 'submissions'
+			| 'customers'
+			| 'waiver'
+			| 'emails'
+			| 'integrations'
+			| 'account';
+	};
 	type FlatItem =
 		| { kind: 'action'; key: string; data: ActionItem; target: SearchTarget | null }
 		| { kind: 'customer'; key: string; data: CustomerResult; target: SearchTarget | null }
@@ -63,6 +74,7 @@
 	let searchInputElement = $state<HTMLInputElement | null>(null);
 	let listElement = $state<HTMLDivElement | null>(null);
 	let selectedIndex = $state(0);
+	let lastDebouncedSearchInput = $state('');
 
 	$effect(() => {
 		if (!open) {
@@ -107,74 +119,79 @@
 		customerResults.length > 0 || bookingResults.length > 0 || submissionResults.length > 0
 	);
 
+	const NAVIGATION_ACTIONS: ActionDefinition[] = [
+		{
+			key: 'dashboard',
+			label: 'Dashboard',
+			description: 'Operational overview',
+			path: '',
+			aliases: ['home', 'overview'],
+			icon: LayoutDashboardIcon
+		},
+		{
+			key: 'bookings',
+			label: 'Bookings',
+			description: 'Daily check-in coverage',
+			path: 'bookings',
+			aliases: ['booking', 'calendar', 'check in', 'check-in'],
+			icon: CalendarCheckIcon
+		},
+		{
+			key: 'submissions',
+			label: 'Submissions',
+			description: 'Signed waiver records',
+			path: 'submissions',
+			aliases: ['submission', 'signed', 'signatures', 'records', 'waivers'],
+			icon: FileTextIcon
+		},
+		{
+			key: 'customers',
+			label: 'Customers',
+			description: 'Signer contacts and visits',
+			path: 'customers',
+			aliases: ['customer', 'contacts', 'people', 'signers'],
+			icon: UsersRoundIcon
+		},
+		{
+			key: 'waiver',
+			label: 'Waiver',
+			description: 'Edit and publish the waiver',
+			path: 'waiver',
+			aliases: ['builder', 'editor', 'template', 'publish'],
+			icon: LayersIcon
+		},
+		{
+			key: 'emails',
+			label: 'Email follow-ups',
+			description: 'Reminder rules and queues',
+			path: 'emails',
+			aliases: ['email', 'follow ups', 'followups', 'reminders'],
+			icon: MailIcon
+		},
+		{
+			key: 'integrations',
+			label: 'Integrations',
+			description: 'Booking providers and services',
+			path: 'integrations',
+			aliases: ['integration', 'settings', 'bookeo', 'providers'],
+			icon: PlugZapIcon
+		},
+		{
+			key: 'account',
+			label: 'Account',
+			description: 'Profile and account settings',
+			path: 'account',
+			aliases: ['settings', 'profile', 'user'],
+			icon: SettingsIcon
+		}
+	];
+
 	const navigationActions = $derived.by<ActionItem[]>(() => {
 		if (!workspaceSlug) return [];
-		return [
-			{
-				key: 'dashboard',
-				label: 'Dashboard',
-				description: 'Operational overview',
-				href: `/app/${workspaceSlug}` as `/app/${string}`,
-				aliases: ['home', 'overview'],
-				icon: LayoutDashboardIcon
-			},
-			{
-				key: 'bookings',
-				label: 'Bookings',
-				description: 'Daily check-in coverage',
-				href: `/app/${workspaceSlug}/bookings` as `/app/${string}`,
-				aliases: ['booking', 'calendar', 'check in', 'check-in'],
-				icon: CalendarCheckIcon
-			},
-			{
-				key: 'submissions',
-				label: 'Submissions',
-				description: 'Signed waiver records',
-				href: `/app/${workspaceSlug}/submissions` as `/app/${string}`,
-				aliases: ['submission', 'signed', 'signatures', 'records', 'waivers'],
-				icon: FileTextIcon
-			},
-			{
-				key: 'customers',
-				label: 'Customers',
-				description: 'Signer contacts and visits',
-				href: `/app/${workspaceSlug}/customers` as `/app/${string}`,
-				aliases: ['customer', 'contacts', 'people', 'signers'],
-				icon: UsersRoundIcon
-			},
-			{
-				key: 'waiver',
-				label: 'Waiver',
-				description: 'Edit and publish the waiver',
-				href: `/app/${workspaceSlug}/waiver` as `/app/${string}`,
-				aliases: ['builder', 'editor', 'template', 'publish'],
-				icon: LayersIcon
-			},
-			{
-				key: 'emails',
-				label: 'Email follow-ups',
-				description: 'Reminder rules and queues',
-				href: `/app/${workspaceSlug}/emails` as `/app/${string}`,
-				aliases: ['email', 'follow ups', 'followups', 'reminders'],
-				icon: MailIcon
-			},
-			{
-				key: 'integrations',
-				label: 'Integrations',
-				description: 'Booking providers and services',
-				href: `/app/${workspaceSlug}/integrations` as `/app/${string}`,
-				aliases: ['integration', 'settings', 'bookeo', 'providers'],
-				icon: PlugZapIcon
-			},
-			{
-				key: 'account',
-				label: 'Account',
-				description: 'Profile and account settings',
-				href: `/app/${workspaceSlug}/account` as `/app/${string}`,
-				aliases: ['settings', 'profile', 'user'],
-				icon: SettingsIcon
-			}
-		];
+		return NAVIGATION_ACTIONS.map((action) => ({
+			...action,
+			href: `/app/${workspaceSlug}${action.path ? `/${action.path}` : ''}` as `/app/${string}`
+		}));
 	});
 
 	const actionResults = $derived.by<ActionItem[]>(() => {
@@ -235,11 +252,9 @@
 	});
 
 	$effect(() => {
-		const query = debouncedSearchInput;
-		untrack(() => {
-			if (query === undefined) return;
-			selectedIndex = 0;
-		});
+		if (debouncedSearchInput === lastDebouncedSearchInput) return;
+		lastDebouncedSearchInput = debouncedSearchInput;
+		selectedIndex = 0;
 	});
 
 	$effect(() => {
@@ -250,13 +265,6 @@
 			node?.scrollIntoView({ block: 'nearest' });
 		});
 	});
-
-	function queryString(entries: Array<[string, string | null]>) {
-		return entries
-			.filter((entry): entry is [string, string] => entry[1] !== null)
-			.map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
-			.join('&');
-	}
 
 	function bookingDateValue(booking: BookingResult) {
 		if (booking.serviceDate) return booking.serviceDate;
@@ -331,8 +339,10 @@
 		if (!target) return;
 		open = false;
 		onNavigate?.();
-		const href = target.query ? `${target.pathname}?${target.query}` : target.pathname;
-		await goto(resolve(href as Pathname), { noScroll: true });
+		const href = (target.query ? `${target.pathname}?${target.query}` : target.pathname) as
+			| `/app/${string}`
+			| `/app/${string}?${string}`;
+		await goto(resolve(href), { noScroll: true });
 	}
 
 	function activateSelected() {
@@ -530,7 +540,7 @@
 									role="option"
 									aria-selected={isSelected}
 									tabindex="-1"
-									onmousemove={() => (selectedIndex = flatIndex)}
+									onmouseenter={() => (selectedIndex = flatIndex)}
 									onclick={() => void goToResult(actionTarget(action))}
 									class={cn(
 										'wd-result group flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left outline-none',
@@ -584,7 +594,7 @@
 									role="option"
 									aria-selected={isSelected}
 									tabindex="-1"
-									onmousemove={() => (selectedIndex = flatIndex)}
+									onmouseenter={() => (selectedIndex = flatIndex)}
 									onclick={() => void goToResult(customerTarget(customer.customerId))}
 									class={cn(
 										'wd-result group flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-left outline-none',
@@ -655,7 +665,7 @@
 									role="option"
 									aria-selected={isSelected}
 									tabindex="-1"
-									onmousemove={() => (selectedIndex = flatIndex)}
+									onmouseenter={() => (selectedIndex = flatIndex)}
 									onclick={() => void goToResult(bookingTarget(booking))}
 									class={cn(
 										'wd-result group flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-left outline-none',
@@ -742,7 +752,7 @@
 									role="option"
 									aria-selected={isSelected}
 									tabindex="-1"
-									onmousemove={() => (selectedIndex = flatIndex)}
+									onmouseenter={() => (selectedIndex = flatIndex)}
 									onclick={() => void goToResult(submissionTarget(submission.submissionId))}
 									class={cn(
 										'wd-result group flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-left outline-none',

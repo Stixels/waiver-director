@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import type { Pathname } from '$app/types';
 	import type { FunctionReturnType } from 'convex/server';
 	import { api } from '$convex/_generated/api';
 	import type { Id } from '$convex/_generated/dataModel';
@@ -20,6 +19,7 @@
 	} from '$lib/components/ui/table';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { formatBookingTimestamp } from '$lib/utils/date';
+	import { queryString } from '$lib/utils/url';
 	import ChevronLeftIcon from '@lucide/svelte/icons/chevron-left';
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 	import FileTextIcon from '@lucide/svelte/icons/file-text';
@@ -79,13 +79,6 @@
 		return page.url.searchParams.get('q')?.trim() ?? '';
 	}
 
-	function queryString(entries: Array<[string, string | null]>) {
-		return entries
-			.filter((entry): entry is [string, string] => entry[1] !== null && entry[1].length > 0)
-			.map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
-			.join('&');
-	}
-
 	async function updateSubmissionsUrl(args: {
 		searchQuery?: string;
 		submissionId?: Id<'waiver_submissions'> | null;
@@ -99,9 +92,13 @@
 			['q', nextSearchQuery],
 			['submissionId', args.submissionId ?? null]
 		]);
-		const href = query ? `${page.url.pathname}?${query}` : page.url.pathname;
+		const pathname =
+			`/app/${page.params.workspaceSlug}/submissions` as `/app/${string}/submissions`;
+		const href = (query ? `${pathname}?${query}` : pathname) as
+			| `/app/${string}/submissions`
+			| `/app/${string}/submissions?${string}`;
 
-		await goto(resolve(href as Pathname), {
+		await goto(resolve(href), {
 			replaceState: args.replaceState ?? true,
 			noScroll: true,
 			keepFocus: true
