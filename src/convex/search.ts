@@ -27,6 +27,16 @@ const bookingResultValue = v.object({
 	signedCount: v.number()
 });
 
+const submissionResultValue = v.object({
+	submissionId: v.id('waiver_submissions'),
+	signerName: v.string(),
+	signerEmail: v.string(),
+	minorCount: v.number(),
+	bookingActivityName: v.union(v.string(), v.null()),
+	bookingStartTime: v.union(v.string(), v.null()),
+	submittedAt: v.number()
+});
+
 function normalizedMatchValue(value?: string | null) {
 	return value?.trim().toLowerCase().replace(/\s+/g, ' ') ?? '';
 }
@@ -38,7 +48,8 @@ export const globalWorkspaceSearch = query({
 	},
 	returns: v.object({
 		customers: v.array(customerResultValue),
-		bookings: v.array(bookingResultValue)
+		bookings: v.array(bookingResultValue),
+		submissions: v.array(submissionResultValue)
 	}),
 	handler: async (ctx, args) => {
 		await requireWorkspaceMember(ctx, args.workspaceId);
@@ -47,7 +58,8 @@ export const globalWorkspaceSearch = query({
 		if (!searchQuery) {
 			return {
 				customers: [],
-				bookings: []
+				bookings: [],
+				submissions: []
 			};
 		}
 
@@ -63,6 +75,13 @@ export const globalWorkspaceSearch = query({
 			.withIndex('by_workspaceId_and_startAt', (q) => q.eq('workspaceId', args.workspaceId))
 			.order('desc')
 			.take(MAX_BOOKINGS_TO_SCAN);
+
+		const submissions = await ctx.db
+			.query('waiver_submissions')
+			.withSearchIndex('search_submissionText', (q) =>
+				q.search('searchText', searchQuery).eq('workspaceId', args.workspaceId)
+			)
+			.take(MAX_SEARCH_RESULTS_PER_GROUP);
 
 		return {
 			customers: customers.map((customer) => ({
@@ -93,7 +112,16 @@ export const globalWorkspaceSearch = query({
 					leadCustomerEmail: booking.leadCustomerEmail ?? null,
 					participantCount: booking.participantCount,
 					signedCount: booking.signedCount
-				}))
+				})),
+			submissions: submissions.map((submission) => ({
+				submissionId: submission._id,
+				signerName: submission.signerName,
+				signerEmail: submission.signerEmail,
+				minorCount: submission.minors.length,
+				bookingActivityName: submission.bookingSnapshot?.activityName ?? null,
+				bookingStartTime: submission.bookingSnapshot?.startTime ?? null,
+				submittedAt: submission.submittedAt
+			}))
 		};
 	}
 });

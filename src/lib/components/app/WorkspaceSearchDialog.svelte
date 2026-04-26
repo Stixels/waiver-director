@@ -10,9 +10,17 @@
 	import { cn } from '$lib/utils';
 	import { tick, untrack } from 'svelte';
 	import CalendarDaysIcon from '@lucide/svelte/icons/calendar-days';
+	import CalendarCheckIcon from '@lucide/svelte/icons/calendar-check';
 	import CornerDownLeftIcon from '@lucide/svelte/icons/corner-down-left';
+	import FileTextIcon from '@lucide/svelte/icons/file-text';
+	import LayoutDashboardIcon from '@lucide/svelte/icons/layout-dashboard';
+	import LayersIcon from '@lucide/svelte/icons/layers';
+	import MailIcon from '@lucide/svelte/icons/mail';
+	import PlugZapIcon from '@lucide/svelte/icons/plug-zap';
 	import SearchIcon from '@lucide/svelte/icons/search';
+	import SettingsIcon from '@lucide/svelte/icons/settings';
 	import UserRoundIcon from '@lucide/svelte/icons/user-round';
+	import UsersRoundIcon from '@lucide/svelte/icons/users-round';
 	import XIcon from '@lucide/svelte/icons/x';
 
 	interface Props {
@@ -27,13 +35,24 @@
 	type SearchResults = FunctionReturnType<typeof api.search.globalWorkspaceSearch>;
 	type CustomerResult = SearchResults['customers'][number];
 	type BookingResult = SearchResults['bookings'][number];
+	type SubmissionResult = SearchResults['submissions'][number];
 	type SearchTarget = {
 		pathname: `/app/${string}`;
 		query: string;
 	};
+	type ActionItem = {
+		key: string;
+		label: string;
+		description: string;
+		href: `/app/${string}`;
+		aliases: string[];
+		icon: typeof SearchIcon;
+	};
 	type FlatItem =
+		| { kind: 'action'; key: string; data: ActionItem; target: SearchTarget | null }
 		| { kind: 'customer'; key: string; data: CustomerResult; target: SearchTarget | null }
-		| { kind: 'booking'; key: string; data: BookingResult; target: SearchTarget | null };
+		| { kind: 'booking'; key: string; data: BookingResult; target: SearchTarget | null }
+		| { kind: 'submission'; key: string; data: SubmissionResult; target: SearchTarget | null };
 
 	const componentId = $props.id();
 	const optionId = (index: number) => `wd-search-${componentId}-result-${index}`;
@@ -80,13 +99,104 @@
 	const searchResults = $derived((searchResultsQuery.data ?? null) as SearchResults | null);
 	const customerResults = $derived(searchResults?.customers ?? []);
 	const bookingResults = $derived(searchResults?.bookings ?? []);
+	const submissionResults = $derived(searchResults?.submissions ?? []);
 	const trimmedQuery = $derived(searchInput.trim());
 	const hasQuery = $derived(trimmedQuery.length > 0);
 	const isSearching = $derived(searchResultsQuery.isLoading && debouncedSearchInput.length > 0);
-	const hasResults = $derived(customerResults.length > 0 || bookingResults.length > 0);
+	const hasDataResults = $derived(
+		customerResults.length > 0 || bookingResults.length > 0 || submissionResults.length > 0
+	);
+
+	const navigationActions = $derived.by<ActionItem[]>(() => {
+		if (!workspaceSlug) return [];
+		return [
+			{
+				key: 'dashboard',
+				label: 'Dashboard',
+				description: 'Operational overview',
+				href: `/app/${workspaceSlug}` as `/app/${string}`,
+				aliases: ['home', 'overview'],
+				icon: LayoutDashboardIcon
+			},
+			{
+				key: 'bookings',
+				label: 'Bookings',
+				description: 'Daily check-in coverage',
+				href: `/app/${workspaceSlug}/bookings` as `/app/${string}`,
+				aliases: ['booking', 'calendar', 'check in', 'check-in'],
+				icon: CalendarCheckIcon
+			},
+			{
+				key: 'submissions',
+				label: 'Submissions',
+				description: 'Signed waiver records',
+				href: `/app/${workspaceSlug}/submissions` as `/app/${string}`,
+				aliases: ['submission', 'signed', 'signatures', 'records', 'waivers'],
+				icon: FileTextIcon
+			},
+			{
+				key: 'customers',
+				label: 'Customers',
+				description: 'Signer contacts and visits',
+				href: `/app/${workspaceSlug}/customers` as `/app/${string}`,
+				aliases: ['customer', 'contacts', 'people', 'signers'],
+				icon: UsersRoundIcon
+			},
+			{
+				key: 'waiver',
+				label: 'Waiver',
+				description: 'Edit and publish the waiver',
+				href: `/app/${workspaceSlug}/waiver` as `/app/${string}`,
+				aliases: ['builder', 'editor', 'template', 'publish'],
+				icon: LayersIcon
+			},
+			{
+				key: 'emails',
+				label: 'Email follow-ups',
+				description: 'Reminder rules and queues',
+				href: `/app/${workspaceSlug}/emails` as `/app/${string}`,
+				aliases: ['email', 'follow ups', 'followups', 'reminders'],
+				icon: MailIcon
+			},
+			{
+				key: 'integrations',
+				label: 'Integrations',
+				description: 'Booking providers and services',
+				href: `/app/${workspaceSlug}/integrations` as `/app/${string}`,
+				aliases: ['integration', 'settings', 'bookeo', 'providers'],
+				icon: PlugZapIcon
+			},
+			{
+				key: 'account',
+				label: 'Account',
+				description: 'Profile and account settings',
+				href: `/app/${workspaceSlug}/account` as `/app/${string}`,
+				aliases: ['settings', 'profile', 'user'],
+				icon: SettingsIcon
+			}
+		];
+	});
+
+	const actionResults = $derived.by<ActionItem[]>(() => {
+		const query = trimmedQuery.toLowerCase();
+		if (!query) return navigationActions;
+		return navigationActions.filter((action) =>
+			[action.label, action.description, ...action.aliases].some((value) =>
+				value.toLowerCase().includes(query)
+			)
+		);
+	});
 
 	const flatItems = $derived.by<FlatItem[]>(() => {
 		const items: FlatItem[] = [];
+		for (const action of actionResults) {
+			items.push({
+				kind: 'action',
+				key: `action:${action.key}`,
+				data: action,
+				target: actionTarget(action)
+			});
+		}
 		for (const customer of customerResults) {
 			items.push({
 				kind: 'customer',
@@ -103,8 +213,17 @@
 				target: bookingTarget(booking)
 			});
 		}
+		for (const submission of submissionResults) {
+			items.push({
+				kind: 'submission',
+				key: `submission:${submission.submissionId}`,
+				data: submission,
+				target: submissionTarget(submission.submissionId)
+			});
+		}
 		return items;
 	});
+	const hasResults = $derived(flatItems.length > 0);
 
 	$effect(() => {
 		const itemCount = flatItems.length;
@@ -179,6 +298,24 @@
 		};
 	}
 
+	function submissionTarget(submissionId: Id<'waiver_submissions'>): SearchTarget | null {
+		if (!workspaceSlug) return null;
+		return {
+			pathname: `/app/${workspaceSlug}/submissions` as `/app/${string}`,
+			query: queryString([
+				['q', trimmedQuery],
+				['submissionId', submissionId]
+			])
+		};
+	}
+
+	function actionTarget(action: ActionItem): SearchTarget {
+		return {
+			pathname: action.href,
+			query: ''
+		};
+	}
+
 	function getInitials(name: string): string {
 		return (
 			name
@@ -194,7 +331,8 @@
 		if (!target) return;
 		open = false;
 		onNavigate?.();
-		await goto(resolve(`${target.pathname}?${target.query}` as Pathname), { noScroll: true });
+		const href = target.query ? `${target.pathname}?${target.query}` : target.pathname;
+		await goto(resolve(href as Pathname), { noScroll: true });
 	}
 
 	function activateSelected() {
@@ -248,7 +386,11 @@
 		void tick().then(() => searchInputElement?.focus());
 	}
 
-	const bookingStartIndex = $derived(customerResults.length);
+	const customerStartIndex = $derived(actionResults.length);
+	const bookingStartIndex = $derived(actionResults.length + customerResults.length);
+	const submissionStartIndex = $derived(
+		actionResults.length + customerResults.length + bookingResults.length
+	);
 </script>
 
 <Dialog bind:open>
@@ -316,38 +458,7 @@
 			aria-label="Search results"
 			class="min-h-0 overflow-y-auto bg-popover"
 		>
-			{#if !hasQuery}
-				<div class="flex h-full flex-col items-center justify-center gap-3 px-6 py-12 text-center">
-					<div
-						class="flex size-11 items-center justify-center rounded-2xl bg-muted/60 ring-1 ring-border/60"
-						aria-hidden="true"
-					>
-						<SearchIcon class="size-5 text-muted-foreground/70" />
-					</div>
-					<div class="space-y-1">
-						<p class="text-[13px] font-medium text-foreground">Search this workspace</p>
-						<p class="max-w-xs text-[12px] leading-relaxed text-muted-foreground">
-							Find customers by name or email, bookings by activity, or jump to a booking by its
-							number.
-						</p>
-					</div>
-					<div
-						class="mt-1 flex flex-wrap items-center justify-center gap-1.5 text-[11px] text-muted-foreground/80"
-					>
-						<span class="rounded-md bg-muted/70 px-2 py-1 ring-1 ring-border/60 ring-inset"
-							>Try a name</span
-						>
-						<span class="text-muted-foreground/30">·</span>
-						<span class="rounded-md bg-muted/70 px-2 py-1 ring-1 ring-border/60 ring-inset"
-							>or an activity</span
-						>
-						<span class="text-muted-foreground/30">·</span>
-						<span class="rounded-md bg-muted/70 px-2 py-1 ring-1 ring-border/60 ring-inset"
-							>or a booking number</span
-						>
-					</div>
-				</div>
-			{:else if isSearching && !hasResults}
+			{#if isSearching && !hasDataResults && actionResults.length === 0}
 				<div class="space-y-1 p-2" aria-busy="true">
 					{#each [0, 1, 2, 3] as item (item)}
 						<div class="flex items-center gap-3 px-3 py-2.5">
@@ -360,24 +471,97 @@
 					{/each}
 				</div>
 			{:else if !hasResults}
-				<div
-					class="flex h-full flex-col items-center justify-center gap-2.5 px-6 py-10 text-center"
-				>
+				<div class="flex h-full flex-col items-center justify-center gap-3 px-6 py-12 text-center">
 					<div
-						class="flex size-10 items-center justify-center rounded-2xl bg-muted/50 ring-1 ring-border/50"
+						class="flex size-11 items-center justify-center rounded-2xl bg-muted/60 ring-1 ring-border/60"
 						aria-hidden="true"
 					>
-						<SearchIcon class="size-4 text-muted-foreground/50" />
+						<SearchIcon class="size-5 text-muted-foreground/70" />
 					</div>
-					<div class="space-y-0.5">
-						<p class="text-[13px] font-medium text-foreground">Nothing matched</p>
-						<p class="text-[11.5px] leading-relaxed text-muted-foreground">
-							No customers or bookings found for
-							<span class="text-foreground/80">“{trimmedQuery}”</span>.
+					<div class="space-y-1">
+						<p class="text-[13px] font-medium text-foreground">
+							{hasQuery ? 'Nothing matched' : 'Search this workspace'}
+						</p>
+						<p class="max-w-xs text-[12px] leading-relaxed text-muted-foreground">
+							{hasQuery
+								? `No pages, customers, bookings, or submissions found for "${trimmedQuery}".`
+								: 'Find customers by name or email, bookings by activity, or jump to a booking by its number.'}
 						</p>
 					</div>
+					{#if !hasQuery}
+						<div
+							class="mt-1 flex flex-wrap items-center justify-center gap-1.5 text-[11px] text-muted-foreground/80"
+						>
+							<span class="rounded-md bg-muted/70 px-2 py-1 ring-1 ring-border/60 ring-inset"
+								>Try a name</span
+							>
+							<span class="text-muted-foreground/30">·</span>
+							<span class="rounded-md bg-muted/70 px-2 py-1 ring-1 ring-border/60 ring-inset"
+								>or an activity</span
+							>
+							<span class="text-muted-foreground/30">·</span>
+							<span class="rounded-md bg-muted/70 px-2 py-1 ring-1 ring-border/60 ring-inset"
+								>or a booking number</span
+							>
+						</div>
+					{/if}
 				</div>
 			{:else}
+				{#if actionResults.length > 0}
+					<section class="px-2 pt-2 pb-1.5">
+						<h3
+							class="px-2 pt-1 pb-1.5 text-[10px] font-semibold tracking-[0.14em] text-muted-foreground/70 uppercase"
+						>
+							Go to
+							<span class="ml-1 font-medium tracking-normal text-muted-foreground/40 normal-case">
+								{actionResults.length}
+							</span>
+						</h3>
+						<div class="flex flex-col">
+							{#each actionResults as action, idx (action.key)}
+								{@const flatIndex = idx}
+								{@const isSelected = flatIndex === selectedIndex}
+								{@const id = optionId(flatIndex)}
+								{@const ActionIcon = action.icon}
+								<button
+									type="button"
+									data-result-id={id}
+									{id}
+									role="option"
+									aria-selected={isSelected}
+									tabindex="-1"
+									onmousemove={() => (selectedIndex = flatIndex)}
+									onclick={() => void goToResult(actionTarget(action))}
+									class={cn(
+										'wd-result group flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left outline-none',
+										isSelected && 'wd-result-selected'
+									)}
+								>
+									<span
+										class="wd-result-icon flex size-6 shrink-0 items-center justify-center rounded-md"
+										aria-hidden="true"
+									>
+										<ActionIcon class="size-[14px]" />
+									</span>
+									<span class="min-w-0 flex-1 truncate text-[12.5px] text-foreground">
+										{action.label}
+									</span>
+									<span
+										class="hidden shrink-0 truncate text-[10.5px] tracking-normal text-muted-foreground/60 normal-case sm:inline"
+										aria-hidden="true"
+									>
+										{action.description}
+									</span>
+									<CornerDownLeftIcon
+										class="wd-result-enter size-3 shrink-0 text-muted-foreground/0"
+										aria-hidden="true"
+									/>
+								</button>
+							{/each}
+						</div>
+					</section>
+				{/if}
+
 				{#if customerResults.length > 0}
 					<section class="px-2 pt-2 pb-1">
 						<h3
@@ -390,7 +574,7 @@
 						</h3>
 						<div class="flex flex-col gap-0.5">
 							{#each customerResults as customer, idx (customer.customerId)}
-								{@const flatIndex = idx}
+								{@const flatIndex = customerStartIndex + idx}
 								{@const isSelected = flatIndex === selectedIndex}
 								{@const id = optionId(flatIndex)}
 								<button
@@ -408,7 +592,7 @@
 									)}
 								>
 									<span
-										class="wd-result-avatar customer-avatar flex size-9 shrink-0 items-center justify-center rounded-xl text-[11px] font-semibold tracking-tight"
+										class="wd-result-avatar flex size-9 shrink-0 items-center justify-center rounded-xl text-[11px] font-semibold tracking-tight"
 										aria-hidden="true"
 									>
 										{getInitials(customer.displayName)}
@@ -480,7 +664,7 @@
 								>
 									<span
 										class={cn(
-											'wd-result-avatar booking-avatar flex size-9 shrink-0 items-center justify-center rounded-xl',
+											'wd-result-avatar flex size-9 shrink-0 items-center justify-center rounded-xl',
 											isCanceled && 'is-canceled'
 										)}
 										aria-hidden="true"
@@ -522,6 +706,89 @@
 										>
 											#{booking.providerBookingId}
 										</span>
+										<CornerDownLeftIcon
+											class="wd-result-enter size-3.5 text-muted-foreground/0"
+											aria-hidden="true"
+										/>
+									</span>
+								</button>
+							{/each}
+						</div>
+					</section>
+				{/if}
+
+				{#if submissionResults.length > 0}
+					<section class="px-2 pt-1 pb-2">
+						<h3
+							class="px-2 pt-2 pb-1.5 text-[10px] font-semibold tracking-[0.14em] text-muted-foreground/70 uppercase"
+						>
+							Submissions
+							<span class="ml-1 font-medium tracking-normal text-muted-foreground/40 normal-case">
+								{submissionResults.length}
+							</span>
+						</h3>
+						<div class="flex flex-col gap-0.5">
+							{#each submissionResults as submission, idx (submission.submissionId)}
+								{@const flatIndex = submissionStartIndex + idx}
+								{@const isSelected = flatIndex === selectedIndex}
+								{@const submittedAt = formatTimestamp(submission.submittedAt, {
+									dateStyle: 'medium'
+								})}
+								{@const id = optionId(flatIndex)}
+								<button
+									type="button"
+									data-result-id={id}
+									{id}
+									role="option"
+									aria-selected={isSelected}
+									tabindex="-1"
+									onmousemove={() => (selectedIndex = flatIndex)}
+									onclick={() => void goToResult(submissionTarget(submission.submissionId))}
+									class={cn(
+										'wd-result group flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-left outline-none',
+										isSelected && 'wd-result-selected'
+									)}
+								>
+									<span
+										class="wd-result-avatar flex size-9 shrink-0 items-center justify-center rounded-xl"
+										aria-hidden="true"
+									>
+										<FileTextIcon class="size-[17px]" />
+									</span>
+									<span class="min-w-0 flex-1">
+										<span class="flex items-center gap-2">
+											<span class="truncate text-[13px] font-medium text-foreground">
+												{submission.signerName}
+											</span>
+											{#if submission.minorCount > 0}
+												<span
+													class="shrink-0 text-[10.5px] font-medium text-muted-foreground/80 tabular-nums"
+													title="{submission.minorCount} {submission.minorCount === 1
+														? 'minor'
+														: 'minors'}"
+												>
+													+{submission.minorCount}
+												</span>
+											{/if}
+										</span>
+										<span
+											class="mt-0.5 flex min-w-0 items-center gap-1.5 text-[11.5px] text-muted-foreground"
+										>
+											<span class="truncate">{submission.signerEmail}</span>
+											{#if submission.bookingActivityName}
+												<span class="text-muted-foreground/40">·</span>
+												<span class="truncate">{submission.bookingActivityName}</span>
+											{/if}
+										</span>
+									</span>
+									<span class="flex shrink-0 items-center gap-2">
+										{#if submittedAt}
+											<span
+												class="hidden rounded-md bg-muted/70 px-1.5 py-0.5 text-[10.5px] font-medium text-muted-foreground tabular-nums ring-1 ring-border/40 ring-inset sm:inline"
+											>
+												{submittedAt}
+											</span>
+										{/if}
 										<CornerDownLeftIcon
 											class="wd-result-enter size-3.5 text-muted-foreground/0"
 											aria-hidden="true"
@@ -589,47 +856,35 @@
 		color: color-mix(in oklch, var(--primary) 65%, var(--muted-foreground));
 	}
 
-	:global(.wd-result-avatar) {
+	:global(.wd-result-avatar),
+	:global(.wd-result-icon) {
+		background: color-mix(in oklch, var(--foreground) 5%, var(--muted));
+		color: var(--muted-foreground);
+		box-shadow: inset 0 0 0 1px var(--border);
 		transition:
 			background-color 120ms ease,
 			color 120ms ease,
 			transform 160ms cubic-bezier(0.16, 1, 0.3, 1);
 	}
 
-	:global(.customer-avatar) {
-		background: color-mix(in oklch, var(--primary) 14%, var(--muted));
-		color: color-mix(in oklch, var(--primary) 70%, var(--foreground));
-		box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--primary) 18%, transparent);
-	}
-
-	:global(.dark .customer-avatar) {
-		background: color-mix(in oklch, var(--primary) 22%, var(--card));
-		color: color-mix(in oklch, var(--primary-foreground) 90%, white);
-		box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--primary) 38%, transparent);
-	}
-
-	:global(.booking-avatar) {
-		background: color-mix(in oklch, var(--foreground) 5%, var(--muted));
-		color: var(--muted-foreground);
-		box-shadow: inset 0 0 0 1px var(--border);
-	}
-
-	:global(.booking-avatar.is-canceled) {
+	:global(.wd-result-avatar.is-canceled) {
 		opacity: 0.55;
 	}
 
-	:global(.wd-result-selected .customer-avatar),
-	:global(.wd-result-selected .booking-avatar) {
-		transform: scale(1.03);
+	:global(.wd-result-selected .wd-result-avatar),
+	:global(.wd-result-selected .wd-result-icon) {
+		transform: scale(1.04);
 	}
 
-	:global(.wd-result-selected .booking-avatar:not(.is-canceled)) {
+	:global(.wd-result-selected .wd-result-avatar:not(.is-canceled)),
+	:global(.wd-result-selected .wd-result-icon) {
 		background: color-mix(in oklch, var(--primary) 12%, var(--muted));
 		color: color-mix(in oklch, var(--primary) 70%, var(--foreground));
 		box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--primary) 24%, transparent);
 	}
 
-	:global(.dark .wd-result-selected .booking-avatar:not(.is-canceled)) {
+	:global(.dark .wd-result-selected .wd-result-avatar:not(.is-canceled)),
+	:global(.dark .wd-result-selected .wd-result-icon) {
 		background: color-mix(in oklch, var(--primary) 22%, var(--card));
 		color: color-mix(in oklch, var(--primary-foreground) 90%, white);
 		box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--primary) 38%, transparent);
