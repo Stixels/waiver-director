@@ -109,8 +109,9 @@
 	});
 
 	$effect(() => {
+		const nextSearchQuery = searchInput.trim();
 		const timeout = setTimeout(() => {
-			searchQuery = searchInput.trim();
+			searchQuery = nextSearchQuery;
 		}, 200);
 		return () => clearTimeout(timeout);
 	});
