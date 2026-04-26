@@ -71,3 +71,20 @@ export function bookingSnapshot(booking: Doc<'bookings'>) {
 		...(booking.leadCustomerEmail ? { leadCustomerEmail: booking.leadCustomerEmail } : {})
 	};
 }
+
+export function bookingSearchText(args: {
+	providerBookingId: string;
+	activityName: string;
+	leadCustomerName?: string;
+	leadCustomerEmail?: string;
+}) {
+	return [
+		args.providerBookingId,
+		args.activityName,
+		args.leadCustomerName,
+		args.leadCustomerEmail,
+		args.leadCustomerEmail?.trim().toLowerCase()
+	]
+		.filter((value): value is string => Boolean(value && value.trim()))
+		.join(' ');
+}

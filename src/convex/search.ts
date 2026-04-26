@@ -3,7 +3,6 @@ import { query } from './_generated/server';
 import { bookingStatusValidator } from './lib/bookings';
 import { requireWorkspaceMember } from './lib/waivers';
 
-const MAX_BOOKINGS_TO_SCAN = 5_000;
 const MAX_SEARCH_RESULTS_PER_GROUP = 8;
 
 const customerResultValue = v.object({
@@ -72,9 +71,10 @@ export const globalWorkspaceSearch = query({
 
 		const bookings = await ctx.db
 			.query('bookings')
-			.withIndex('by_workspaceId_and_startAt', (q) => q.eq('workspaceId', args.workspaceId))
-			.order('desc')
-			.take(MAX_BOOKINGS_TO_SCAN);
+			.withSearchIndex('search_bookingText', (q) =>
+				q.search('searchText', searchQuery).eq('workspaceId', args.workspaceId)
+			)
+			.take(MAX_SEARCH_RESULTS_PER_GROUP);
 
 		const submissions = await ctx.db
 			.query('waiver_submissions')
@@ -91,28 +91,18 @@ export const globalWorkspaceSearch = query({
 				lastSeenAt: customer.lastSeenAt,
 				visitCount: customer.visitCount
 			})),
-			bookings: bookings
-				.filter((booking) =>
-					[
-						booking.activityName,
-						booking.leadCustomerName,
-						booking.leadCustomerEmail,
-						booking.providerBookingId
-					].some((value) => normalizedMatchValue(value).includes(searchQuery))
-				)
-				.slice(0, MAX_SEARCH_RESULTS_PER_GROUP)
-				.map((booking) => ({
-					bookingId: booking._id,
-					providerBookingId: booking.providerBookingId,
-					status: booking.status,
-					activityName: booking.activityName,
-					startTime: booking.startTime ?? null,
-					serviceDate: booking.serviceDate ?? null,
-					leadCustomerName: booking.leadCustomerName ?? null,
-					leadCustomerEmail: booking.leadCustomerEmail ?? null,
-					participantCount: booking.participantCount,
-					signedCount: booking.signedCount
-				})),
+			bookings: bookings.map((booking) => ({
+				bookingId: booking._id,
+				providerBookingId: booking.providerBookingId,
+				status: booking.status,
+				activityName: booking.activityName,
+				startTime: booking.startTime ?? null,
+				serviceDate: booking.serviceDate ?? null,
+				leadCustomerName: booking.leadCustomerName ?? null,
+				leadCustomerEmail: booking.leadCustomerEmail ?? null,
+				participantCount: booking.participantCount,
+				signedCount: booking.signedCount
+			})),
 			submissions: submissions.map((submission) => ({
 				submissionId: submission._id,
 				signerName: submission.signerName,

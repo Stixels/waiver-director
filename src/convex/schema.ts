@@ -232,6 +232,7 @@ export default defineSchema({
 		provider: bookingProviderValidator,
 		providerBookingId: v.string(),
 		lookupToken: v.string(),
+		searchText: v.string(),
 		status: v.union(v.literal('active'), v.literal('canceled')),
 		activityName: v.string(),
 		startTime: v.optional(v.string()),
@@ -261,7 +262,11 @@ export default defineSchema({
 			'workspaceId',
 			'leadCustomerEmail',
 			'serviceDate'
-		]),
+		])
+		.searchIndex('search_bookingText', {
+			searchField: 'searchText',
+			filterFields: ['workspaceId']
+		}),
 
 	booking_webhook_events: defineTable({
 		workspaceId: v.id('workspaces'),
