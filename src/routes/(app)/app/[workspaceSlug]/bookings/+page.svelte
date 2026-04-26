@@ -71,6 +71,7 @@
 	});
 
 	const dayRange = $derived(dayRangeForDate(selectedDate));
+	const isToday = $derived(selectedDate === toDateInputValue(new Date()));
 	const bookingsQuery = useProtectedQuery(
 		api.bookings.listWorkspaceBookings,
 		() =>
@@ -105,7 +106,6 @@
 		bookingsQuery.isLoading || waiverQuery.isLoading || appContext.isLoading
 	);
 	const currentPage = $derived((bookingPage?.pageIndex ?? pageIndex) + 1);
-	const isToday = $derived(selectedDate === toDateInputValue(new Date()));
 	const hasPagination = $derived(
 		!!bookingPage && (bookingPage.hasPreviousPage || bookingPage.hasNextPage)
 	);
