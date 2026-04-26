@@ -8,6 +8,8 @@
 	import { useConvexAuthState } from '$lib/components/auth/convex-auth.svelte';
 	import { appMainNavItems, appConfigNavItems } from '$lib/domain/navigation';
 	import CreateWorkspaceForm from '$lib/components/workspaces/CreateWorkspaceForm.svelte';
+	import WorkspaceSearchDialog from '$lib/components/app/WorkspaceSearchDialog.svelte';
+	import { Kbd } from '$lib/components/ui/kbd';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import {
 		DropdownMenu,
@@ -36,7 +38,9 @@
 	import EllipsisIcon from '@lucide/svelte/icons/ellipsis';
 	import Building2Icon from '@lucide/svelte/icons/building-2';
 	import MoonStarIcon from '@lucide/svelte/icons/moon-star';
+	import SearchIcon from '@lucide/svelte/icons/search';
 	import SunIcon from '@lucide/svelte/icons/sun';
+	import { onMount } from 'svelte';
 
 	interface Props {
 		collapsed?: boolean;
@@ -80,6 +84,8 @@
 	const currentPath = $derived(page.url.pathname);
 	let isSigningOut = $state(false);
 	let createWorkspaceDialogOpen = $state(false);
+	let searchDialogOpen = $state(false);
+	let searchShortcutModifier = $state('Ctrl');
 	const currentWorkspaceSubpath = $derived.by(() => {
 		const match = currentPath.match(/^\/app\/[^/]+(\/.*)?$/);
 		return match?.[1] ?? '';
@@ -88,6 +94,10 @@
 	const accountMenuSide = $derived(mode === 'drawer' ? 'top' : 'right');
 	const dropdownMenuAlign = $derived(mode === 'drawer' ? 'center' : 'start');
 	const dropdownMenuSideOffset = $derived(mode === 'drawer' ? 8 : 10);
+
+	onMount(() => {
+		searchShortcutModifier = /Mac|iPhone|iPad|iPod/.test(navigator.platform) ? '⌘' : 'Ctrl';
+	});
 
 	$effect(() => {
 		if (typeof window === 'undefined') return;
@@ -150,6 +160,19 @@
 		onNavigate?.();
 	}
 
+	function openSearchDialog(): void {
+		searchDialogOpen = true;
+	}
+
+	function handleSearchShortcut(event: KeyboardEvent): void {
+		if (event.defaultPrevented) return;
+		if (event.key.toLowerCase() !== 'k') return;
+		if (!event.metaKey && !event.ctrlKey) return;
+
+		event.preventDefault();
+		openSearchDialog();
+	}
+
 	async function selectWorkspace(workspaceSlug: string): Promise<void> {
 		handleNavigation();
 		if (workspaceSlug === activeWorkspaceSlug) return;
@@ -185,6 +208,8 @@
 		}
 	}
 </script>
+
+<svelte:window onkeydown={handleSearchShortcut} />
 
 <div
 	class="sidebar-root flex h-full flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground"
@@ -342,8 +367,41 @@
 		</DialogContent>
 	</Dialog>
 
+	<WorkspaceSearchDialog
+		bind:open={searchDialogOpen}
+		workspaceId={activeWorkspace?.workspaceId ?? null}
+		workspaceSlug={activeWorkspaceSlug}
+		{onNavigate}
+	/>
+
 	<!-- ─── Navigation ─── -->
 	<nav class="flex flex-1 flex-col overflow-y-auto px-2 pb-2" aria-label="Primary navigation">
+		<div class="pb-2">
+			<button
+				type="button"
+				class="nav-item group flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left transition-colors"
+				title={isCollapsed ? 'Search' : undefined}
+				aria-label={isCollapsed ? 'Search customers and bookings' : undefined}
+				onclick={openSearchDialog}
+			>
+				<SearchIcon
+					class="size-[17px] shrink-0 text-muted-foreground transition-colors group-hover:text-sidebar-foreground"
+					aria-hidden="true"
+				/>
+				<span
+					class="sidebar-copy nav-item-label text-[13px] leading-none text-muted-foreground transition-colors group-hover:text-sidebar-foreground"
+				>
+					Search
+				</span>
+				<span class="sidebar-copy ml-auto flex items-center gap-1" aria-hidden="true">
+					<Kbd class="bg-sidebar-accent/50 text-muted-foreground/70">
+						{searchShortcutModifier}
+					</Kbd>
+					<Kbd class="bg-sidebar-accent/50 text-muted-foreground/70">K</Kbd>
+				</span>
+			</button>
+		</div>
+
 		<!-- Main workflow items -->
 		<div class="flex flex-col gap-0.5">
 			{#each appMainNavItems as item (item.href)}

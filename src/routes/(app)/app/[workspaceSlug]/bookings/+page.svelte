@@ -1,6 +1,9 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 	import type { FunctionReturnType } from 'convex/server';
 	import { page } from '$app/state';
+	import type { Pathname } from '$app/types';
 	import { toast } from 'svelte-sonner';
 	import { api } from '$convex/_generated/api';
 	import type { Id } from '$convex/_generated/dataModel';
@@ -44,13 +47,15 @@
 		{ value: 'canceled', label: 'Canceled' }
 	];
 
-	let selectedDate = $state(toDateInputValue(new Date()));
+	let selectedDate = $state(initialSelectedDate());
 	let pageIndex = $state(0);
 	let searchQuery = $state('');
 	let debouncedSearchQuery = $state('');
 	let lastDebouncedSearchQuery = $state('');
 	let statusFilter = $state<StatusFilter>('all');
 	let lastWorkspaceId = $state<string | null>(null);
+	let lastAppliedSearchDate: string | null = null;
+	let lastOpenedSearchBookingKey: string | null = null;
 	let selectedBookingId = $state<Id<'bookings'> | null>(null);
 	let detailOpen = $state(false);
 	let now = $state(Date.now());
@@ -101,6 +106,10 @@
 		!!bookingPage && (bookingPage.hasPreviousPage || bookingPage.hasNextPage)
 	);
 	const isInitialLoading = $derived(isLoading && !bookingPage);
+	const searchDateParam = $derived(page.url.searchParams.get('date'));
+	const searchBookingIdParam = $derived(
+		page.url.searchParams.get('bookingId') as Id<'bookings'> | null
+	);
 
 	function toDateInputValue(date: Date) {
 		const year = date.getFullYear();
@@ -112,6 +121,17 @@
 	function dateFromInputValue(value: string) {
 		const [year, month, day] = value.split('-').map(Number);
 		return new Date(year, month - 1, day);
+	}
+
+	function isDateInputValue(value: string | null): value is string {
+		if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+		const date = dateFromInputValue(value);
+		return !Number.isNaN(date.getTime());
+	}
+
+	function initialSelectedDate() {
+		const urlDate = page.url.searchParams.get('date');
+		return isDateInputValue(urlDate) ? urlDate : toDateInputValue(new Date());
 	}
 
 	function dayRangeForDate(value: string) {
@@ -128,10 +148,59 @@
 		pageIndex = 0;
 	}
 
+	function queryString(entries: Array<[string, string | null]>) {
+		return entries
+			.filter((entry): entry is [string, string] => entry[1] !== null)
+			.map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
+			.join('&');
+	}
+
+	async function updateBookingsUrl(args: {
+		date: string;
+		bookingId?: Id<'bookings'> | null;
+		replaceState?: boolean;
+	}) {
+		lastAppliedSearchDate = args.date;
+		const query = queryString([
+			['date', args.date],
+			['bookingId', args.bookingId ?? null]
+		]);
+
+		await goto(resolve(`${page.url.pathname}?${query}` as Pathname), {
+			replaceState: args.replaceState ?? true,
+			noScroll: true,
+			keepFocus: true
+		});
+	}
+
+	function setSelectedDate(
+		value: string,
+		options: { updateUrl?: boolean; clearBooking?: boolean } = {}
+	) {
+		if (!isDateInputValue(value)) return;
+		selectedDate = value;
+		resetPagination();
+		if (options.clearBooking) {
+			selectedBookingId = null;
+			detailOpen = false;
+		}
+		if (options.updateUrl) {
+			void updateBookingsUrl({
+				date: value,
+				bookingId: options.clearBooking ? null : selectedBookingId,
+				replaceState: true
+			});
+		}
+	}
+
 	$effect(() => {
 		const workspaceId = currentWorkspace?.workspaceId ?? null;
 		if (workspaceId === lastWorkspaceId) return;
 		lastWorkspaceId = workspaceId;
+		lastAppliedSearchDate = null;
+		lastOpenedSearchBookingKey = null;
+		selectedBookingId = null;
+		detailOpen = false;
 		resetPagination();
 	});
 
@@ -150,20 +219,54 @@
 		resetPagination();
 	});
 
+	$effect(() => {
+		if (!searchDateParam) {
+			lastAppliedSearchDate = null;
+			return;
+		}
+		if (searchDateParam === lastAppliedSearchDate || !isDateInputValue(searchDateParam)) return;
+		lastAppliedSearchDate = searchDateParam;
+		setSelectedDate(searchDateParam);
+	});
+
+	$effect(() => {
+		if (!searchBookingIdParam) {
+			if (detailOpen) detailOpen = false;
+			lastOpenedSearchBookingKey = null;
+			return;
+		}
+		if (searchBookingIdParam === lastOpenedSearchBookingKey) return;
+		lastOpenedSearchBookingKey = searchBookingIdParam;
+		selectedBookingId = searchBookingIdParam;
+		detailOpen = true;
+	});
+
+	$effect(() => {
+		if (detailOpen || !searchBookingIdParam) return;
+		void updateBookingsUrl({
+			date: selectedDate,
+			bookingId: null,
+			replaceState: true
+		});
+	});
+
 	function changeDate(days: number) {
 		const [year, month, day] = selectedDate.split('-').map(Number);
-		selectedDate = toDateInputValue(new Date(year, month - 1, day + days));
-		resetPagination();
+		setSelectedDate(toDateInputValue(new Date(year, month - 1, day + days)), {
+			updateUrl: true,
+			clearBooking: true
+		});
 	}
 
 	function goToday() {
-		selectedDate = toDateInputValue(new Date());
-		resetPagination();
+		setSelectedDate(toDateInputValue(new Date()), { updateUrl: true, clearBooking: true });
 	}
 
 	function handleDateInput(event: Event) {
-		selectedDate = (event.currentTarget as HTMLInputElement).value;
-		resetPagination();
+		setSelectedDate((event.currentTarget as HTMLInputElement).value, {
+			updateUrl: true,
+			clearBooking: true
+		});
 	}
 
 	function goNextPage() {
@@ -242,6 +345,11 @@
 	function openBooking(bookingId: Id<'bookings'>) {
 		selectedBookingId = bookingId;
 		detailOpen = true;
+		void updateBookingsUrl({
+			date: selectedDate,
+			bookingId,
+			replaceState: false
+		});
 	}
 
 	function handleBookingRowKeydown(event: KeyboardEvent, bookingId: Id<'bookings'>) {

@@ -1,4 +1,7 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
+	import type { Pathname } from '$app/types';
 	import type { FunctionReturnType } from 'convex/server';
 	import { api } from '$convex/_generated/api';
 	import type { Id } from '$convex/_generated/dataModel';
@@ -27,13 +30,17 @@
 	const currentWorkspace = $derived(
 		appContext.workspaces.find((workspace) => workspace.slug === page.params.workspaceSlug) ?? null
 	);
+	const initialQuery = initialSearchQuery();
 
 	let cursor = $state<string | null>(null);
 	let previousCursors = $state<(string | null)[]>([]);
-	let searchInput = $state('');
-	let searchQuery = $state('');
+	let searchInput = $state(initialQuery);
+	let searchQuery = $state(initialQuery);
 	let lastWorkspaceId = $state<string | null>(null);
-	let lastSearchQuery = $state('');
+	let lastSearchQuery = initialQuery;
+	let lastAppliedSearchQuery = initialQuery;
+	let lastAppliedCustomerId: string | null = null;
+	let lastOpenedSubmissionKey: string | null = null;
 	let selectedCustomerId = $state<Id<'customers'> | null>(null);
 	let detailOpen = $state(false);
 	let selectedSubmissionId = $state<Id<'waiver_submissions'> | null>(null);
@@ -70,6 +77,13 @@
 	const totalCount = $derived(customerPage?.totalCount ?? null);
 	const hasPreviousPage = $derived(previousCursors.length > 0);
 	const currentPage = $derived(previousCursors.length + 1);
+	const customerIdParam = $derived(
+		page.url.searchParams.get('customerId') as Id<'customers'> | null
+	);
+	const submissionIdParam = $derived(
+		page.url.searchParams.get('submissionId') as Id<'waiver_submissions'> | null
+	);
+	const searchQueryParam = $derived(page.url.searchParams.get('q')?.trim() ?? '');
 
 	const customerDetailQuery = useProtectedQuery(
 		api.customers.getCustomerDetail,
@@ -92,13 +106,54 @@
 	);
 	const isLoadingDetail = $derived(customerDetailQuery.isLoading && Boolean(selectedCustomerId));
 
+	function initialSearchQuery() {
+		return page.url.searchParams.get('q')?.trim() ?? '';
+	}
+
+	function queryString(entries: Array<[string, string | null]>) {
+		return entries
+			.filter((entry): entry is [string, string] => entry[1] !== null && entry[1].length > 0)
+			.map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
+			.join('&');
+	}
+
+	async function updateCustomersUrl(args: {
+		searchQuery?: string;
+		customerId?: Id<'customers'> | null;
+		submissionId?: Id<'waiver_submissions'> | null;
+		replaceState?: boolean;
+	}) {
+		const nextSearchQuery = args.searchQuery ?? searchQuery;
+		lastAppliedSearchQuery = nextSearchQuery;
+		lastAppliedCustomerId = args.customerId ?? null;
+		lastOpenedSubmissionKey = args.submissionId ?? null;
+
+		const query = queryString([
+			['q', nextSearchQuery],
+			['customerId', args.customerId ?? null],
+			['submissionId', args.submissionId ?? null]
+		]);
+		const href = query ? `${page.url.pathname}?${query}` : page.url.pathname;
+
+		await goto(resolve(href as Pathname), {
+			replaceState: args.replaceState ?? true,
+			noScroll: true,
+			keepFocus: true
+		});
+	}
+
 	$effect(() => {
 		const workspaceId = currentWorkspace?.workspaceId ?? null;
 		if (workspaceId === lastWorkspaceId) return;
 		lastWorkspaceId = workspaceId;
 		cursor = null;
 		previousCursors = [];
+		lastAppliedSearchQuery = searchQuery;
+		lastAppliedCustomerId = null;
+		lastOpenedSubmissionKey = null;
 		selectedCustomerId = null;
+		selectedSubmissionId = null;
+		detailOpen = false;
 	});
 
 	$effect(() => {
@@ -106,6 +161,15 @@
 		lastSearchQuery = searchQuery;
 		cursor = null;
 		previousCursors = [];
+		selectedCustomerId = null;
+		selectedSubmissionId = null;
+		detailOpen = false;
+		void updateCustomersUrl({
+			searchQuery,
+			customerId: null,
+			submissionId: null,
+			replaceState: true
+		});
 	});
 
 	$effect(() => {
@@ -117,19 +181,45 @@
 	});
 
 	$effect(() => {
-		if (customers.length === 0) {
-			selectedCustomerId = null;
+		if (searchQueryParam === lastAppliedSearchQuery) return;
+		lastAppliedSearchQuery = searchQueryParam;
+		lastSearchQuery = searchQueryParam;
+		searchInput = searchQueryParam;
+		searchQuery = searchQueryParam;
+		cursor = null;
+		previousCursors = [];
+	});
+
+	$effect(() => {
+		if (!customerIdParam) {
+			lastAppliedCustomerId = null;
 			return;
 		}
+		if (customerIdParam === lastAppliedCustomerId) return;
+		lastAppliedCustomerId = customerIdParam;
+		selectedCustomerId = customerIdParam;
+	});
 
-		if (
-			selectedCustomerId &&
-			customers.some((customer) => customer.customerId === selectedCustomerId)
-		) {
+	$effect(() => {
+		if (!submissionIdParam) {
+			if (detailOpen) detailOpen = false;
+			lastOpenedSubmissionKey = null;
 			return;
 		}
+		if (submissionIdParam === lastOpenedSubmissionKey) return;
+		lastOpenedSubmissionKey = submissionIdParam;
+		selectedSubmissionId = submissionIdParam;
+		detailOpen = true;
+	});
 
-		selectedCustomerId = customers[0].customerId;
+	$effect(() => {
+		if (detailOpen || !submissionIdParam) return;
+		void updateCustomersUrl({
+			searchQuery,
+			customerId: selectedCustomerId,
+			submissionId: null,
+			replaceState: true
+		});
 	});
 
 	function formatTimestamp(
@@ -182,11 +272,25 @@
 
 	function selectCustomer(customerId: Id<'customers'>) {
 		selectedCustomerId = customerId;
+		selectedSubmissionId = null;
+		detailOpen = false;
+		void updateCustomersUrl({
+			searchQuery,
+			customerId,
+			submissionId: null,
+			replaceState: false
+		});
 	}
 
 	function openSubmission(submissionId: Id<'waiver_submissions'>) {
 		selectedSubmissionId = submissionId;
 		detailOpen = true;
+		void updateCustomersUrl({
+			searchQuery,
+			customerId: selectedCustomerId,
+			submissionId,
+			replaceState: false
+		});
 	}
 
 	function goPreviousPage() {

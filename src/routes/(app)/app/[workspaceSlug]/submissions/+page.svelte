@@ -1,4 +1,7 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
+	import type { Pathname } from '$app/types';
 	import type { FunctionReturnType } from 'convex/server';
 	import { api } from '$convex/_generated/api';
 	import type { Id } from '$convex/_generated/dataModel';
@@ -29,14 +32,17 @@
 	const currentWorkspace = $derived(
 		appContext.workspaces.find((workspace) => workspace.slug === page.params.workspaceSlug) ?? null
 	);
+	const initialQuery = initialSearchQuery();
 
 	let cursor = $state<string | null>(null);
 	let cursorHistory = $state<Array<string | null>>([]);
 	let currentPage = $state(1);
-	let searchInput = $state('');
-	let searchQuery = $state('');
+	let searchInput = $state(initialQuery);
+	let searchQuery = $state(initialQuery);
 	let lastWorkspaceId = $state<string | null>(null);
-	let lastSearchQuery = $state('');
+	let lastSearchQuery = initialQuery;
+	let lastAppliedSearchQuery = initialQuery;
+	let lastOpenedSubmissionKey: string | null = null;
 
 	const submissionsQuery = useProtectedQuery(
 		api.waivers.listRecentSubmissions,
@@ -59,15 +65,57 @@
 	const submissionPage = $derived((submissionsQuery.data ?? null) as SubmissionPage | null);
 	const recentSubmissions = $derived((submissionPage?.submissions ?? []) as RecentSubmission[]);
 	const isLoadingSubmissions = $derived(submissionsQuery.isLoading || appContext.isLoading);
+	const searchQueryParam = $derived(page.url.searchParams.get('q')?.trim() ?? '');
+	const submissionIdParam = $derived(
+		page.url.searchParams.get('submissionId') as Id<'waiver_submissions'> | null
+	);
 
 	// lastSubmissionId stays set after first open so the sheet stays mounted
 	// (preserves close animation and avoids re-mounting on subsequent opens).
 	let lastSubmissionId = $state<Id<'waiver_submissions'> | null>(null);
 	let detailOpen = $state(false);
 
+	function initialSearchQuery() {
+		return page.url.searchParams.get('q')?.trim() ?? '';
+	}
+
+	function queryString(entries: Array<[string, string | null]>) {
+		return entries
+			.filter((entry): entry is [string, string] => entry[1] !== null && entry[1].length > 0)
+			.map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
+			.join('&');
+	}
+
+	async function updateSubmissionsUrl(args: {
+		searchQuery?: string;
+		submissionId?: Id<'waiver_submissions'> | null;
+		replaceState?: boolean;
+	}) {
+		const nextSearchQuery = args.searchQuery ?? searchQuery;
+		lastAppliedSearchQuery = nextSearchQuery;
+		lastOpenedSubmissionKey = args.submissionId ?? null;
+
+		const query = queryString([
+			['q', nextSearchQuery],
+			['submissionId', args.submissionId ?? null]
+		]);
+		const href = query ? `${page.url.pathname}?${query}` : page.url.pathname;
+
+		await goto(resolve(href as Pathname), {
+			replaceState: args.replaceState ?? true,
+			noScroll: true,
+			keepFocus: true
+		});
+	}
+
 	function openSubmission(submissionId: Id<'waiver_submissions'>) {
 		lastSubmissionId = submissionId;
 		detailOpen = true;
+		void updateSubmissionsUrl({
+			searchQuery,
+			submissionId,
+			replaceState: false
+		});
 	}
 
 	function handleSubmissionRowKeydown(
@@ -102,6 +150,10 @@
 		const workspaceId = currentWorkspace?.workspaceId ?? null;
 		if (workspaceId === lastWorkspaceId) return;
 		lastWorkspaceId = workspaceId;
+		lastAppliedSearchQuery = searchQuery;
+		lastOpenedSubmissionKey = null;
+		lastSubmissionId = null;
+		detailOpen = false;
 		resetPagination();
 	});
 
@@ -109,6 +161,13 @@
 		if (searchQuery === lastSearchQuery) return;
 		lastSearchQuery = searchQuery;
 		resetPagination();
+		lastSubmissionId = null;
+		detailOpen = false;
+		void updateSubmissionsUrl({
+			searchQuery,
+			submissionId: null,
+			replaceState: true
+		});
 	});
 
 	$effect(() => {
@@ -117,6 +176,36 @@
 			searchQuery = nextSearchQuery;
 		}, 200);
 		return () => clearTimeout(timeout);
+	});
+
+	$effect(() => {
+		if (searchQueryParam === lastAppliedSearchQuery) return;
+		lastAppliedSearchQuery = searchQueryParam;
+		lastSearchQuery = searchQueryParam;
+		searchInput = searchQueryParam;
+		searchQuery = searchQueryParam;
+		resetPagination();
+	});
+
+	$effect(() => {
+		if (!submissionIdParam) {
+			if (detailOpen) detailOpen = false;
+			lastOpenedSubmissionKey = null;
+			return;
+		}
+		if (submissionIdParam === lastOpenedSubmissionKey) return;
+		lastOpenedSubmissionKey = submissionIdParam;
+		lastSubmissionId = submissionIdParam;
+		detailOpen = true;
+	});
+
+	$effect(() => {
+		if (detailOpen || !submissionIdParam) return;
+		void updateSubmissionsUrl({
+			searchQuery,
+			submissionId: null,
+			replaceState: true
+		});
 	});
 
 	function goNextPage() {
