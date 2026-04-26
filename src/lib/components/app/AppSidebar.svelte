@@ -96,7 +96,7 @@
 	const dropdownMenuSideOffset = $derived(mode === 'drawer' ? 8 : 10);
 
 	onMount(() => {
-		searchShortcutModifier = /Mac|iPhone|iPad|iPod/.test(navigator.platform) ? '⌘' : 'Ctrl';
+		searchShortcutModifier = /mac|iphone|ipad|ipod/i.test(navigator.userAgent) ? '⌘' : 'Ctrl';
 	});
 
 	$effect(() => {
