@@ -1097,10 +1097,10 @@
 							: undefined}
 					>
 						<Button
-							size="sm"
+							size="lg"
 							onclick={handleSendSelected}
 							disabled={selectionLoading !== null || !canSendSelected}
-							class="w-full sm:w-auto"
+							class="h-9 w-full sm:h-8 sm:w-auto"
 						>
 							{selectionLoading === 'send' ? 'Sending…' : 'Send'}
 						</Button>
@@ -1110,11 +1110,11 @@
 						title={!canCancelSelected ? 'Select queued rows to cancel' : undefined}
 					>
 						<Button
-							size="sm"
+							size="lg"
 							variant="outline"
 							onclick={handleCancelSelected}
 							disabled={selectionLoading !== null || !canCancelSelected}
-							class="w-full sm:w-auto"
+							class="h-9 w-full sm:h-8 sm:w-auto"
 						>
 							{selectionLoading === 'cancel' ? 'Cancelling…' : 'Cancel'}
 						</Button>
