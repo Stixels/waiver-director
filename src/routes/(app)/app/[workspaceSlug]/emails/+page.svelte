@@ -446,6 +446,7 @@
 			signerName: f.signerName,
 			signerEmail: f.signerEmail,
 			bookingId: f.bookingNumber ? `#${f.bookingNumber}` : null,
+			businessName: currentWorkspace?.name ?? '',
 			activityDate: new Intl.DateTimeFormat('en-US', { dateStyle: 'long' }).format(
 				new Date(f.submittedAt)
 			),
@@ -457,9 +458,10 @@
 
 	function resolveTemplate(template: string, vars: NonNullable<typeof previewVars>) {
 		return template
-			.replace(/\{customer_name\}/g, vars.signerName)
-			.replace(/\{booking_id\}/g, vars.bookingId ?? '')
-			.replace(/\{activity_date\}/g, vars.activityDate);
+			.replace(/\{\{customer_name\}\}|\{customer_name\}/g, vars.signerName)
+			.replace(/\{\{booking_id\}\}|\{booking_id\}/g, vars.bookingId ?? '')
+			.replace(/\{\{business_name\}\}|\{business_name\}/g, vars.businessName)
+			.replace(/\{\{activity_date\}\}|\{activity_date\}/g, vars.activityDate);
 	}
 
 	function resolveHtmlTemplate(template: string, vars: NonNullable<typeof previewVars>) {
@@ -467,6 +469,7 @@
 			...vars,
 			signerName: escapeHtml(vars.signerName),
 			bookingId: escapeHtml(vars.bookingId ?? ''),
+			businessName: escapeHtml(vars.businessName),
 			activityDate: escapeHtml(vars.activityDate)
 		});
 	}
@@ -665,9 +668,10 @@
 	}
 
 	const VARIABLES = [
-		{ label: '{customer_name}', value: '{customer_name}' },
-		{ label: '{booking_id}', value: '{booking_id}' },
-		{ label: '{activity_date}', value: '{activity_date}' }
+		{ label: '{{customer_name}}', value: '{{customer_name}}' },
+		{ label: '{{booking_id}}', value: '{{booking_id}}' },
+		{ label: '{{business_name}}', value: '{{business_name}}' },
+		{ label: '{{activity_date}}', value: '{{activity_date}}' }
 	];
 
 	const STATUS_STYLES: Record<string, string> = {
@@ -992,7 +996,7 @@
 						<Input
 							id="email-subject"
 							bind:value={subject}
-							placeholder="Thank you for visiting, {'{customer_name}'}!"
+							placeholder="Thank you for visiting, {'{{customer_name}}'}!"
 						/>
 					</div>
 

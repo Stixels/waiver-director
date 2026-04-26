@@ -16,9 +16,9 @@ import { escapeHtml, sanitizeRichTextHtml } from '../lib/utils/rich-text';
 
 const DEFAULT_SEND_AFTER_AMOUNT = 2;
 const DEFAULT_SEND_AFTER_UNIT = 'hours' as const;
-const DEFAULT_SUBJECT = 'Thank you for visiting, {customer_name}!';
+const DEFAULT_SUBJECT = 'Thank you for visiting, {{customer_name}}!';
 const DEFAULT_BODY =
-	"<p>Hi {customer_name},</p><p>We wanted to take a moment to thank you for your recent visit. It was a pleasure having you with us!</p><p>Would you mind taking 30 seconds to share your experience with us? We'd love to hear how we did.</p>";
+	"<p>Hi {{customer_name}},</p><p>We wanted to take a moment to thank you for your recent visit. It was a pleasure having you with us!</p><p>Would you mind taking 30 seconds to share your experience with us? We'd love to hear how we did.</p>";
 const EMAIL_TEMPLATE_LIMIT = 100;
 const FOLLOW_UP_STATS_LIMIT = 1000;
 
@@ -525,12 +525,14 @@ export const getFollowUpForDelivery = internalQuery({
 export const getTemplateForWorkspace = internalQuery({
 	args: { workspaceId: v.id('workspaces') },
 	handler: async (ctx, args) => {
+		const workspace = await ctx.db.get(args.workspaceId);
 		const editorContent = await ctx.db
 			.query('email_editor_content')
 			.withIndex('by_workspaceId', (q) => q.eq('workspaceId', args.workspaceId))
 			.unique();
 
 		return {
+			workspaceName: workspace?.name ?? '',
 			subject: editorContent?.subject ?? DEFAULT_SUBJECT,
 			body: editorContent?.body ?? DEFAULT_BODY,
 			sendAfterAmount: editorContent?.sendAfterAmount ?? DEFAULT_SEND_AFTER_AMOUNT,
@@ -577,21 +579,23 @@ export const markFollowUpFailed = internalMutation({
 
 function resolveVariables(
 	template: string,
-	vars: { signerName: string; bookingId: string; activityDate: string }
+	vars: { signerName: string; bookingId: string; businessName: string; activityDate: string }
 ): string {
 	return template
-		.replace(/\{customer_name\}/g, vars.signerName)
-		.replace(/\{booking_id\}/g, vars.bookingId)
-		.replace(/\{activity_date\}/g, vars.activityDate);
+		.replace(/\{\{customer_name\}\}|\{customer_name\}/g, vars.signerName)
+		.replace(/\{\{booking_id\}\}|\{booking_id\}/g, vars.bookingId)
+		.replace(/\{\{business_name\}\}|\{business_name\}/g, vars.businessName)
+		.replace(/\{\{activity_date\}\}|\{activity_date\}/g, vars.activityDate);
 }
 
 function resolveHtmlVariables(
 	template: string,
-	vars: { signerName: string; bookingId: string; activityDate: string }
+	vars: { signerName: string; bookingId: string; businessName: string; activityDate: string }
 ): string {
 	return resolveVariables(template, {
 		signerName: escapeHtml(vars.signerName),
 		bookingId: escapeHtml(vars.bookingId),
+		businessName: escapeHtml(vars.businessName),
 		activityDate: escapeHtml(vars.activityDate)
 	});
 }
@@ -632,7 +636,7 @@ function htmlTemplateToText(template: string): string {
 
 function plainTextTemplateWithVariables(
 	template: string,
-	vars: { signerName: string; bookingId: string; activityDate: string }
+	vars: { signerName: string; bookingId: string; businessName: string; activityDate: string }
 ): string {
 	return resolveVariables(htmlTemplateToText(template), vars)
 		.replace(/\s{2,}/g, ' ')
@@ -728,12 +732,9 @@ export const deliverFollowUpEmail = internalAction({
 
 		if (!followUp || followUp.status !== 'queued') return;
 
-		const template =
-			followUp.subjectTemplate && followUp.bodyTemplate
-				? null
-				: await ctx.runQuery(internal.emails.getTemplateForWorkspace, {
-						workspaceId: followUp.workspaceId
-					});
+		const template = await ctx.runQuery(internal.emails.getTemplateForWorkspace, {
+			workspaceId: followUp.workspaceId
+		});
 
 		const followUpWithBooking = followUp as typeof followUp & { bookingNumber?: string };
 		const bookingId = followUpWithBooking.bookingNumber
@@ -743,11 +744,14 @@ export const deliverFollowUpEmail = internalAction({
 			new Date(followUp.submittedAt)
 		);
 
-		const vars = { signerName: followUp.signerName, bookingId, activityDate };
-		const subjectTemplate = followUp.subjectTemplate ?? template?.subject ?? DEFAULT_SUBJECT;
-		const bodyTemplate = sanitizeRichTextHtml(
-			followUp.bodyTemplate ?? template?.body ?? DEFAULT_BODY
-		);
+		const vars = {
+			signerName: followUp.signerName,
+			bookingId,
+			businessName: template.workspaceName,
+			activityDate
+		};
+		const subjectTemplate = followUp.subjectTemplate ?? template.subject;
+		const bodyTemplate = sanitizeRichTextHtml(followUp.bodyTemplate ?? template.body);
 		const subject = resolveVariables(subjectTemplate, vars);
 		const bodyHtml = resolveHtmlVariables(bodyTemplate, vars);
 		const bodyText = plainTextTemplateWithVariables(bodyTemplate, vars);
