@@ -14,10 +14,11 @@ import { internal } from './_generated/api';
 import { requireWorkspaceMember } from './lib/waivers';
 import { escapeHtml, sanitizeRichTextHtml } from '../lib/utils/rich-text';
 
-const DEFAULT_SEND_AFTER_HOURS = 2;
+const DEFAULT_SEND_AFTER_AMOUNT = 2;
+const DEFAULT_SEND_AFTER_UNIT = 'hours' as const;
 const DEFAULT_SUBJECT = 'Thank you for visiting, {customer_name}!';
 const DEFAULT_BODY =
-	"<p>Hi {customer_name},</p><p>We wanted to take a moment to thank you for your recent visit. It was a pleasure having you with us!</p><p>Your signed waiver is on file for your visit.</p><p>Would you mind taking 30 seconds to share your experience with us? We'd love to hear how we did.</p>";
+	"<p>Hi {customer_name},</p><p>We wanted to take a moment to thank you for your recent visit. It was a pleasure having you with us!</p><p>Would you mind taking 30 seconds to share your experience with us? We'd love to hear how we did.</p>";
 const EMAIL_TEMPLATE_LIMIT = 100;
 const FOLLOW_UP_STATS_LIMIT = 1000;
 
@@ -29,10 +30,20 @@ const followUpStatusValue = v.union(
 	v.literal('failed')
 );
 
+const sendAfterUnitValue = v.union(v.literal('minutes'), v.literal('hours'), v.literal('days'));
+type SendAfterUnit = 'minutes' | 'hours' | 'days';
+
+function sendAfterToMs(amount: number, unit: SendAfterUnit) {
+	if (unit === 'minutes') return amount * 60 * 1000;
+	if (unit === 'hours') return amount * 60 * 60 * 1000;
+	return amount * 24 * 60 * 60 * 1000;
+}
+
 function validateEmailTemplateInput(args: {
 	subject: string;
 	body: string;
-	sendAfterHours: number;
+	sendAfterAmount: number;
+	sendAfterUnit: SendAfterUnit;
 }): string {
 	if (args.subject.trim().length === 0) {
 		throw new ConvexError({ code: 'invalid_argument', message: 'Subject is required.' });
@@ -41,10 +52,10 @@ function validateEmailTemplateInput(args: {
 	if (body.length === 0) {
 		throw new ConvexError({ code: 'invalid_argument', message: 'Email body is required.' });
 	}
-	if (args.sendAfterHours < 1 || args.sendAfterHours > 168) {
+	if (!Number.isInteger(args.sendAfterAmount) || args.sendAfterAmount < 1) {
 		throw new ConvexError({
 			code: 'invalid_argument',
-			message: 'Send after must be between 1 and 168 hours.'
+			message: 'Send after must be a positive whole number.'
 		});
 	}
 	return body;
@@ -83,7 +94,8 @@ export const getEmailEditorContent = query({
 				workspaceId: editorContent.workspaceId,
 				subject: editorContent.subject,
 				body: editorContent.body,
-				sendAfterHours: editorContent.sendAfterHours,
+				sendAfterAmount: editorContent.sendAfterAmount,
+				sendAfterUnit: editorContent.sendAfterUnit,
 				updatedAt: editorContent.updatedAt,
 				isDefault: false as const
 			};
@@ -93,7 +105,8 @@ export const getEmailEditorContent = query({
 			workspaceId: args.workspaceId,
 			subject: DEFAULT_SUBJECT,
 			body: DEFAULT_BODY,
-			sendAfterHours: DEFAULT_SEND_AFTER_HOURS,
+			sendAfterAmount: DEFAULT_SEND_AFTER_AMOUNT,
+			sendAfterUnit: DEFAULT_SEND_AFTER_UNIT,
 			isDefault: true as const
 		};
 	}
@@ -104,7 +117,8 @@ export const upsertEmailEditorContent = mutation({
 		workspaceId: v.id('workspaces'),
 		subject: v.string(),
 		body: v.string(),
-		sendAfterHours: v.number()
+		sendAfterAmount: v.number(),
+		sendAfterUnit: sendAfterUnitValue
 	},
 	handler: async (ctx, args) => {
 		await requireWorkspaceMember(ctx, args.workspaceId);
@@ -122,7 +136,8 @@ export const upsertEmailEditorContent = mutation({
 			await ctx.db.patch(existing._id, {
 				subject,
 				body,
-				sendAfterHours: args.sendAfterHours,
+				sendAfterAmount: args.sendAfterAmount,
+				sendAfterUnit: args.sendAfterUnit,
 				updatedAt: now
 			});
 		} else {
@@ -130,7 +145,8 @@ export const upsertEmailEditorContent = mutation({
 				workspaceId: args.workspaceId,
 				subject,
 				body,
-				sendAfterHours: args.sendAfterHours,
+				sendAfterAmount: args.sendAfterAmount,
+				sendAfterUnit: args.sendAfterUnit,
 				updatedAt: now
 			});
 		}
@@ -154,7 +170,8 @@ export const listEmailTemplates = query({
 			name: template.name,
 			subject: template.subject,
 			body: template.body,
-			sendAfterHours: template.sendAfterHours,
+			sendAfterAmount: template.sendAfterAmount,
+			sendAfterUnit: template.sendAfterUnit,
 			createdAt: template.createdAt
 		}));
 	}
@@ -166,7 +183,8 @@ export const saveEmailTemplate = mutation({
 		name: v.string(),
 		subject: v.string(),
 		body: v.string(),
-		sendAfterHours: v.number()
+		sendAfterAmount: v.number(),
+		sendAfterUnit: sendAfterUnitValue
 	},
 	handler: async (ctx, args) => {
 		await requireWorkspaceMember(ctx, args.workspaceId);
@@ -182,7 +200,8 @@ export const saveEmailTemplate = mutation({
 			name: args.name.trim(),
 			subject,
 			body,
-			sendAfterHours: args.sendAfterHours,
+			sendAfterAmount: args.sendAfterAmount,
+			sendAfterUnit: args.sendAfterUnit,
 			createdAt: Date.now()
 		});
 	}
@@ -459,8 +478,10 @@ export const scheduleFollowUpOnSubmission = internalMutation({
 
 		const subjectTemplate = editorContent?.subject ?? DEFAULT_SUBJECT;
 		const bodyTemplate = editorContent?.body ?? DEFAULT_BODY;
-		const sendAfterHours = editorContent?.sendAfterHours ?? DEFAULT_SEND_AFTER_HOURS;
-		const sendAfterMs = sendAfterHours * 60 * 60 * 1000;
+		const sendAfterMs = sendAfterToMs(
+			editorContent?.sendAfterAmount ?? DEFAULT_SEND_AFTER_AMOUNT,
+			editorContent?.sendAfterUnit ?? DEFAULT_SEND_AFTER_UNIT
+		);
 		const scheduledAt = args.submittedAt + sendAfterMs;
 		const submission = await ctx.db.get(args.submissionId);
 		const bookingNumber =
@@ -512,7 +533,8 @@ export const getTemplateForWorkspace = internalQuery({
 		return {
 			subject: editorContent?.subject ?? DEFAULT_SUBJECT,
 			body: editorContent?.body ?? DEFAULT_BODY,
-			sendAfterHours: editorContent?.sendAfterHours ?? DEFAULT_SEND_AFTER_HOURS
+			sendAfterAmount: editorContent?.sendAfterAmount ?? DEFAULT_SEND_AFTER_AMOUNT,
+			sendAfterUnit: editorContent?.sendAfterUnit ?? DEFAULT_SEND_AFTER_UNIT
 		};
 	}
 });

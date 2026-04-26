@@ -41,8 +41,10 @@
 
 	const convex = useConvexClient();
 	const appContext = useAppContext();
-	const MIN_SEND_AFTER_HOURS = 1;
-	const MAX_SEND_AFTER_HOURS = 168;
+	const SEND_AFTER_UNITS = ['minutes', 'hours', 'days'] as const;
+	type SendAfterUnit = (typeof SEND_AFTER_UNITS)[number];
+	const DEFAULT_SEND_AFTER_AMOUNT = 2;
+	const DEFAULT_SEND_AFTER_UNIT: SendAfterUnit = 'hours';
 	const AUTOSAVE_DELAY_MS = 1800;
 
 	const currentWorkspace = $derived(
@@ -98,12 +100,7 @@
 			},
 			...(statusFilters.size > 0
 				? {
-						statuses: [...statusFilters] as (
-							| 'queued'
-							| 'sent'
-							| 'cancelled'
-							| 'failed'
-						)[]
+						statuses: [...statusFilters] as ('queued' | 'sent' | 'cancelled' | 'failed')[]
 					}
 				: {}),
 			...(searchQuery.trim() ? { searchQuery: searchQuery.trim() } : {}),
@@ -139,11 +136,13 @@
 
 	let subject = $state('');
 	let body = $state('<p></p>');
-	let sendAfterHours = $state(2);
+	let sendAfterAmount = $state(DEFAULT_SEND_AFTER_AMOUNT);
+	let sendAfterUnit = $state<SendAfterUnit>(DEFAULT_SEND_AFTER_UNIT);
 	let editorContentLoaded = $state(false);
 	let savedSubject = $state('');
 	let savedBody = $state('<p></p>');
-	let savedSendAfterHours = $state(2);
+	let savedSendAfterAmount = $state(DEFAULT_SEND_AFTER_AMOUNT);
+	let savedSendAfterUnit = $state<SendAfterUnit>(DEFAULT_SEND_AFTER_UNIT);
 	let isSavingEditorContent = $state(false);
 	let lastSavedAt = $state<number | null>(null);
 	let lastSaveError = $state<string | null>(null);
@@ -151,20 +150,18 @@
 	let editorRef = $state<{ insertText: (text: string) => void } | null>(null);
 	let loadedEditorContentWorkspaceId = $state<Id<'workspaces'> | null>(null);
 
-	const normalizedSendAfterHours = $derived(clampSendAfterHours(sendAfterHours));
-	const isSendAfterHoursValid = $derived(
-		Number.isInteger(sendAfterHours) &&
-			sendAfterHours >= MIN_SEND_AFTER_HOURS &&
-			sendAfterHours <= MAX_SEND_AFTER_HOURS
-	);
+	const normalizedSendAfterAmount = $derived(clampSendAfterAmount(sendAfterAmount));
+	const isSendAfterValid = $derived(Number.isInteger(sendAfterAmount) && sendAfterAmount >= 1);
 
 	function resetEditorContentState() {
 		subject = '';
 		body = '<p></p>';
-		sendAfterHours = 2;
+		sendAfterAmount = DEFAULT_SEND_AFTER_AMOUNT;
+		sendAfterUnit = DEFAULT_SEND_AFTER_UNIT;
 		savedSubject = '';
 		savedBody = '<p></p>';
-		savedSendAfterHours = 2;
+		savedSendAfterAmount = DEFAULT_SEND_AFTER_AMOUNT;
+		savedSendAfterUnit = DEFAULT_SEND_AFTER_UNIT;
 		lastSavedAt = null;
 		lastSaveError = null;
 		editorContentLoaded = false;
@@ -190,10 +187,12 @@
 			const editorContent = editorContentQuery.data;
 			subject = editorContent.subject;
 			body = editorContent.body;
-			sendAfterHours = editorContent.sendAfterHours;
+			sendAfterAmount = editorContent.sendAfterAmount;
+			sendAfterUnit = editorContent.sendAfterUnit;
 			savedSubject = editorContent.subject;
 			savedBody = editorContent.body;
-			savedSendAfterHours = editorContent.sendAfterHours;
+			savedSendAfterAmount = editorContent.sendAfterAmount;
+			savedSendAfterUnit = editorContent.sendAfterUnit;
 			lastSavedAt = null;
 			lastSaveError = null;
 			editorContentLoaded = true;
@@ -203,9 +202,14 @@
 
 	const isDirty = $derived(
 		editorContentLoaded &&
-			(subject !== savedSubject || body !== savedBody || sendAfterHours !== savedSendAfterHours)
+			(subject !== savedSubject ||
+				body !== savedBody ||
+				sendAfterAmount !== savedSendAfterAmount ||
+				sendAfterUnit !== savedSendAfterUnit)
 	);
-	const editorContentFingerprint = $derived(`${subject}\u0000${body}\u0000${sendAfterHours}`);
+	const editorContentFingerprint = $derived(
+		`${subject}\u0000${body}\u0000${sendAfterAmount}\u0000${sendAfterUnit}`
+	);
 	let lastObservedEditorContentFingerprint = $state('');
 	const saveState = $derived<'idle' | 'dirty' | 'saving' | 'saved' | 'error'>(
 		(() => {
@@ -244,7 +248,7 @@
 	$effect(() => {
 		void editorContentFingerprint;
 		void isSavingEditorContent;
-		void isSendAfterHoursValid;
+		void isSendAfterValid;
 		void lastSaveError;
 
 		if (autosaveTimer) {
@@ -255,7 +259,7 @@
 		untrack(() => {
 			if (!currentWorkspace) return;
 			if (!isDirty) return;
-			if (!isSendAfterHoursValid) return;
+			if (!isSendAfterValid) return;
 			if (isSavingEditorContent) return;
 			if (lastSaveError) return;
 
@@ -272,18 +276,25 @@
 		};
 	});
 
-	function clampSendAfterHours(value: unknown) {
-		return Math.trunc(
-			Math.max(MIN_SEND_AFTER_HOURS, Math.min(MAX_SEND_AFTER_HOURS, Number(value) || 1))
-		);
+	function clampSendAfterAmount(value: unknown) {
+		return Math.trunc(Math.max(1, Number(value) || 1));
 	}
 
-	function sanitizeSendAfterHours(e: Event) {
+	function sanitizeSendAfterAmount(e: Event) {
 		const input = e.currentTarget;
 		if (!(input instanceof HTMLInputElement)) return;
-		const nextValue = clampSendAfterHours(input.value);
-		sendAfterHours = nextValue;
+		const nextValue = clampSendAfterAmount(input.value);
+		sendAfterAmount = nextValue;
 		input.value = String(nextValue);
+	}
+
+	function updateSendAfterUnit(e: Event) {
+		const select = e.currentTarget;
+		if (!(select instanceof HTMLSelectElement)) return;
+		if (!SEND_AFTER_UNITS.includes(select.value as SendAfterUnit)) return;
+		const nextUnit = select.value as SendAfterUnit;
+		sendAfterUnit = nextUnit;
+		sendAfterAmount = clampSendAfterAmount(sendAfterAmount);
 	}
 
 	function insertVariable(variable: string) {
@@ -297,7 +308,8 @@
 		const editorContentToSave = {
 			subject,
 			body,
-			sendAfterHours: clampSendAfterHours(sendAfterHours)
+			sendAfterAmount: clampSendAfterAmount(sendAfterAmount),
+			sendAfterUnit
 		};
 		isSavingEditorContent = true;
 		lastSaveError = null;
@@ -306,13 +318,15 @@
 				workspaceId,
 				subject: editorContentToSave.subject,
 				body: editorContentToSave.body,
-				sendAfterHours: editorContentToSave.sendAfterHours
+				sendAfterAmount: editorContentToSave.sendAfterAmount,
+				sendAfterUnit: editorContentToSave.sendAfterUnit
 			});
 
 			if (currentWorkspace?.workspaceId === workspaceId) {
 				savedSubject = editorContentToSave.subject;
 				savedBody = editorContentToSave.body;
-				savedSendAfterHours = editorContentToSave.sendAfterHours;
+				savedSendAfterAmount = editorContentToSave.sendAfterAmount;
+				savedSendAfterUnit = editorContentToSave.sendAfterUnit;
 				lastSavedAt = Date.now();
 			}
 			if (showToast) toast.success('Email content saved.');
@@ -337,7 +351,7 @@
 	}
 
 	async function confirmSaveTemplate() {
-		if (!currentWorkspace || !templateName.trim() || !isSendAfterHoursValid) return;
+		if (!currentWorkspace || !templateName.trim() || !isSendAfterValid) return;
 		isSavingReusableTemplate = true;
 		try {
 			await convex.mutation(api.emails.saveEmailTemplate, {
@@ -345,7 +359,8 @@
 				name: templateName.trim(),
 				subject,
 				body,
-				sendAfterHours: normalizedSendAfterHours
+				sendAfterAmount: normalizedSendAfterAmount,
+				sendAfterUnit
 			});
 			saveTemplateOpen = false;
 			templateName = '';
@@ -379,7 +394,8 @@
 
 		subject = template.subject;
 		body = template.body;
-		sendAfterHours = template.sendAfterHours;
+		sendAfterAmount = template.sendAfterAmount;
+		sendAfterUnit = template.sendAfterUnit;
 		lastSavedAt = null;
 		lastSaveError = null;
 		loadTemplateOpen = false;
@@ -756,7 +772,7 @@
 	bind:open={saveTemplateOpen}
 	bind:templateName
 	isSaving={isSavingReusableTemplate}
-	canSave={isSendAfterHoursValid}
+	canSave={isSendAfterValid}
 	onConfirm={confirmSaveTemplate}
 />
 
@@ -916,19 +932,28 @@
 								<Input
 									type="number"
 									min="1"
-									max="168"
-									value={sendAfterHours}
-									oninput={sanitizeSendAfterHours}
-									onblur={sanitizeSendAfterHours}
-									class="h-6 w-12 px-1 text-center text-sm"
-									aria-invalid={!isSendAfterHoursValid}
-									aria-describedby="send-after-hours-error"
+									value={sendAfterAmount}
+									oninput={sanitizeSendAfterAmount}
+									onblur={sanitizeSendAfterAmount}
+									class="h-7 w-16 px-2 text-center text-sm tabular-nums"
+									aria-invalid={!isSendAfterValid}
+									aria-describedby="send-after-error"
 								/>
-								<span>hours after they sign.</span>
+								<select
+									value={sendAfterUnit}
+									onchange={updateSendAfterUnit}
+									class="h-7 rounded-md border border-input bg-input/20 px-2 py-0.5 text-sm text-muted-foreground shadow-xs transition-colors outline-none hover:text-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 md:text-xs/relaxed dark:bg-input/30"
+									aria-label="Send after unit"
+								>
+									{#each SEND_AFTER_UNITS as unit (unit)}
+										<option value={unit}>{unit}</option>
+									{/each}
+								</select>
+								<span>after they sign.</span>
 							</div>
-							{#if !isSendAfterHoursValid}
-								<p id="send-after-hours-error" class="text-xs text-destructive">
-									Enter a whole number from {MIN_SEND_AFTER_HOURS} to {MAX_SEND_AFTER_HOURS}.
+							{#if !isSendAfterValid}
+								<p id="send-after-error" class="text-xs text-destructive">
+									Enter a positive whole number.
 								</p>
 							{/if}
 						</div>
@@ -937,7 +962,7 @@
 								variant="outline"
 								size="sm"
 								onclick={openSaveTemplate}
-								disabled={isSavingEditorContent || !isSendAfterHoursValid}
+								disabled={isSavingEditorContent || !isSendAfterValid}
 								class="flex-1 sm:flex-none"
 							>
 								Save as template

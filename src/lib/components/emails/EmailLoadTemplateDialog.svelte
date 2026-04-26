@@ -34,6 +34,10 @@
 		onLoad,
 		onDelete
 	}: Props = $props();
+
+	function formatDelay(template: EmailTemplate) {
+		return `${template.sendAfterAmount} ${template.sendAfterUnit} delay`;
+	}
 </script>
 
 <Dialog
@@ -76,7 +80,7 @@
 								>
 									<p class="truncate text-sm font-medium">{template.name}</p>
 									<p class="mt-0.5 truncate text-xs text-muted-foreground">
-										{template.sendAfterHours}h delay
+										{formatDelay(template)}
 									</p>
 								</button>
 								<div class="flex shrink-0 items-center gap-1">

@@ -189,7 +189,8 @@ export default defineSchema({
 		workspaceId: v.id('workspaces'),
 		subject: v.string(),
 		body: v.string(),
-		sendAfterHours: v.number(),
+		sendAfterAmount: v.number(),
+		sendAfterUnit: v.union(v.literal('minutes'), v.literal('hours'), v.literal('days')),
 		updatedAt: v.number()
 	}).index('by_workspaceId', ['workspaceId']),
 
@@ -198,7 +199,8 @@ export default defineSchema({
 		name: v.string(),
 		subject: v.string(),
 		body: v.string(),
-		sendAfterHours: v.number(),
+		sendAfterAmount: v.number(),
+		sendAfterUnit: v.union(v.literal('minutes'), v.literal('hours'), v.literal('days')),
 		createdAt: v.number()
 	}).index('by_workspaceId', ['workspaceId']),
 
