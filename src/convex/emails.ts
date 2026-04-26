@@ -7,6 +7,8 @@ import {
 	mutation,
 	query
 } from './_generated/server';
+import type { Doc } from './_generated/dataModel';
+import type { QueryCtx } from './_generated/server';
 import { Resend } from 'resend';
 import { internal } from './_generated/api';
 import { requireWorkspaceMember } from './lib/waivers';
@@ -15,7 +17,7 @@ import { escapeHtml, sanitizeRichTextHtml } from '../lib/utils/rich-text';
 const DEFAULT_SEND_AFTER_HOURS = 2;
 const DEFAULT_SUBJECT = 'Thank you for visiting, {customer_name}!';
 const DEFAULT_BODY =
-	"<p>Hi {customer_name},</p><p>We wanted to take a moment to thank you for your recent visit. It was a pleasure having you with us!</p><p>As a reminder, you can always access your signed waivers and activity history through your personal dashboard using your Booking ID: #{booking_id}.</p><p>Would you mind taking 30 seconds to share your experience with us? We'd love to hear how we did.</p>";
+	"<p>Hi {customer_name},</p><p>We wanted to take a moment to thank you for your recent visit. It was a pleasure having you with us!</p><p>Your signed waiver is on file for your visit.</p><p>Would you mind taking 30 seconds to share your experience with us? We'd love to hear how we did.</p>";
 const EMAIL_TEMPLATE_LIMIT = 100;
 const FOLLOW_UP_STATS_LIMIT = 1000;
 
@@ -46,6 +48,23 @@ function validateEmailTemplateInput(args: {
 		});
 	}
 	return body;
+}
+
+async function resolveFollowUpBookingNumber(
+	ctx: Pick<QueryCtx, 'db'>,
+	followUp: Doc<'email_follow_ups'>
+) {
+	const submission = await ctx.db.get(followUp.submissionId);
+	if (!submission || submission.workspaceId !== followUp.workspaceId) return null;
+	return submission.bookingSnapshot?.providerBookingId ?? null;
+}
+
+async function withResolvedBookingNumber(
+	ctx: Pick<QueryCtx, 'db'>,
+	followUp: Doc<'email_follow_ups'>
+) {
+	const bookingNumber = await resolveFollowUpBookingNumber(ctx, followUp);
+	return bookingNumber ? { ...followUp, bookingNumber } : followUp;
 }
 
 export const getEmailEditorContent = query({
@@ -260,7 +279,13 @@ export const listFollowUps = query({
 				q = q.filter((q) => q.lt(q.field('submittedAt'), dateTo));
 			}
 
-			return await q.paginate(args.paginationOpts);
+			const result = await q.paginate(args.paginationOpts);
+			return {
+				...result,
+				page: await Promise.all(
+					result.page.map((followUp) => withResolvedBookingNumber(ctx, followUp))
+				)
+			};
 		}
 
 		const followUpsQuery =
@@ -286,7 +311,13 @@ export const listFollowUps = query({
 			q = q.filter((q) => q.lt(q.field('submittedAt'), dateTo));
 		}
 
-		return await q.paginate(args.paginationOpts);
+		const result = await q.paginate(args.paginationOpts);
+		return {
+			...result,
+			page: await Promise.all(
+				result.page.map((followUp) => withResolvedBookingNumber(ctx, followUp))
+			)
+		};
 	}
 });
 
@@ -506,13 +537,20 @@ export const scheduleFollowUpOnSubmission = internalMutation({
 		const sendAfterHours = editorContent?.sendAfterHours ?? DEFAULT_SEND_AFTER_HOURS;
 		const sendAfterMs = sendAfterHours * 60 * 60 * 1000;
 		const scheduledAt = args.submittedAt + sendAfterMs;
+		const submission = await ctx.db.get(args.submissionId);
+		const bookingNumber =
+			submission?.workspaceId === args.workspaceId
+				? submission.bookingSnapshot?.providerBookingId
+				: undefined;
 
 		const followUpId = await ctx.db.insert('email_follow_ups', {
 			workspaceId: args.workspaceId,
 			submissionId: args.submissionId,
 			signerName: args.signerName,
 			signerEmail: args.signerEmail,
-			searchText: `${args.signerName} ${args.signerEmail} #BK-${args.submissionId.slice(-5).toUpperCase()}`,
+			searchText: [args.signerName, args.signerEmail, bookingNumber]
+				.filter((value): value is string => Boolean(value && value.trim()))
+				.join(' '),
 			subjectTemplate,
 			bodyTemplate,
 			submittedAt: args.submittedAt,
@@ -533,7 +571,8 @@ export const scheduleFollowUpOnSubmission = internalMutation({
 export const getFollowUpForDelivery = internalQuery({
 	args: { followUpId: v.id('email_follow_ups') },
 	handler: async (ctx, args) => {
-		return await ctx.db.get(args.followUpId);
+		const followUp = await ctx.db.get(args.followUpId);
+		return followUp ? await withResolvedBookingNumber(ctx, followUp) : null;
 	}
 });
 
@@ -749,7 +788,10 @@ export const deliverFollowUpEmail = internalAction({
 						workspaceId: followUp.workspaceId
 					});
 
-		const bookingId = `#BK-${followUp.submissionId.slice(-5).toUpperCase()}`;
+		const followUpWithBooking = followUp as typeof followUp & { bookingNumber?: string };
+		const bookingId = followUpWithBooking.bookingNumber
+			? `#${followUpWithBooking.bookingNumber}`
+			: '';
 		const activityDate = new Intl.DateTimeFormat('en-US', { dateStyle: 'long' }).format(
 			new Date(followUp.submittedAt)
 		);

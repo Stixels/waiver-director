@@ -118,7 +118,9 @@
 		currentWorkspace ? { workspaceId: currentWorkspace.workspaceId } : 'skip'
 	);
 
-	type FollowUp = FunctionReturnType<typeof api.emails.listFollowUps>['page'][number];
+	type FollowUp = FunctionReturnType<typeof api.emails.listFollowUps>['page'][number] & {
+		bookingNumber?: string;
+	};
 	type EmailTemplate = FunctionReturnType<typeof api.emails.listEmailTemplates>[number];
 
 	const stats = $derived(statsQuery.data);
@@ -429,7 +431,7 @@
 		return {
 			signerName: f.signerName,
 			signerEmail: f.signerEmail,
-			bookingId: `#BK-${f.submissionId.slice(-5).toUpperCase()}`,
+			bookingId: f.bookingNumber ? `#${f.bookingNumber}` : null,
 			activityDate: new Intl.DateTimeFormat('en-US', { dateStyle: 'long' }).format(
 				new Date(f.submittedAt)
 			),
@@ -442,7 +444,7 @@
 	function resolveTemplate(template: string, vars: NonNullable<typeof previewVars>) {
 		return template
 			.replace(/\{customer_name\}/g, vars.signerName)
-			.replace(/\{booking_id\}/g, vars.bookingId)
+			.replace(/\{booking_id\}/g, vars.bookingId ?? '')
 			.replace(/\{activity_date\}/g, vars.activityDate);
 	}
 
@@ -450,7 +452,7 @@
 		return resolveTemplate(template, {
 			...vars,
 			signerName: escapeHtml(vars.signerName),
-			bookingId: escapeHtml(vars.bookingId),
+			bookingId: escapeHtml(vars.bookingId ?? ''),
 			activityDate: escapeHtml(vars.activityDate)
 		});
 	}
@@ -647,7 +649,7 @@
 	}
 
 	function displayBookingId(followUp: FollowUp) {
-		return `#BK-${followUp.submissionId.slice(-5).toUpperCase()}`;
+		return followUp.bookingNumber ? `#${followUp.bookingNumber}` : '—';
 	}
 
 	function formatFollowUpSchedule(followUp: FollowUp) {
@@ -696,9 +698,12 @@
 			<div class="max-h-[75vh] overflow-y-auto px-6 py-6">
 				<!-- Meta -->
 				<div class="mb-4 flex flex-wrap gap-x-5 gap-y-1 text-xs text-muted-foreground">
-					<span
-						><span class="font-medium text-foreground">Booking</span> {previewVars.bookingId}</span
-					>
+					{#if previewVars.bookingId}
+						<span
+							><span class="font-medium text-foreground">Booking</span>
+							{previewVars.bookingId}</span
+						>
+					{/if}
 					<span
 						><span class="font-medium text-foreground">Signed</span>
 						{previewVars.activityDate}</span
@@ -1160,8 +1165,8 @@
 					<div class="hidden flex-1 rounded-xl border border-border md:block">
 						<Table class="table-fixed">
 							<colgroup>
-								<col class="w-[4%]" /><col class="w-[28%]" /><col class="w-[13%]" />
-								<col class="w-[18%]" /><col class="w-[22%]" /><col class="w-[15%]" />
+								<col class="w-[4%]" /><col class="w-[24%]" /><col class="w-[20%]" />
+								<col class="w-[20%]" /><col class="w-[18%]" /><col class="w-[14%]" />
 							</colgroup>
 							<TableHeader>
 								<TableRow class="border-border hover:bg-transparent">
@@ -1207,8 +1212,8 @@
 					<div class="hidden rounded-xl border border-border md:block">
 						<Table class="table-fixed">
 							<colgroup>
-								<col class="w-[4%]" /><col class="w-[28%]" /><col class="w-[13%]" />
-								<col class="w-[18%]" /><col class="w-[22%]" /><col class="w-[15%]" />
+								<col class="w-[4%]" /><col class="w-[24%]" /><col class="w-[20%]" />
+								<col class="w-[20%]" /><col class="w-[18%]" /><col class="w-[14%]" />
 							</colgroup>
 							<TableHeader>
 								<TableRow class="border-border hover:bg-transparent">
@@ -1283,8 +1288,10 @@
 											<p class="truncate text-sm font-medium">{followUp.signerName}</p>
 											<p class="truncate text-xs text-muted-foreground">{followUp.signerEmail}</p>
 										</TableCell>
-										<TableCell class="font-mono text-sm text-muted-foreground">
-											{displayBookingId(followUp)}
+										<TableCell class="min-w-0 font-mono text-sm text-muted-foreground">
+											<span class="block truncate" title={displayBookingId(followUp)}>
+												{displayBookingId(followUp)}
+											</span>
 										</TableCell>
 										<TableCell class="text-xs text-muted-foreground">
 											{formatTimestamp(followUp.submittedAt)}
@@ -1372,7 +1379,9 @@
 											</span>
 										</div>
 										<div class="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
-											<span class="font-mono">{displayBookingId(followUp)}</span>
+											<span class="max-w-full truncate font-mono" title={displayBookingId(followUp)}
+												>{displayBookingId(followUp)}</span
+											>
 											<span>·</span>
 											<span>{formatFollowUpSchedule(followUp)}</span>
 										</div>
