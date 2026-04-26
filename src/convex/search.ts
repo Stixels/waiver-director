@@ -37,7 +37,7 @@ const submissionResultValue = v.object({
 });
 
 function normalizedMatchValue(value?: string | null) {
-	return value?.trim().toLowerCase().replace(/\s+/g, ' ') ?? '';
+	return value?.trim().replace(/\s+/g, ' ') ?? '';
 }
 
 export const globalWorkspaceSearch = query({

@@ -3,7 +3,7 @@
 	import { resolve } from '$app/paths';
 	import type { FunctionReturnType } from 'convex/server';
 	import { api } from '$convex/_generated/api';
-	import type { Id, TableNames } from '$convex/_generated/dataModel';
+	import type { Id } from '$convex/_generated/dataModel';
 	import { page } from '$app/state';
 	import { useAppContext } from '$lib/components/app/app-context.svelte';
 	import { useProtectedQuery } from '$lib/components/auth/convex-auth.svelte';
@@ -11,7 +11,7 @@
 	import { Button } from '$lib/components/ui/button';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { formatBookingTimestamp } from '$lib/utils/date';
-	import { queryString } from '$lib/utils/url';
+	import { parseConvexId, queryString } from '$lib/utils/url';
 	import { cn } from '$lib/utils';
 	import { onMount } from 'svelte';
 	import CalendarClockIcon from '@lucide/svelte/icons/calendar-clock';
@@ -109,11 +109,6 @@
 
 	function initialSearchQuery() {
 		return page.url.searchParams.get('q')?.trim() ?? '';
-	}
-
-	function parseConvexId<TableName extends TableNames>(value: string | null): Id<TableName> | null {
-		const trimmed = value?.trim() ?? '';
-		return /^[a-z0-9]{32}$/.test(trimmed) ? (trimmed as Id<TableName>) : null;
 	}
 
 	async function updateCustomersUrl(args: {

@@ -20,7 +20,7 @@
 		TableRow
 	} from '$lib/components/ui/table';
 	import { publicEnv } from '$lib/config/public';
-	import { queryString } from '$lib/utils/url';
+	import { parseConvexId, queryString } from '$lib/utils/url';
 	import { cn } from '$lib/utils';
 	import { onMount } from 'svelte';
 	import ChevronLeftIcon from '@lucide/svelte/icons/chevron-left';
@@ -56,6 +56,7 @@
 	let lastWorkspaceId = $state<string | null>(null);
 	let lastAppliedSearchDate: string | null = null;
 	let lastOpenedSearchBookingKey: string | null = null;
+	let isClearingWorkspaceUrl = $state(false);
 	let selectedBookingId = $state<Id<'bookings'> | null>(null);
 	let detailOpen = $state(false);
 	let now = $state(Date.now());
@@ -108,7 +109,7 @@
 	const isInitialLoading = $derived(isLoading && !bookingPage);
 	const searchDateParam = $derived(page.url.searchParams.get('date'));
 	const searchBookingIdParam = $derived(
-		page.url.searchParams.get('bookingId') as Id<'bookings'> | null
+		parseConvexId<'bookings'>(page.url.searchParams.get('bookingId'))
 	);
 
 	function toDateInputValue(date: Date) {
@@ -155,17 +156,21 @@
 	}
 
 	async function updateBookingsUrl(args: {
-		date: string;
+		date?: string | null;
 		bookingId?: Id<'bookings'> | null;
 		replaceState?: boolean;
 	}) {
-		lastAppliedSearchDate = args.date;
+		const nextDate = args.date ?? null;
+		lastAppliedSearchDate = nextDate;
 		const query = queryString([
-			['date', args.date],
+			['date', nextDate],
 			['bookingId', args.bookingId ?? null]
 		]);
 
-		const href = `${page.url.pathname}?${query}` as `/app/${string}/bookings?${string}`;
+		const pathname = `/app/${page.params.workspaceSlug}/bookings` as `/app/${string}/bookings`;
+		const href = (query ? `${pathname}?${query}` : pathname) as
+			| `/app/${string}/bookings`
+			| `/app/${string}/bookings?${string}`;
 
 		await goto(resolve(href), {
 			replaceState: args.replaceState ?? true,
@@ -196,13 +201,31 @@
 
 	$effect(() => {
 		const workspaceId = currentWorkspace?.workspaceId ?? null;
+		if (!workspaceId) {
+			lastOpenedSearchBookingKey = null;
+			selectedBookingId = null;
+			detailOpen = false;
+			resetPagination();
+			return;
+		}
 		if (workspaceId === lastWorkspaceId) return;
+		const isWorkspaceChange = lastWorkspaceId !== null;
 		lastWorkspaceId = workspaceId;
 		lastAppliedSearchDate = null;
 		lastOpenedSearchBookingKey = null;
 		selectedBookingId = null;
 		detailOpen = false;
 		resetPagination();
+		if (isWorkspaceChange) {
+			isClearingWorkspaceUrl = true;
+			void updateBookingsUrl({
+				date: null,
+				bookingId: null,
+				replaceState: true
+			}).finally(() => {
+				isClearingWorkspaceUrl = false;
+			});
+		}
 	});
 
 	$effect(() => {
@@ -221,6 +244,7 @@
 	});
 
 	$effect(() => {
+		if (isClearingWorkspaceUrl) return;
 		if (!searchDateParam) {
 			lastAppliedSearchDate = null;
 			return;
@@ -231,6 +255,7 @@
 	});
 
 	$effect(() => {
+		if (isClearingWorkspaceUrl) return;
 		if (!searchBookingIdParam) {
 			if (detailOpen) detailOpen = false;
 			lastOpenedSearchBookingKey = null;
@@ -243,6 +268,7 @@
 	});
 
 	$effect(() => {
+		if (isClearingWorkspaceUrl) return;
 		if (detailOpen || !searchBookingIdParam) return;
 		void updateBookingsUrl({
 			date: selectedDate,
