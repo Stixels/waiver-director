@@ -62,7 +62,6 @@
 	const PAGE_SIZE = 25;
 	const STATUS_OPTIONS = [
 		{ value: 'queued', label: 'Queued' },
-		{ value: 'paused', label: 'Paused' },
 		{ value: 'sent', label: 'Sent' },
 		{ value: 'cancelled', label: 'Cancelled' },
 		{ value: 'failed', label: 'Failed' }
@@ -103,7 +102,6 @@
 							| 'queued'
 							| 'sent'
 							| 'cancelled'
-							| 'paused'
 							| 'failed'
 						)[]
 					}
@@ -490,9 +488,7 @@
 	const canSendSelected = $derived(
 		selectedFollowUps.some((f) => ['queued', 'paused', 'cancelled', 'failed'].includes(f.status))
 	);
-	const canCancelSelected = $derived(
-		selectedFollowUps.some((f) => ['queued', 'paused'].includes(f.status))
-	);
+	const canCancelSelected = $derived(selectedFollowUps.some((f) => f.status === 'queued'));
 
 	$effect(() => {
 		if (headerCheckboxEl) {
@@ -602,25 +598,15 @@
 
 	let rowLoading = $state<Id<'email_follow_ups'> | null>(null);
 
-	async function handleRowAction(
-		action: 'send' | 'pause' | 'resume' | 'cancel',
-		followUpId: Id<'email_follow_ups'>
-	) {
+	async function handleRowAction(action: 'send' | 'cancel', followUpId: Id<'email_follow_ups'>) {
 		rowLoading = followUpId;
 		try {
 			if (action === 'send') {
 				await convex.mutation(api.emails.sendFollowUpNow, { followUpId });
 				toast.success('Sending now.');
-			} else if (action === 'pause') {
-				await convex.mutation(api.emails.pauseFollowUp, { followUpId });
-				toast.success('Follow-up paused.');
-			} else if (action === 'resume') {
-				await convex.mutation(api.emails.resumeFollowUp, { followUpId });
-				toast.success('Follow-up resumed.');
 			} else if (action === 'cancel') {
 				await convex.mutation(api.emails.cancelFollowUp, { followUpId });
 				toast.success('Follow-up cancelled.');
-				previewOpen = false;
 			}
 		} catch (err) {
 			toast.error(getConvexErrorMessage(err, 'Action failed.'));
@@ -708,7 +694,7 @@
 						><span class="font-medium text-foreground">Signed</span>
 						{previewVars.activityDate}</span
 					>
-					{#if previewVars.status === 'queued' || previewVars.status === 'paused'}
+					{#if previewVars.status === 'queued'}
 						<span
 							><span class="font-medium text-foreground">Sends</span>
 							{formatScheduled(previewVars.scheduledAt)}</span
@@ -737,36 +723,21 @@
 			</div>
 
 			<!-- Footer actions -->
-			{#if previewVars.status === 'queued' || previewVars.status === 'paused'}
+			{#if ['queued', 'cancelled', 'failed', 'paused'].includes(previewVars.status)}
 				<div class="flex items-center justify-between border-t border-border px-6 py-4">
-					<Button
-						variant="destructive"
-						size="sm"
-						onclick={() => handleRowAction('cancel', previewVars!.followUpId)}
-						disabled={rowLoading === previewVars.followUpId}
-					>
-						Cancel follow-up
-					</Button>
+					{#if previewVars.status === 'queued'}
+						<Button
+							variant="destructive"
+							size="sm"
+							onclick={() => handleRowAction('cancel', previewVars!.followUpId)}
+							disabled={rowLoading === previewVars.followUpId}
+						>
+							Cancel follow-up
+						</Button>
+					{:else}
+						<span></span>
+					{/if}
 					<div class="flex gap-2">
-						{#if previewVars.status === 'queued'}
-							<Button
-								variant="outline"
-								size="sm"
-								onclick={() => handleRowAction('pause', previewVars!.followUpId)}
-								disabled={rowLoading === previewVars.followUpId}
-							>
-								Pause
-							</Button>
-						{:else}
-							<Button
-								variant="outline"
-								size="sm"
-								onclick={() => handleRowAction('resume', previewVars!.followUpId)}
-								disabled={rowLoading === previewVars.followUpId}
-							>
-								Resume
-							</Button>
-						{/if}
 						<Button
 							size="sm"
 							onclick={() => handleRowAction('send', previewVars!.followUpId)}
@@ -1093,7 +1064,7 @@
 					<span
 						class="inline-block flex-1 sm:flex-none"
 						title={!canSendSelected
-							? 'Select queued, paused, cancelled, or failed rows to send'
+							? 'Select queued, cancelled, or failed rows to send'
 							: undefined}
 					>
 						<Button
@@ -1107,7 +1078,7 @@
 					</span>
 					<span
 						class="inline-block flex-1 sm:flex-none"
-						title={!canCancelSelected ? 'Select queued or paused rows to cancel' : undefined}
+						title={!canCancelSelected ? 'Select queued rows to cancel' : undefined}
 					>
 						<Button
 							size="sm"

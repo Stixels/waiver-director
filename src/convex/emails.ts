@@ -213,13 +213,6 @@ export const getFollowUpStats = query({
 			)
 			.take(FOLLOW_UP_STATS_LIMIT);
 
-		const paused = await ctx.db
-			.query('email_follow_ups')
-			.withIndex('by_workspaceId_and_status', (q) =>
-				q.eq('workspaceId', args.workspaceId).eq('status', 'paused')
-			)
-			.take(FOLLOW_UP_STATS_LIMIT);
-
 		const sent = await ctx.db
 			.query('email_follow_ups')
 			.withIndex('by_workspaceId_and_status_and_sentAt', (q) =>
@@ -238,7 +231,7 @@ export const getFollowUpStats = query({
 
 		return {
 			sentToday,
-			pendingCount: queued.length + paused.length,
+			pendingCount: queued.length,
 			// This total is capped by FOLLOW_UP_STATS_LIMIT. Use a persisted counter if this needs
 			// to stay exact after a workspace has more sent follow-ups than the read limit.
 			totalSent: sent.length
@@ -331,10 +324,10 @@ export const cancelFollowUp = mutation({
 
 		await requireWorkspaceMember(ctx, followUp.workspaceId);
 
-		if (followUp.status !== 'queued' && followUp.status !== 'paused') {
+		if (followUp.status !== 'queued') {
 			throw new ConvexError({
 				code: 'invalid_state',
-				message: 'Only queued or paused follow-ups can be cancelled.'
+				message: 'Only queued follow-ups can be cancelled.'
 			});
 		}
 
@@ -353,74 +346,6 @@ export const cancelFollowUp = mutation({
 	}
 });
 
-export const pauseFollowUp = mutation({
-	args: { followUpId: v.id('email_follow_ups') },
-	handler: async (ctx, args) => {
-		const followUp = await ctx.db.get(args.followUpId);
-		if (!followUp) {
-			throw new ConvexError({ code: 'not_found', message: 'Follow-up not found.' });
-		}
-
-		await requireWorkspaceMember(ctx, followUp.workspaceId);
-
-		if (followUp.status !== 'queued') {
-			throw new ConvexError({
-				code: 'invalid_state',
-				message: 'Only queued follow-ups can be paused.'
-			});
-		}
-
-		if (followUp.scheduledFunctionId) {
-			try {
-				await ctx.scheduler.cancel(followUp.scheduledFunctionId);
-			} catch {
-				// Already ran
-			}
-		}
-
-		await ctx.db.patch(args.followUpId, {
-			status: 'paused',
-			scheduledFunctionId: undefined
-		});
-	}
-});
-
-export const resumeFollowUp = mutation({
-	args: { followUpId: v.id('email_follow_ups') },
-	handler: async (ctx, args) => {
-		const followUp = await ctx.db.get(args.followUpId);
-		if (!followUp) {
-			throw new ConvexError({ code: 'not_found', message: 'Follow-up not found.' });
-		}
-
-		await requireWorkspaceMember(ctx, followUp.workspaceId);
-
-		if (followUp.status !== 'paused') {
-			throw new ConvexError({
-				code: 'invalid_state',
-				message: 'Only paused follow-ups can be resumed.'
-			});
-		}
-
-		const now = Date.now();
-		// If the original scheduled time has passed, send in 5 minutes
-		const delay = followUp.scheduledAt > now ? followUp.scheduledAt - now : 5 * 60 * 1000;
-		const scheduledAt = now + delay;
-
-		const scheduledFunctionId = await ctx.scheduler.runAfter(
-			delay,
-			internal.emails.deliverFollowUpEmail,
-			{ followUpId: args.followUpId }
-		);
-
-		await ctx.db.patch(args.followUpId, {
-			status: 'queued',
-			scheduledAt,
-			scheduledFunctionId
-		});
-	}
-});
-
 export const sendFollowUpNow = mutation({
 	args: { followUpId: v.id('email_follow_ups') },
 	handler: async (ctx, args) => {
@@ -431,7 +356,7 @@ export const sendFollowUpNow = mutation({
 
 		await requireWorkspaceMember(ctx, followUp.workspaceId);
 
-		if (followUp.status !== 'queued' && followUp.status !== 'paused') {
+		if (!['queued', 'paused', 'cancelled', 'failed'].includes(followUp.status)) {
 			throw new ConvexError({
 				code: 'invalid_state',
 				message: 'Follow-up cannot be sent.'
@@ -503,7 +428,7 @@ export const cancelSelected = mutation({
 		for (const followUpId of args.followUpIds) {
 			const followUp = await ctx.db.get(followUpId);
 			if (!followUp || followUp.workspaceId !== args.workspaceId) continue;
-			if (!['queued', 'paused'].includes(followUp.status)) continue;
+			if (followUp.status !== 'queued') continue;
 			if (followUp.scheduledFunctionId) {
 				try {
 					await ctx.scheduler.cancel(followUp.scheduledFunctionId);
