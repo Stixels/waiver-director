@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 	import type { FunctionReturnType } from 'convex/server';
 	import { api } from '$convex/_generated/api';
 	import type { Id } from '$convex/_generated/dataModel';
@@ -9,6 +11,7 @@
 	import { Button } from '$lib/components/ui/button';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { formatBookingTimestamp } from '$lib/utils/date';
+	import { parseConvexId, queryString } from '$lib/utils/url';
 	import { cn } from '$lib/utils';
 	import { onMount } from 'svelte';
 	import CalendarClockIcon from '@lucide/svelte/icons/calendar-clock';
@@ -27,13 +30,18 @@
 	const currentWorkspace = $derived(
 		appContext.workspaces.find((workspace) => workspace.slug === page.params.workspaceSlug) ?? null
 	);
+	const initialQuery = initialSearchQuery();
 
 	let cursor = $state<string | null>(null);
 	let previousCursors = $state<(string | null)[]>([]);
-	let searchInput = $state('');
-	let searchQuery = $state('');
+	let searchInput = $state(initialQuery);
+	let searchQuery = $state(initialQuery);
 	let lastWorkspaceId = $state<string | null>(null);
-	let lastSearchQuery = $state('');
+	let lastSearchQuery = initialQuery;
+	let lastAppliedSearchQuery = initialQuery;
+	let lastAppliedCustomerId: string | null = null;
+	let lastOpenedSubmissionKey: string | null = null;
+	let isClearingWorkspaceUrl = $state(false);
 	let selectedCustomerId = $state<Id<'customers'> | null>(null);
 	let detailOpen = $state(false);
 	let selectedSubmissionId = $state<Id<'waiver_submissions'> | null>(null);
@@ -70,6 +78,13 @@
 	const totalCount = $derived(customerPage?.totalCount ?? null);
 	const hasPreviousPage = $derived(previousCursors.length > 0);
 	const currentPage = $derived(previousCursors.length + 1);
+	const customerIdParam = $derived(
+		parseConvexId<'customers'>(page.url.searchParams.get('customerId'))
+	);
+	const submissionIdParam = $derived(
+		parseConvexId<'waiver_submissions'>(page.url.searchParams.get('submissionId'))
+	);
+	const searchQueryParam = $derived(page.url.searchParams.get('q')?.trim() ?? '');
 
 	const customerDetailQuery = useProtectedQuery(
 		api.customers.getCustomerDetail,
@@ -92,13 +107,75 @@
 	);
 	const isLoadingDetail = $derived(customerDetailQuery.isLoading && Boolean(selectedCustomerId));
 
+	function initialSearchQuery() {
+		return page.url.searchParams.get('q')?.trim() ?? '';
+	}
+
+	async function updateCustomersUrl(args: {
+		searchQuery?: string;
+		customerId?: Id<'customers'> | null;
+		submissionId?: Id<'waiver_submissions'> | null;
+		replaceState?: boolean;
+	}) {
+		const nextSearchQuery = args.searchQuery ?? searchQuery;
+		lastAppliedSearchQuery = nextSearchQuery;
+		lastAppliedCustomerId = args.customerId ?? null;
+		lastOpenedSubmissionKey = args.submissionId ?? null;
+
+		const query = queryString([
+			['q', nextSearchQuery],
+			['customerId', args.customerId ?? null],
+			['submissionId', args.submissionId ?? null]
+		]);
+		const pathname = `/app/${page.params.workspaceSlug}/customers` as `/app/${string}/customers`;
+		const href = (query ? `${pathname}?${query}` : pathname) as
+			| `/app/${string}/customers`
+			| `/app/${string}/customers?${string}`;
+
+		await goto(resolve(href), {
+			replaceState: args.replaceState ?? true,
+			noScroll: true,
+			keepFocus: true
+		});
+	}
+
 	$effect(() => {
 		const workspaceId = currentWorkspace?.workspaceId ?? null;
+		if (!workspaceId) {
+			cursor = null;
+			previousCursors = [];
+			selectedCustomerId = null;
+			selectedSubmissionId = null;
+			detailOpen = false;
+			return;
+		}
 		if (workspaceId === lastWorkspaceId) return;
+		const isWorkspaceChange = lastWorkspaceId !== null;
 		lastWorkspaceId = workspaceId;
 		cursor = null;
 		previousCursors = [];
+		if (isWorkspaceChange) {
+			searchInput = '';
+			searchQuery = '';
+			lastSearchQuery = '';
+		}
+		lastAppliedSearchQuery = isWorkspaceChange ? '' : searchQuery;
+		lastAppliedCustomerId = null;
+		lastOpenedSubmissionKey = null;
 		selectedCustomerId = null;
+		selectedSubmissionId = null;
+		detailOpen = false;
+		if (isWorkspaceChange) {
+			isClearingWorkspaceUrl = true;
+			void updateCustomersUrl({
+				searchQuery: '',
+				customerId: null,
+				submissionId: null,
+				replaceState: true
+			}).finally(() => {
+				isClearingWorkspaceUrl = false;
+			});
+		}
 	});
 
 	$effect(() => {
@@ -106,6 +183,15 @@
 		lastSearchQuery = searchQuery;
 		cursor = null;
 		previousCursors = [];
+		selectedCustomerId = null;
+		selectedSubmissionId = null;
+		detailOpen = false;
+		void updateCustomersUrl({
+			searchQuery,
+			customerId: null,
+			submissionId: null,
+			replaceState: true
+		});
 	});
 
 	$effect(() => {
@@ -117,19 +203,48 @@
 	});
 
 	$effect(() => {
-		if (customers.length === 0) {
-			selectedCustomerId = null;
+		if (isClearingWorkspaceUrl) return;
+		if (searchQueryParam === lastAppliedSearchQuery) return;
+		lastAppliedSearchQuery = searchQueryParam;
+		lastSearchQuery = searchQueryParam;
+		searchInput = searchQueryParam;
+		searchQuery = searchQueryParam;
+		cursor = null;
+		previousCursors = [];
+	});
+
+	$effect(() => {
+		if (isClearingWorkspaceUrl) return;
+		if (!customerIdParam) {
+			lastAppliedCustomerId = null;
 			return;
 		}
+		if (customerIdParam === lastAppliedCustomerId) return;
+		lastAppliedCustomerId = customerIdParam;
+		selectedCustomerId = customerIdParam;
+	});
 
-		if (
-			selectedCustomerId &&
-			customers.some((customer) => customer.customerId === selectedCustomerId)
-		) {
+	$effect(() => {
+		if (isClearingWorkspaceUrl) return;
+		if (!submissionIdParam) {
+			if (detailOpen) detailOpen = false;
+			lastOpenedSubmissionKey = null;
 			return;
 		}
+		if (submissionIdParam === lastOpenedSubmissionKey) return;
+		lastOpenedSubmissionKey = submissionIdParam;
+		selectedSubmissionId = submissionIdParam;
+		detailOpen = true;
+	});
 
-		selectedCustomerId = customers[0].customerId;
+	$effect(() => {
+		if (detailOpen || !submissionIdParam) return;
+		void updateCustomersUrl({
+			searchQuery,
+			customerId: selectedCustomerId,
+			submissionId: null,
+			replaceState: true
+		});
 	});
 
 	function formatTimestamp(
@@ -182,11 +297,25 @@
 
 	function selectCustomer(customerId: Id<'customers'>) {
 		selectedCustomerId = customerId;
+		selectedSubmissionId = null;
+		detailOpen = false;
+		void updateCustomersUrl({
+			searchQuery,
+			customerId,
+			submissionId: null,
+			replaceState: false
+		});
 	}
 
 	function openSubmission(submissionId: Id<'waiver_submissions'>) {
 		selectedSubmissionId = submissionId;
 		detailOpen = true;
+		void updateCustomersUrl({
+			searchQuery,
+			customerId: selectedCustomerId,
+			submissionId,
+			replaceState: false
+		});
 	}
 
 	function goPreviousPage() {

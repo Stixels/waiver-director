@@ -12,6 +12,7 @@ import type { ActionCtx } from './_generated/server';
 import {
 	assertValidSyncHorizon,
 	bookingProviderValidator,
+	bookingSearchText,
 	missingBookeoRequiredPermissions,
 	normalizeEmail,
 	normalizeNullableString,
@@ -1191,6 +1192,12 @@ export const upsertProviderBooking = internalMutation({
 			integrationId: integration._id,
 			provider: integration.provider,
 			providerBookingId: args.booking.providerBookingId,
+			searchText: bookingSearchText({
+				providerBookingId: args.booking.providerBookingId,
+				activityName,
+				leadCustomerName: args.booking.leadCustomerName,
+				leadCustomerEmail: args.booking.leadCustomerEmail
+			}),
 			status: args.booking.status,
 			activityName,
 			startTime: args.booking.startTime,

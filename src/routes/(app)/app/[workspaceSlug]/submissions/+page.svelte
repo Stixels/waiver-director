@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 	import type { FunctionReturnType } from 'convex/server';
 	import { api } from '$convex/_generated/api';
 	import type { Id } from '$convex/_generated/dataModel';
@@ -17,6 +19,7 @@
 	} from '$lib/components/ui/table';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { formatBookingTimestamp } from '$lib/utils/date';
+	import { queryString } from '$lib/utils/url';
 	import ChevronLeftIcon from '@lucide/svelte/icons/chevron-left';
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 	import FileTextIcon from '@lucide/svelte/icons/file-text';
@@ -29,14 +32,17 @@
 	const currentWorkspace = $derived(
 		appContext.workspaces.find((workspace) => workspace.slug === page.params.workspaceSlug) ?? null
 	);
+	const initialQuery = initialSearchQuery();
 
 	let cursor = $state<string | null>(null);
 	let cursorHistory = $state<Array<string | null>>([]);
 	let currentPage = $state(1);
-	let searchInput = $state('');
-	let searchQuery = $state('');
+	let searchInput = $state(initialQuery);
+	let searchQuery = $state(initialQuery);
 	let lastWorkspaceId = $state<string | null>(null);
-	let lastSearchQuery = $state('');
+	let lastSearchQuery = initialQuery;
+	let lastAppliedSearchQuery = initialQuery;
+	let lastOpenedSubmissionKey: string | null = null;
 
 	const submissionsQuery = useProtectedQuery(
 		api.waivers.listRecentSubmissions,
@@ -59,15 +65,54 @@
 	const submissionPage = $derived((submissionsQuery.data ?? null) as SubmissionPage | null);
 	const recentSubmissions = $derived((submissionPage?.submissions ?? []) as RecentSubmission[]);
 	const isLoadingSubmissions = $derived(submissionsQuery.isLoading || appContext.isLoading);
+	const searchQueryParam = $derived(page.url.searchParams.get('q')?.trim() ?? '');
+	const submissionIdParam = $derived(
+		page.url.searchParams.get('submissionId') as Id<'waiver_submissions'> | null
+	);
 
 	// lastSubmissionId stays set after first open so the sheet stays mounted
 	// (preserves close animation and avoids re-mounting on subsequent opens).
 	let lastSubmissionId = $state<Id<'waiver_submissions'> | null>(null);
 	let detailOpen = $state(false);
 
+	function initialSearchQuery() {
+		return page.url.searchParams.get('q')?.trim() ?? '';
+	}
+
+	async function updateSubmissionsUrl(args: {
+		searchQuery?: string;
+		submissionId?: Id<'waiver_submissions'> | null;
+		replaceState?: boolean;
+	}) {
+		const nextSearchQuery = args.searchQuery ?? searchQuery;
+		lastAppliedSearchQuery = nextSearchQuery;
+		lastOpenedSubmissionKey = args.submissionId ?? null;
+
+		const query = queryString([
+			['q', nextSearchQuery],
+			['submissionId', args.submissionId ?? null]
+		]);
+		const pathname =
+			`/app/${page.params.workspaceSlug}/submissions` as `/app/${string}/submissions`;
+		const href = (query ? `${pathname}?${query}` : pathname) as
+			| `/app/${string}/submissions`
+			| `/app/${string}/submissions?${string}`;
+
+		await goto(resolve(href), {
+			replaceState: args.replaceState ?? true,
+			noScroll: true,
+			keepFocus: true
+		});
+	}
+
 	function openSubmission(submissionId: Id<'waiver_submissions'>) {
 		lastSubmissionId = submissionId;
 		detailOpen = true;
+		void updateSubmissionsUrl({
+			searchQuery,
+			submissionId,
+			replaceState: false
+		});
 	}
 
 	function handleSubmissionRowKeydown(
@@ -102,6 +147,10 @@
 		const workspaceId = currentWorkspace?.workspaceId ?? null;
 		if (workspaceId === lastWorkspaceId) return;
 		lastWorkspaceId = workspaceId;
+		lastAppliedSearchQuery = searchQuery;
+		lastOpenedSubmissionKey = null;
+		lastSubmissionId = null;
+		detailOpen = false;
 		resetPagination();
 	});
 
@@ -109,6 +158,13 @@
 		if (searchQuery === lastSearchQuery) return;
 		lastSearchQuery = searchQuery;
 		resetPagination();
+		lastSubmissionId = null;
+		detailOpen = false;
+		void updateSubmissionsUrl({
+			searchQuery,
+			submissionId: null,
+			replaceState: true
+		});
 	});
 
 	$effect(() => {
@@ -117,6 +173,36 @@
 			searchQuery = nextSearchQuery;
 		}, 200);
 		return () => clearTimeout(timeout);
+	});
+
+	$effect(() => {
+		if (searchQueryParam === lastAppliedSearchQuery) return;
+		lastAppliedSearchQuery = searchQueryParam;
+		lastSearchQuery = searchQueryParam;
+		searchInput = searchQueryParam;
+		searchQuery = searchQueryParam;
+		resetPagination();
+	});
+
+	$effect(() => {
+		if (!submissionIdParam) {
+			if (detailOpen) detailOpen = false;
+			lastOpenedSubmissionKey = null;
+			return;
+		}
+		if (submissionIdParam === lastOpenedSubmissionKey) return;
+		lastOpenedSubmissionKey = submissionIdParam;
+		lastSubmissionId = submissionIdParam;
+		detailOpen = true;
+	});
+
+	$effect(() => {
+		if (detailOpen || !submissionIdParam) return;
+		void updateSubmissionsUrl({
+			searchQuery,
+			submissionId: null,
+			replaceState: true
+		});
 	});
 
 	function goNextPage() {
@@ -167,7 +253,7 @@
 			/>
 			<input
 				type="search"
-				placeholder="Search by name, email, or booking number"
+				placeholder="Search by customer, activity, or booking number"
 				bind:value={searchInput}
 				class="h-10 w-full rounded-lg border border-input bg-card/50 pr-10 pl-11 text-sm shadow-xs transition-all placeholder:text-muted-foreground/70 hover:bg-card focus-visible:border-ring focus-visible:bg-background focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
 				aria-label="Search submissions"

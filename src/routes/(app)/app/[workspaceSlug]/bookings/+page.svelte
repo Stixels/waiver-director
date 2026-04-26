@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 	import type { FunctionReturnType } from 'convex/server';
 	import { page } from '$app/state';
 	import { toast } from 'svelte-sonner';
@@ -18,6 +20,7 @@
 		TableRow
 	} from '$lib/components/ui/table';
 	import { publicEnv } from '$lib/config/public';
+	import { parseConvexId, queryString } from '$lib/utils/url';
 	import { cn } from '$lib/utils';
 	import { onMount } from 'svelte';
 	import ChevronLeftIcon from '@lucide/svelte/icons/chevron-left';
@@ -45,7 +48,7 @@
 		{ value: 'canceled', label: 'Canceled' }
 	];
 
-	let selectedDate = $state(toDateInputValue(new Date()));
+	let selectedDate = $state(initialSelectedDate());
 	let pageIndex = $state(0);
 	let searchQuery = $state('');
 	let debouncedSearchQuery = $state('');
@@ -53,6 +56,9 @@
 	let statusFilter = $state<StatusFilter>('all');
 	let hideDone = $state(true);
 	let lastWorkspaceId = $state<string | null>(null);
+	let lastAppliedSearchDate: string | null = null;
+	let lastOpenedSearchBookingKey: string | null = null;
+	let isClearingWorkspaceUrl = $state(false);
 	let selectedBookingId = $state<Id<'bookings'> | null>(null);
 	let detailOpen = $state(false);
 	let now = $state(Date.now());
@@ -104,6 +110,10 @@
 		!!bookingPage && (bookingPage.hasPreviousPage || bookingPage.hasNextPage)
 	);
 	const isInitialLoading = $derived(isLoading && !bookingPage);
+	const searchDateParam = $derived(page.url.searchParams.get('date'));
+	const searchBookingIdParam = $derived(
+		parseConvexId<'bookings'>(page.url.searchParams.get('bookingId'))
+	);
 
 	function toDateInputValue(date: Date) {
 		const year = date.getFullYear();
@@ -115,6 +125,23 @@
 	function dateFromInputValue(value: string) {
 		const [year, month, day] = value.split('-').map(Number);
 		return new Date(year, month - 1, day);
+	}
+
+	function isDateInputValue(value: string | null): value is string {
+		if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+		const date = dateFromInputValue(value);
+		const [year, month, day] = value.split('-').map(Number);
+		return (
+			!Number.isNaN(date.getTime()) &&
+			date.getFullYear() === year &&
+			date.getMonth() === month - 1 &&
+			date.getDate() === day
+		);
+	}
+
+	function initialSelectedDate() {
+		const urlDate = page.url.searchParams.get('date');
+		return isDateInputValue(urlDate) ? urlDate : toDateInputValue(new Date());
 	}
 
 	function dayRangeForDate(value: string) {
@@ -131,11 +158,77 @@
 		pageIndex = 0;
 	}
 
+	async function updateBookingsUrl(args: {
+		date?: string | null;
+		bookingId?: Id<'bookings'> | null;
+		replaceState?: boolean;
+	}) {
+		const nextDate = args.date ?? null;
+		lastAppliedSearchDate = nextDate;
+		const query = queryString([
+			['date', nextDate],
+			['bookingId', args.bookingId ?? null]
+		]);
+
+		const pathname = `/app/${page.params.workspaceSlug}/bookings` as `/app/${string}/bookings`;
+		const href = (query ? `${pathname}?${query}` : pathname) as
+			| `/app/${string}/bookings`
+			| `/app/${string}/bookings?${string}`;
+
+		await goto(resolve(href), {
+			replaceState: args.replaceState ?? true,
+			noScroll: true,
+			keepFocus: true
+		});
+	}
+
+	function setSelectedDate(
+		value: string,
+		options: { updateUrl?: boolean; clearBooking?: boolean } = {}
+	) {
+		if (!isDateInputValue(value)) return;
+		selectedDate = value;
+		resetPagination();
+		if (options.clearBooking) {
+			selectedBookingId = null;
+			detailOpen = false;
+		}
+		if (options.updateUrl) {
+			void updateBookingsUrl({
+				date: value,
+				bookingId: options.clearBooking ? null : selectedBookingId,
+				replaceState: true
+			});
+		}
+	}
+
 	$effect(() => {
 		const workspaceId = currentWorkspace?.workspaceId ?? null;
+		if (!workspaceId) {
+			lastOpenedSearchBookingKey = null;
+			selectedBookingId = null;
+			detailOpen = false;
+			resetPagination();
+			return;
+		}
 		if (workspaceId === lastWorkspaceId) return;
+		const isWorkspaceChange = lastWorkspaceId !== null;
 		lastWorkspaceId = workspaceId;
+		lastAppliedSearchDate = null;
+		lastOpenedSearchBookingKey = null;
+		selectedBookingId = null;
+		detailOpen = false;
 		resetPagination();
+		if (isWorkspaceChange) {
+			isClearingWorkspaceUrl = true;
+			void updateBookingsUrl({
+				date: null,
+				bookingId: null,
+				replaceState: true
+			}).finally(() => {
+				isClearingWorkspaceUrl = false;
+			});
+		}
 	});
 
 	$effect(() => {
@@ -153,20 +246,57 @@
 		resetPagination();
 	});
 
+	$effect(() => {
+		if (isClearingWorkspaceUrl) return;
+		if (!searchDateParam) {
+			lastAppliedSearchDate = null;
+			return;
+		}
+		if (searchDateParam === lastAppliedSearchDate || !isDateInputValue(searchDateParam)) return;
+		lastAppliedSearchDate = searchDateParam;
+		setSelectedDate(searchDateParam);
+	});
+
+	$effect(() => {
+		if (isClearingWorkspaceUrl) return;
+		if (!searchBookingIdParam) {
+			if (detailOpen) detailOpen = false;
+			lastOpenedSearchBookingKey = null;
+			return;
+		}
+		if (searchBookingIdParam === lastOpenedSearchBookingKey) return;
+		lastOpenedSearchBookingKey = searchBookingIdParam;
+		selectedBookingId = searchBookingIdParam;
+		detailOpen = true;
+	});
+
+	$effect(() => {
+		if (isClearingWorkspaceUrl) return;
+		if (detailOpen || !searchBookingIdParam) return;
+		void updateBookingsUrl({
+			date: selectedDate,
+			bookingId: null,
+			replaceState: true
+		});
+	});
+
 	function changeDate(days: number) {
 		const [year, month, day] = selectedDate.split('-').map(Number);
-		selectedDate = toDateInputValue(new Date(year, month - 1, day + days));
-		resetPagination();
+		setSelectedDate(toDateInputValue(new Date(year, month - 1, day + days)), {
+			updateUrl: true,
+			clearBooking: true
+		});
 	}
 
 	function goToday() {
-		selectedDate = toDateInputValue(new Date());
-		resetPagination();
+		setSelectedDate(toDateInputValue(new Date()), { updateUrl: true, clearBooking: true });
 	}
 
 	function handleDateInput(event: Event) {
-		selectedDate = (event.currentTarget as HTMLInputElement).value;
-		resetPagination();
+		setSelectedDate((event.currentTarget as HTMLInputElement).value, {
+			updateUrl: true,
+			clearBooking: true
+		});
 	}
 
 	function goNextPage() {
@@ -250,6 +380,11 @@
 	function openBooking(bookingId: Id<'bookings'>) {
 		selectedBookingId = bookingId;
 		detailOpen = true;
+		void updateBookingsUrl({
+			date: selectedDate,
+			bookingId,
+			replaceState: false
+		});
 	}
 
 	function handleBookingRowKeydown(event: KeyboardEvent, bookingId: Id<'bookings'>) {
