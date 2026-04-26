@@ -21,6 +21,7 @@ import type * as lib_customers from "../lib/customers.js";
 import type * as lib_submissions from "../lib/submissions.js";
 import type * as lib_waivers from "../lib/waivers.js";
 import type * as lib_workspaces from "../lib/workspaces.js";
+import type * as search from "../search.js";
 import type * as users from "../users.js";
 import type * as waivers from "../waivers.js";
 import type * as workspaces from "../workspaces.js";
@@ -45,6 +46,7 @@ declare const fullApi: ApiFromModules<{
   "lib/submissions": typeof lib_submissions;
   "lib/waivers": typeof lib_waivers;
   "lib/workspaces": typeof lib_workspaces;
+  search: typeof search;
   users: typeof users;
   waivers: typeof waivers;
   workspaces: typeof workspaces;

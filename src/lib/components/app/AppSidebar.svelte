@@ -8,6 +8,8 @@
 	import { useConvexAuthState } from '$lib/components/auth/convex-auth.svelte';
 	import { appMainNavItems, appConfigNavItems } from '$lib/domain/navigation';
 	import CreateWorkspaceForm from '$lib/components/workspaces/CreateWorkspaceForm.svelte';
+	import WorkspaceSearchDialog from '$lib/components/app/WorkspaceSearchDialog.svelte';
+	import { Kbd } from '$lib/components/ui/kbd';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import {
 		DropdownMenu,
@@ -36,7 +38,9 @@
 	import EllipsisIcon from '@lucide/svelte/icons/ellipsis';
 	import Building2Icon from '@lucide/svelte/icons/building-2';
 	import MoonStarIcon from '@lucide/svelte/icons/moon-star';
+	import SearchIcon from '@lucide/svelte/icons/search';
 	import SunIcon from '@lucide/svelte/icons/sun';
+	import { onMount } from 'svelte';
 
 	interface Props {
 		collapsed?: boolean;
@@ -80,6 +84,9 @@
 	const currentPath = $derived(page.url.pathname);
 	let isSigningOut = $state(false);
 	let createWorkspaceDialogOpen = $state(false);
+	let searchDialogOpen = $state(false);
+	let hydrated = $state(false);
+	let searchShortcutModifier = $state<'⌘' | 'Ctrl' | null>(null);
 	const currentWorkspaceSubpath = $derived.by(() => {
 		const match = currentPath.match(/^\/app\/[^/]+(\/.*)?$/);
 		return match?.[1] ?? '';
@@ -88,6 +95,11 @@
 	const accountMenuSide = $derived(mode === 'drawer' ? 'top' : 'right');
 	const dropdownMenuAlign = $derived(mode === 'drawer' ? 'center' : 'start');
 	const dropdownMenuSideOffset = $derived(mode === 'drawer' ? 8 : 10);
+
+	onMount(() => {
+		hydrated = true;
+		searchShortcutModifier = /mac|iphone|ipad|ipod/i.test(navigator.userAgent) ? '⌘' : 'Ctrl';
+	});
 
 	$effect(() => {
 		if (typeof window === 'undefined') return;
@@ -150,6 +162,28 @@
 		onNavigate?.();
 	}
 
+	function openSearchDialog(): void {
+		searchDialogOpen = true;
+	}
+
+	function isWaiverEditorActive(): boolean {
+		const activeElement = document.activeElement;
+		return (
+			activeElement instanceof HTMLElement &&
+			Boolean(activeElement.closest('.waiver-canvas-editor, [data-waiver-canvas-editor]'))
+		);
+	}
+
+	function handleSearchShortcut(event: KeyboardEvent): void {
+		if (event.defaultPrevented) return;
+		if (event.key.toLowerCase() !== 'k') return;
+		if (!event.metaKey && !event.ctrlKey) return;
+		if (isWaiverEditorActive()) return;
+
+		event.preventDefault();
+		openSearchDialog();
+	}
+
 	async function selectWorkspace(workspaceSlug: string): Promise<void> {
 		handleNavigation();
 		if (workspaceSlug === activeWorkspaceSlug) return;
@@ -185,6 +219,8 @@
 		}
 	}
 </script>
+
+<svelte:window onkeydown={handleSearchShortcut} />
 
 <div
 	class="sidebar-root flex h-full flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground"
@@ -341,6 +377,51 @@
 			</div>
 		</DialogContent>
 	</Dialog>
+
+	<WorkspaceSearchDialog
+		bind:open={searchDialogOpen}
+		workspaceId={activeWorkspace?.workspaceId ?? null}
+		workspaceSlug={activeWorkspaceSlug}
+		{onNavigate}
+	/>
+
+	<!-- ─── Search trigger ─── -->
+	<div class="shrink-0 px-2 pb-2">
+		<button
+			type="button"
+			class="search-pill group flex w-full items-center gap-2 rounded-lg bg-sidebar-accent/40 px-2.5 py-1.5 text-left ring-1 ring-sidebar-border/50 transition-all ring-inset hover:bg-sidebar-accent hover:ring-sidebar-border focus-visible:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none"
+			title={isCollapsed ? 'Search workspace' : undefined}
+			aria-label={isCollapsed ? 'Search customers and bookings' : 'Open workspace search'}
+			aria-keyshortcuts={hydrated && searchShortcutModifier
+				? `${searchShortcutModifier === '⌘' ? 'Meta' : 'Control'}+K`
+				: undefined}
+			onclick={openSearchDialog}
+		>
+			<SearchIcon
+				class="size-[15px] shrink-0 text-muted-foreground/80 transition-colors group-hover:text-sidebar-foreground"
+				aria-hidden="true"
+			/>
+			<span
+				class="sidebar-copy search-pill-label flex-1 truncate text-[12.5px] text-muted-foreground/80 transition-colors group-hover:text-sidebar-foreground"
+			>
+				Search workspace
+			</span>
+			{#if hydrated && searchShortcutModifier}
+				<span class="sidebar-copy search-pill-kbd flex items-center gap-0.5" aria-hidden="true">
+					<Kbd
+						class="h-[18px] min-w-[18px] border-sidebar-border/70 bg-background/40 px-1 text-[9.5px] text-muted-foreground/80"
+					>
+						{searchShortcutModifier}
+					</Kbd>
+					<Kbd
+						class="h-[18px] min-w-[18px] border-sidebar-border/70 bg-background/40 px-1 text-[9.5px] text-muted-foreground/80"
+					>
+						K
+					</Kbd>
+				</span>
+			{/if}
+		</button>
+	</div>
 
 	<!-- ─── Navigation ─── -->
 	<nav class="flex flex-1 flex-col overflow-y-auto px-2 pb-2" aria-label="Primary navigation">
@@ -538,6 +619,21 @@
 
 	.nav-item.is-active {
 		background: var(--sidebar-accent);
+	}
+
+	.search-pill {
+		min-height: 2rem;
+		transition:
+			padding 0.22s cubic-bezier(0.4, 0, 0.2, 1),
+			gap 0.22s cubic-bezier(0.4, 0, 0.2, 1),
+			background-color 0.15s ease,
+			box-shadow 0.15s ease;
+	}
+
+	.sidebar-root[data-collapsed='true'] .search-pill {
+		gap: 0;
+		padding-inline: 0.5rem;
+		justify-content: center;
 	}
 
 	.sidebar-header,

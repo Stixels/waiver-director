@@ -71,3 +71,17 @@ export function bookingSnapshot(booking: Doc<'bookings'>) {
 		...(booking.leadCustomerEmail ? { leadCustomerEmail: booking.leadCustomerEmail } : {})
 	};
 }
+
+export function bookingSearchText(args: {
+	providerBookingId: string;
+	activityName: string;
+	leadCustomerName?: string;
+	leadCustomerEmail?: string;
+}) {
+	const normalizeSearchValue = (value: string | undefined) => value?.trim().toLowerCase() ?? '';
+
+	return [args.providerBookingId, args.activityName, args.leadCustomerName, args.leadCustomerEmail]
+		.map(normalizeSearchValue)
+		.filter((value) => value.length > 0)
+		.join(' ');
+}
