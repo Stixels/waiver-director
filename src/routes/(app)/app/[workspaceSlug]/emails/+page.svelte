@@ -391,6 +391,9 @@
 		deletingTemplateId = template._id;
 		try {
 			await convex.mutation(api.emails.deleteEmailTemplate, { templateId: template._id });
+			if (selectedTemplate?._id === template._id) {
+				selectedTemplate = null;
+			}
 			toast.success('Template deleted.');
 		} catch (err) {
 			toast.error(getConvexErrorMessage(err, 'Failed to delete template.'));
