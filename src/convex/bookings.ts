@@ -7,6 +7,7 @@ import { requireWorkspaceMember } from './lib/waivers';
 
 const MAX_BOOKING_LIST_SPAN_MS = 48 * 60 * 60 * 1000;
 const MAX_BOOKINGS_PER_LIST_WINDOW = 5_000;
+const DEFAULT_BOOKING_DURATION_MS = 60 * 60 * 1000;
 
 const bookingSummaryValue = v.object({
 	bookingId: v.id('bookings'),
@@ -98,6 +99,17 @@ function serializeBooking(booking: Doc<'bookings'>) {
 	};
 }
 
+function bookingIsDone(booking: Doc<'bookings'>, now: number) {
+	if (typeof booking.endAt === 'number') return booking.endAt < now;
+	const endTime = booking.endTime ? Date.parse(booking.endTime) : Number.NaN;
+	if (Number.isFinite(endTime)) return endTime < now;
+	if (typeof booking.startAt === 'number')
+		return booking.startAt + DEFAULT_BOOKING_DURATION_MS < now;
+	if (!booking.startTime) return false;
+	const startAt = Date.parse(booking.startTime);
+	return Number.isFinite(startAt) && startAt + DEFAULT_BOOKING_DURATION_MS < now;
+}
+
 export const listWorkspaceBookings = query({
 	args: {
 		workspaceId: v.id('workspaces'),
@@ -106,6 +118,7 @@ export const listWorkspaceBookings = query({
 		pageIndex: v.number(),
 		pageSize: v.number(),
 		searchQuery: v.optional(v.string()),
+		hideDone: v.boolean(),
 		statusFilter: v.union(
 			v.literal('all'),
 			v.literal('active'),
@@ -142,15 +155,24 @@ export const listWorkspaceBookings = query({
 			)
 			.take(MAX_BOOKINGS_PER_LIST_WINDOW);
 
-		const serialized = dayBookings.map((booking) => serializeBooking(booking));
-		const summary = serialized.reduce(
-			(total, booking) => {
-				const isCanceled = booking.status === 'canceled';
-				const isIncomplete = !isCanceled && booking.signedCount < booking.participantCount;
+		const now = Date.now();
+		const serialized = dayBookings.map((booking) => ({
+			booking: serializeBooking(booking),
+			isDone: bookingIsDone(booking, now)
+		}));
+		const visibleByDoneFilter = serialized.filter((entry) => {
+			if (!args.hideDone) return true;
+			return !entry.isDone;
+		});
+		const summary = visibleByDoneFilter.reduce(
+			(total, entry) => {
+				const isCanceled = entry.booking.status === 'canceled';
+				const isIncomplete =
+					!isCanceled && entry.booking.signedCount < entry.booking.participantCount;
 
 				return {
 					totalCount: total.totalCount + 1,
-					activeCount: total.activeCount + (booking.status === 'active' ? 1 : 0),
+					activeCount: total.activeCount + (entry.booking.status === 'active' ? 1 : 0),
 					incompleteCount: total.incompleteCount + (isIncomplete ? 1 : 0),
 					canceledCount: total.canceledCount + (isCanceled ? 1 : 0)
 				};
@@ -163,7 +185,8 @@ export const listWorkspaceBookings = query({
 			}
 		);
 
-		const filteredBookings = serialized
+		const filteredBookings = visibleByDoneFilter
+			.map((entry) => entry.booking)
 			.filter((booking) => {
 				if (args.statusFilter === 'active') return booking.status === 'active';
 				if (args.statusFilter === 'attention') {
@@ -187,7 +210,6 @@ export const listWorkspaceBookings = query({
 				if (aStart !== bStart) return aStart - bStart;
 				return a.activityName.localeCompare(b.activityName);
 			});
-		const now = Date.now();
 		const nextUpcomingBooking =
 			filteredBookings
 				.filter((booking) => booking.status === 'active')

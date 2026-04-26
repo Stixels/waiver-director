@@ -26,6 +26,7 @@
 	import CalendarDaysIcon from '@lucide/svelte/icons/calendar-days';
 	import CalendarOffIcon from '@lucide/svelte/icons/calendar-off';
 	import CircleCheckIcon from '@lucide/svelte/icons/circle-check';
+	import EyeOffIcon from '@lucide/svelte/icons/eye-off';
 	import SearchIcon from '@lucide/svelte/icons/search';
 	import XIcon from '@lucide/svelte/icons/x';
 
@@ -50,6 +51,7 @@
 	let debouncedSearchQuery = $state('');
 	let lastDebouncedSearchQuery = $state('');
 	let statusFilter = $state<StatusFilter>('all');
+	let hideDone = $state(true);
 	let lastWorkspaceId = $state<string | null>(null);
 	let selectedBookingId = $state<Id<'bookings'> | null>(null);
 	let detailOpen = $state(false);
@@ -74,6 +76,7 @@
 						pageIndex,
 						pageSize: PAGE_SIZE,
 						searchQuery: debouncedSearchQuery,
+						hideDone: hideDone && isToday,
 						statusFilter
 					}
 				: 'skip',
@@ -190,6 +193,11 @@
 	function setStatusFilter(value: StatusFilter) {
 		if (statusFilter === value) return;
 		statusFilter = value;
+		resetPagination();
+	}
+
+	function handleHideDoneChange(event: Event) {
+		hideDone = (event.currentTarget as HTMLInputElement).checked;
 		resetPagination();
 	}
 
@@ -371,6 +379,24 @@
 			</div>
 
 			<div class="flex w-full flex-wrap items-center gap-3 lg:w-auto">
+				{#if isToday}
+					<label
+						class="inline-flex h-10 w-full cursor-pointer items-center rounded-lg border border-input bg-card/50 p-0.5 shadow-xs lg:w-auto"
+					>
+						<input
+							type="checkbox"
+							checked={hideDone}
+							onchange={handleHideDoneChange}
+							class="peer sr-only"
+						/>
+						<span
+							class="inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-md px-3 text-xs font-medium whitespace-nowrap text-muted-foreground transition-all peer-checked:bg-background peer-checked:text-foreground peer-checked:shadow-sm peer-focus-visible:ring-2 peer-focus-visible:ring-ring/30 peer-focus-visible:outline-none hover:text-foreground lg:h-8"
+						>
+							<EyeOffIcon class="size-3.5" aria-hidden="true" />
+							Hide done
+						</span>
+					</label>
+				{/if}
 				<div
 					class="grid h-10 w-full grid-cols-4 items-center rounded-lg border border-input bg-card/50 p-0.5 shadow-xs lg:inline-flex lg:w-auto"
 					role="tablist"
@@ -480,11 +506,15 @@
 					<p class="text-sm font-medium">
 						{searchQuery || statusFilter !== 'all'
 							? 'No matching bookings'
-							: 'No bookings synced for this day'}
+							: hideDone && isToday
+								? 'No unfinished bookings'
+								: 'No bookings synced for this day'}
 					</p>
 					<p class="text-xs text-muted-foreground">
 						{#if searchQuery || statusFilter !== 'all'}
 							Adjust search or filters for {formatSelectedDate(selectedDate)}.
+						{:else if hideDone && isToday}
+							Show done bookings to review rooms that have already ended.
 						{:else}
 							Try a different date or check the booking integration.
 						{/if}
