@@ -18,6 +18,7 @@ import type * as lib_auth from "../lib/auth.js";
 import type * as lib_bookingSignatures from "../lib/bookingSignatures.js";
 import type * as lib_bookings from "../lib/bookings.js";
 import type * as lib_customers from "../lib/customers.js";
+import type * as lib_submissions from "../lib/submissions.js";
 import type * as lib_waivers from "../lib/waivers.js";
 import type * as lib_workspaces from "../lib/workspaces.js";
 import type * as users from "../users.js";
@@ -41,6 +42,7 @@ declare const fullApi: ApiFromModules<{
   "lib/bookingSignatures": typeof lib_bookingSignatures;
   "lib/bookings": typeof lib_bookings;
   "lib/customers": typeof lib_customers;
+  "lib/submissions": typeof lib_submissions;
   "lib/waivers": typeof lib_waivers;
   "lib/workspaces": typeof lib_workspaces;
   users: typeof users;

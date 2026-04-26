@@ -20,6 +20,8 @@
 	import ChevronLeftIcon from '@lucide/svelte/icons/chevron-left';
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 	import FileTextIcon from '@lucide/svelte/icons/file-text';
+	import SearchIcon from '@lucide/svelte/icons/search';
+	import XIcon from '@lucide/svelte/icons/x';
 
 	const PAGE_SIZE = 20;
 
@@ -31,7 +33,10 @@
 	let cursor = $state<string | null>(null);
 	let cursorHistory = $state<Array<string | null>>([]);
 	let currentPage = $state(1);
+	let searchInput = $state('');
+	let searchQuery = $state('');
 	let lastWorkspaceId = $state<string | null>(null);
+	let lastSearchQuery = $state('');
 
 	const submissionsQuery = useProtectedQuery(
 		api.waivers.listRecentSubmissions,
@@ -42,7 +47,8 @@
 						paginationOpts: {
 							numItems: PAGE_SIZE,
 							cursor
-						}
+						},
+						searchQuery
 					}
 				: 'skip',
 		() => ({ keepPreviousData: true })
@@ -99,6 +105,20 @@
 		resetPagination();
 	});
 
+	$effect(() => {
+		if (searchQuery === lastSearchQuery) return;
+		lastSearchQuery = searchQuery;
+		resetPagination();
+	});
+
+	$effect(() => {
+		const nextSearchQuery = searchInput.trim();
+		const timeout = setTimeout(() => {
+			searchQuery = nextSearchQuery;
+		}, 200);
+		return () => clearTimeout(timeout);
+	});
+
 	function goNextPage() {
 		if (!submissionPage || submissionPage.isDone) return;
 		cursorHistory = [...cursorHistory, cursor];
@@ -112,6 +132,12 @@
 		cursorHistory = cursorHistory.slice(0, -1);
 		cursor = previousCursor;
 		currentPage = Math.max(1, currentPage - 1);
+	}
+
+	function clearSearch() {
+		if (!searchInput && !searchQuery) return;
+		searchInput = '';
+		searchQuery = '';
 	}
 </script>
 
@@ -132,6 +158,30 @@
 		<div class="space-y-1">
 			<h1 class="text-2xl font-semibold tracking-tight">Signed waiver records</h1>
 			<p class="text-sm text-muted-foreground">Click any row to view the full signed waiver.</p>
+		</div>
+
+		<div class="relative w-full lg:max-w-md">
+			<SearchIcon
+				class="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground"
+				aria-hidden="true"
+			/>
+			<input
+				type="search"
+				placeholder="Search by name, email, or booking number"
+				bind:value={searchInput}
+				class="h-10 w-full rounded-lg border border-input bg-card/50 pr-10 pl-11 text-sm shadow-xs transition-all placeholder:text-muted-foreground/70 hover:bg-card focus-visible:border-ring focus-visible:bg-background focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
+				aria-label="Search submissions"
+			/>
+			{#if searchInput}
+				<button
+					type="button"
+					onclick={clearSearch}
+					class="absolute top-1/2 right-2 inline-flex size-6 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
+					aria-label="Clear search"
+				>
+					<XIcon class="size-3.5" aria-hidden="true" />
+				</button>
+			{/if}
 		</div>
 
 		{#if isLoadingSubmissions}
@@ -203,9 +253,13 @@
 					<FileTextIcon class="size-5" aria-hidden="true" />
 				</div>
 				<div class="space-y-1">
-					<p class="text-sm font-medium">No submissions yet</p>
+					<p class="text-sm font-medium">
+						{searchQuery ? 'No matching submissions' : 'No submissions yet'}
+					</p>
 					<p class="text-xs text-muted-foreground">
-						Once guests sign the live waiver, records will appear here.
+						{searchQuery
+							? 'Try a different name, email, or booking number.'
+							: 'Once guests sign the live waiver, records will appear here.'}
 					</p>
 				</div>
 			</div>

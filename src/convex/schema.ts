@@ -164,6 +164,7 @@ export default defineSchema({
 		bookingSnapshot: v.optional(bookingSnapshotValidator),
 		signerName: v.string(),
 		signerEmail: v.string(),
+		searchText: v.string(),
 		signerDateOfBirth: v.string(),
 		signatureDataUrl: v.string(),
 		answers: v.record(v.string(), v.union(v.string(), v.boolean(), v.null())),
@@ -177,7 +178,11 @@ export default defineSchema({
 	})
 		.index('by_workspaceId', ['workspaceId'])
 		.index('by_bookingId', ['bookingId'])
-		.index('by_customerId_and_submittedAt', ['customerId', 'submittedAt']),
+		.index('by_customerId_and_submittedAt', ['customerId', 'submittedAt'])
+		.searchIndex('search_submissionText', {
+			searchField: 'searchText',
+			filterFields: ['workspaceId']
+		}),
 
 	booking_integrations: defineTable({
 		workspaceId: v.id('workspaces'),

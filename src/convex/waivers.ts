@@ -5,6 +5,7 @@ import type { Doc, Id } from './_generated/dataModel';
 import type { MutationCtx, QueryCtx } from './_generated/server';
 import { bookingSnapshot, bookingSnapshotValidator } from './lib/bookings';
 import { upsertSignerCustomer } from './lib/customers';
+import { submissionSearchText } from './lib/submissions';
 import {
 	assertWorkspaceRecord,
 	minorInputValidator,
@@ -329,7 +330,8 @@ export const getSubmission = query({
 export const listRecentSubmissions = query({
 	args: {
 		workspaceId: v.id('workspaces'),
-		paginationOpts: paginationOptsValidator
+		paginationOpts: paginationOptsValidator,
+		searchQuery: v.optional(v.string())
 	},
 	returns: v.object({
 		submissions: v.array(
@@ -349,12 +351,20 @@ export const listRecentSubmissions = query({
 	}),
 	handler: async (ctx, args) => {
 		await requireWorkspaceMember(ctx, args.workspaceId);
+		const searchQuery = args.searchQuery?.trim().toLowerCase().replace(/\s+/g, ' ') ?? '';
 
-		const submissionPage = await ctx.db
-			.query('waiver_submissions')
-			.withIndex('by_workspaceId', (q) => q.eq('workspaceId', args.workspaceId))
-			.order('desc')
-			.paginate(args.paginationOpts);
+		const submissionPage = searchQuery
+			? await ctx.db
+					.query('waiver_submissions')
+					.withSearchIndex('search_submissionText', (q) =>
+						q.search('searchText', searchQuery).eq('workspaceId', args.workspaceId)
+					)
+					.paginate(args.paginationOpts)
+			: await ctx.db
+					.query('waiver_submissions')
+					.withIndex('by_workspaceId', (q) => q.eq('workspaceId', args.workspaceId))
+					.order('desc')
+					.paginate(args.paginationOpts);
 
 		return {
 			submissions: submissionPage.page.map((submission) => ({
@@ -562,7 +572,12 @@ export const submitPublicWaiver = mutation({
 					}
 				: {}),
 			signerName,
-			signerEmail,
+			signerEmail: originalSignerEmail,
+			searchText: submissionSearchText({
+				signerName,
+				signerEmail: originalSignerEmail,
+				booking
+			}),
 			signerDateOfBirth,
 			signatureDataUrl: args.signatureDataUrl,
 			answers: args.answers,
