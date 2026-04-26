@@ -61,7 +61,16 @@
 		padding-left: 1.25rem;
 	}
 
+	.waiver-rich-text :global(ul) {
+		list-style-type: disc;
+	}
+
+	.waiver-rich-text :global(ol) {
+		list-style-type: decimal;
+	}
+
 	.waiver-rich-text :global(li) {
+		display: list-item;
 		margin: 0.2rem 0;
 	}
 

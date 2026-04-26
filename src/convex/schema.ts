@@ -157,7 +157,7 @@ export default defineSchema({
 		.index('by_versionId', ['versionId'])
 		.index('by_bookingId', ['bookingId']),
 
-	email_templates: defineTable({
+	email_editor_content: defineTable({
 		workspaceId: v.id('workspaces'),
 		subject: v.string(),
 		body: v.string(),
@@ -165,7 +165,7 @@ export default defineSchema({
 		updatedAt: v.number()
 	}).index('by_workspaceId', ['workspaceId']),
 
-	email_template_presets: defineTable({
+	email_templates: defineTable({
 		workspaceId: v.id('workspaces'),
 		name: v.string(),
 		subject: v.string(),

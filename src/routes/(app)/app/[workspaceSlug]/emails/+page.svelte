@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
+	import { untrack } from 'svelte';
 	import { SvelteSet } from 'svelte/reactivity';
 	import { useConvexClient } from 'convex-svelte';
 	import { toast } from 'svelte-sonner';
@@ -29,21 +30,20 @@
 		DialogHeader,
 		DialogTitle
 	} from '$lib/components/ui/dialog';
-	import RichTextEditor from '$lib/components/waivers/RichTextEditor.svelte';
+	import EmailLoadTemplateDialog from '$lib/components/emails/EmailLoadTemplateDialog.svelte';
+	import EmailSaveTemplateDialog from '$lib/components/emails/EmailSaveTemplateDialog.svelte';
+	import RichTextEditor from '$lib/components/emails/RichTextEditor.svelte';
 	import WaiverRichText from '$lib/components/waivers/WaiverRichText.svelte';
-	import {
-		DropdownMenu,
-		DropdownMenuContent,
-		DropdownMenuItem,
-		DropdownMenuTrigger
-	} from '$lib/components/ui/dropdown-menu';
-	import TrashIcon from '@lucide/svelte/icons/trash-2';
-	import EllipsisVerticalIcon from '@lucide/svelte/icons/ellipsis-vertical';
+	import CloudIcon from '@lucide/svelte/icons/cloud';
+	import CloudCheckIcon from '@lucide/svelte/icons/cloud-check';
+	import CloudOffIcon from '@lucide/svelte/icons/cloud-off';
+	import LoaderIcon from '@lucide/svelte/icons/loader';
 
 	const convex = useConvexClient();
 	const appContext = useAppContext();
 	const MIN_SEND_AFTER_HOURS = 1;
 	const MAX_SEND_AFTER_HOURS = 168;
+	const AUTOSAVE_DELAY_MS = 1800;
 
 	const currentWorkspace = $derived(
 		appContext.workspaces.find((w) => w.slug === page.params.workspaceSlug) ?? null
@@ -51,7 +51,7 @@
 
 	// ─── Queries ───────────────────────────────────────────────────────────────
 
-	const templateQuery = useProtectedQuery(api.emails.getEmailTemplate, () =>
+	const editorContentQuery = useProtectedQuery(api.emails.getEmailEditorContent, () =>
 		currentWorkspace ? { workspaceId: currentWorkspace.workspaceId } : 'skip'
 	);
 
@@ -114,39 +114,42 @@
 		};
 	});
 
-	const presetsQuery = useProtectedQuery(api.emails.listTemplatePresets, () =>
+	const templatesQuery = useProtectedQuery(api.emails.listEmailTemplates, () =>
 		currentWorkspace ? { workspaceId: currentWorkspace.workspaceId } : 'skip'
 	);
 
 	type FollowUp = FunctionReturnType<typeof api.emails.listFollowUps>['page'][number];
-	type TemplatePreset = FunctionReturnType<typeof api.emails.listTemplatePresets>[number];
+	type EmailTemplate = FunctionReturnType<typeof api.emails.listEmailTemplates>[number];
 
 	const stats = $derived(statsQuery.data);
 	const followUpsPage = $derived(followUpsQuery.data);
 	const followUps = $derived((followUpsPage?.page ?? []) as FollowUp[]);
-	const presets = $derived((presetsQuery.data ?? []) as TemplatePreset[]);
-	const isLoading = $derived(appContext.isLoading || templateQuery.isLoading);
+	const templates = $derived((templatesQuery.data ?? []) as EmailTemplate[]);
+	const isLoading = $derived(appContext.isLoading || editorContentQuery.isLoading);
 	const pageError = $derived(
 		appContext.error ??
-			templateQuery.error ??
+			editorContentQuery.error ??
 			statsQuery.error ??
 			followUpsQuery.error ??
-			presetsQuery.error ??
+			templatesQuery.error ??
 			null
 	);
 
-	// ─── Template editor state ─────────────────────────────────────────────────
+	// ─── Editor content state ──────────────────────────────────────────────────
 
 	let subject = $state('');
 	let body = $state('<p></p>');
 	let sendAfterHours = $state(2);
-	let templateLoaded = $state(false);
+	let editorContentLoaded = $state(false);
 	let savedSubject = $state('');
 	let savedBody = $state('<p></p>');
 	let savedSendAfterHours = $state(2);
-	let isSavingTemplate = $state(false);
+	let isSavingEditorContent = $state(false);
+	let lastSavedAt = $state<number | null>(null);
+	let lastSaveError = $state<string | null>(null);
+	let autosaveTimer: ReturnType<typeof setTimeout> | null = null;
 	let editorRef = $state<{ insertText: (text: string) => void } | null>(null);
-	let loadedTemplateWorkspaceId = $state<Id<'workspaces'> | null>(null);
+	let loadedEditorContentWorkspaceId = $state<Id<'workspaces'> | null>(null);
 
 	const normalizedSendAfterHours = $derived(clampSendAfterHours(sendAfterHours));
 	const isSendAfterHoursValid = $derived(
@@ -155,51 +158,119 @@
 			sendAfterHours <= MAX_SEND_AFTER_HOURS
 	);
 
+	function resetEditorContentState() {
+		subject = '';
+		body = '<p></p>';
+		sendAfterHours = 2;
+		savedSubject = '';
+		savedBody = '<p></p>';
+		savedSendAfterHours = 2;
+		lastSavedAt = null;
+		lastSaveError = null;
+		editorContentLoaded = false;
+		loadedEditorContentWorkspaceId = null;
+	}
+
 	$effect(() => {
 		const workspaceId = currentWorkspace?.workspaceId ?? null;
 
 		if (!workspaceId) {
-			subject = '';
-			body = '<p></p>';
-			sendAfterHours = 2;
-			savedSubject = '';
-			savedBody = '<p></p>';
-			savedSendAfterHours = 2;
-			templateLoaded = false;
-			loadedTemplateWorkspaceId = null;
+			resetEditorContentState();
 			return;
 		}
 
-		if (loadedTemplateWorkspaceId !== workspaceId) {
-			subject = '';
-			body = '<p></p>';
-			sendAfterHours = 2;
-			savedSubject = '';
-			savedBody = '<p></p>';
-			savedSendAfterHours = 2;
-			templateLoaded = false;
+		if (loadedEditorContentWorkspaceId !== workspaceId) {
+			resetEditorContentState();
 		}
 
 		if (
-			templateQuery.data?.workspaceId === workspaceId &&
-			loadedTemplateWorkspaceId !== workspaceId
+			editorContentQuery.data?.workspaceId === workspaceId &&
+			loadedEditorContentWorkspaceId !== workspaceId
 		) {
-			const template = templateQuery.data;
-			subject = template.subject;
-			body = template.body;
-			sendAfterHours = template.sendAfterHours;
-			savedSubject = template.subject;
-			savedBody = template.body;
-			savedSendAfterHours = template.sendAfterHours;
-			templateLoaded = true;
-			loadedTemplateWorkspaceId = workspaceId;
+			const editorContent = editorContentQuery.data;
+			subject = editorContent.subject;
+			body = editorContent.body;
+			sendAfterHours = editorContent.sendAfterHours;
+			savedSubject = editorContent.subject;
+			savedBody = editorContent.body;
+			savedSendAfterHours = editorContent.sendAfterHours;
+			lastSavedAt = null;
+			lastSaveError = null;
+			editorContentLoaded = true;
+			loadedEditorContentWorkspaceId = workspaceId;
 		}
 	});
 
 	const isDirty = $derived(
-		templateLoaded &&
+		editorContentLoaded &&
 			(subject !== savedSubject || body !== savedBody || sendAfterHours !== savedSendAfterHours)
 	);
+	const editorContentFingerprint = $derived(`${subject}\u0000${body}\u0000${sendAfterHours}`);
+	let lastObservedEditorContentFingerprint = $state('');
+	const saveState = $derived<'idle' | 'dirty' | 'saving' | 'saved' | 'error'>(
+		(() => {
+			if (lastSaveError) return 'error';
+			if (isSavingEditorContent) return 'saving';
+			if (isDirty) return 'dirty';
+			if (lastSavedAt) return 'saved';
+			return 'idle';
+		})()
+	);
+	const savedLabel = $derived.by(() => {
+		if (saveState === 'saving') return 'Saving…';
+		if (saveState === 'error') return 'Could not save';
+		if (saveState === 'dirty') return 'Unsaved changes';
+		if (!lastSavedAt) return 'All changes saved';
+
+		const time = new Intl.DateTimeFormat('en-US', {
+			hour: 'numeric',
+			minute: '2-digit'
+		}).format(new Date(lastSavedAt));
+
+		return `Last saved at ${time}`;
+	});
+
+	$effect(() => {
+		const currentFingerprint = editorContentFingerprint;
+
+		untrack(() => {
+			if (lastSaveError && currentFingerprint !== lastObservedEditorContentFingerprint) {
+				lastSaveError = null;
+			}
+			lastObservedEditorContentFingerprint = currentFingerprint;
+		});
+	});
+
+	$effect(() => {
+		void editorContentFingerprint;
+		void isSavingEditorContent;
+		void isSendAfterHoursValid;
+		void lastSaveError;
+
+		if (autosaveTimer) {
+			clearTimeout(autosaveTimer);
+			autosaveTimer = null;
+		}
+
+		untrack(() => {
+			if (!currentWorkspace) return;
+			if (!isDirty) return;
+			if (!isSendAfterHoursValid) return;
+			if (isSavingEditorContent) return;
+			if (lastSaveError) return;
+
+			autosaveTimer = setTimeout(() => {
+				void persistEditorContent({ showToast: false });
+			}, AUTOSAVE_DELAY_MS);
+		});
+
+		return () => {
+			if (autosaveTimer) {
+				clearTimeout(autosaveTimer);
+				autosaveTimer = null;
+			}
+		};
+	});
 
 	function clampSendAfterHours(value: unknown) {
 		return Math.trunc(
@@ -219,119 +290,112 @@
 		editorRef?.insertText(variable);
 	}
 
-	async function persistTemplate(nextTemplate?: {
-		subject: string;
-		body: string;
-		sendAfterHours: number;
-		successMessage?: string;
-	}) {
+	async function persistEditorContent(options: { showToast?: boolean } = {}) {
 		if (!currentWorkspace) return;
-		const templateToSave = {
-			subject: nextTemplate?.subject ?? subject,
-			body: nextTemplate?.body ?? body,
-			sendAfterHours: clampSendAfterHours(nextTemplate?.sendAfterHours ?? sendAfterHours)
+		const showToast = options.showToast ?? true;
+		const workspaceId = currentWorkspace.workspaceId;
+		const editorContentToSave = {
+			subject,
+			body,
+			sendAfterHours: clampSendAfterHours(sendAfterHours)
 		};
-		isSavingTemplate = true;
+		isSavingEditorContent = true;
+		lastSaveError = null;
 		try {
-			await convex.mutation(api.emails.upsertEmailTemplate, {
-				workspaceId: currentWorkspace.workspaceId,
-				subject: templateToSave.subject,
-				body: templateToSave.body,
-				sendAfterHours: templateToSave.sendAfterHours
+			await convex.mutation(api.emails.upsertEmailEditorContent, {
+				workspaceId,
+				subject: editorContentToSave.subject,
+				body: editorContentToSave.body,
+				sendAfterHours: editorContentToSave.sendAfterHours
 			});
-			subject = templateToSave.subject;
-			body = templateToSave.body;
-			sendAfterHours = templateToSave.sendAfterHours;
-			savedSubject = templateToSave.subject;
-			savedBody = templateToSave.body;
-			savedSendAfterHours = templateToSave.sendAfterHours;
-			toast.success(nextTemplate?.successMessage ?? 'Email template saved.');
+
+			if (currentWorkspace?.workspaceId === workspaceId) {
+				savedSubject = editorContentToSave.subject;
+				savedBody = editorContentToSave.body;
+				savedSendAfterHours = editorContentToSave.sendAfterHours;
+				lastSavedAt = Date.now();
+			}
+			if (showToast) toast.success('Email content saved.');
 		} catch (err) {
-			toast.error(
-				getConvexErrorMessage(
-					err,
-					nextTemplate ? 'Failed to update email template.' : 'Failed to save email template.'
-				)
-			);
+			const message = getConvexErrorMessage(err, 'Failed to save email content.');
+			lastSaveError = message;
+			if (showToast) toast.error(message);
 		} finally {
-			isSavingTemplate = false;
+			isSavingEditorContent = false;
 		}
 	}
 
-	async function saveTemplate() {
-		if (!isSendAfterHoursValid) return;
-		await persistTemplate();
+	// ─── Save template dialog ──────────────────────────────────────────────────
+
+	let saveTemplateOpen = $state(false);
+	let templateName = $state('');
+	let isSavingReusableTemplate = $state(false);
+
+	function openSaveTemplate() {
+		templateName = '';
+		saveTemplateOpen = true;
 	}
 
-	// ─── Save template preset dialog ───────────────────────────────────────────
-
-	let savePresetOpen = $state(false);
-	let presetName = $state('');
-	let isSavingPreset = $state(false);
-
-	function openSavePreset() {
-		presetName = '';
-		savePresetOpen = true;
-	}
-
-	async function confirmSavePreset() {
-		if (!currentWorkspace || !presetName.trim() || !isSendAfterHoursValid) return;
-		isSavingPreset = true;
+	async function confirmSaveTemplate() {
+		if (!currentWorkspace || !templateName.trim() || !isSendAfterHoursValid) return;
+		isSavingReusableTemplate = true;
 		try {
-			await convex.mutation(api.emails.saveTemplatePreset, {
+			await convex.mutation(api.emails.saveEmailTemplate, {
 				workspaceId: currentWorkspace.workspaceId,
-				name: presetName.trim(),
+				name: templateName.trim(),
 				subject,
 				body,
 				sendAfterHours: normalizedSendAfterHours
 			});
-			savePresetOpen = false;
-			presetName = '';
-			toast.success('Template saved as preset.');
+			saveTemplateOpen = false;
+			templateName = '';
+			toast.success('Template saved.');
 		} catch (err) {
-			toast.error(getConvexErrorMessage(err, 'Failed to save preset.'));
+			toast.error(getConvexErrorMessage(err, 'Failed to save template.'));
 		} finally {
-			isSavingPreset = false;
+			isSavingReusableTemplate = false;
 		}
 	}
 
-	// ─── Load template preset dialog ───────────────────────────────────────────
+	// ─── Load template dialog ──────────────────────────────────────────────────
 
-	let loadPresetOpen = $state(false);
-	let deletingPresetId = $state<TemplatePreset['_id'] | null>(null);
-	let selectedPreset = $state<TemplatePreset | null>(null);
+	let loadTemplateOpen = $state(false);
+	let deletingTemplateId = $state<EmailTemplate['_id'] | null>(null);
+	let selectedTemplate = $state<EmailTemplate | null>(null);
 
 	$effect(() => {
-		if (loadPresetOpen && presets.length > 0 && !selectedPreset) {
-			selectedPreset = presets[0];
+		if (loadTemplateOpen && templates.length > 0 && !selectedTemplate) {
+			selectedTemplate = templates[0];
 		}
 	});
 
-	function loadPreset(preset: TemplatePreset) {
+	function loadTemplate(template: EmailTemplate) {
 		if (
 			isDirty &&
-			!confirm('Loading this preset will replace your unsaved email template changes. Continue?')
+			!confirm('Loading this template will replace your unsaved email content changes. Continue?')
 		) {
 			return;
 		}
 
-		subject = preset.subject;
-		body = preset.body;
-		sendAfterHours = preset.sendAfterHours;
-		loadPresetOpen = false;
-		selectedPreset = null;
-		toast.success(`Loaded "${preset.name}". Save changes to apply it.`);
+		subject = template.subject;
+		body = template.body;
+		sendAfterHours = template.sendAfterHours;
+		lastSavedAt = null;
+		lastSaveError = null;
+		loadTemplateOpen = false;
+		selectedTemplate = null;
+		toast.success(`Loaded "${template.name}". Autosave will update the editor content.`);
 	}
 
-	async function deletePreset(presetId: TemplatePreset['_id']) {
-		deletingPresetId = presetId;
+	async function deleteTemplate(template: EmailTemplate) {
+		deletingTemplateId = template._id;
 		try {
-			await convex.mutation(api.emails.deleteTemplatePreset, { presetId });
+			await convex.mutation(api.emails.deleteEmailTemplate, { templateId: template._id });
 			toast.success('Template deleted.');
 		} catch (err) {
-			toast.error(getConvexErrorMessage(err, 'Failed to delete preset.'));
+			toast.error(getConvexErrorMessage(err, 'Failed to delete template.'));
 		} finally {
-			deletingPresetId = null;
+			deletingTemplateId = null;
 		}
 	}
 
@@ -406,7 +470,6 @@
 	// ─── Search/filter/pagination state ───────────────────────────────────────
 
 	const hasNextPage = $derived(Boolean(followUpsPage && !followUpsPage.isDone));
-	const pagedFollowUps = $derived(followUps);
 
 	// ─── Selection state ──────────────────────────────────────────────────────
 
@@ -414,9 +477,9 @@
 	let headerCheckboxEl = $state<HTMLInputElement | null>(null);
 
 	const allVisibleSelected = $derived(
-		pagedFollowUps.length > 0 && pagedFollowUps.every((f) => selectedIds.has(f._id))
+		followUps.length > 0 && followUps.every((f) => selectedIds.has(f._id))
 	);
-	const someVisibleSelected = $derived(pagedFollowUps.some((f) => selectedIds.has(f._id)));
+	const someVisibleSelected = $derived(followUps.some((f) => selectedIds.has(f._id)));
 
 	const selectedFollowUps = $derived(followUps.filter((f) => selectedIds.has(f._id)));
 	const canSendSelected = $derived(
@@ -467,7 +530,7 @@
 		if (allVisibleSelected) {
 			selectedIds = new SvelteSet();
 		} else {
-			selectedIds = new SvelteSet(pagedFollowUps.map((f) => f._id));
+			selectedIds = new SvelteSet(followUps.map((f) => f._id));
 		}
 	}
 
@@ -496,7 +559,7 @@
 
 	// ─── Bulk / selection actions ──────────────────────────────────────────────
 
-	let selectionLoading = $state<'send' | 'pause' | 'cancel' | null>(null);
+	let selectionLoading = $state<'send' | 'cancel' | null>(null);
 
 	async function handleSendSelected() {
 		if (!currentWorkspace || selectedIds.size === 0) return;
@@ -710,143 +773,26 @@
 	</DialogContent>
 </Dialog>
 
-<!-- Save template preset dialog -->
-<Dialog bind:open={savePresetOpen}>
-	<DialogContent class="max-w-sm gap-0 overflow-hidden p-0">
-		<DialogHeader class="border-b border-border px-6 py-4">
-			<DialogTitle>Save as template</DialogTitle>
-			<DialogDescription>Give this template a name so you can load it later.</DialogDescription>
-		</DialogHeader>
-		<div class="px-6 py-5">
-			<label
-				for="preset-name"
-				class="block pb-1 text-xs font-medium tracking-[0.14em] text-muted-foreground uppercase"
-			>
-				Template name
-			</label>
-			<Input
-				id="preset-name"
-				bind:value={presetName}
-				placeholder="e.g. Summer promotion, Default thank-you…"
-				onkeydown={(e) => {
-					if (e.key === 'Enter' && presetName.trim() && isSendAfterHoursValid) {
-						confirmSavePreset();
-					}
-				}}
-			/>
-		</div>
-		<div class="flex items-center justify-end gap-2 border-t border-border px-6 py-4">
-			<Button variant="outline" onclick={() => (savePresetOpen = false)} disabled={isSavingPreset}>
-				Cancel
-			</Button>
-			<Button
-				onclick={confirmSavePreset}
-				disabled={isSavingPreset || !presetName.trim() || !isSendAfterHoursValid}
-			>
-				{isSavingPreset ? 'Saving…' : 'Save template'}
-			</Button>
-		</div>
-	</DialogContent>
-</Dialog>
+<EmailSaveTemplateDialog
+	bind:open={saveTemplateOpen}
+	bind:templateName
+	isSaving={isSavingReusableTemplate}
+	canSave={isSendAfterHoursValid}
+	onConfirm={confirmSaveTemplate}
+/>
 
-<!-- Load template preset dialog -->
-<Dialog
-	bind:open={loadPresetOpen}
-	onOpenChange={(open) => {
-		if (!open) selectedPreset = null;
-	}}
->
-	<DialogContent class="gap-0 overflow-hidden p-0 sm:max-w-4xl">
-		<DialogHeader class="border-b border-border px-6 py-4">
-			<DialogTitle>Load template</DialogTitle>
-			<DialogDescription>Select a saved template to preview it, then click Load.</DialogDescription>
-		</DialogHeader>
-		<div class="flex min-h-0" style="height: 60vh">
-			<!-- Template list -->
-			<div class="w-72 shrink-0 overflow-y-auto border-r border-border">
-				{#if presetsQuery.isLoading}
-					<div class="space-y-2 px-4 py-4">
-						{#each [0, 1, 2] as i (i)}
-							<Skeleton class="h-16 w-full rounded-lg" />
-						{/each}
-					</div>
-				{:else if presets.length === 0}
-					<div class="px-4 py-10 text-center text-sm text-muted-foreground">
-						No saved templates yet. Use "Save template" to create one.
-					</div>
-				{:else}
-					<div class="divide-y divide-border">
-						{#each presets as preset (preset._id)}
-							{@const isSelected = selectedPreset?._id === preset._id}
-							<div
-								class="flex items-center gap-2 px-4 py-3 transition-colors hover:bg-muted/30 {isSelected
-									? 'bg-muted/40'
-									: ''}"
-							>
-								<button class="min-w-0 flex-1 text-left" onclick={() => (selectedPreset = preset)}>
-									<p class="truncate text-sm font-medium">{preset.name}</p>
-									<p class="mt-0.5 truncate text-xs text-muted-foreground">
-										{preset.sendAfterHours}h delay
-									</p>
-								</button>
-								<div class="flex shrink-0 items-center gap-1">
-									<Button size="sm" class="h-6 px-2 text-xs" onclick={() => loadPreset(preset)}>
-										Load
-									</Button>
-									<button
-										class="rounded p-1 text-muted-foreground/50 transition-colors hover:bg-destructive/10 hover:text-destructive disabled:opacity-40"
-										onclick={() => deletePreset(preset._id)}
-										disabled={deletingPresetId === preset._id}
-										title="Delete preset"
-									>
-										<TrashIcon class="size-3.5" />
-									</button>
-								</div>
-							</div>
-						{/each}
-					</div>
-				{/if}
-			</div>
+<EmailLoadTemplateDialog
+	bind:open={loadTemplateOpen}
+	bind:selectedTemplate
+	{templates}
+	isLoading={templatesQuery.isLoading}
+	{deletingTemplateId}
+	onLoad={loadTemplate}
+	onDelete={deleteTemplate}
+/>
 
-			<!-- Preview panel -->
-			<div class="min-w-0 flex-1 overflow-y-auto px-6 py-5">
-				{#if selectedPreset}
-					<div class="space-y-4">
-						<div class="space-y-1">
-							<p
-								class="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase"
-							>
-								Subject
-							</p>
-							<p class="text-sm font-medium wrap-break-word">{selectedPreset.subject}</p>
-						</div>
-						<div class="space-y-1">
-							<p
-								class="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase"
-							>
-								Body
-							</p>
-							<WaiverRichText
-								html={selectedPreset.body}
-								class="overflow-hidden rounded-xl border border-border bg-muted/10 px-4 py-3 text-sm leading-7 wrap-break-word text-foreground"
-							/>
-						</div>
-					</div>
-				{:else}
-					<div class="flex h-full items-center justify-center text-sm text-muted-foreground">
-						Select a template to preview it.
-					</div>
-				{/if}
-			</div>
-		</div>
-		<div class="flex justify-end border-t border-border px-6 py-4">
-			<Button variant="outline" onclick={() => (loadPresetOpen = false)}>Close</Button>
-		</div>
-	</DialogContent>
-</Dialog>
-
-<div class="w-full min-w-0 p-6">
-	<div class="mx-auto w-full max-w-5xl min-w-0 space-y-8">
+<div class="w-full min-w-0 p-4 sm:p-6">
+	<div class="mx-auto w-full max-w-5xl min-w-0 space-y-6 sm:space-y-8">
 		<!-- Page header -->
 		<div class="space-y-1">
 			<p class="text-xs font-bold tracking-[0.16em] text-primary uppercase">Automation</p>
@@ -873,64 +819,89 @@
 		{/if}
 
 		<!-- Stats cards -->
-		<div class="grid grid-cols-3 gap-4">
-			<div class="rounded-xl border border-border bg-card p-5">
-				<p class="text-[10px] font-bold tracking-[0.18em] text-muted-foreground/50 uppercase">
+		<div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+			<div class="rounded-xl border border-border bg-card/30 p-4">
+				<p class="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase">
 					Emails sent today
 				</p>
 				{#if statsQuery.isLoading}
 					<Skeleton class="mt-2 h-8 w-16" />
 				{:else}
-					<p class="mt-1 text-3xl font-bold tabular-nums">{stats?.sentToday ?? 0}</p>
+					<p class="mt-1 text-3xl font-semibold tabular-nums">{stats?.sentToday ?? 0}</p>
 				{/if}
 			</div>
-			<div class="rounded-xl border border-border bg-card p-5">
-				<p class="text-[10px] font-bold tracking-[0.18em] text-muted-foreground/50 uppercase">
+			<div class="rounded-xl border border-border bg-card/30 p-4">
+				<p class="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase">
 					Pending queue
 				</p>
 				{#if statsQuery.isLoading}
 					<Skeleton class="mt-2 h-8 w-10" />
 				{:else}
-					<p class="mt-1 text-3xl font-bold tabular-nums">{stats?.pendingCount ?? 0}</p>
+					<p class="mt-1 text-3xl font-semibold tabular-nums">{stats?.pendingCount ?? 0}</p>
 				{/if}
 			</div>
-			<div class="rounded-xl border border-border bg-card p-5">
-				<p class="text-[10px] font-bold tracking-[0.18em] text-muted-foreground/50 uppercase">
+			<div class="rounded-xl border border-border bg-card/30 p-4">
+				<p class="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase">
 					Total sent
 				</p>
 				{#if statsQuery.isLoading}
 					<Skeleton class="mt-2 h-8 w-14" />
 				{:else}
-					<p class="mt-1 text-3xl font-bold tabular-nums">{stats?.totalSent ?? 0}</p>
+					<p class="mt-1 text-3xl font-semibold tabular-nums">{stats?.totalSent ?? 0}</p>
 				{/if}
 			</div>
 		</div>
 
-		<!-- Template editor -->
+		<!-- Editor content -->
 		{#if isLoading}
 			<div class="space-y-4">
-				<div class="space-y-2">
-					<Skeleton class="h-7 w-44" />
-					<div class="flex items-center gap-2">
-						<Skeleton class="h-5 w-52" />
-						<Skeleton class="h-8 w-28" />
-						<Skeleton class="h-8 w-8" />
+				<!-- Editor section header skeleton -->
+				<div class="space-y-1.5">
+					<div class="flex items-center justify-between gap-3">
+						<Skeleton class="h-7 w-44" />
+						<Skeleton class="h-5 w-36 rounded-full" />
+					</div>
+					<div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+						<Skeleton class="h-5 w-64" />
+						<div class="flex shrink-0 items-center gap-1.5">
+							<Skeleton class="h-8 flex-1 sm:w-32 sm:flex-none" />
+							<Skeleton class="h-8 flex-1 sm:w-28 sm:flex-none" />
+						</div>
 					</div>
 				</div>
-				<div class="space-y-4">
-					<div class="space-y-2">
+
+				<!-- Fields skeleton -->
+				<div class="space-y-5">
+					<!-- Subject -->
+					<div class="space-y-3">
 						<Skeleton class="h-3 w-24" />
 						<Skeleton class="h-9 w-full" />
 					</div>
+
+					<!-- Body -->
 					<div class="space-y-2">
-						<Skeleton class="h-3 w-20" />
+						<div
+							class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3"
+						>
+							<Skeleton class="h-3 w-20" />
+							<div class="flex gap-1.5">
+								<Skeleton class="h-9 w-32" />
+								<Skeleton class="h-9 w-24" />
+								<Skeleton class="h-9 w-32" />
+							</div>
+						</div>
 						<div class="overflow-hidden rounded-xl border border-border bg-background">
-							<div class="flex h-10 items-center gap-1 border-b border-border px-3">
-								<Skeleton class="h-7 w-7" />
+							<div class="flex flex-wrap items-center gap-1.5 border-b border-border px-3 py-2">
+								<Skeleton class="h-7 w-20" />
+								<Skeleton class="h-7 w-9" />
+								<Skeleton class="h-7 w-24" />
+								<Skeleton class="h-7 w-14" />
+								<Skeleton class="h-7 w-32" />
+								<Skeleton class="h-7 w-16" />
 								<Skeleton class="h-7 w-7" />
 								<Skeleton class="h-7 w-7" />
 							</div>
-							<div class="min-h-56 space-y-3 p-4">
+							<div class="min-h-[260px] space-y-3 p-4">
 								<Skeleton class="h-4 w-full" />
 								<Skeleton class="h-4 w-10/12" />
 								<Skeleton class="h-4 w-3/4" />
@@ -943,8 +914,24 @@
 			<div class="space-y-4">
 				<!-- Editor section header -->
 				<div class="space-y-1.5">
-					<h2 class="text-xl font-semibold tracking-tight">Follow-up email</h2>
-					<div class="flex items-center justify-between gap-4">
+					<div class="flex items-center justify-between gap-3">
+						<div class="min-w-0">
+							<h2 class="text-xl font-semibold tracking-tight">Follow-up email</h2>
+						</div>
+						<span class="save-indicator shrink-0" data-state={saveState}>
+							{#if saveState === 'saving'}
+								<LoaderIcon class="size-3.5 animate-spin" />
+							{:else if saveState === 'error'}
+								<CloudOffIcon class="size-3.5" />
+							{:else if saveState === 'dirty'}
+								<CloudIcon class="size-3.5" />
+							{:else}
+								<CloudCheckIcon class="size-3.5" />
+							{/if}
+							<span class="truncate">{savedLabel}</span>
+						</span>
+					</div>
+					<div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 						<div class="space-y-1">
 							<div class="flex flex-wrap items-center gap-1.5 text-sm text-muted-foreground">
 								<span>Sent to every signer</span>
@@ -969,27 +956,22 @@
 						</div>
 						<div class="flex shrink-0 items-center gap-1.5">
 							<Button
+								variant="outline"
 								size="sm"
-								onclick={saveTemplate}
-								disabled={!isDirty || isSavingTemplate || !isSendAfterHoursValid}
+								onclick={openSaveTemplate}
+								disabled={isSavingEditorContent || !isSendAfterHoursValid}
+								class="flex-1 sm:flex-none"
 							>
-								{isSavingTemplate ? 'Saving…' : 'Save changes'}
+								Save as template
 							</Button>
-							<DropdownMenu>
-								<DropdownMenuTrigger>
-									{#snippet child({ props })}
-										<Button variant="outline" size="sm" {...props}>
-											<EllipsisVerticalIcon class="size-4" />
-										</Button>
-									{/snippet}
-								</DropdownMenuTrigger>
-								<DropdownMenuContent align="end">
-									<DropdownMenuItem onclick={openSavePreset}>Save as template</DropdownMenuItem>
-									<DropdownMenuItem onclick={() => (loadPresetOpen = true)}
-										>Load template</DropdownMenuItem
-									>
-								</DropdownMenuContent>
-							</DropdownMenu>
+							<Button
+								variant="outline"
+								size="sm"
+								onclick={() => (loadTemplateOpen = true)}
+								class="flex-1 sm:flex-none"
+							>
+								Load template
+							</Button>
 						</div>
 					</div>
 				</div>
@@ -1013,7 +995,9 @@
 
 					<!-- Body -->
 					<div class="space-y-2">
-						<div class="flex items-center justify-between gap-3">
+						<div
+							class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3"
+						>
 							<label
 								for="email-body"
 								class="text-xs font-medium tracking-[0.14em] text-muted-foreground uppercase"
@@ -1021,11 +1005,13 @@
 								Email body
 							</label>
 							<!-- Variable chips -->
-							<div class="flex flex-wrap gap-1.5">
+							<div
+								class="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-x-visible sm:px-0 sm:pb-0"
+							>
 								{#each VARIABLES as variable (variable.value)}
 									<button
 										onclick={() => insertVariable(variable.value)}
-										class="flex h-9 items-center rounded-md border border-border bg-muted/30 px-2.5 font-mono text-[11px] text-muted-foreground transition-colors hover:border-foreground/30 hover:bg-muted/60 hover:text-foreground"
+										class="flex h-9 shrink-0 items-center rounded-md border border-border bg-muted/30 px-2.5 font-mono text-[11px] text-muted-foreground transition-colors hover:border-foreground/30 hover:bg-muted/60 hover:text-foreground"
 									>
 										{variable.label}
 									</button>
@@ -1048,7 +1034,9 @@
 			</div>
 
 			<!-- Status filter pills (multi-select) -->
-			<div class="flex flex-wrap gap-1.5">
+			<div
+				class="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-x-visible sm:px-0 sm:pb-0"
+			>
 				{#each STATUS_OPTIONS as opt (opt.value)}
 					{@const active = statusFilters.has(opt.value)}
 					<button
@@ -1056,7 +1044,7 @@
 							if (active) statusFilters.delete(opt.value);
 							else statusFilters.add(opt.value);
 						}}
-						class="inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-medium transition-colors {active
+						class="inline-flex shrink-0 items-center gap-1 rounded-full border px-3 py-1 text-xs font-medium transition-colors {active
 							? 'border-primary bg-primary text-primary-foreground'
 							: 'border-border bg-transparent text-muted-foreground hover:border-foreground/30 hover:text-foreground'}"
 					>
@@ -1067,24 +1055,36 @@
 			</div>
 
 			<!-- Filters + actions -->
-			<div class="flex flex-wrap items-center gap-3">
-				<div class="flex items-center gap-2 text-sm text-muted-foreground">
-					<label for="date-from" class="shrink-0">From</label>
-					<Input id="date-from" type="date" bind:value={dateFrom} class="h-8 w-36 text-sm" />
-				</div>
-				<div class="flex items-center gap-2 text-sm text-muted-foreground">
-					<label for="date-to" class="shrink-0">To</label>
-					<Input id="date-to" type="date" bind:value={dateTo} class="h-8 w-36 text-sm" />
-				</div>
+			<div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
 				<Input
 					type="search"
 					placeholder="Search by name, email or booking…"
 					bind:value={searchQuery}
-					class="h-8 min-w-48 flex-1 text-sm"
+					class="h-9 w-full text-sm sm:h-8 sm:min-w-48 sm:flex-1"
 				/>
-				<div class="flex gap-1.5">
+				<div class="grid grid-cols-2 gap-2 sm:flex sm:items-center sm:gap-3">
+					<div class="flex items-center gap-2 text-sm text-muted-foreground">
+						<label for="date-from" class="shrink-0">From</label>
+						<Input
+							id="date-from"
+							type="date"
+							bind:value={dateFrom}
+							class="h-9 w-full text-sm sm:h-8 sm:w-36"
+						/>
+					</div>
+					<div class="flex items-center gap-2 text-sm text-muted-foreground">
+						<label for="date-to" class="shrink-0">To</label>
+						<Input
+							id="date-to"
+							type="date"
+							bind:value={dateTo}
+							class="h-9 w-full text-sm sm:h-8 sm:w-36"
+						/>
+					</div>
+				</div>
+				<div class="flex gap-1.5 sm:ml-auto">
 					<span
-						class="inline-block"
+						class="inline-block flex-1 sm:flex-none"
 						title={!canSendSelected
 							? 'Select queued, paused, cancelled, or failed rows to send'
 							: undefined}
@@ -1093,12 +1093,13 @@
 							size="sm"
 							onclick={handleSendSelected}
 							disabled={selectionLoading !== null || !canSendSelected}
+							class="w-full sm:w-auto"
 						>
 							{selectionLoading === 'send' ? 'Sending…' : 'Send'}
 						</Button>
 					</span>
 					<span
-						class="inline-block"
+						class="inline-block flex-1 sm:flex-none"
 						title={!canCancelSelected ? 'Select queued or paused rows to cancel' : undefined}
 					>
 						<Button
@@ -1106,6 +1107,7 @@
 							variant="outline"
 							onclick={handleCancelSelected}
 							disabled={selectionLoading !== null || !canCancelSelected}
+							class="w-full sm:w-auto"
 						>
 							{selectionLoading === 'cancel' ? 'Cancelling…' : 'Cancel'}
 						</Button>
@@ -1113,10 +1115,47 @@
 				</div>
 			</div>
 
-			<!-- Table -->
-			<div class="flex min-h-[520px] flex-col">
+			<!-- List -->
+			<div class="flex flex-col md:min-h-[520px]">
+				{#snippet paginationFooter(border: boolean)}
+					<div
+						class="flex items-center justify-between {border
+							? 'border-t border-border'
+							: ''} px-4 py-3 sm:px-5"
+					>
+						<p class="text-xs text-muted-foreground">
+							{#if followUps.length === 0}
+								No entries
+							{:else}
+								Page {currentPage + 1} · Showing {followUps.length}
+								{followUps.length === 1 ? 'entry' : 'entries'}
+							{/if}
+						</p>
+						<div class="flex items-center gap-1">
+							<button
+								class="rounded px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
+								disabled={currentPage === 0}
+								onclick={goToPreviousPage}
+							>
+								← Prev
+							</button>
+							<span class="min-w-[64px] px-2 py-1 text-center text-xs text-muted-foreground">
+								Page {currentPage + 1}
+							</span>
+							<button
+								class="rounded px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
+								disabled={!hasNextPage}
+								onclick={goToNextPage}
+							>
+								Next →
+							</button>
+						</div>
+					</div>
+				{/snippet}
+
 				{#if followUpsQuery.isLoading || appContext.isLoading}
-					<div class="flex-1 rounded-xl border border-border">
+					<!-- Desktop skeleton -->
+					<div class="hidden flex-1 rounded-xl border border-border md:block">
 						<Table class="table-fixed">
 							<colgroup>
 								<col class="w-[4%]" /><col class="w-[28%]" /><col class="w-[13%]" />
@@ -1143,16 +1182,27 @@
 							</TableBody>
 						</Table>
 					</div>
+					<!-- Mobile skeleton -->
+					<div class="space-y-3 md:hidden">
+						{#each [0, 1, 2] as i (i)}
+							<div class="space-y-2 rounded-xl border border-border bg-card/30 p-4">
+								<Skeleton class="h-4 w-32" />
+								<Skeleton class="h-3 w-48" />
+								<Skeleton class="h-4 w-20" />
+							</div>
+						{/each}
+					</div>
 				{:else if followUps.length === 0}
 					<div
-						class="rounded-2xl border border-dashed border-border bg-muted/20 px-4 py-16 text-center text-sm text-muted-foreground"
+						class="rounded-xl border border-dashed border-border bg-muted/20 px-4 py-16 text-center text-sm text-muted-foreground"
 					>
 						{searchQuery || dateFrom || dateTo || statusFilters.size > 0
 							? 'No follow-ups match your filters.'
 							: `No follow-ups yet for ${currentWorkspace?.name ?? 'this workspace'}. They appear here after guests sign a waiver.`}
 					</div>
 				{:else}
-					<div class="rounded-xl border border-border">
+					<!-- Desktop table -->
+					<div class="hidden rounded-xl border border-border md:block">
 						<Table class="table-fixed">
 							<colgroup>
 								<col class="w-[4%]" /><col class="w-[28%]" /><col class="w-[13%]" />
@@ -1193,7 +1243,7 @@
 								</TableRow>
 							</TableHeader>
 							<TableBody>
-								{#each pagedFollowUps as followUp (followUp._id)}
+								{#each followUps as followUp (followUp._id)}
 									<TableRow
 										class="cursor-pointer border-border transition-colors hover:bg-muted/40 focus-visible:bg-muted/40 focus-visible:outline-none {selectedIds.has(
 											followUp._id
@@ -1265,38 +1315,111 @@
 							</TableBody>
 						</Table>
 
-						<div class="flex items-center justify-between border-t border-border px-5 py-3">
-							<p class="text-xs text-muted-foreground">
-								{#if followUps.length === 0}
-									No entries
-								{:else}
-									Page {currentPage + 1} · Showing {followUps.length}
-									{followUps.length === 1 ? 'entry' : 'entries'}
-								{/if}
-							</p>
-							<div class="flex items-center gap-1">
-								<button
-									class="rounded px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
-									disabled={currentPage === 0}
-									onclick={goToPreviousPage}
-								>
-									← Prev
-								</button>
-								<span class="min-w-[64px] px-2 py-1 text-center text-xs text-muted-foreground">
-									Page {currentPage + 1}
-								</span>
-								<button
-									class="rounded px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
-									disabled={!hasNextPage}
-									onclick={goToNextPage}
-								>
-									Next →
-								</button>
+						{@render paginationFooter(true)}
+					</div>
+
+					<!-- Mobile cards -->
+					<div class="space-y-3 md:hidden">
+						{#each followUps as followUp (followUp._id)}
+							<div
+								class="overflow-hidden rounded-xl border border-border bg-card/30 transition-colors {selectedIds.has(
+									followUp._id
+								)
+									? 'ring-1 ring-ring/50'
+									: ''}"
+							>
+								<div class="flex items-stretch">
+									<label class="flex shrink-0 cursor-pointer items-center px-3">
+										<span class="sr-only">Select follow-up</span>
+										<input
+											type="checkbox"
+											class="size-4 cursor-pointer rounded accent-primary"
+											checked={selectedIds.has(followUp._id)}
+											onchange={() => toggleRowSelection(followUp._id)}
+										/>
+									</label>
+									<button
+										type="button"
+										class="min-w-0 flex-1 px-1 py-3 pr-4 text-left transition-colors hover:bg-muted/30 focus-visible:bg-muted/30 focus-visible:outline-none"
+										onclick={() => openPreview(followUp)}
+									>
+										<div class="flex items-start justify-between gap-2">
+											<div class="min-w-0 flex-1 space-y-0.5">
+												<p class="truncate text-sm font-medium">{followUp.signerName}</p>
+												<p class="truncate text-xs text-muted-foreground">
+													{followUp.signerEmail}
+												</p>
+											</div>
+											<span
+												class="inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium capitalize {STATUS_STYLES[
+													followUp.status
+												] ?? ''}"
+											>
+												<span
+													class="size-1.5 rounded-full {followUp.status === 'queued'
+														? 'bg-blue-400'
+														: followUp.status === 'sent'
+															? 'bg-green-400'
+															: followUp.status === 'paused'
+																? 'bg-yellow-400'
+																: followUp.status === 'failed'
+																	? 'bg-red-400'
+																	: 'bg-muted-foreground'}"
+												></span>
+												{followUp.status}
+											</span>
+										</div>
+										<div class="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+											<span class="font-mono">{displayBookingId(followUp)}</span>
+											<span>·</span>
+											<span>{formatFollowUpSchedule(followUp)}</span>
+										</div>
+									</button>
+								</div>
 							</div>
-						</div>
+						{/each}
+
+						{@render paginationFooter(false)}
 					</div>
 				{/if}
 			</div>
 		</div>
 	</div>
 </div>
+
+<style>
+	.save-indicator {
+		display: inline-flex;
+		max-width: 100%;
+		align-items: center;
+		gap: 0.4rem;
+		padding: 0.25rem 0.55rem;
+		border-radius: 9999px;
+		font-size: 0.7rem;
+		font-weight: 500;
+		letter-spacing: 0.01em;
+		color: var(--muted-foreground);
+		background: color-mix(in srgb, var(--muted) 40%, transparent);
+		transition:
+			color 180ms ease,
+			background 180ms ease;
+	}
+
+	.save-indicator[data-state='saving'] {
+		color: color-mix(in srgb, var(--primary) 60%, var(--foreground));
+	}
+
+	.save-indicator[data-state='saved'],
+	.save-indicator[data-state='idle'] {
+		color: color-mix(in srgb, var(--muted-foreground) 85%, var(--foreground));
+	}
+
+	.save-indicator[data-state='error'] {
+		color: var(--destructive);
+		background: color-mix(in srgb, var(--destructive) 14%, transparent);
+	}
+
+	.save-indicator[data-state='dirty'] {
+		color: color-mix(in srgb, var(--primary) 70%, var(--foreground));
+	}
+</style>

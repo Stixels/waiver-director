@@ -4,14 +4,17 @@
 	import Link from '@tiptap/extension-link';
 	import Placeholder from '@tiptap/extension-placeholder';
 	import TextAlign from '@tiptap/extension-text-align';
+	import { FontFamily, FontSize, TextStyle } from '@tiptap/extension-text-style';
 	import Underline from '@tiptap/extension-underline';
 	import StarterKit from '@tiptap/starter-kit';
+	import { toast } from 'svelte-sonner';
 	import AlignCenterIcon from '@lucide/svelte/icons/align-center';
 	import AlignJustifyIcon from '@lucide/svelte/icons/align-justify';
 	import AlignLeftIcon from '@lucide/svelte/icons/align-left';
 	import AlignRightIcon from '@lucide/svelte/icons/align-right';
 	import BoldIcon from '@lucide/svelte/icons/bold';
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
+	import CodeIcon from '@lucide/svelte/icons/code';
 	import ItalicIcon from '@lucide/svelte/icons/italic';
 	import LinkIcon from '@lucide/svelte/icons/link';
 	import ListIcon from '@lucide/svelte/icons/list';
@@ -26,6 +29,16 @@
 		DropdownMenuSeparator,
 		DropdownMenuTrigger
 	} from '$lib/components/ui/dropdown-menu';
+	import {
+		Dialog,
+		DialogContent,
+		DialogDescription,
+		DialogFooter,
+		DialogHeader,
+		DialogTitle
+	} from '$lib/components/ui/dialog';
+	import { Button } from '$lib/components/ui/button';
+	import { Textarea } from '$lib/components/ui/textarea';
 	import { sanitizeRichTextHtml } from '$lib/utils/rich-text';
 
 	interface Props {
@@ -37,6 +50,24 @@
 
 	type TextAlignValue = 'left' | 'center' | 'right' | 'justify';
 	const headingLevels = [1, 2, 3, 4, 5, 6] as const;
+	const DEFAULT_FONT_LABEL = 'System';
+	const DEFAULT_SIZE_LABEL = '14';
+	const DEFAULT_OPTION_LABEL = 'Default';
+	const DEFAULT_TOOLBAR_STATE = {
+		blockShortLabel: 'Text',
+		alignment: 'left' as TextAlignValue,
+		bold: false,
+		italic: false,
+		underline: false,
+		strike: false,
+		bulletList: false,
+		orderedList: false,
+		link: false,
+		fontFamily: null as string | null,
+		fontFamilyLabel: DEFAULT_FONT_LABEL,
+		fontSize: null as string | null,
+		fontSizeLabel: DEFAULT_SIZE_LABEL
+	};
 
 	let {
 		value = $bindable('<p></p>'),
@@ -48,17 +79,9 @@
 	let editorElement = $state<HTMLDivElement | null>(null);
 	let editor = $state<Editor | null>(null);
 	let hasFocus = $state(false);
-	let toolbarState = $state({
-		blockShortLabel: 'Text',
-		alignment: 'left' as TextAlignValue,
-		bold: false,
-		italic: false,
-		underline: false,
-		strike: false,
-		bulletList: false,
-		orderedList: false,
-		link: false
-	});
+	let htmlDialogOpen = $state(false);
+	let htmlSnippet = $state('');
+	let toolbarState = $state(DEFAULT_TOOLBAR_STATE);
 
 	function currentHtml() {
 		return sanitizeRichTextHtml(value) || '<p></p>';
@@ -90,6 +113,29 @@
 		editor?.chain().focus().insertContent(text).run();
 	}
 
+	const FONT_FAMILIES = [
+		{ label: DEFAULT_OPTION_LABEL, value: null },
+		{ label: 'Arial', value: 'Arial, Helvetica, sans-serif' },
+		{ label: 'Helvetica', value: 'Helvetica, Arial, sans-serif' },
+		{ label: 'Georgia', value: 'Georgia, "Times New Roman", serif' },
+		{ label: 'Times New Roman', value: '"Times New Roman", Times, serif' },
+		{ label: 'Verdana', value: 'Verdana, Geneva, sans-serif' },
+		{ label: 'Tahoma', value: 'Tahoma, Geneva, sans-serif' },
+		{ label: 'Courier New', value: '"Courier New", Courier, monospace' }
+	] as const;
+
+	const FONT_SIZES = [
+		{ label: DEFAULT_OPTION_LABEL, value: null },
+		{ label: '12', value: '12px' },
+		{ label: '14', value: '14px' },
+		{ label: '16', value: '16px' },
+		{ label: '18', value: '18px' },
+		{ label: '20', value: '20px' },
+		{ label: '24', value: '24px' },
+		{ label: '30', value: '30px' },
+		{ label: '36', value: '36px' }
+	] as const;
+
 	function setLink() {
 		if (!editor || disabled) return;
 
@@ -106,19 +152,66 @@
 		editor.chain().focus().extendMarkRange('link').setLink({ href: trimmed }).run();
 	}
 
+	function openHtmlDialog() {
+		if (!editor || disabled) return;
+		htmlSnippet = '';
+		htmlDialogOpen = true;
+	}
+
+	function closeHtmlDialog() {
+		htmlDialogOpen = false;
+		htmlSnippet = '';
+	}
+
+	function insertHtmlSnippet() {
+		if (!editor || disabled) return;
+
+		const sanitized = sanitizeRichTextHtml(htmlSnippet);
+		if (!sanitized) {
+			toast.error('Paste a supported HTML snippet to insert.');
+			return;
+		}
+
+		editor.chain().focus().insertContent(sanitized).run();
+		closeHtmlDialog();
+	}
+
+	function normalizeTextStyleValue(value: unknown) {
+		return typeof value === 'string' && value.trim() ? value.trim() : null;
+	}
+
+	function getSelectionComputedStyle(sourceEditor: Editor) {
+		try {
+			const { from } = sourceEditor.state.selection;
+			const domAtPosition = sourceEditor.view.domAtPos(from).node;
+			const element =
+				domAtPosition instanceof HTMLElement ? domAtPosition : domAtPosition.parentElement;
+			return element ? window.getComputedStyle(element) : null;
+		} catch {
+			return null;
+		}
+	}
+
+	function readableFontFamily(value: string | null | undefined) {
+		const firstFamily = value?.split(',')[0]?.trim().replaceAll('"', '').replaceAll("'", '');
+		if (!firstFamily) return DEFAULT_FONT_LABEL;
+		if (
+			['ui-sans-serif', 'system-ui', '-apple-system', 'BlinkMacSystemFont'].includes(firstFamily)
+		) {
+			return DEFAULT_FONT_LABEL;
+		}
+		return firstFamily;
+	}
+
+	function readableFontSize(value: string | null | undefined) {
+		if (!value) return DEFAULT_SIZE_LABEL;
+		const numericSize = Number.parseFloat(value);
+		return Number.isFinite(numericSize) ? `${Math.round(numericSize)}` : value.replace(/px$/i, '');
+	}
+
 	function syncToolbarState(sourceEditor: Editor | null) {
 		if (!sourceEditor) {
-			toolbarState = {
-				blockShortLabel: 'Text',
-				alignment: 'left',
-				bold: false,
-				italic: false,
-				underline: false,
-				strike: false,
-				bulletList: false,
-				orderedList: false,
-				link: false
-			};
+			toolbarState = DEFAULT_TOOLBAR_STATE;
 			return;
 		}
 
@@ -134,6 +227,11 @@
 			sourceEditor.isActive({ textAlign: value })
 		) ?? 'left') as TextAlignValue;
 
+		const textStyleAttrs = sourceEditor.getAttributes('textStyle');
+		const fontFamily = normalizeTextStyleValue(textStyleAttrs.fontFamily);
+		const fontSize = normalizeTextStyleValue(textStyleAttrs.fontSize);
+		const computedStyle = getSelectionComputedStyle(sourceEditor);
+
 		toolbarState = {
 			blockShortLabel,
 			alignment,
@@ -143,8 +241,37 @@
 			strike: sourceEditor.isActive('strike'),
 			bulletList: sourceEditor.isActive('bulletList'),
 			orderedList: sourceEditor.isActive('orderedList'),
-			link: sourceEditor.isActive('link')
+			link: sourceEditor.isActive('link'),
+			fontFamily,
+			fontFamilyLabel: activeFontFamilyLabel(fontFamily, computedStyle?.fontFamily),
+			fontSize,
+			fontSizeLabel: readableFontSize(fontSize ?? computedStyle?.fontSize)
 		};
+	}
+
+	function setFontFamily(family: string | null) {
+		if (!editor || disabled) return;
+		if (family) {
+			editor.chain().focus().setFontFamily(family).run();
+		} else {
+			editor.chain().focus().unsetFontFamily().run();
+		}
+	}
+
+	function setFontSize(size: string | null) {
+		if (!editor || disabled) return;
+		if (size) {
+			editor.chain().focus().setFontSize(size).run();
+		} else {
+			editor.chain().focus().unsetFontSize().run();
+		}
+	}
+
+	function activeFontFamilyLabel(value: string | null, fallback?: string | null) {
+		if (!value) return readableFontFamily(fallback);
+		return (
+			FONT_FAMILIES.find((f) => f.value === value)?.label ?? value.split(',')[0].replaceAll('"', '')
+		);
 	}
 
 	onMount(() => {
@@ -167,6 +294,9 @@
 					horizontalRule: false
 				}),
 				Underline,
+				TextStyle,
+				FontFamily,
+				FontSize,
 				Link.configure({
 					autolink: true,
 					defaultProtocol: 'https',
@@ -183,7 +313,7 @@
 				attributes: {
 					id,
 					class:
-						'waiver-editor min-h-[260px] rounded-lg bg-background px-4 py-3 text-sm leading-7 text-foreground outline-none'
+						'rich-text-editor-body min-h-[260px] rounded-lg bg-background px-4 py-3 text-sm leading-7 text-foreground outline-none'
 				}
 			},
 			onCreate: ({ editor }) => {
@@ -195,6 +325,9 @@
 			},
 			onSelectionUpdate: () => {
 				syncToolbarState(instance);
+			},
+			onTransaction: ({ editor }) => {
+				syncToolbarState(editor);
 			},
 			onFocus: () => {
 				hasFocus = true;
@@ -210,14 +343,7 @@
 		editor = instance;
 		syncToolbarState(instance);
 
-		const handleSelectionUpdate = () => syncToolbarState(instance);
-		const handleTransaction = () => syncToolbarState(instance);
-		instance.on('selectionUpdate', handleSelectionUpdate);
-		instance.on('transaction', handleTransaction);
-
 		return () => {
-			instance.off('selectionUpdate', handleSelectionUpdate);
-			instance.off('transaction', handleTransaction);
 			instance.destroy();
 			editor = null;
 			syncToolbarState(null);
@@ -256,9 +382,13 @@
 			<div class="flex items-center gap-1 rounded-lg border border-border bg-background p-1">
 				<DropdownMenu>
 					<DropdownMenuTrigger class="inline-flex">
-						<button type="button" class="toolbar-select" disabled={!editor || disabled}>
+						<button
+							type="button"
+							class="toolbar-select toolbar-select-font"
+							disabled={!editor || disabled}
+						>
 							<span class="toolbar-select-label">{toolbarState.blockShortLabel}</span>
-							<ChevronDownIcon />
+							<ChevronDownIcon class="toolbar-select-chevron" />
 						</button>
 					</DropdownMenuTrigger>
 					<DropdownMenuContent align="start" class="w-44">
@@ -284,7 +414,11 @@
 			<div class="flex items-center gap-1 rounded-lg border border-border bg-background p-1">
 				<DropdownMenu>
 					<DropdownMenuTrigger class="inline-flex">
-						<button type="button" class="toolbar-select" disabled={!editor || disabled}>
+						<button
+							type="button"
+							class="toolbar-select toolbar-select-size"
+							disabled={!editor || disabled}
+						>
 							{#if toolbarState.alignment === 'center'}
 								<AlignCenterIcon />
 							{:else if toolbarState.alignment === 'right'}
@@ -294,7 +428,7 @@
 							{:else}
 								<AlignLeftIcon />
 							{/if}
-							<ChevronDownIcon />
+							<ChevronDownIcon class="toolbar-select-chevron" />
 						</button>
 					</DropdownMenuTrigger>
 					<DropdownMenuContent align="start" class="w-40">
@@ -329,6 +463,66 @@
 							<AlignJustifyIcon />
 							<span>Justify</span>
 						</DropdownMenuItem>
+					</DropdownMenuContent>
+				</DropdownMenu>
+			</div>
+
+			<div
+				class="toolbar-select-group toolbar-select-group-font flex items-center gap-1 rounded-lg border border-border bg-background p-1"
+			>
+				<DropdownMenu>
+					<DropdownMenuTrigger class="inline-flex w-full">
+						<button
+							type="button"
+							class="toolbar-select toolbar-select-font"
+							disabled={!editor || disabled}
+						>
+							<span class="toolbar-select-label">
+								{toolbarState.fontFamilyLabel}
+							</span>
+							<ChevronDownIcon class="toolbar-select-chevron" />
+						</button>
+					</DropdownMenuTrigger>
+					<DropdownMenuContent align="start" class="w-48">
+						{#each FONT_FAMILIES as family (family.label)}
+							<DropdownMenuItem
+								class={toolbarState.fontFamily === family.value ? 'font-semibold' : undefined}
+								onclick={() => setFontFamily(family.value)}
+							>
+								<span style={family.value ? `font-family: ${family.value}` : undefined}>
+									{family.label}
+								</span>
+							</DropdownMenuItem>
+						{/each}
+					</DropdownMenuContent>
+				</DropdownMenu>
+			</div>
+
+			<div
+				class="toolbar-select-group toolbar-select-group-size flex items-center gap-1 rounded-lg border border-border bg-background p-1"
+			>
+				<DropdownMenu>
+					<DropdownMenuTrigger class="inline-flex w-full">
+						<button
+							type="button"
+							class="toolbar-select toolbar-select-size"
+							disabled={!editor || disabled}
+						>
+							<span class="toolbar-select-label">
+								{toolbarState.fontSizeLabel}
+							</span>
+							<ChevronDownIcon class="toolbar-select-chevron" />
+						</button>
+					</DropdownMenuTrigger>
+					<DropdownMenuContent align="start" class="w-32">
+						{#each FONT_SIZES as size (size.label)}
+							<DropdownMenuItem
+								class={toolbarState.fontSize === size.value ? 'font-semibold' : undefined}
+								onclick={() => setFontSize(size.value)}
+							>
+								{size.label}
+							</DropdownMenuItem>
+						{/each}
 					</DropdownMenuContent>
 				</DropdownMenu>
 			</div>
@@ -390,7 +584,7 @@
 					class="toolbar-button"
 					class:is-active={toolbarState.bulletList}
 					aria-pressed={toolbarState.bulletList}
-					disabled={!canCommand((editor) => editor.can().chain().focus().toggleBulletList().run())}
+					disabled={!editor || disabled}
 					aria-label="Bulleted list"
 					title="Bulleted list"
 					onclick={() => command((editor) => editor.chain().focus().toggleBulletList().run())}
@@ -402,7 +596,7 @@
 					class="toolbar-button"
 					class:is-active={toolbarState.orderedList}
 					aria-pressed={toolbarState.orderedList}
-					disabled={!canCommand((editor) => editor.can().chain().focus().toggleOrderedList().run())}
+					disabled={!editor || disabled}
 					aria-label="Numbered list"
 					title="Numbered list"
 					onclick={() => command((editor) => editor.chain().focus().toggleOrderedList().run())}
@@ -440,6 +634,19 @@
 				<button
 					type="button"
 					class="toolbar-button"
+					disabled={!editor || disabled}
+					aria-label="Insert HTML"
+					title="Insert HTML"
+					onclick={openHtmlDialog}
+				>
+					<CodeIcon />
+				</button>
+			</div>
+
+			<div class="flex items-center gap-1 rounded-lg border border-border bg-background p-1">
+				<button
+					type="button"
+					class="toolbar-button"
 					disabled={!canCommand((editor) =>
 						editor.can().chain().focus().unsetAllMarks().clearNodes().run()
 					)}
@@ -461,13 +668,36 @@
 	>
 		<div bind:this={editorElement}></div>
 	</div>
-
-	<div
-		class="shrink-0 border-t border-border bg-muted/10 px-4 py-2 text-[11px] text-muted-foreground"
-	>
-		Use simple formatting for legal copy: emphasis, lists, and links.
-	</div>
 </div>
+
+<Dialog bind:open={htmlDialogOpen}>
+	<DialogContent class="gap-0 overflow-hidden p-0 sm:max-w-xl">
+		<DialogHeader class="border-b border-border px-6 py-4">
+			<DialogTitle>Insert HTML</DialogTitle>
+			<DialogDescription>
+				Paste a snippet. Unsupported tags and attributes are removed before insertion.
+			</DialogDescription>
+		</DialogHeader>
+		<form
+			class="space-y-4 px-6 py-5"
+			onsubmit={(event) => {
+				event.preventDefault();
+				insertHtmlSnippet();
+			}}
+		>
+			<Textarea
+				bind:value={htmlSnippet}
+				class="min-h-48 font-mono text-xs leading-5"
+				placeholder="<p>Your email content...</p>"
+				{disabled}
+			/>
+			<DialogFooter>
+				<Button type="button" variant="outline" onclick={closeHtmlDialog}>Cancel</Button>
+				<Button type="submit" disabled={disabled || !htmlSnippet.trim()}>Insert</Button>
+			</DialogFooter>
+		</form>
+	</DialogContent>
+</Dialog>
 
 <style>
 	.rich-text-editor-viewport {
@@ -508,7 +738,9 @@
 	.toolbar-select {
 		display: inline-flex;
 		height: 1.85rem;
+		width: 100%;
 		align-items: center;
+		justify-content: space-between;
 		gap: 0.25rem;
 		border-radius: 0.5rem;
 		padding: 0 0.45rem;
@@ -519,6 +751,26 @@
 			background-color 150ms ease,
 			color 150ms ease;
 		white-space: nowrap;
+	}
+
+	.toolbar-select-group {
+		flex: 0 0 auto;
+	}
+
+	.toolbar-select-group-font {
+		width: 7.5rem;
+	}
+
+	.toolbar-select-group-size {
+		width: 4.75rem;
+	}
+
+	.toolbar-select-font {
+		min-width: 0;
+	}
+
+	.toolbar-select-size {
+		min-width: 0;
 	}
 
 	.toolbar-select:hover {
@@ -532,10 +784,18 @@
 
 	.toolbar-select-label {
 		min-width: 2rem;
+		overflow: hidden;
 		text-align: left;
+		text-overflow: ellipsis;
 	}
 
-	:global(.waiver-editor p.is-editor-empty:first-child::before) {
+	:global(.toolbar-select-chevron) {
+		width: 0.8rem;
+		height: 0.8rem;
+		flex: 0 0 0.8rem;
+	}
+
+	:global(.rich-text-editor-body p.is-editor-empty:first-child::before) {
 		content: attr(data-placeholder);
 		float: left;
 		color: var(--muted-foreground);
@@ -544,80 +804,85 @@
 		height: 0;
 	}
 
-	:global(.waiver-editor p) {
+	:global(.rich-text-editor-body p) {
 		margin: 0 0 0.875rem;
 	}
 
-	:global(.waiver-editor h1),
-	:global(.waiver-editor h2),
-	:global(.waiver-editor h3),
-	:global(.waiver-editor h4),
-	:global(.waiver-editor h5),
-	:global(.waiver-editor h6) {
+	:global(.rich-text-editor-body h1),
+	:global(.rich-text-editor-body h2),
+	:global(.rich-text-editor-body h3),
+	:global(.rich-text-editor-body h4),
+	:global(.rich-text-editor-body h5),
+	:global(.rich-text-editor-body h6) {
 		margin: 1.25rem 0 0.75rem;
 		font-weight: 700;
 		line-height: 1.2;
 	}
 
-	:global(.waiver-editor h1) {
+	:global(.rich-text-editor-body h1) {
 		font-size: 1.875rem;
 	}
 
-	:global(.waiver-editor h2) {
+	:global(.rich-text-editor-body h2) {
 		font-size: 1.5rem;
 	}
 
-	:global(.waiver-editor h3) {
+	:global(.rich-text-editor-body h3) {
 		font-size: 1.25rem;
 	}
 
-	:global(.waiver-editor h4) {
+	:global(.rich-text-editor-body h4) {
 		font-size: 1.125rem;
 	}
 
-	:global(.waiver-editor h5),
-	:global(.waiver-editor h6) {
+	:global(.rich-text-editor-body h5),
+	:global(.rich-text-editor-body h6) {
 		font-size: 1rem;
 	}
 
-	:global(.waiver-editor ul),
-	:global(.waiver-editor ol) {
+	:global(.rich-text-editor-body ul),
+	:global(.rich-text-editor-body ol) {
 		margin: 0 0 0.875rem;
 		padding-left: 1.25rem;
 	}
 
-	:global(.waiver-editor a) {
+	:global(.rich-text-editor-body ul) {
+		list-style-type: disc;
+	}
+
+	:global(.rich-text-editor-body ol) {
+		list-style-type: decimal;
+	}
+
+	:global(.rich-text-editor-body li) {
+		display: list-item;
+		margin: 0.2rem 0;
+	}
+
+	:global(.rich-text-editor-body a) {
 		color: var(--primary);
 		text-decoration: underline;
 		text-underline-offset: 0.15em;
 	}
 
-	:global(.waiver-editor img[data-email-image='true']) {
-		border-radius: 0.75rem;
-	}
-
-	:global(.waiver-editor p[data-email-button='true']) {
-		margin: 0 0 1rem;
-	}
-
-	:global(.waiver-editor strong) {
+	:global(.rich-text-editor-body strong) {
 		font-weight: 700;
 	}
 
-	:global(.waiver-editor em) {
+	:global(.rich-text-editor-body em) {
 		font-style: italic;
 	}
 
-	:global(.waiver-editor.ProseMirror) {
+	:global(.rich-text-editor-body.ProseMirror) {
 		outline: none;
 	}
 
-	:global(.waiver-editor .ProseMirror-selectednode) {
+	:global(.rich-text-editor-body .ProseMirror-selectednode) {
 		outline: 2px solid color-mix(in srgb, var(--ring) 55%, transparent);
 		outline-offset: 2px;
 	}
 
-	:global(.waiver-editor.ProseMirror[contenteditable='false']) {
+	:global(.rich-text-editor-body.ProseMirror[contenteditable='false']) {
 		opacity: 0.8;
 	}
 </style>

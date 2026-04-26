@@ -16,7 +16,7 @@ const DEFAULT_SEND_AFTER_HOURS = 2;
 const DEFAULT_SUBJECT = 'Thank you for visiting, {customer_name}!';
 const DEFAULT_BODY =
 	"<p>Hi {customer_name},</p><p>We wanted to take a moment to thank you for your recent visit. It was a pleasure having you with us!</p><p>As a reminder, you can always access your signed waivers and activity history through your personal dashboard using your Booking ID: #{booking_id}.</p><p>Would you mind taking 30 seconds to share your experience with us? We'd love to hear how we did.</p>";
-const TEMPLATE_PRESET_LIMIT = 100;
+const EMAIL_TEMPLATE_LIMIT = 100;
 const FOLLOW_UP_STATS_LIMIT = 1000;
 
 const followUpStatusValue = v.union(
@@ -48,39 +48,39 @@ function validateEmailTemplateInput(args: {
 	return body;
 }
 
-export const getEmailTemplate = query({
+export const getEmailEditorContent = query({
 	args: { workspaceId: v.id('workspaces') },
 	handler: async (ctx, args) => {
 		await requireWorkspaceMember(ctx, args.workspaceId);
 
-		const template = await ctx.db
-			.query('email_templates')
+		const editorContent = await ctx.db
+			.query('email_editor_content')
 			.withIndex('by_workspaceId', (q) => q.eq('workspaceId', args.workspaceId))
 			.unique();
 
-		if (!template) {
+		if (editorContent) {
 			return {
-				workspaceId: args.workspaceId,
-				subject: DEFAULT_SUBJECT,
-				body: DEFAULT_BODY,
-				sendAfterHours: DEFAULT_SEND_AFTER_HOURS,
-				isDefault: true as const
+				_id: editorContent._id,
+				workspaceId: editorContent.workspaceId,
+				subject: editorContent.subject,
+				body: editorContent.body,
+				sendAfterHours: editorContent.sendAfterHours,
+				updatedAt: editorContent.updatedAt,
+				isDefault: false as const
 			};
 		}
 
 		return {
-			_id: template._id,
-			workspaceId: template.workspaceId,
-			subject: template.subject,
-			body: template.body,
-			sendAfterHours: template.sendAfterHours,
-			updatedAt: template.updatedAt,
-			isDefault: false as const
+			workspaceId: args.workspaceId,
+			subject: DEFAULT_SUBJECT,
+			body: DEFAULT_BODY,
+			sendAfterHours: DEFAULT_SEND_AFTER_HOURS,
+			isDefault: true as const
 		};
 	}
 });
 
-export const upsertEmailTemplate = mutation({
+export const upsertEmailEditorContent = mutation({
 	args: {
 		workspaceId: v.id('workspaces'),
 		subject: v.string(),
@@ -93,7 +93,7 @@ export const upsertEmailTemplate = mutation({
 		const body = validateEmailTemplateInput(args);
 
 		const existing = await ctx.db
-			.query('email_templates')
+			.query('email_editor_content')
 			.withIndex('by_workspaceId', (q) => q.eq('workspaceId', args.workspaceId))
 			.unique();
 
@@ -107,7 +107,7 @@ export const upsertEmailTemplate = mutation({
 				updatedAt: now
 			});
 		} else {
-			await ctx.db.insert('email_templates', {
+			await ctx.db.insert('email_editor_content', {
 				workspaceId: args.workspaceId,
 				subject,
 				body,
@@ -118,19 +118,30 @@ export const upsertEmailTemplate = mutation({
 	}
 });
 
-export const listTemplatePresets = query({
+export const listEmailTemplates = query({
 	args: { workspaceId: v.id('workspaces') },
 	handler: async (ctx, args) => {
 		await requireWorkspaceMember(ctx, args.workspaceId);
-		return await ctx.db
-			.query('email_template_presets')
+
+		const templates = await ctx.db
+			.query('email_templates')
 			.withIndex('by_workspaceId', (q) => q.eq('workspaceId', args.workspaceId))
 			.order('desc')
-			.take(TEMPLATE_PRESET_LIMIT);
+			.take(EMAIL_TEMPLATE_LIMIT);
+
+		return templates.map((template) => ({
+			_id: template._id,
+			workspaceId: template.workspaceId,
+			name: template.name,
+			subject: template.subject,
+			body: template.body,
+			sendAfterHours: template.sendAfterHours,
+			createdAt: template.createdAt
+		}));
 	}
 });
 
-export const saveTemplatePreset = mutation({
+export const saveEmailTemplate = mutation({
 	args: {
 		workspaceId: v.id('workspaces'),
 		name: v.string(),
@@ -147,7 +158,7 @@ export const saveTemplatePreset = mutation({
 			throw new ConvexError({ code: 'invalid_argument', message: 'Template name is required.' });
 		}
 
-		await ctx.db.insert('email_template_presets', {
+		return await ctx.db.insert('email_templates', {
 			workspaceId: args.workspaceId,
 			name: args.name.trim(),
 			subject,
@@ -158,13 +169,13 @@ export const saveTemplatePreset = mutation({
 	}
 });
 
-export const deleteTemplatePreset = mutation({
-	args: { presetId: v.id('email_template_presets') },
+export const deleteEmailTemplate = mutation({
+	args: { templateId: v.id('email_templates') },
 	handler: async (ctx, args) => {
-		const preset = await ctx.db.get(args.presetId);
-		if (!preset) throw new ConvexError({ code: 'not_found', message: 'Preset not found.' });
-		await requireWorkspaceMember(ctx, preset.workspaceId);
-		await ctx.db.delete(args.presetId);
+		const template = await ctx.db.get(args.templateId);
+		if (!template) throw new ConvexError({ code: 'not_found', message: 'Template not found.' });
+		await requireWorkspaceMember(ctx, template.workspaceId);
+		await ctx.db.delete(args.templateId);
 	}
 });
 
@@ -485,14 +496,14 @@ export const scheduleFollowUpOnSubmission = internalMutation({
 		submittedAt: v.number()
 	},
 	handler: async (ctx, args) => {
-		const template = await ctx.db
-			.query('email_templates')
+		const editorContent = await ctx.db
+			.query('email_editor_content')
 			.withIndex('by_workspaceId', (q) => q.eq('workspaceId', args.workspaceId))
 			.unique();
 
-		const subjectTemplate = template?.subject ?? DEFAULT_SUBJECT;
-		const bodyTemplate = template?.body ?? DEFAULT_BODY;
-		const sendAfterHours = template?.sendAfterHours ?? DEFAULT_SEND_AFTER_HOURS;
+		const subjectTemplate = editorContent?.subject ?? DEFAULT_SUBJECT;
+		const bodyTemplate = editorContent?.body ?? DEFAULT_BODY;
+		const sendAfterHours = editorContent?.sendAfterHours ?? DEFAULT_SEND_AFTER_HOURS;
 		const sendAfterMs = sendAfterHours * 60 * 60 * 1000;
 		const scheduledAt = args.submittedAt + sendAfterMs;
 
@@ -529,15 +540,15 @@ export const getFollowUpForDelivery = internalQuery({
 export const getTemplateForWorkspace = internalQuery({
 	args: { workspaceId: v.id('workspaces') },
 	handler: async (ctx, args) => {
-		const template = await ctx.db
-			.query('email_templates')
+		const editorContent = await ctx.db
+			.query('email_editor_content')
 			.withIndex('by_workspaceId', (q) => q.eq('workspaceId', args.workspaceId))
 			.unique();
 
 		return {
-			subject: template?.subject ?? DEFAULT_SUBJECT,
-			body: template?.body ?? DEFAULT_BODY,
-			sendAfterHours: template?.sendAfterHours ?? DEFAULT_SEND_AFTER_HOURS
+			subject: editorContent?.subject ?? DEFAULT_SUBJECT,
+			body: editorContent?.body ?? DEFAULT_BODY,
+			sendAfterHours: editorContent?.sendAfterHours ?? DEFAULT_SEND_AFTER_HOURS
 		};
 	}
 });
