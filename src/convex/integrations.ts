@@ -29,7 +29,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const BOOKEO_WINDOW_MS = 31 * DAY_MS;
 const BOOKEO_FETCH_TIMEOUT_MS = 20_000;
 const BOOKEO_SYNC_MAX_PAGES = 200;
-const CONNECTION_SESSION_RETENTION_MS = 30 * DAY_MS;
+const CONNECTION_SESSION_RETENTION_MS = 7 * DAY_MS;
 const BOOKEO_WEBHOOK_SUCCESS_RETENTION_MS = 7 * DAY_MS;
 const BOOKEO_WEBHOOK_FAILED_RETENTION_MS = 30 * DAY_MS;
 
@@ -868,26 +868,6 @@ export const markConnectionSession = internalMutation({
 	}
 });
 
-export const markExpiredBookingConnectionSessionsCron = internalMutation({
-	args: {},
-	returns: v.object({
-		expiredCount: v.number()
-	}),
-	handler: async (ctx) => {
-		const now = Date.now();
-		const sessions = await ctx.db
-			.query('booking_connection_sessions')
-			.withIndex('by_status_and_expiresAt', (q) => q.eq('status', 'pending').lt('expiresAt', now))
-			.take(100);
-
-		for (const session of sessions) {
-			await ctx.db.patch(session._id, { status: 'expired' });
-		}
-
-		return { expiredCount: sessions.length };
-	}
-});
-
 export const pruneOldBookingConnectionSessionsCron = internalMutation({
 	args: {},
 	returns: v.object({
@@ -895,10 +875,10 @@ export const pruneOldBookingConnectionSessionsCron = internalMutation({
 	}),
 	handler: async (ctx) => {
 		const cutoff = Date.now() - CONNECTION_SESSION_RETENTION_MS;
-		const terminalStatuses = ['expired', 'completed', 'failed'] as const;
+		const statuses = ['pending', 'expired', 'completed', 'failed'] as const;
 		let deletedCount = 0;
 
-		for (const status of terminalStatuses) {
+		for (const status of statuses) {
 			const sessions = await ctx.db
 				.query('booking_connection_sessions')
 				.withIndex('by_status_and_createdAt', (q) => q.eq('status', status).lt('createdAt', cutoff))

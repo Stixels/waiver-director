@@ -223,7 +223,6 @@ export default defineSchema({
 	})
 		.index('by_state', ['state'])
 		.index('by_workspaceId', ['workspaceId'])
-		.index('by_status_and_expiresAt', ['status', 'expiresAt'])
 		.index('by_status_and_createdAt', ['status', 'createdAt']),
 
 	bookings: defineTable({
