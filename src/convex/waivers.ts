@@ -506,7 +506,8 @@ export const submitPublicWaiver = mutation({
 		}
 
 		const signerName = args.signerName.trim();
-		const signerEmail = args.signerEmail.trim().toLowerCase();
+		const originalSignerEmail = args.signerEmail.trim();
+		const signerEmail = originalSignerEmail.toLowerCase();
 		const signerDateOfBirth = args.signerDateOfBirth.trim();
 		if (signerName.length < 2 || signerName.length > 120) {
 			throw new ConvexError({
@@ -551,17 +552,9 @@ export const submitPublicWaiver = mutation({
 		}
 
 		const submittedAt = Date.now();
-		const customerId = await upsertSignerCustomer(ctx, {
-			workspaceId: waiver.workspaceId,
-			signerName,
-			signerEmail,
-			submittedAt,
-			bookingId: booking?._id ?? null
-		});
 		const submissionId = await ctx.db.insert('waiver_submissions', {
 			workspaceId: waiver.workspaceId,
 			versionId: waiver.publishedVersionId,
-			customerId,
 			...(booking
 				? {
 						bookingId: booking._id,
@@ -577,9 +570,15 @@ export const submitPublicWaiver = mutation({
 			status: 'submitted',
 			submittedAt
 		});
-		await ctx.db.patch(customerId, {
+		const customerId = await upsertSignerCustomer(ctx, {
+			workspaceId: waiver.workspaceId,
+			signerName,
+			signerEmail: originalSignerEmail,
+			submittedAt,
+			bookingId: booking?._id ?? null,
 			latestSubmissionId: submissionId
 		});
+		await ctx.db.patch(submissionId, { customerId });
 		if (booking) {
 			await ctx.db.patch(booking._id, {
 				signedCount: booking.signedCount + 1 + minors.length

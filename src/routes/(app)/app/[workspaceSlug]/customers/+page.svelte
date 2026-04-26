@@ -28,7 +28,9 @@
 		appContext.workspaces.find((workspace) => workspace.slug === page.params.workspaceSlug) ?? null
 	);
 
-	let pageIndex = $state(0);
+	let cursor = $state<string | null>(null);
+	let previousCursors = $state<(string | null)[]>([]);
+	let searchInput = $state('');
 	let searchQuery = $state('');
 	let lastWorkspaceId = $state<string | null>(null);
 	let lastSearchQuery = $state('');
@@ -50,12 +52,14 @@
 			currentWorkspace
 				? {
 						workspaceId: currentWorkspace.workspaceId,
-						pageIndex,
-						pageSize: PAGE_SIZE,
+						paginationOpts: {
+							numItems: PAGE_SIZE,
+							cursor
+						},
 						searchQuery
 					}
 				: 'skip',
-		() => ({ keepPreviousData: false })
+		() => ({ keepPreviousData: true })
 	);
 
 	type CustomerPage = FunctionReturnType<typeof api.customers.listWorkspaceCustomers>;
@@ -64,6 +68,8 @@
 	const customers = $derived((customerPage?.customers ?? []) as CustomerSummary[]);
 	const isLoadingCustomers = $derived(customersQuery.isLoading || appContext.isLoading);
 	const totalCount = $derived(customerPage?.totalCount ?? null);
+	const hasPreviousPage = $derived(previousCursors.length > 0);
+	const currentPage = $derived(previousCursors.length + 1);
 
 	const customerDetailQuery = useProtectedQuery(
 		api.customers.getCustomerDetail,
@@ -90,14 +96,23 @@
 		const workspaceId = currentWorkspace?.workspaceId ?? null;
 		if (workspaceId === lastWorkspaceId) return;
 		lastWorkspaceId = workspaceId;
-		pageIndex = 0;
+		cursor = null;
+		previousCursors = [];
 		selectedCustomerId = null;
 	});
 
 	$effect(() => {
 		if (searchQuery === lastSearchQuery) return;
 		lastSearchQuery = searchQuery;
-		pageIndex = 0;
+		cursor = null;
+		previousCursors = [];
+	});
+
+	$effect(() => {
+		const timeout = setTimeout(() => {
+			searchQuery = searchInput.trim();
+		}, 200);
+		return () => clearTimeout(timeout);
 	});
 
 	$effect(() => {
@@ -158,10 +173,10 @@
 		if (diffDay < 7) return `${diffDay}d ago`;
 		const diffWk = Math.floor(diffDay / 7);
 		if (diffWk < 5) return `${diffWk}w ago`;
-		const diffMo = Math.floor(diffDay / 30);
-		if (diffMo < 12) return `${diffMo}mo ago`;
 		const diffYr = Math.floor(diffDay / 365);
-		return `${diffYr}y ago`;
+		if (diffYr >= 1) return `${diffYr}y ago`;
+		const diffMo = Math.floor(diffDay / 30);
+		return `${diffMo}mo ago`;
 	}
 
 	function selectCustomer(customerId: Id<'customers'>) {
@@ -174,16 +189,21 @@
 	}
 
 	function goPreviousPage() {
-		pageIndex = Math.max(0, pageIndex - 1);
+		if (previousCursors.length === 0) return;
+		const nextPreviousCursors = previousCursors.slice(0, -1);
+		cursor = previousCursors[previousCursors.length - 1];
+		previousCursors = nextPreviousCursors;
 	}
 
 	function goNextPage() {
-		if (!customerPage?.hasNextPage) return;
-		pageIndex += 1;
+		if (!customerPage || customerPage.isDone) return;
+		previousCursors = [...previousCursors, cursor];
+		cursor = customerPage.continueCursor;
 	}
 
 	function clearSearch() {
-		if (!searchQuery) return;
+		if (!searchInput && !searchQuery) return;
+		searchInput = '';
 		searchQuery = '';
 	}
 </script>
@@ -214,11 +234,11 @@
 					class="inline-flex items-center gap-2 rounded-full border border-border bg-card/40 px-3 py-1.5 text-xs font-medium text-muted-foreground"
 				>
 					<UsersRoundIcon class="size-3.5" aria-hidden="true" />
-					{#if isLoadingCustomers && totalCount === null}
+					{#if isLoadingCustomers && !customerPage}
 						<Skeleton class="h-3 w-10" />
 					{:else}
 						<span class="text-foreground tabular-nums">{totalCount ?? 0}</span>
-						{(totalCount ?? 0) === 1 ? 'contact' : 'contacts'}
+						{(totalCount ?? 0) === 1 ? 'customer' : 'customers'}
 					{/if}
 				</span>
 			</div>
@@ -233,11 +253,11 @@
 				<input
 					type="search"
 					placeholder="Search by name or email"
-					bind:value={searchQuery}
+					bind:value={searchInput}
 					class="h-10 w-full rounded-lg border border-input bg-card/50 pr-10 pl-11 text-sm shadow-xs transition-all placeholder:text-muted-foreground/70 hover:bg-card focus-visible:border-ring focus-visible:bg-background focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
 					aria-label="Search customers"
 				/>
-				{#if searchQuery}
+				{#if searchInput}
 					<button
 						type="button"
 						onclick={clearSearch}
@@ -355,17 +375,16 @@
 					</div>
 				{/if}
 
-				{#if customerPage && (customerPage.hasPreviousPage || customerPage.hasNextPage)}
+				{#if customerPage && (hasPreviousPage || !customerPage.isDone)}
 					<div class="flex items-center justify-between gap-3">
 						<p class="text-xs text-muted-foreground tabular-nums">
-							Page {pageIndex + 1} · {customerPage.totalCount}
-							{customerPage.totalCount === 1 ? 'customer' : 'customers'}
+							Page {currentPage}
 						</p>
 						<div class="flex items-center gap-2">
 							<Button
 								size="sm"
 								variant="outline"
-								disabled={!customerPage.hasPreviousPage}
+								disabled={!hasPreviousPage}
 								onclick={goPreviousPage}
 							>
 								<ChevronLeftIcon class="size-4" aria-hidden="true" />
@@ -374,7 +393,7 @@
 							<Button
 								size="sm"
 								variant="outline"
-								disabled={!customerPage.hasNextPage}
+								disabled={customerPage.isDone}
 								onclick={goNextPage}
 							>
 								Next
@@ -534,6 +553,11 @@
 									</li>
 								{/each}
 							</ul>
+							{#if selectedCustomerDetail.hasMore}
+								<p class="border-t border-border px-4 py-3 text-xs text-muted-foreground">
+									Showing the most recent {selectedCustomerDetail.visits.length} visits.
+								</p>
+							{/if}
 						{/if}
 					</div>
 				{:else}

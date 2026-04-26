@@ -1,10 +1,10 @@
-import { v } from 'convex/values';
+import { paginationOptsValidator } from 'convex/server';
+import { ConvexError, v } from 'convex/values';
 import { query } from './_generated/server';
 import type { Doc } from './_generated/dataModel';
 import { bookingSnapshotValidator } from './lib/bookings';
 import { requireWorkspaceMember } from './lib/waivers';
 
-const MAX_CUSTOMERS_PER_LIST = 1_000;
 const MAX_CUSTOMER_VISITS = 50;
 
 const customerSummaryValue = v.object({
@@ -43,44 +43,55 @@ function serializeCustomer(customer: Doc<'customers'>) {
 export const listWorkspaceCustomers = query({
 	args: {
 		workspaceId: v.id('workspaces'),
-		pageIndex: v.number(),
-		pageSize: v.number(),
+		paginationOpts: paginationOptsValidator,
 		searchQuery: v.optional(v.string())
 	},
 	returns: v.object({
 		customers: v.array(customerSummaryValue),
-		pageIndex: v.number(),
 		totalCount: v.number(),
-		hasPreviousPage: v.boolean(),
-		hasNextPage: v.boolean()
+		continueCursor: v.string(),
+		isDone: v.boolean()
 	}),
 	handler: async (ctx, args) => {
 		await requireWorkspaceMember(ctx, args.workspaceId);
+		const workspace = await ctx.db.get(args.workspaceId);
+		if (!workspace) {
+			throw new ConvexError({
+				code: 'not_found',
+				message: 'Workspace not found.'
+			});
+		}
 
-		const pageIndex = Math.max(0, Math.min(Math.floor(args.pageIndex), 100));
-		const pageSize = Math.max(1, Math.min(Math.floor(args.pageSize), 50));
 		const searchQuery = normalizedMatchValue(args.searchQuery);
-		const customers = await ctx.db
-			.query('customers')
-			.withIndex('by_workspaceId_and_lastSeenAt', (q) => q.eq('workspaceId', args.workspaceId))
-			.order('desc')
-			.take(MAX_CUSTOMERS_PER_LIST);
+		const pageSize = Math.max(1, Math.floor(args.paginationOpts.numItems));
 
-		const filteredCustomers = customers.filter((customer) => {
-			if (!searchQuery) return true;
-			return [customer.displayName, customer.primaryEmail].some((value) =>
-				normalizedMatchValue(value).includes(searchQuery)
-			);
-		});
-		const pageStart = pageIndex * pageSize;
-		const pageCustomers = filteredCustomers.slice(pageStart, pageStart + pageSize);
+		if (!searchQuery) {
+			const customerPage = await ctx.db
+				.query('customers')
+				.withIndex('by_workspaceId_and_lastSeenAt', (q) => q.eq('workspaceId', args.workspaceId))
+				.order('desc')
+				.paginate({ ...args.paginationOpts, numItems: pageSize });
+
+			return {
+				customers: customerPage.page.map((customer) => serializeCustomer(customer)),
+				totalCount: workspace.customerCount,
+				continueCursor: customerPage.continueCursor,
+				isDone: customerPage.isDone
+			};
+		}
+
+		const customerPage = await ctx.db
+			.query('customers')
+			.withSearchIndex('search_customerText', (q) =>
+				q.search('searchText', searchQuery).eq('workspaceId', args.workspaceId)
+			)
+			.paginate({ ...args.paginationOpts, numItems: pageSize });
 
 		return {
-			customers: pageCustomers.map((customer) => serializeCustomer(customer)),
-			pageIndex,
-			totalCount: filteredCustomers.length,
-			hasPreviousPage: pageIndex > 0,
-			hasNextPage: filteredCustomers.length > pageStart + pageSize
+			customers: customerPage.page.map((customer) => serializeCustomer(customer)),
+			totalCount: workspace.customerCount,
+			continueCursor: customerPage.continueCursor,
+			isDone: customerPage.isDone
 		};
 	}
 });
@@ -94,7 +105,8 @@ export const getCustomerDetail = query({
 		v.null(),
 		v.object({
 			customer: customerSummaryValue,
-			visits: v.array(customerVisitValue)
+			visits: v.array(customerVisitValue),
+			hasMore: v.boolean()
 		})
 	),
 	handler: async (ctx, args) => {
@@ -109,18 +121,30 @@ export const getCustomerDetail = query({
 			.order('desc')
 			.take(MAX_CUSTOMER_VISITS);
 
+		for (const submission of submissions) {
+			if (submission.workspaceId !== args.workspaceId) {
+				throw new ConvexError({
+					code: 'data_integrity_error',
+					message: 'Submission workspaceId mismatch.',
+					submissionId: submission._id,
+					workspaceId: submission.workspaceId,
+					expectedWorkspaceId: args.workspaceId
+				});
+			}
+		}
+
 		return {
 			customer: serializeCustomer(customer),
-			visits: submissions
-				.filter((submission) => submission.workspaceId === args.workspaceId)
-				.map((submission) => ({
-					submissionId: submission._id,
-					signerName: submission.signerName,
-					signerEmail: submission.signerEmail,
-					submittedAt: submission.submittedAt,
-					minorCount: submission.minors.length,
-					booking: submission.bookingSnapshot ?? null
-				}))
+			visits: submissions.map((submission) => ({
+				submissionId: submission._id,
+				signerName: submission.signerName,
+				signerEmail: submission.signerEmail,
+				submittedAt: submission.submittedAt,
+				minorCount: submission.minors.length,
+				booking: submission.bookingSnapshot ?? null
+			})),
+			hasMore:
+				submissions.length === MAX_CUSTOMER_VISITS && customer.visitCount > MAX_CUSTOMER_VISITS
 		};
 	}
 });
