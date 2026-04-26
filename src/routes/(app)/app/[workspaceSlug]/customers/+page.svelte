@@ -55,7 +55,7 @@
 						searchQuery
 					}
 				: 'skip',
-		() => ({ keepPreviousData: true })
+		() => ({ keepPreviousData: false })
 	);
 
 	type CustomerPage = FunctionReturnType<typeof api.customers.listWorkspaceCustomers>;
@@ -74,11 +74,16 @@
 						customerId: selectedCustomerId
 					}
 				: 'skip',
-		() => ({ keepPreviousData: true })
+		() => ({ keepPreviousData: false })
 	);
 
 	type CustomerDetail = FunctionReturnType<typeof api.customers.getCustomerDetail>;
 	const customerDetail = $derived((customerDetailQuery.data ?? null) as CustomerDetail | null);
+	const selectedCustomerDetail = $derived(
+		selectedCustomerId && customerDetail?.customer.customerId === selectedCustomerId
+			? customerDetail
+			: null
+	);
 	const isLoadingDetail = $derived(customerDetailQuery.isLoading && Boolean(selectedCustomerId));
 
 	$effect(() => {
@@ -410,25 +415,25 @@
 							<Skeleton class="h-12 w-full" />
 						</div>
 					</div>
-				{:else if customerDetail}
-					{@const tier = frequencyTier(customerDetail.customer.visitCount)}
+				{:else if selectedCustomerDetail}
+					{@const tier = frequencyTier(selectedCustomerDetail.customer.visitCount)}
 					<div class="rounded-xl border border-border bg-card/30">
 						<div class="space-y-4 p-4">
 							<div class="flex items-start gap-3">
 								<div
 									class="flex size-10 shrink-0 items-center justify-center rounded-full border border-border bg-background text-xs font-semibold text-foreground"
 								>
-									{initialsFor(customerDetail.customer.displayName)}
+									{initialsFor(selectedCustomerDetail.customer.displayName)}
 								</div>
 								<div class="min-w-0 flex-1">
 									<h2 class="truncate text-base font-semibold tracking-tight">
-										{customerDetail.customer.displayName}
+										{selectedCustomerDetail.customer.displayName}
 									</h2>
 									<p
 										class="mt-0.5 flex items-center gap-1.5 truncate text-xs text-muted-foreground"
 									>
 										<MailIcon class="size-3 shrink-0" aria-hidden="true" />
-										<span class="truncate">{customerDetail.customer.primaryEmail}</span>
+										<span class="truncate">{selectedCustomerDetail.customer.primaryEmail}</span>
 									</p>
 								</div>
 								<span
@@ -448,22 +453,22 @@
 								<div class="flex items-baseline justify-between gap-3">
 									<dt class="text-xs text-muted-foreground">Visits</dt>
 									<dd class="font-medium tabular-nums">
-										{customerDetail.customer.visitCount}
+										{selectedCustomerDetail.customer.visitCount}
 									</dd>
 								</div>
 								<div class="flex items-baseline justify-between gap-3">
 									<dt class="text-xs text-muted-foreground">First seen</dt>
 									<dd class="font-medium">
-										{formatTimestamp(customerDetail.customer.firstSeenAt)}
+										{formatTimestamp(selectedCustomerDetail.customer.firstSeenAt)}
 									</dd>
 								</div>
 								<div class="flex items-baseline justify-between gap-3">
 									<dt class="text-xs text-muted-foreground">Last seen</dt>
 									<dd class="font-medium">
 										<span class="ml-1 text-xs font-normal text-muted-foreground tabular-nums">
-											{relativeFromNow(customerDetail.customer.lastSeenAt)} ·
+											{relativeFromNow(selectedCustomerDetail.customer.lastSeenAt)} ·
 										</span>
-										{formatTimestamp(customerDetail.customer.lastSeenAt)}
+										{formatTimestamp(selectedCustomerDetail.customer.lastSeenAt)}
 									</dd>
 								</div>
 							</dl>
@@ -474,17 +479,17 @@
 						<div class="flex items-center justify-between border-b border-border px-4 py-3">
 							<h2 class="text-sm font-semibold tracking-tight">Visit history</h2>
 							<span class="text-xs text-muted-foreground tabular-nums">
-								{customerDetail.visits.length}
-								{customerDetail.visits.length === 1 ? 'record' : 'records'}
+								{selectedCustomerDetail.visits.length}
+								{selectedCustomerDetail.visits.length === 1 ? 'record' : 'records'}
 							</span>
 						</div>
-						{#if customerDetail.visits.length === 0}
+						{#if selectedCustomerDetail.visits.length === 0}
 							<div class="px-4 py-8 text-center text-sm text-muted-foreground">
 								No visits found.
 							</div>
 						{:else}
 							<ul class="divide-y divide-border">
-								{#each customerDetail.visits as visit (visit.submissionId)}
+								{#each selectedCustomerDetail.visits as visit (visit.submissionId)}
 									{@const dateLabel = visit.booking?.startTime
 										? formatBookingTimestamp(visit.booking.startTime, {
 												dateStyle: 'medium',
