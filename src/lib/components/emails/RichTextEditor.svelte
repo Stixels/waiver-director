@@ -371,293 +371,273 @@
 	class:shadow-[0_0_0_3px_color-mix(in_srgb,var(--ring)_22%,transparent)]={hasFocus}
 	class:border-border={!hasFocus}
 >
-	<div class="shrink-0 border-b border-border bg-muted/20 px-3 py-2">
+	<div class="shrink-0 border-b border-border/80 bg-card/40 px-4 py-2 backdrop-blur-sm">
 		<div
-			class="editor-toolbar flex flex-nowrap items-center gap-1.5 overflow-x-auto pb-1"
+			class="editor-toolbar flex flex-nowrap items-center gap-1 overflow-x-auto"
 			role="toolbar"
 			aria-label="Rich text formatting"
 			tabindex="-1"
 			onmousedown={keepToolbarFocus}
 		>
-			<div class="flex items-center gap-1 rounded-lg border border-border bg-background p-1">
-				<DropdownMenu>
-					<DropdownMenuTrigger class="inline-flex">
-						<button
-							type="button"
-							class="toolbar-select toolbar-select-font"
-							disabled={!editor || disabled}
-						>
-							<span class="toolbar-select-label">{toolbarState.blockShortLabel}</span>
-							<ChevronDownIcon class="toolbar-select-chevron" />
-						</button>
-					</DropdownMenuTrigger>
-					<DropdownMenuContent align="start" class="w-44">
-						<DropdownMenuItem
-							onclick={() => command((editor) => editor.chain().focus().setParagraph().run())}
-						>
-							Paragraph
-						</DropdownMenuItem>
-						<DropdownMenuSeparator />
-						{#each headingLevels as level (level)}
-							<DropdownMenuItem
-								class={toolbarState.blockShortLabel === `H${level}` ? 'font-semibold' : undefined}
-								onclick={() =>
-									command((editor) => editor.chain().focus().toggleHeading({ level }).run())}
-							>
-								Heading {level}
-							</DropdownMenuItem>
-						{/each}
-					</DropdownMenuContent>
-				</DropdownMenu>
-			</div>
-
-			<div class="flex items-center gap-1 rounded-lg border border-border bg-background p-1">
-				<DropdownMenu>
-					<DropdownMenuTrigger class="inline-flex">
-						<button
-							type="button"
-							class="toolbar-select toolbar-select-size"
-							disabled={!editor || disabled}
-						>
-							{#if toolbarState.alignment === 'center'}
-								<AlignCenterIcon />
-							{:else if toolbarState.alignment === 'right'}
-								<AlignRightIcon />
-							{:else if toolbarState.alignment === 'justify'}
-								<AlignJustifyIcon />
-							{:else}
-								<AlignLeftIcon />
-							{/if}
-							<ChevronDownIcon class="toolbar-select-chevron" />
-						</button>
-					</DropdownMenuTrigger>
-					<DropdownMenuContent align="start" class="w-40">
-						<DropdownMenuItem
-							class={toolbarState.alignment === 'left' ? 'font-semibold' : undefined}
-							onclick={() => command((editor) => editor.chain().focus().setTextAlign('left').run())}
-						>
-							<AlignLeftIcon />
-							<span>Left</span>
-						</DropdownMenuItem>
-						<DropdownMenuItem
-							class={toolbarState.alignment === 'center' ? 'font-semibold' : undefined}
-							onclick={() =>
-								command((editor) => editor.chain().focus().setTextAlign('center').run())}
-						>
-							<AlignCenterIcon />
-							<span>Center</span>
-						</DropdownMenuItem>
-						<DropdownMenuItem
-							class={toolbarState.alignment === 'right' ? 'font-semibold' : undefined}
-							onclick={() =>
-								command((editor) => editor.chain().focus().setTextAlign('right').run())}
-						>
-							<AlignRightIcon />
-							<span>Right</span>
-						</DropdownMenuItem>
-						<DropdownMenuItem
-							class={toolbarState.alignment === 'justify' ? 'font-semibold' : undefined}
-							onclick={() =>
-								command((editor) => editor.chain().focus().setTextAlign('justify').run())}
-						>
-							<AlignJustifyIcon />
-							<span>Justify</span>
-						</DropdownMenuItem>
-					</DropdownMenuContent>
-				</DropdownMenu>
-			</div>
-
-			<div
-				class="toolbar-select-group toolbar-select-group-font flex items-center gap-1 rounded-lg border border-border bg-background p-1"
-			>
-				<DropdownMenu>
-					<DropdownMenuTrigger class="inline-flex w-full">
-						<button
-							type="button"
-							class="toolbar-select toolbar-select-font"
-							disabled={!editor || disabled}
-						>
-							<span class="toolbar-select-label">
-								{toolbarState.fontFamilyLabel}
-							</span>
-							<ChevronDownIcon class="toolbar-select-chevron" />
-						</button>
-					</DropdownMenuTrigger>
-					<DropdownMenuContent align="start" class="w-48">
-						{#each FONT_FAMILIES as family (family.label)}
-							<DropdownMenuItem
-								class={toolbarState.fontFamily === family.value ? 'font-semibold' : undefined}
-								onclick={() => setFontFamily(family.value)}
-							>
-								<span style={family.value ? `font-family: ${family.value}` : undefined}>
-									{family.label}
-								</span>
-							</DropdownMenuItem>
-						{/each}
-					</DropdownMenuContent>
-				</DropdownMenu>
-			</div>
-
-			<div
-				class="toolbar-select-group toolbar-select-group-size flex items-center gap-1 rounded-lg border border-border bg-background p-1"
-			>
-				<DropdownMenu>
-					<DropdownMenuTrigger class="inline-flex w-full">
-						<button
-							type="button"
-							class="toolbar-select toolbar-select-size"
-							disabled={!editor || disabled}
-						>
-							<span class="toolbar-select-label">
-								{toolbarState.fontSizeLabel}
-							</span>
-							<ChevronDownIcon class="toolbar-select-chevron" />
-						</button>
-					</DropdownMenuTrigger>
-					<DropdownMenuContent align="start" class="w-32">
-						{#each FONT_SIZES as size (size.label)}
-							<DropdownMenuItem
-								class={toolbarState.fontSize === size.value ? 'font-semibold' : undefined}
-								onclick={() => setFontSize(size.value)}
-							>
-								{size.label}
-							</DropdownMenuItem>
-						{/each}
-					</DropdownMenuContent>
-				</DropdownMenu>
-			</div>
-
-			<div class="flex items-center gap-1 rounded-lg border border-border bg-background p-1">
-				<button
-					type="button"
-					class="toolbar-button"
-					class:is-active={toolbarState.bold}
-					aria-pressed={toolbarState.bold}
-					disabled={!canCommand((editor) => editor.can().chain().focus().toggleBold().run())}
-					aria-label="Bold"
-					title="Bold"
-					onclick={() => command((editor) => editor.chain().focus().toggleBold().run())}
-				>
-					<BoldIcon />
-				</button>
-				<button
-					type="button"
-					class="toolbar-button"
-					class:is-active={toolbarState.italic}
-					aria-pressed={toolbarState.italic}
-					disabled={!canCommand((editor) => editor.can().chain().focus().toggleItalic().run())}
-					aria-label="Italic"
-					title="Italic"
-					onclick={() => command((editor) => editor.chain().focus().toggleItalic().run())}
-				>
-					<ItalicIcon />
-				</button>
-				<button
-					type="button"
-					class="toolbar-button"
-					class:is-active={toolbarState.underline}
-					aria-pressed={toolbarState.underline}
-					disabled={!canCommand((editor) => editor.can().chain().focus().toggleUnderline().run())}
-					aria-label="Underline"
-					title="Underline"
-					onclick={() => command((editor) => editor.chain().focus().toggleUnderline().run())}
-				>
-					<UnderlineIcon />
-				</button>
-				<button
-					type="button"
-					class="toolbar-button"
-					class:is-active={toolbarState.strike}
-					aria-pressed={toolbarState.strike}
-					disabled={!canCommand((editor) => editor.can().chain().focus().toggleStrike().run())}
-					aria-label="Strike"
-					title="Strike"
-					onclick={() => command((editor) => editor.chain().focus().toggleStrike().run())}
-				>
-					<StrikethroughIcon />
-				</button>
-			</div>
-
-			<div class="flex items-center gap-1 rounded-lg border border-border bg-background p-1">
-				<button
-					type="button"
-					class="toolbar-button"
-					class:is-active={toolbarState.bulletList}
-					aria-pressed={toolbarState.bulletList}
-					disabled={!editor || disabled}
-					aria-label="Bulleted list"
-					title="Bulleted list"
-					onclick={() => command((editor) => editor.chain().focus().toggleBulletList().run())}
-				>
-					<ListIcon />
-				</button>
-				<button
-					type="button"
-					class="toolbar-button"
-					class:is-active={toolbarState.orderedList}
-					aria-pressed={toolbarState.orderedList}
-					disabled={!editor || disabled}
-					aria-label="Numbered list"
-					title="Numbered list"
-					onclick={() => command((editor) => editor.chain().focus().toggleOrderedList().run())}
-				>
-					<ListOrderedIcon />
-				</button>
-			</div>
-
-			<div class="flex items-center gap-1 rounded-lg border border-border bg-background p-1">
-				<button
-					type="button"
-					class="toolbar-button"
-					class:is-active={toolbarState.link}
-					aria-pressed={toolbarState.link}
-					disabled={!editor || disabled}
-					aria-label="Set link"
-					title="Set link"
-					onclick={setLink}
-				>
-					<LinkIcon />
-				</button>
-				{#if toolbarState.link}
+			<DropdownMenu>
+				<DropdownMenuTrigger class="inline-flex">
 					<button
 						type="button"
-						class="rounded-md px-2 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
-						disabled={!canCommand((editor) => editor.can().chain().focus().unsetLink().run())}
-						onclick={() => command((editor) => editor.chain().focus().unsetLink().run())}
+						class="toolbar-select toolbar-select-block"
+						disabled={!editor || disabled}
 					>
-						Remove
+						<span class="toolbar-select-label">{toolbarState.blockShortLabel}</span>
+						<ChevronDownIcon class="size-3" />
 					</button>
-				{/if}
-			</div>
+				</DropdownMenuTrigger>
+				<DropdownMenuContent align="start" class="w-44">
+					<DropdownMenuItem
+						onclick={() => command((editor) => editor.chain().focus().setParagraph().run())}
+					>
+						Paragraph
+					</DropdownMenuItem>
+					<DropdownMenuSeparator />
+					{#each headingLevels as level (level)}
+						<DropdownMenuItem
+							class={toolbarState.blockShortLabel === `H${level}` ? 'font-semibold' : undefined}
+							onclick={() =>
+								command((editor) => editor.chain().focus().toggleHeading({ level }).run())}
+						>
+							Heading {level}
+						</DropdownMenuItem>
+					{/each}
+				</DropdownMenuContent>
+			</DropdownMenu>
 
-			<div class="flex items-center gap-1 rounded-lg border border-border bg-background p-1">
+			<DropdownMenu>
+				<DropdownMenuTrigger class="inline-flex">
+					<button type="button" class="toolbar-button" disabled={!editor || disabled} aria-label="Alignment">
+						{#if toolbarState.alignment === 'center'}
+							<AlignCenterIcon class="size-3.5" />
+						{:else if toolbarState.alignment === 'right'}
+							<AlignRightIcon class="size-3.5" />
+						{:else if toolbarState.alignment === 'justify'}
+							<AlignJustifyIcon class="size-3.5" />
+						{:else}
+							<AlignLeftIcon class="size-3.5" />
+						{/if}
+					</button>
+				</DropdownMenuTrigger>
+				<DropdownMenuContent align="start" class="w-40">
+					<DropdownMenuItem
+						class={toolbarState.alignment === 'left' ? 'font-semibold' : undefined}
+						onclick={() => command((editor) => editor.chain().focus().setTextAlign('left').run())}
+					>
+						<AlignLeftIcon class="size-4" />
+						<span>Left</span>
+					</DropdownMenuItem>
+					<DropdownMenuItem
+						class={toolbarState.alignment === 'center' ? 'font-semibold' : undefined}
+						onclick={() =>
+							command((editor) => editor.chain().focus().setTextAlign('center').run())}
+					>
+						<AlignCenterIcon class="size-4" />
+						<span>Center</span>
+					</DropdownMenuItem>
+					<DropdownMenuItem
+						class={toolbarState.alignment === 'right' ? 'font-semibold' : undefined}
+						onclick={() =>
+							command((editor) => editor.chain().focus().setTextAlign('right').run())}
+					>
+						<AlignRightIcon class="size-4" />
+						<span>Right</span>
+					</DropdownMenuItem>
+					<DropdownMenuItem
+						class={toolbarState.alignment === 'justify' ? 'font-semibold' : undefined}
+						onclick={() =>
+							command((editor) => editor.chain().focus().setTextAlign('justify').run())}
+					>
+						<AlignJustifyIcon class="size-4" />
+						<span>Justify</span>
+					</DropdownMenuItem>
+				</DropdownMenuContent>
+			</DropdownMenu>
+
+			<DropdownMenu>
+				<DropdownMenuTrigger class="inline-flex">
+					<button
+						type="button"
+						class="toolbar-select toolbar-select-font"
+						disabled={!editor || disabled}
+					>
+						<span class="toolbar-select-label toolbar-select-label-plain">
+							{toolbarState.fontFamilyLabel}
+						</span>
+						<ChevronDownIcon class="size-3" />
+					</button>
+				</DropdownMenuTrigger>
+				<DropdownMenuContent align="start" class="w-48">
+					{#each FONT_FAMILIES as family (family.label)}
+						<DropdownMenuItem
+							class={toolbarState.fontFamily === family.value ? 'font-semibold' : undefined}
+							onclick={() => setFontFamily(family.value)}
+						>
+							<span style={family.value ? `font-family: ${family.value}` : undefined}>
+								{family.label}
+							</span>
+						</DropdownMenuItem>
+					{/each}
+				</DropdownMenuContent>
+			</DropdownMenu>
+
+			<DropdownMenu>
+				<DropdownMenuTrigger class="inline-flex">
+					<button
+						type="button"
+						class="toolbar-select toolbar-select-size"
+						disabled={!editor || disabled}
+					>
+						<span class="toolbar-select-label toolbar-select-label-plain">
+							{toolbarState.fontSizeLabel}
+						</span>
+						<ChevronDownIcon class="size-3" />
+					</button>
+				</DropdownMenuTrigger>
+				<DropdownMenuContent align="start" class="w-32">
+					{#each FONT_SIZES as size (size.label)}
+						<DropdownMenuItem
+							class={toolbarState.fontSize === size.value ? 'font-semibold' : undefined}
+							onclick={() => setFontSize(size.value)}
+						>
+							{size.label}
+						</DropdownMenuItem>
+					{/each}
+				</DropdownMenuContent>
+			</DropdownMenu>
+
+			<span class="toolbar-divider"></span>
+
+			<button
+				type="button"
+				class="toolbar-button"
+				class:is-active={toolbarState.bold}
+				aria-pressed={toolbarState.bold}
+				disabled={!canCommand((editor) => editor.can().chain().focus().toggleBold().run())}
+				aria-label="Bold"
+				title="Bold"
+				onclick={() => command((editor) => editor.chain().focus().toggleBold().run())}
+			>
+				<BoldIcon class="size-3.5" />
+			</button>
+			<button
+				type="button"
+				class="toolbar-button"
+				class:is-active={toolbarState.italic}
+				aria-pressed={toolbarState.italic}
+				disabled={!canCommand((editor) => editor.can().chain().focus().toggleItalic().run())}
+				aria-label="Italic"
+				title="Italic"
+				onclick={() => command((editor) => editor.chain().focus().toggleItalic().run())}
+			>
+				<ItalicIcon class="size-3.5" />
+			</button>
+			<button
+				type="button"
+				class="toolbar-button"
+				class:is-active={toolbarState.underline}
+				aria-pressed={toolbarState.underline}
+				disabled={!canCommand((editor) => editor.can().chain().focus().toggleUnderline().run())}
+				aria-label="Underline"
+				title="Underline"
+				onclick={() => command((editor) => editor.chain().focus().toggleUnderline().run())}
+			>
+				<UnderlineIcon class="size-3.5" />
+			</button>
+			<button
+				type="button"
+				class="toolbar-button"
+				class:is-active={toolbarState.strike}
+				aria-pressed={toolbarState.strike}
+				disabled={!canCommand((editor) => editor.can().chain().focus().toggleStrike().run())}
+				aria-label="Strike"
+				title="Strike"
+				onclick={() => command((editor) => editor.chain().focus().toggleStrike().run())}
+			>
+				<StrikethroughIcon class="size-3.5" />
+			</button>
+
+			<span class="toolbar-divider"></span>
+
+			<button
+				type="button"
+				class="toolbar-button"
+				class:is-active={toolbarState.bulletList}
+				aria-pressed={toolbarState.bulletList}
+				disabled={!editor || disabled}
+				aria-label="Bulleted list"
+				title="Bulleted list"
+				onclick={() => command((editor) => editor.chain().focus().toggleBulletList().run())}
+			>
+				<ListIcon class="size-3.5" />
+			</button>
+			<button
+				type="button"
+				class="toolbar-button"
+				class:is-active={toolbarState.orderedList}
+				aria-pressed={toolbarState.orderedList}
+				disabled={!editor || disabled}
+				aria-label="Numbered list"
+				title="Numbered list"
+				onclick={() => command((editor) => editor.chain().focus().toggleOrderedList().run())}
+			>
+				<ListOrderedIcon class="size-3.5" />
+			</button>
+
+			<span class="toolbar-divider"></span>
+
+			<button
+				type="button"
+				class="toolbar-button"
+				class:is-active={toolbarState.link}
+				aria-pressed={toolbarState.link}
+				disabled={!editor || disabled}
+				aria-label="Set link"
+				title="Set link"
+				onclick={setLink}
+			>
+				<LinkIcon class="size-3.5" />
+			</button>
+			{#if toolbarState.link}
 				<button
 					type="button"
-					class="toolbar-button"
-					disabled={!editor || disabled}
-					aria-label="Insert HTML"
-					title="Insert HTML"
-					onclick={openHtmlDialog}
+					class="rounded-md px-2 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
+					disabled={!canCommand((editor) => editor.can().chain().focus().unsetLink().run())}
+					onclick={() => command((editor) => editor.chain().focus().unsetLink().run())}
 				>
-					<CodeIcon />
+					Remove
 				</button>
-			</div>
+			{/if}
 
-			<div class="flex items-center gap-1 rounded-lg border border-border bg-background p-1">
-				<button
-					type="button"
-					class="toolbar-button"
-					disabled={!canCommand((editor) =>
-						editor.can().chain().focus().unsetAllMarks().clearNodes().run()
-					)}
-					aria-label="Clear formatting"
-					title="Clear formatting"
-					onclick={() =>
-						command((editor) => editor.chain().focus().unsetAllMarks().clearNodes().run())}
-				>
-					<RemoveFormattingIcon />
-				</button>
-			</div>
+			<span class="toolbar-divider"></span>
+
+			<button
+				type="button"
+				class="toolbar-button"
+				disabled={!editor || disabled}
+				aria-label="Insert HTML"
+				title="Insert HTML"
+				onclick={openHtmlDialog}
+			>
+				<CodeIcon class="size-3.5" />
+			</button>
+			<button
+				type="button"
+				class="toolbar-button"
+				disabled={!canCommand((editor) =>
+					editor.can().chain().focus().unsetAllMarks().clearNodes().run()
+				)}
+				aria-label="Clear formatting"
+				title="Clear formatting"
+				onclick={() =>
+					command((editor) => editor.chain().focus().unsetAllMarks().clearNodes().run())}
+			>
+				<RemoveFormattingIcon class="size-3.5" />
+			</button>
 		</div>
 	</div>
 
@@ -710,41 +690,37 @@
 		width: 1.85rem;
 		align-items: center;
 		justify-content: center;
-		border-radius: 0.5rem;
-		border: 1px solid transparent;
+		border-radius: 0.45rem;
 		color: var(--muted-foreground);
 		transition:
 			background-color 150ms ease,
 			color 150ms ease,
-			box-shadow 150ms ease,
-			border-color 150ms ease;
+			box-shadow 150ms ease;
 	}
 
-	.toolbar-button:hover {
+	.toolbar-button:hover:not(:disabled) {
 		background: color-mix(in srgb, var(--muted) 80%, transparent);
 		color: var(--foreground);
 	}
 
 	.toolbar-button.is-active {
-		background: color-mix(in srgb, var(--muted) 80%, transparent);
-		color: var(--foreground);
+		background: color-mix(in srgb, var(--primary) 18%, transparent);
+		color: color-mix(in srgb, var(--primary) 80%, var(--foreground));
 	}
 
 	.toolbar-button:disabled {
-		opacity: 0.45;
+		opacity: 0.4;
 		cursor: not-allowed;
 	}
 
 	.toolbar-select {
 		display: inline-flex;
 		height: 1.85rem;
-		width: 100%;
 		align-items: center;
-		justify-content: space-between;
 		gap: 0.25rem;
-		border-radius: 0.5rem;
-		padding: 0 0.45rem;
-		font-size: 0.7rem;
+		border-radius: 0.45rem;
+		padding: 0 0.55rem;
+		font-size: 0.72rem;
 		font-weight: 500;
 		color: var(--foreground);
 		transition:
@@ -753,27 +729,21 @@
 		white-space: nowrap;
 	}
 
-	.toolbar-select-group {
-		flex: 0 0 auto;
-	}
-
-	.toolbar-select-group-font {
-		width: 7.5rem;
-	}
-
-	.toolbar-select-group-size {
-		width: 4.75rem;
+	.toolbar-select-block {
+		min-width: 0;
 	}
 
 	.toolbar-select-font {
-		min-width: 0;
+		width: 7rem;
+		justify-content: space-between;
 	}
 
 	.toolbar-select-size {
-		min-width: 0;
+		width: 4.5rem;
+		justify-content: space-between;
 	}
 
-	.toolbar-select:hover {
+	.toolbar-select:hover:not(:disabled) {
 		background: color-mix(in srgb, var(--muted) 80%, transparent);
 	}
 
@@ -783,16 +753,26 @@
 	}
 
 	.toolbar-select-label {
-		min-width: 2rem;
+		min-width: 1.4rem;
 		overflow: hidden;
 		text-align: left;
 		text-overflow: ellipsis;
+		font-variant: all-small-caps;
+		letter-spacing: 0.03em;
 	}
 
-	:global(.toolbar-select-chevron) {
-		width: 0.8rem;
-		height: 0.8rem;
-		flex: 0 0 0.8rem;
+	.toolbar-select-label-plain {
+		font-variant: normal;
+		letter-spacing: 0;
+	}
+
+	.toolbar-divider {
+		display: inline-block;
+		width: 1px;
+		height: 1rem;
+		margin: 0 0.1rem;
+		background: var(--border);
+		flex: 0 0 1px;
 	}
 
 	:global(.rich-text-editor-body p.is-editor-empty:first-child::before) {
