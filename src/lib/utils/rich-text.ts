@@ -21,7 +21,7 @@ const ALLOWED_TAGS = [
 ];
 
 const SAFE_FONT_TOKEN =
-	'(?:Arial|Helvetica|Georgia|"Times New Roman"|Times|Verdana|Geneva|Tahoma|"Courier New"|Courier|sans-serif|serif|monospace)';
+	'(?:Arial|Helvetica|Georgia|["\']Times New Roman["\']|Times|Verdana|Geneva|Tahoma|["\']Courier New["\']|Courier|sans-serif|serif|monospace)';
 const FONT_FAMILY_PATTERN = new RegExp(`^${SAFE_FONT_TOKEN}(?:\\s*,\\s*${SAFE_FONT_TOKEN})*$`);
 const FONT_SIZE_PATTERN = /^(?:12|14|16|18|20|24|30|36)px$/;
 const BLOCK_TAGS = ['p', 'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'];

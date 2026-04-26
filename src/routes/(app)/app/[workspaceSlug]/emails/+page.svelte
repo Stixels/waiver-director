@@ -328,14 +328,18 @@
 				savedSendAfterAmount = editorContentToSave.sendAfterAmount;
 				savedSendAfterUnit = editorContentToSave.sendAfterUnit;
 				lastSavedAt = Date.now();
+				if (showToast) toast.success('Email content saved.');
 			}
-			if (showToast) toast.success('Email content saved.');
 		} catch (err) {
 			const message = getConvexErrorMessage(err, 'Failed to save email content.');
-			lastSaveError = message;
-			if (showToast) toast.error(message);
+			if (currentWorkspace?.workspaceId === workspaceId) {
+				lastSaveError = message;
+				if (showToast) toast.error(message);
+			}
 		} finally {
-			isSavingEditorContent = false;
+			if (currentWorkspace?.workspaceId === workspaceId) {
+				isSavingEditorContent = false;
+			}
 		}
 	}
 
@@ -422,15 +426,25 @@
 
 	let previewOpen = $state(false);
 	let previewFollowUpId = $state<FollowUp['_id'] | null>(null);
+	let previewSnapshot = $state<FollowUp | null>(null);
 
 	function openPreview(followUp: FollowUp) {
+		previewSnapshot = followUp;
 		previewFollowUpId = followUp._id;
 		previewOpen = true;
 	}
 
-	const lastPreviewFollowUp = $derived.by(
-		() => followUps.find((followUp) => followUp._id === previewFollowUpId) ?? null
-	);
+	$effect(() => {
+		if (previewOpen) return;
+		previewFollowUpId = null;
+		previewSnapshot = null;
+	});
+
+	const lastPreviewFollowUp = $derived.by(() => {
+		if (!previewFollowUpId) return null;
+		const visibleFollowUp = followUps.find((followUp) => followUp._id === previewFollowUpId);
+		return visibleFollowUp ?? (previewSnapshot?._id === previewFollowUpId ? previewSnapshot : null);
+	});
 
 	function isInteractiveEventTarget(event: Event) {
 		const target = event.target;
