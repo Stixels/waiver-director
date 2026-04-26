@@ -284,4 +284,5 @@ export default defineSchema({
 		.index('by_workspaceId', ['workspaceId'])
 		.index('by_integrationId', ['integrationId'])
 		.index('by_integrationId_and_messageId', ['integrationId', 'messageId'])
+		.index('by_status_and_receivedAt', ['status', 'receivedAt'])
 });

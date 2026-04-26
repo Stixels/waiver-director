@@ -30,6 +30,8 @@ const BOOKEO_WINDOW_MS = 31 * DAY_MS;
 const BOOKEO_FETCH_TIMEOUT_MS = 20_000;
 const BOOKEO_SYNC_MAX_PAGES = 200;
 const CONNECTION_SESSION_RETENTION_MS = 30 * DAY_MS;
+const BOOKEO_WEBHOOK_SUCCESS_RETENTION_MS = 7 * DAY_MS;
+const BOOKEO_WEBHOOK_FAILED_RETENTION_MS = 30 * DAY_MS;
 
 type BookeoBooking = Record<string, unknown>;
 
@@ -904,6 +906,39 @@ export const pruneOldBookingConnectionSessionsCron = internalMutation({
 
 			for (const session of sessions) {
 				await ctx.db.delete(session._id);
+				deletedCount += 1;
+			}
+		}
+
+		return { deletedCount };
+	}
+});
+
+export const pruneOldBookeoWebhookEventsCron = internalMutation({
+	args: {},
+	returns: v.object({
+		deletedCount: v.number()
+	}),
+	handler: async (ctx) => {
+		const now = Date.now();
+		const retentionByStatus = [
+			{ status: 'processed', retentionMs: BOOKEO_WEBHOOK_SUCCESS_RETENTION_MS },
+			{ status: 'ignored', retentionMs: BOOKEO_WEBHOOK_SUCCESS_RETENTION_MS },
+			{ status: 'failed', retentionMs: BOOKEO_WEBHOOK_FAILED_RETENTION_MS }
+		] as const;
+		let deletedCount = 0;
+
+		for (const { status, retentionMs } of retentionByStatus) {
+			const cutoff = now - retentionMs;
+			const events = await ctx.db
+				.query('booking_webhook_events')
+				.withIndex('by_status_and_receivedAt', (q) =>
+					q.eq('status', status).lt('receivedAt', cutoff)
+				)
+				.take(100);
+
+			for (const event of events) {
+				await ctx.db.delete(event._id);
 				deletedCount += 1;
 			}
 		}
