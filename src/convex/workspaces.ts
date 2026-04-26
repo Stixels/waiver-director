@@ -63,7 +63,8 @@ export const createWorkspace = mutation({
 			name,
 			slug,
 			status: 'active',
-			createdByUserId: user._id
+			createdByUserId: user._id,
+			customerCount: 0
 		});
 
 		await ctx.db.insert('workspace_memberships', {

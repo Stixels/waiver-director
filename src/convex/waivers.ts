@@ -4,6 +4,7 @@ import { mutation, query } from './_generated/server';
 import type { Doc, Id } from './_generated/dataModel';
 import type { MutationCtx, QueryCtx } from './_generated/server';
 import { bookingSnapshot, bookingSnapshotValidator } from './lib/bookings';
+import { upsertSignerCustomer } from './lib/customers';
 import {
 	assertWorkspaceRecord,
 	minorInputValidator,
@@ -505,7 +506,8 @@ export const submitPublicWaiver = mutation({
 		}
 
 		const signerName = args.signerName.trim();
-		const signerEmail = args.signerEmail.trim().toLowerCase();
+		const originalSignerEmail = args.signerEmail.trim();
+		const signerEmail = originalSignerEmail.toLowerCase();
 		const signerDateOfBirth = args.signerDateOfBirth.trim();
 		if (signerName.length < 2 || signerName.length > 120) {
 			throw new ConvexError({
@@ -568,6 +570,15 @@ export const submitPublicWaiver = mutation({
 			status: 'submitted',
 			submittedAt
 		});
+		const customerId = await upsertSignerCustomer(ctx, {
+			workspaceId: waiver.workspaceId,
+			signerName,
+			signerEmail: originalSignerEmail,
+			submittedAt,
+			bookingId: booking?._id ?? null,
+			latestSubmissionId: submissionId
+		});
+		await ctx.db.patch(submissionId, { customerId });
 		if (booking) {
 			await ctx.db.patch(booking._id, {
 				signedCount: booking.signedCount + 1 + minors.length

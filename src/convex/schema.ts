@@ -27,7 +27,8 @@ export default defineSchema({
 		name: v.string(),
 		slug: v.string(),
 		status: v.union(v.literal('active'), v.literal('archived')),
-		createdByUserId: v.optional(v.id('users'))
+		createdByUserId: v.optional(v.id('users')),
+		customerCount: v.number()
 	})
 		.index('by_slug', ['slug'])
 		.index('by_createdByUserId', ['createdByUserId']),
@@ -135,9 +136,30 @@ export default defineSchema({
 		.index('by_waiverId', ['waiverId'])
 		.index('by_waiverId_and_versionNumber', ['waiverId', 'versionNumber']),
 
+	customers: defineTable({
+		workspaceId: v.id('workspaces'),
+		normalizedEmail: v.string(),
+		primaryEmail: v.string(),
+		searchText: v.string(),
+		displayName: v.string(),
+		firstSeenAt: v.number(),
+		lastSeenAt: v.number(),
+		visitCount: v.number(),
+		latestSubmissionId: v.id('waiver_submissions'),
+		latestBookingId: v.optional(v.id('bookings'))
+	})
+		.index('by_workspaceId', ['workspaceId'])
+		.index('by_workspaceId_and_normalizedEmail', ['workspaceId', 'normalizedEmail'])
+		.index('by_workspaceId_and_lastSeenAt', ['workspaceId', 'lastSeenAt'])
+		.searchIndex('search_customerText', {
+			searchField: 'searchText',
+			filterFields: ['workspaceId']
+		}),
+
 	waiver_submissions: defineTable({
 		workspaceId: v.id('workspaces'),
 		versionId: v.id('waiver_versions'),
+		customerId: v.optional(v.id('customers')),
 		bookingId: v.optional(v.id('bookings')),
 		bookingSnapshot: v.optional(bookingSnapshotValidator),
 		signerName: v.string(),
@@ -154,7 +176,8 @@ export default defineSchema({
 		submittedAt: v.number()
 	})
 		.index('by_workspaceId', ['workspaceId'])
-		.index('by_bookingId', ['bookingId']),
+		.index('by_bookingId', ['bookingId'])
+		.index('by_customerId_and_submittedAt', ['customerId', 'submittedAt']),
 
 	booking_integrations: defineTable({
 		workspaceId: v.id('workspaces'),
