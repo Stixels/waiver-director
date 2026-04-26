@@ -252,8 +252,10 @@
 
 	type TimeStatus = {
 		label: string;
-		tone: 'now' | 'soon' | 'upcoming' | 'past';
+		tone: 'now' | 'soon' | 'past';
 	};
+
+	const UPCOMING_BOOKING_CHIP_WINDOW_MINUTES = 60;
 
 	// Only meaningful when viewing today: gives each row a scannable "when is this"
 	// hint so operators don't have to mentally subtract times.
@@ -261,22 +263,21 @@
 		if (!isToday || !booking.startTime) return null;
 		const startAt = Date.parse(booking.startTime);
 		if (Number.isNaN(startAt)) return null;
-		const endAt = booking.endTime ? Date.parse(booking.endTime) : startAt + 2 * 60 * 60 * 1000;
+		const endAt = booking.endTime ? Date.parse(booking.endTime) : startAt + 1 * 60 * 60 * 1000;
 		const diffMs = startAt - now;
 		const diffMinutes = Math.round(diffMs / 60_000);
 
 		if (now >= startAt && now <= endAt) return { label: 'Now', tone: 'now' };
 		if (now > endAt) return { label: 'Done', tone: 'past' };
-		if (diffMinutes <= 60) return { label: `In ${diffMinutes}m`, tone: 'soon' };
-		const diffHours = Math.round(diffMinutes / 60);
-		if (diffHours <= 12) return { label: `In ${diffHours}h`, tone: 'upcoming' };
+		if (diffMinutes <= UPCOMING_BOOKING_CHIP_WINDOW_MINUTES) {
+			return { label: `In ${diffMinutes}m`, tone: 'soon' };
+		}
 		return null;
 	}
 
 	function timeStatusClass(tone: TimeStatus['tone']) {
 		if (tone === 'now') return 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400';
 		if (tone === 'soon') return 'bg-amber-500/15 text-amber-700 dark:text-amber-400';
-		if (tone === 'upcoming') return 'bg-muted text-muted-foreground';
 		return 'bg-muted/60 text-muted-foreground/70';
 	}
 </script>
