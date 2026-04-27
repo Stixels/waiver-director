@@ -177,9 +177,63 @@ export default defineSchema({
 		submittedAt: v.number()
 	})
 		.index('by_workspaceId', ['workspaceId'])
+		.index('by_versionId', ['versionId'])
 		.index('by_bookingId', ['bookingId'])
 		.index('by_customerId_and_submittedAt', ['customerId', 'submittedAt'])
 		.searchIndex('search_submissionText', {
+			searchField: 'searchText',
+			filterFields: ['workspaceId']
+		}),
+
+	email_editor_content: defineTable({
+		workspaceId: v.id('workspaces'),
+		subject: v.string(),
+		body: v.string(),
+		sendAfterAmount: v.number(),
+		sendAfterUnit: v.union(v.literal('minutes'), v.literal('hours'), v.literal('days')),
+		updatedAt: v.number()
+	}).index('by_workspaceId', ['workspaceId']),
+
+	email_templates: defineTable({
+		workspaceId: v.id('workspaces'),
+		name: v.string(),
+		subject: v.string(),
+		body: v.string(),
+		sendAfterAmount: v.number(),
+		sendAfterUnit: v.union(v.literal('minutes'), v.literal('hours'), v.literal('days')),
+		createdAt: v.number()
+	}).index('by_workspaceId', ['workspaceId']),
+
+	email_follow_ups: defineTable({
+		workspaceId: v.id('workspaces'),
+		submissionId: v.id('waiver_submissions'),
+		signerName: v.string(),
+		signerEmail: v.string(),
+		searchText: v.optional(v.string()),
+		subjectTemplate: v.optional(v.string()),
+		bodyTemplate: v.optional(v.string()),
+		submittedAt: v.number(),
+		scheduledAt: v.number(),
+		status: v.union(
+			v.literal('queued'),
+			v.literal('sent'),
+			v.literal('cancelled'),
+			v.literal('paused'),
+			v.literal('failed')
+		),
+		scheduledFunctionId: v.optional(v.id('_scheduled_functions')),
+		sentAt: v.optional(v.number()),
+		sentSubject: v.optional(v.string()),
+		sentBodyHtml: v.optional(v.string()),
+		failedAt: v.optional(v.number()),
+		failureReason: v.optional(v.string()),
+		cancelledAt: v.optional(v.number())
+	})
+		.index('by_workspaceId', ['workspaceId'])
+		.index('by_workspaceId_and_status', ['workspaceId', 'status'])
+		.index('by_workspaceId_and_status_and_sentAt', ['workspaceId', 'status', 'sentAt'])
+		.index('by_submissionId', ['submissionId'])
+		.searchIndex('search_follow_ups', {
 			searchField: 'searchText',
 			filterFields: ['workspaceId']
 		}),

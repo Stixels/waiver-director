@@ -3,6 +3,7 @@ import { ConvexError, v } from 'convex/values';
 import { mutation, query } from './_generated/server';
 import type { Doc, Id } from './_generated/dataModel';
 import type { MutationCtx, QueryCtx } from './_generated/server';
+import { internal } from './_generated/api';
 import { bookingSnapshot, bookingSnapshotValidator } from './lib/bookings';
 import { upsertSignerCustomer } from './lib/customers';
 import { submissionSearchText } from './lib/submissions';
@@ -594,6 +595,15 @@ export const submitPublicWaiver = mutation({
 			latestSubmissionId: submissionId
 		});
 		await ctx.db.patch(submissionId, { customerId });
+
+		await ctx.scheduler.runAfter(0, internal.emails.scheduleFollowUpOnSubmission, {
+			workspaceId: waiver.workspaceId,
+			submissionId,
+			signerName,
+			signerEmail: originalSignerEmail,
+			submittedAt
+		});
+
 		if (booking) {
 			await ctx.db.patch(booking._id, {
 				signedCount: booking.signedCount + 1 + minors.length

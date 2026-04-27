@@ -12,6 +12,7 @@ import type * as app from "../app.js";
 import type * as bookings from "../bookings.js";
 import type * as crons from "../crons.js";
 import type * as customers from "../customers.js";
+import type * as emails from "../emails.js";
 import type * as http from "../http.js";
 import type * as integrations from "../integrations.js";
 import type * as lib_auth from "../lib/auth.js";
@@ -37,6 +38,7 @@ declare const fullApi: ApiFromModules<{
   bookings: typeof bookings;
   crons: typeof crons;
   customers: typeof customers;
+  emails: typeof emails;
   http: typeof http;
   integrations: typeof integrations;
   "lib/auth": typeof lib_auth;

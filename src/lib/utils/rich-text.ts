@@ -16,8 +16,14 @@ const ALLOWED_TAGS = [
 	'h3',
 	'h4',
 	'h5',
-	'h6'
+	'h6',
+	'span'
 ];
+
+const SAFE_FONT_TOKEN =
+	'(?:Arial|Helvetica|Georgia|["\']Times New Roman["\']|Times|Verdana|Geneva|Tahoma|["\']Courier New["\']|Courier|sans-serif|serif|monospace)';
+const FONT_FAMILY_PATTERN = new RegExp(`^${SAFE_FONT_TOKEN}(?:\\s*,\\s*${SAFE_FONT_TOKEN})*$`);
+const FONT_SIZE_PATTERN = /^(?:12|14|16|18|20|24|30|36)px$/;
 const BLOCK_TAGS = ['p', 'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'];
 const URL_PROTOCOL_REGEX = /^(https?:|mailto:|tel:|\/|#)/i;
 const TEXT_ALIGN_PATTERNS = [/^left$/i, /^center$/i, /^right$/i, /^justify$/i];
@@ -32,7 +38,8 @@ const SANITIZE_OPTIONS: import('sanitize-html').IOptions = {
 		h3: ['style'],
 		h4: ['style'],
 		h5: ['style'],
-		h6: ['style']
+		h6: ['style'],
+		span: ['style']
 	},
 	allowedStyles: {
 		p: { 'text-align': TEXT_ALIGN_PATTERNS },
@@ -41,7 +48,11 @@ const SANITIZE_OPTIONS: import('sanitize-html').IOptions = {
 		h3: { 'text-align': TEXT_ALIGN_PATTERNS },
 		h4: { 'text-align': TEXT_ALIGN_PATTERNS },
 		h5: { 'text-align': TEXT_ALIGN_PATTERNS },
-		h6: { 'text-align': TEXT_ALIGN_PATTERNS }
+		h6: { 'text-align': TEXT_ALIGN_PATTERNS },
+		span: {
+			'font-family': [FONT_FAMILY_PATTERN],
+			'font-size': [FONT_SIZE_PATTERN]
+		}
 	},
 	allowedSchemes: ['http', 'https', 'mailto', 'tel'],
 	allowedSchemesAppliedToAttributes: ['href'],
@@ -50,6 +61,7 @@ const SANITIZE_OPTIONS: import('sanitize-html').IOptions = {
 		div: (_tagName, attribs) => ({ tagName: 'p', attribs }),
 		b: sanitizeHtml.simpleTransform('strong', {}),
 		i: sanitizeHtml.simpleTransform('em', {}),
+		button: sanitizeHtml.simpleTransform('span', {}),
 		strike: sanitizeHtml.simpleTransform('s', {}),
 		del: sanitizeHtml.simpleTransform('s', {}),
 		a: (_tagName, attribs): import('sanitize-html').Tag => {
@@ -70,7 +82,7 @@ const SANITIZE_OPTIONS: import('sanitize-html').IOptions = {
 	}
 };
 
-function escapeHtml(value: string): string {
+export function escapeHtml(value: string): string {
 	return value
 		.replaceAll('&', '&amp;')
 		.replaceAll('<', '&lt;')
