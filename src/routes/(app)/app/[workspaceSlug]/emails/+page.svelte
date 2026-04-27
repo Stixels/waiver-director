@@ -604,7 +604,7 @@
 				followUpIds: [...selectedIds] as Id<'email_follow_ups'>[]
 			});
 			selectedIds = new SvelteSet();
-			toast.success('Sending selected follow-ups.');
+			toast.message('Selected follow-ups queued for delivery.');
 		} catch (err) {
 			toast.error(getConvexErrorMessage(err, 'Failed to send selected.'));
 		} finally {
@@ -636,7 +636,7 @@
 		try {
 			if (action === 'send') {
 				await convex.mutation(api.emails.sendFollowUpNow, { followUpId });
-				toast.success('Sending now.');
+				toast.message('Follow-up queued for delivery.');
 			} else if (action === 'cancel') {
 				await convex.mutation(api.emails.cancelFollowUp, { followUpId });
 				toast.success('Follow-up cancelled.');
