@@ -13,12 +13,13 @@
 	import CalendarCheckIcon from '@lucide/svelte/icons/calendar-check';
 	import CornerDownLeftIcon from '@lucide/svelte/icons/corner-down-left';
 	import FileTextIcon from '@lucide/svelte/icons/file-text';
+	import Building2Icon from '@lucide/svelte/icons/building-2';
 	import LayoutDashboardIcon from '@lucide/svelte/icons/layout-dashboard';
 	import LayersIcon from '@lucide/svelte/icons/layers';
 	import MailIcon from '@lucide/svelte/icons/mail';
 	import PlugZapIcon from '@lucide/svelte/icons/plug-zap';
 	import SearchIcon from '@lucide/svelte/icons/search';
-	import SettingsIcon from '@lucide/svelte/icons/settings';
+	import SlidersHorizontalIcon from '@lucide/svelte/icons/sliders-horizontal';
 	import UserRoundIcon from '@lucide/svelte/icons/user-round';
 	import UsersRoundIcon from '@lucide/svelte/icons/users-round';
 	import XIcon from '@lucide/svelte/icons/x';
@@ -47,6 +48,7 @@
 		href: `/app/${string}`;
 		aliases: string[];
 		icon: typeof SearchIcon;
+		showWhenEmpty?: boolean;
 	};
 	type ActionDefinition = Omit<ActionItem, 'href'> & {
 		path:
@@ -57,6 +59,9 @@
 			| 'waiver'
 			| 'emails'
 			| 'integrations'
+			| 'settings'
+			| 'settings/general'
+			| 'settings/email'
 			| 'account';
 	};
 	type FlatItem =
@@ -173,16 +178,42 @@
 			label: 'Integrations',
 			description: 'Booking providers and services',
 			path: 'integrations',
-			aliases: ['integration', 'settings', 'bookeo', 'providers'],
+			aliases: ['integration', 'bookeo', 'providers', 'connection', 'connect'],
 			icon: PlugZapIcon
+		},
+		{
+			key: 'settings',
+			label: 'Workspace settings',
+			description: 'Identity, email, and workspace setup',
+			path: 'settings',
+			aliases: ['settings', 'workspace settings', 'workspace setup', 'configuration'],
+			icon: SlidersHorizontalIcon
+		},
+		{
+			key: 'settings-general',
+			label: 'General settings',
+			description: 'Workspace name and URL slug',
+			path: 'settings/general',
+			aliases: ['general', 'workspace name', 'workspace slug', 'slug', 'url slug', 'identity'],
+			icon: Building2Icon,
+			showWhenEmpty: false
+		},
+		{
+			key: 'settings-email',
+			label: 'Email identity settings',
+			description: 'Sender name and reply-to address',
+			path: 'settings/email',
+			aliases: ['email identity', 'sender', 'reply to', 'reply-to', 'from address'],
+			icon: MailIcon,
+			showWhenEmpty: false
 		},
 		{
 			key: 'account',
 			label: 'Account',
-			description: 'Profile and account settings',
+			description: 'Profile and user preferences',
 			path: 'account',
-			aliases: ['settings', 'profile', 'user'],
-			icon: SettingsIcon
+			aliases: ['account', 'profile', 'user', 'billing'],
+			icon: UserRoundIcon
 		}
 	];
 
@@ -196,7 +227,7 @@
 
 	const actionResults = $derived.by<ActionItem[]>(() => {
 		const query = trimmedQuery.toLowerCase();
-		if (!query) return navigationActions;
+		if (!query) return navigationActions.filter((action) => action.showWhenEmpty !== false);
 		return navigationActions.filter((action) =>
 			[action.label, action.description, ...action.aliases].some((value) =>
 				value.toLowerCase().includes(query)
@@ -429,7 +460,7 @@
 				type="text"
 				bind:value={searchInput}
 				onkeydown={handleKeydown}
-				placeholder="Search customers, bookings, emails, activity, booking #…"
+				placeholder="Search pages, customers, bookings, emails, booking #…"
 				autocomplete="off"
 				autocapitalize="off"
 				autocorrect="off"
@@ -439,7 +470,7 @@
 				aria-controls={listboxId}
 				aria-activedescendant={hasResults ? optionId(selectedIndex) : undefined}
 				aria-autocomplete="list"
-				aria-label="Search customers and bookings"
+				aria-label="Search pages, customers, and bookings"
 				class="h-10 min-w-0 flex-1 bg-transparent text-[15px] tracking-tight text-foreground outline-none placeholder:font-normal placeholder:text-muted-foreground/60"
 			/>
 			{#if hasQuery}
@@ -495,7 +526,7 @@
 						<p class="max-w-xs text-[12px] leading-relaxed text-muted-foreground">
 							{hasQuery
 								? `No pages, customers, bookings, or submissions found for "${trimmedQuery}".`
-								: 'Find customers by name or email, bookings by activity, or jump to a booking by its number.'}
+								: 'Jump to a page, find customers by name or email, or open a booking by its number.'}
 						</p>
 					</div>
 					{#if !hasQuery}
@@ -503,11 +534,11 @@
 							class="mt-1 flex flex-wrap items-center justify-center gap-1.5 text-[11px] text-muted-foreground/80"
 						>
 							<span class="rounded-md bg-muted/70 px-2 py-1 ring-1 ring-border/60 ring-inset"
-								>Try a name</span
+								>Try a page</span
 							>
 							<span class="text-muted-foreground/30">·</span>
 							<span class="rounded-md bg-muted/70 px-2 py-1 ring-1 ring-border/60 ring-inset"
-								>or an activity</span
+								>or a name</span
 							>
 							<span class="text-muted-foreground/30">·</span>
 							<span class="rounded-md bg-muted/70 px-2 py-1 ring-1 ring-border/60 ring-inset"
