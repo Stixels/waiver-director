@@ -105,18 +105,6 @@
 	/>
 {/if}
 
-{#if detail && canShare}
-	<QrCodeDialog
-		bind:open={qrDialogOpen}
-		title="Booking QR code"
-		description="Scan to open the waiver for {detail.booking.activityName}."
-		url={bookingPublicUrl()}
-		copySuccessMessage="Booking waiver link copied."
-		copyErrorMessage="Unable to copy booking link."
-		logContext="bookings/detail"
-	/>
-{/if}
-
 <Sheet bind:open>
 	<SheetContent side="right" class="w-full! gap-0 overflow-hidden p-0 sm:max-w-xl!">
 		{#if isLoading}
@@ -200,19 +188,6 @@
 							<Button
 								size="sm"
 								variant="outline"
-								onclick={() => (qrDialogOpen = true)}
-								disabled={!canShare}
-								title={isCanceled
-									? 'Canceled bookings cannot be shared'
-									: !publicSlug
-										? 'Publish a waiver to share QR codes'
-										: 'Show booking QR code'}
-							>
-								<QrCodeIcon class="size-3" aria-hidden="true" />
-								QR code
-							</Button>
-							<Button
-								size="sm"
 								onclick={copyBookingLink}
 								disabled={!canShare}
 								title={isCanceled
@@ -223,6 +198,19 @@
 							>
 								<LinkIcon class="size-3" aria-hidden="true" />
 								Copy link
+							</Button>
+							<Button
+								size="sm"
+								onclick={() => (qrDialogOpen = true)}
+								disabled={!canShare}
+								title={isCanceled
+									? 'Canceled bookings cannot be shared'
+									: !publicSlug
+										? 'Publish a waiver to share QR codes'
+										: 'Show booking QR code'}
+							>
+								<QrCodeIcon class="size-3" aria-hidden="true" />
+								QR code
 							</Button>
 						</div>
 					</div>
@@ -307,3 +295,15 @@
 		{/if}
 	</SheetContent>
 </Sheet>
+
+{#if detail && canShare}
+	<QrCodeDialog
+		bind:open={qrDialogOpen}
+		title="Booking QR code"
+		description="Scan to open the waiver for {detail.booking.activityName}."
+		url={bookingPublicUrl()}
+		copySuccessMessage="Booking waiver link copied."
+		copyErrorMessage="Unable to copy booking link."
+		logContext="bookings/detail"
+	/>
+{/if}

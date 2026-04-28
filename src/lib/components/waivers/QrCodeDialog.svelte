@@ -44,13 +44,13 @@
 </script>
 
 <Dialog bind:open>
-	<DialogContent class="max-w-xs gap-0 overflow-hidden p-0">
+	<DialogContent class="max-w-sm gap-0 overflow-hidden p-0">
 		<DialogHeader class="border-b border-border px-5 py-4">
 			<DialogTitle>{title}</DialogTitle>
 			<DialogDescription>{description}</DialogDescription>
 		</DialogHeader>
 		<div class="flex flex-col items-center gap-4 p-6">
-			<QrCodePreview text={url} size={200} />
+			<QrCodePreview text={url} size={280} />
 			<Button variant="outline" class="w-full" onclick={copyLink}>
 				<LinkIcon class="size-3.5" aria-hidden="true" />
 				Copy link
