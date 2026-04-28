@@ -352,10 +352,7 @@
 	/>
 {/if}
 
-<PageHeader
-	title="Signer contacts"
-	subtitle="Track waiver signers and their repeat-visit history."
->
+<PageHeader title="Signer contacts" subtitle="Track waiver signers and their repeat-visit history.">
 	{#snippet actions()}
 		<span
 			class="inline-flex h-10 items-center gap-2 rounded-full border border-border bg-card/40 px-3 text-xs font-medium text-muted-foreground"

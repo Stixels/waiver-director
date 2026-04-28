@@ -113,6 +113,26 @@
 			: 0
 	);
 	const codeExpired = $derived(replyToPendingVerification && codeExpiresInMs <= 0);
+	const canRequestReplyToVerification = $derived(
+		Boolean(
+			senderSettings?.platformFromEmail &&
+			replyToEmail.trim() &&
+			!isSendingVerification &&
+			!isConfirmingVerification &&
+			!isCancellingVerification
+		)
+	);
+	const canConfirmReplyToVerification = $derived(
+		Boolean(
+			senderSettings?.platformFromEmail &&
+			verificationCode.trim() &&
+			!isSendingVerification &&
+			!isConfirmingVerification &&
+			!isCancellingVerification &&
+			replyToPendingVerification &&
+			!codeExpired
+		)
+	);
 
 	function formatCountdown(ms: number) {
 		const totalSec = Math.max(0, Math.floor(ms / 1000));
@@ -168,7 +188,7 @@
 	}
 
 	async function requestReplyToVerification() {
-		if (!replyToEmail.trim()) return;
+		if (!canRequestReplyToVerification) return;
 		isSendingVerification = true;
 		try {
 			await convex.action(api.emails.startReplyToVerification, {
@@ -185,7 +205,7 @@
 	}
 
 	async function confirmReplyToEmail() {
-		if (!verificationCode.trim()) return;
+		if (!canConfirmReplyToVerification) return;
 		isConfirmingVerification = true;
 		try {
 			await convex.action(api.emails.confirmReplyToVerification, {
@@ -202,6 +222,8 @@
 	}
 
 	async function cancelReplyToVerification() {
+		if (isSendingVerification || isConfirmingVerification || isCancellingVerification) return;
+		if (!senderSettings?.pendingReplyToEmail) return;
 		isCancellingVerification = true;
 		try {
 			await convex.mutation(api.emails.cancelReplyToVerification, {
@@ -227,7 +249,7 @@
 	}
 
 	function handleAutoVerify() {
-		if (verificationCode.trim().length === 6 && replyToPendingVerification) {
+		if (verificationCode.trim().length === 6 && canConfirmReplyToVerification) {
 			void confirmReplyToEmail();
 		}
 	}
@@ -358,8 +380,7 @@
 							disabled={isSendingVerification ||
 								isConfirmingVerification ||
 								isCancellingVerification ||
-								!replyToEmail.trim() ||
-								!senderSettings?.platformFromEmail}
+								!canRequestReplyToVerification}
 							class="step-cta gap-2"
 						>
 							{#if isSendingVerification}
@@ -437,8 +458,7 @@
 									isConfirmingVerification ||
 									isCancellingVerification ||
 									verificationCode.trim().length !== 6 ||
-									!replyToPendingVerification ||
-									codeExpired}
+									!canConfirmReplyToVerification}
 								class="otp-verify gap-2"
 							>
 								{#if isConfirmingVerification}
@@ -455,7 +475,8 @@
 								onclick={cancelReplyToVerification}
 								disabled={isSendingVerification ||
 									isConfirmingVerification ||
-									isCancellingVerification}
+									isCancellingVerification ||
+									!senderSettings?.pendingReplyToEmail}
 								class="otp-cancel gap-2"
 							>
 								{#if isCancellingVerification}
@@ -476,7 +497,7 @@
 									<button
 										type="button"
 										class="otp-foot-link"
-										disabled={isSendingVerification || isCancellingVerification}
+										disabled={!canRequestReplyToVerification}
 										onclick={requestReplyToVerification}
 									>
 										resend the code

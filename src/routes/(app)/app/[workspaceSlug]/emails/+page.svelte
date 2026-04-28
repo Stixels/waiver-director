@@ -155,8 +155,19 @@
 	// ─── Sender summary (read-only on this page) ──────────────────────────────
 
 	const businessName = $derived(currentWorkspace?.name ?? 'Your business');
+	const hasPlatformFromEmail = $derived(Boolean(senderSettings?.platformFromEmail));
 	const workspaceCanSendEmail = $derived(Boolean(senderSettings?.canSendEmails));
 	const replyToPendingVerification = $derived(Boolean(senderSettings?.pendingReplyToEmail));
+	const senderUnavailableMessage = $derived(
+		hasPlatformFromEmail
+			? 'Verify a reply-to email before sending follow-ups.'
+			: 'Sender domain is not configured. Set RESEND_FROM_EMAIL before sending follow-ups.'
+	);
+	const sendSelectionTooltip = $derived.by(() => {
+		if (canSendSelected) return undefined;
+		if (!workspaceCanSendEmail) return senderUnavailableMessage;
+		return 'Select queued, paused, cancelled, or failed rows to send';
+	});
 
 	// ─── Editor content state ──────────────────────────────────────────────────
 
@@ -625,7 +636,7 @@
 	async function handleSendSelected() {
 		if (!currentWorkspace || selectedIds.size === 0) return;
 		if (!workspaceCanSendEmail) {
-			toast.error('Verify a reply-to email before sending follow-ups.');
+			toast.error(senderUnavailableMessage);
 			return;
 		}
 		selectionLoading = 'send';
@@ -664,7 +675,7 @@
 
 	async function handleRowAction(action: 'send' | 'cancel', followUpId: Id<'email_follow_ups'>) {
 		if (action === 'send' && !workspaceCanSendEmail) {
-			toast.error('Verify a reply-to email before sending follow-ups.');
+			toast.error(senderUnavailableMessage);
 			return;
 		}
 		rowLoading = followUpId;
@@ -807,9 +818,7 @@
 						<span></span>
 					{/if}
 					<div class="flex gap-2">
-						<span
-							title={!workspaceCanSendEmail ? 'Verify a reply-to email before sending' : undefined}
-						>
+						<span title={!workspaceCanSendEmail ? senderUnavailableMessage : undefined}>
 							<Button
 								size="sm"
 								onclick={() => handleRowAction('send', previewVars!.followUpId)}
@@ -875,9 +884,12 @@
 					</span>
 				</a>
 			{:else}
-				<div class="sender-banner" data-state={replyToPendingVerification ? 'pending' : 'unset'}>
+				<div
+					class="sender-banner"
+					data-state={replyToPendingVerification && hasPlatformFromEmail ? 'pending' : 'unset'}
+				>
 					<div class="sender-banner-mark">
-						{#if replyToPendingVerification}
+						{#if replyToPendingVerification && hasPlatformFromEmail}
 							<MailCheckIcon class="size-[18px]" />
 						{:else}
 							<MailIcon class="size-[18px]" />
@@ -885,14 +897,20 @@
 					</div>
 					<div class="sender-banner-body">
 						<p class="sender-banner-title">
-							{#if replyToPendingVerification}
+							{#if !hasPlatformFromEmail}
+								Sender domain is not configured
+							{:else if replyToPendingVerification}
 								Almost there — verify your reply-to email
 							{:else}
 								Set up your sender to start sending follow-ups
 							{/if}
 						</p>
 						<p class="sender-banner-desc">
-							{#if replyToPendingVerification}
+							{#if !hasPlatformFromEmail}
+								Ask an admin to set
+								<code>RESEND_FROM_EMAIL</code>
+								before follow-ups can be queued for delivery.
+							{:else if replyToPendingVerification}
 								We sent a code to
 								<strong class="font-medium text-foreground"
 									>{senderSettings?.pendingReplyToEmail}</strong
@@ -903,7 +921,7 @@
 						</p>
 					</div>
 					<a class="sender-banner-cta" href={settingsHref}>
-						{replyToPendingVerification ? 'Continue' : 'Set up'}
+						{replyToPendingVerification && hasPlatformFromEmail ? 'Continue' : 'Set up'}
 						<ChevronRightIcon class="size-3.5" />
 					</a>
 				</div>
@@ -1200,14 +1218,7 @@
 					</div>
 				</div>
 				<div class="flex gap-1.5 sm:ml-auto">
-					<span
-						class="inline-block flex-1 sm:flex-none"
-						title={!canSendSelected
-							? workspaceCanSendEmail
-								? 'Select queued, paused, cancelled, or failed rows to send'
-								: 'Verify a reply-to email before sending'
-							: undefined}
-					>
+					<span class="inline-block flex-1 sm:flex-none" title={sendSelectionTooltip}>
 						<Button
 							size="lg"
 							onclick={handleSendSelected}

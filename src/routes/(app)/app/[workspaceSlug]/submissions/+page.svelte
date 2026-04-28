@@ -241,10 +241,7 @@
 	/>
 {/if}
 
-<PageHeader
-	title="Signed waiver records"
-	subtitle="Click any row to view the full signed waiver."
->
+<PageHeader title="Signed waiver records" subtitle="Click any row to view the full signed waiver.">
 	{#snippet meta()}
 		<div class="relative w-full lg:max-w-md">
 			<SearchIcon

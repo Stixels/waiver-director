@@ -490,7 +490,7 @@
 				aria-hidden="true"
 			/>
 			<input
-				type="text"
+				type="search"
 				placeholder="Search by customer, activity, or booking number"
 				value={searchQuery}
 				oninput={handleSearchInput}

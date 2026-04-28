@@ -70,6 +70,10 @@ function configuredFromEmail(): string | null {
 	return process.env.RESEND_FROM_EMAIL?.trim() || null;
 }
 
+function canSendWorkspaceEmail(settings: Doc<'workspace_email_settings'> | null): boolean {
+	return Boolean(configuredFromEmail() && settings?.replyToEmail && settings.replyToVerifiedAt);
+}
+
 function requireFromEmail(): string {
 	const fromAddress = configuredFromEmail();
 	if (!fromAddress) {
@@ -99,6 +103,13 @@ async function requireWorkspaceVerifiedReplyTo(
 	ctx: Pick<QueryCtx, 'db'>,
 	workspaceId: Doc<'workspaces'>['_id']
 ) {
+	if (!configuredFromEmail()) {
+		throw new ConvexError({
+			code: 'invalid_configuration',
+			message: 'RESEND_FROM_EMAIL is not set.'
+		});
+	}
+
 	const settings = await ctx.db
 		.query('workspace_email_settings')
 		.withIndex('by_workspaceId', (q) => q.eq('workspaceId', workspaceId))
@@ -215,9 +226,7 @@ export const getWorkspaceEmailSenderSettings = query({
 			replyToVerifiedAt: settings?.replyToVerifiedAt ?? null,
 			pendingReplyToEmail: settings?.pendingReplyToEmail ?? null,
 			verificationCodeExpiresAt: settings?.verificationCodeExpiresAt ?? null,
-			canSendEmails: Boolean(
-				platformFromEmail && settings?.replyToEmail && settings.replyToVerifiedAt
-			)
+			canSendEmails: canSendWorkspaceEmail(settings)
 		};
 	}
 });
@@ -861,7 +870,7 @@ export const scheduleFollowUpOnSubmission = internalMutation({
 			.query('workspace_email_settings')
 			.withIndex('by_workspaceId', (q) => q.eq('workspaceId', args.workspaceId))
 			.unique();
-		const canSend = Boolean(senderSettings?.replyToEmail && senderSettings.replyToVerifiedAt);
+		const canSend = canSendWorkspaceEmail(senderSettings);
 
 		const followUpId = await ctx.db.insert('email_follow_ups', {
 			workspaceId: args.workspaceId,

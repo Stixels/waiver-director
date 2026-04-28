@@ -14,7 +14,7 @@
 </script>
 
 <header class="page-header w-full px-6 py-5">
-	<div class="mx-auto w-full min-w-0 max-w-7xl">
+	<div class="mx-auto w-full max-w-7xl min-w-0">
 		<div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
 			<div class="min-w-0 space-y-1.5">
 				<h1 class="text-2xl font-semibold tracking-tight text-balance">{title}</h1>

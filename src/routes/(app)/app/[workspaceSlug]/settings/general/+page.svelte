@@ -24,6 +24,7 @@
 	import CheckIcon from '@lucide/svelte/icons/check';
 
 	const WORKSPACE_SLUG_REGEX = /^[a-z0-9](?:[a-z0-9-]{0,46}[a-z0-9])$/;
+	const RESERVED_SLUGS = ['workspaces'];
 
 	const convex = useConvexClient();
 	const appContext = useAppContext();
@@ -67,8 +68,10 @@
 	const nameChanged = $derived(Boolean(currentWorkspace && trimmedName !== currentWorkspace.name));
 	const nameValid = $derived(trimmedName.length >= 2 && trimmedName.length <= 80);
 
-	const slugChanged = $derived(Boolean(currentWorkspace && slug && slug !== currentWorkspace.slug));
-	const slugValid = $derived(WORKSPACE_SLUG_REGEX.test(slug));
+	const slugChanged = $derived(Boolean(currentWorkspace && slug !== currentWorkspace.slug));
+	const slugValid = $derived(
+		Boolean(slug) && WORKSPACE_SLUG_REGEX.test(slug) && !RESERVED_SLUGS.includes(slug)
+	);
 	const slugMatchesConfirm = $derived(confirmTyped.trim() === slug);
 
 	function handleSlugInput(event: Event) {
@@ -129,7 +132,9 @@
 	<DialogContent class="overflow-hidden p-0 sm:max-w-md">
 		<DialogHeader class="space-y-2 border-b border-border px-6 py-5">
 			<div class="flex items-start gap-3">
-				<div class="flex size-8 items-center justify-center rounded-md border text-muted-foreground">
+				<div
+					class="flex size-8 items-center justify-center rounded-md border text-muted-foreground"
+				>
 					<TriangleAlertIcon class="size-5" />
 				</div>
 				<div class="min-w-0 flex-1">
@@ -279,9 +284,10 @@
 				class="slug-input h-10 font-mono"
 			/>
 		</div>
-		<p class="settings-hint" class:invalid={slug.length > 0 && !slugValid}>
-			{#if slug.length > 0 && !slugValid}
-				2–48 lowercase letters, numbers, and hyphens. Must start and end with a letter or number.
+		<p class="settings-hint" class:invalid={slugChanged && !slugValid}>
+			{#if slugChanged && !slugValid}
+				2–48 lowercase letters, numbers, and hyphens. Must start/end with a letter or number and
+				cannot be reserved.
 			{:else if slugChanged}
 				Will change your URL from
 				<code class="settings-mono">app/{currentWorkspace?.slug}</code>

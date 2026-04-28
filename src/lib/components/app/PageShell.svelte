@@ -9,7 +9,7 @@
 </script>
 
 <div class="w-full min-w-0 p-6">
-	<div class="mx-auto w-full min-w-0 max-w-7xl space-y-6">
+	<div class="mx-auto w-full max-w-7xl min-w-0 space-y-6">
 		{@render children()}
 	</div>
 </div>
