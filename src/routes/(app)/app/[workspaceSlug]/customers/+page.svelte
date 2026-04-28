@@ -358,7 +358,7 @@
 >
 	{#snippet actions()}
 		<span
-			class="inline-flex items-center gap-2 rounded-full border border-border bg-card/40 px-3 py-1.5 text-xs font-medium text-muted-foreground"
+			class="inline-flex h-10 items-center gap-2 rounded-full border border-border bg-card/40 px-3 text-xs font-medium text-muted-foreground"
 		>
 			<UsersRoundIcon class="size-3.5" aria-hidden="true" />
 			{#if isLoadingCustomers && !customerPage}

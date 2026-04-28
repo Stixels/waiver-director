@@ -446,7 +446,7 @@
 >
 	{#snippet actions()}
 		<div
-			class="flex w-full flex-wrap items-center gap-1 rounded-xl border border-border bg-card/40 p-1.5 lg:w-auto"
+			class="flex w-full flex-wrap items-center gap-1 rounded-xl border border-border bg-card/40 p-0.5 lg:w-auto"
 		>
 			<Button
 				size="icon-sm"
