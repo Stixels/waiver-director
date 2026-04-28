@@ -677,7 +677,7 @@
 				</div>
 			{:else}
 				<div
-					class="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border bg-card/30 px-4 py-12 text-center"
+					class="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border bg-card/30 px-4 py-16 text-center"
 				>
 					<div
 						class="flex size-10 items-center justify-center rounded-full bg-muted text-muted-foreground"
