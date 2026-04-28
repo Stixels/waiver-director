@@ -651,20 +651,22 @@
 											<CalendarClockIcon class="size-3" aria-hidden="true" />
 										</div>
 										<div class="min-w-0 flex-1">
-											<p class="truncate text-sm font-medium">
-												{visit.booking?.activityName ?? 'General waiver'}
-											</p>
+											<div class="flex min-w-0 items-center gap-2">
+												<p class="truncate text-sm font-medium">
+													{visit.booking?.activityName ?? 'General waiver'}
+												</p>
+												{#if visit.minorCount > 0}
+													<span
+														class="inline-flex shrink-0 items-center rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-muted-foreground tabular-nums"
+													>
+														+{visit.minorCount}
+														{visit.minorCount === 1 ? 'minor' : 'minors'}
+													</span>
+												{/if}
+											</div>
 											<p class="mt-0.5 truncate text-xs text-muted-foreground tabular-nums">
 												{dateLabel}
 											</p>
-											{#if visit.minorCount > 0}
-												<p
-													class="mt-1 inline-flex items-center rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-muted-foreground tabular-nums"
-												>
-													+{visit.minorCount}
-													{visit.minorCount === 1 ? 'minor' : 'minors'}
-												</p>
-											{/if}
 										</div>
 										<ChevronRightIcon
 											class="mt-0.5 size-4 shrink-0 text-muted-foreground/50 transition-transform group-hover:translate-x-0.5 group-hover:text-muted-foreground"
