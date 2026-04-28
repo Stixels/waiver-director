@@ -8,6 +8,8 @@
 	import type { Id } from '$convex/_generated/dataModel';
 	import BookingDetailSheet from '$lib/components/bookings/BookingDetailSheet.svelte';
 	import { useAppContext } from '$lib/components/app/app-context.svelte';
+	import PageShell from '$lib/components/app/PageShell.svelte';
+	import PageHeader from '$lib/components/app/PageHeader.svelte';
 	import { useProtectedQuery } from '$lib/components/auth/convex-auth.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { Skeleton } from '$lib/components/ui/skeleton';
@@ -438,522 +440,515 @@
 	/>
 {/if}
 
-<div class="w-full min-w-0 p-6">
-	<div class="mx-auto w-full max-w-7xl min-w-0 space-y-6">
-		<div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-			<div class="min-w-0 space-y-1">
-				<h1 class="text-2xl font-semibold tracking-tight">Check-ins</h1>
-				<p class="text-sm text-muted-foreground">
-					{formatSelectedDate(selectedDate)} · Front desk check-in coverage.
-				</p>
-			</div>
-
-			<div
-				class="flex w-full flex-wrap items-center gap-1 rounded-xl border border-border bg-card/40 p-1.5 lg:w-auto"
+<PageHeader
+	title="Check-ins"
+	subtitle="{formatSelectedDate(selectedDate)} · Front desk check-in coverage."
+>
+	{#snippet actions()}
+		<div
+			class="flex w-full flex-wrap items-center gap-1 rounded-xl border border-border bg-card/40 p-1.5 lg:w-auto"
+		>
+			<Button
+				size="icon-sm"
+				variant="ghost"
+				onclick={() => changeDate(-1)}
+				aria-label="Previous day"
 			>
-				<Button
-					size="icon-sm"
-					variant="ghost"
-					onclick={() => changeDate(-1)}
-					aria-label="Previous day"
-				>
-					<ChevronLeftIcon class="size-4" aria-hidden="true" />
-				</Button>
+				<ChevronLeftIcon class="size-4" aria-hidden="true" />
+			</Button>
 
-				<label
-					class="relative flex h-9 flex-1 items-center gap-2 rounded-md border border-input bg-background px-2.5 text-sm transition-colors focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/30 lg:flex-none"
-				>
-					<CalendarDaysIcon class="size-4 text-muted-foreground" aria-hidden="true" />
-					<span class="sr-only">Booking date</span>
-					<input
-						type="date"
-						class="h-7 w-full bg-transparent text-sm outline-none lg:w-32"
-						value={selectedDate}
-						oninput={handleDateInput}
-					/>
-				</label>
-
-				<Button
-					size="sm"
-					variant={isToday ? 'secondary' : 'ghost'}
-					onclick={goToday}
-					disabled={isToday}
-				>
-					Today
-				</Button>
-				<Button size="icon-sm" variant="ghost" onclick={() => changeDate(1)} aria-label="Next day">
-					<ChevronRightIcon class="size-4" aria-hidden="true" />
-				</Button>
-			</div>
-		</div>
-
-		<div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-			<div class="relative w-full lg:max-w-md">
-				<SearchIcon
-					class="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground transition-colors"
-					aria-hidden="true"
-				/>
+			<label
+				class="relative flex h-9 flex-1 items-center gap-2 rounded-md border border-input bg-background px-2.5 text-sm transition-colors focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/30 lg:flex-none"
+			>
+				<CalendarDaysIcon class="size-4 text-muted-foreground" aria-hidden="true" />
+				<span class="sr-only">Booking date</span>
 				<input
-					type="text"
-					placeholder="Search by customer, activity, or booking number"
-					value={searchQuery}
-					oninput={handleSearchInput}
-					class="h-10 w-full rounded-lg border border-input bg-card/50 pr-10 pl-11 text-sm shadow-xs transition-all placeholder:text-muted-foreground/70 hover:bg-card focus-visible:border-ring focus-visible:bg-background focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
-					aria-label="Search bookings"
+					type="date"
+					class="h-7 w-full bg-transparent text-sm outline-none lg:w-32"
+					value={selectedDate}
+					oninput={handleDateInput}
 				/>
-				{#if searchQuery}
+			</label>
+
+			<Button
+				size="sm"
+				variant={isToday ? 'secondary' : 'ghost'}
+				onclick={goToday}
+				disabled={isToday}
+			>
+				Today
+			</Button>
+			<Button size="icon-sm" variant="ghost" onclick={() => changeDate(1)} aria-label="Next day">
+				<ChevronRightIcon class="size-4" aria-hidden="true" />
+			</Button>
+		</div>
+	{/snippet}
+	{#snippet meta()}
+		<div class="relative w-full lg:max-w-md">
+			<SearchIcon
+				class="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground transition-colors"
+				aria-hidden="true"
+			/>
+			<input
+				type="text"
+				placeholder="Search by customer, activity, or booking number"
+				value={searchQuery}
+				oninput={handleSearchInput}
+				class="h-9 w-full rounded-lg border border-input bg-background/60 pr-10 pl-11 text-sm shadow-xs transition-all placeholder:text-muted-foreground/70 hover:bg-background focus-visible:border-ring focus-visible:bg-background focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
+				aria-label="Search bookings"
+			/>
+			{#if searchQuery}
+				<button
+					type="button"
+					onclick={clearSearch}
+					class="absolute top-1/2 right-2 inline-flex size-6 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
+					aria-label="Clear search"
+				>
+					<XIcon class="size-3.5" aria-hidden="true" />
+				</button>
+			{/if}
+		</div>
+	{/snippet}
+</PageHeader>
+
+<PageShell>
+	<div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+		<div class="flex w-full flex-wrap items-center gap-3 lg:w-auto">
+			{#if isToday}
+				<label
+					class="inline-flex h-10 w-full cursor-pointer items-center rounded-lg border border-input bg-card/50 p-0.5 shadow-xs lg:w-auto"
+				>
+					<input
+						type="checkbox"
+						checked={hideDone}
+						onchange={handleHideDoneChange}
+						class="peer sr-only"
+					/>
+					<span
+						class="inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-md px-3 text-xs font-medium whitespace-nowrap text-muted-foreground transition-all peer-checked:bg-background peer-checked:text-foreground peer-checked:shadow-sm peer-focus-visible:ring-2 peer-focus-visible:ring-ring/30 peer-focus-visible:outline-none hover:text-foreground lg:h-8"
+					>
+						<EyeOffIcon class="size-3.5" aria-hidden="true" />
+						Hide done
+					</span>
+				</label>
+			{/if}
+			<div
+				class="grid h-10 w-full grid-cols-4 items-center rounded-lg border border-input bg-card/50 p-0.5 shadow-xs lg:inline-flex lg:w-auto"
+				role="tablist"
+				aria-label="Filter bookings by status"
+			>
+				{#each STATUS_FILTERS as filter (filter.value)}
+					{@const active = statusFilter === filter.value}
+					{@const filterCount = statusFilterCount(filter.value)}
 					<button
 						type="button"
-						onclick={clearSearch}
-						class="absolute top-1/2 right-2 inline-flex size-6 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
-						aria-label="Clear search"
-					>
-						<XIcon class="size-3.5" aria-hidden="true" />
-					</button>
-				{/if}
-			</div>
-
-			<div class="flex w-full flex-wrap items-center gap-3 lg:w-auto">
-				{#if isToday}
-					<label
-						class="inline-flex h-10 w-full cursor-pointer items-center rounded-lg border border-input bg-card/50 p-0.5 shadow-xs lg:w-auto"
-					>
-						<input
-							type="checkbox"
-							checked={hideDone}
-							onchange={handleHideDoneChange}
-							class="peer sr-only"
-						/>
-						<span
-							class="inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-md px-3 text-xs font-medium whitespace-nowrap text-muted-foreground transition-all peer-checked:bg-background peer-checked:text-foreground peer-checked:shadow-sm peer-focus-visible:ring-2 peer-focus-visible:ring-ring/30 peer-focus-visible:outline-none hover:text-foreground lg:h-8"
-						>
-							<EyeOffIcon class="size-3.5" aria-hidden="true" />
-							Hide done
-						</span>
-					</label>
-				{/if}
-				<div
-					class="grid h-10 w-full grid-cols-4 items-center rounded-lg border border-input bg-card/50 p-0.5 shadow-xs lg:inline-flex lg:w-auto"
-					role="tablist"
-					aria-label="Filter bookings by status"
-				>
-					{#each STATUS_FILTERS as filter (filter.value)}
-						{@const active = statusFilter === filter.value}
-						{@const filterCount = statusFilterCount(filter.value)}
-						<button
-							type="button"
-							role="tab"
-							aria-selected={active}
-							onclick={() => setStatusFilter(filter.value)}
-							class={cn(
-								'inline-flex h-9 items-center justify-center rounded-md px-1.5 text-xs font-medium whitespace-nowrap transition-all focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none lg:h-8 lg:px-3',
-								active
-									? 'bg-background text-foreground shadow-sm'
-									: 'text-muted-foreground hover:text-foreground'
-							)}
-						>
-							<span>{filter.label}</span>
-							<span
-								class={cn(
-									'ml-1 rounded-sm px-1 py-0.5 text-[10px] tabular-nums lg:ml-1.5 lg:px-1.5',
-									active ? 'bg-muted text-muted-foreground' : 'bg-muted/60 text-muted-foreground'
-								)}
-							>
-								{#if isInitialLoading}
-									<Skeleton class="h-2.5 w-2.5" />
-								{:else if filterCount === null}
-									&mdash;
-								{:else}
-									{filterCount}
-								{/if}
-							</span>
-						</button>
-					{/each}
-				</div>
-			</div>
-		</div>
-
-		{#if isLoading}
-			<div class="space-y-3 md:hidden">
-				{#each [0, 1, 2, 3, 4, 5] as index (index)}
-					<div class="overflow-hidden rounded-xl border border-border bg-card/30">
-						<div class="p-4">
-							<div class="flex items-start justify-between gap-3">
-								<div class="min-w-0 flex-1 space-y-2">
-									<div class="flex items-center gap-2">
-										<Skeleton class="h-4 w-16" />
-										<Skeleton class="h-5 w-12 rounded-full" />
-									</div>
-									<Skeleton class="h-5 w-32" />
-									<Skeleton class="h-4 w-28" />
-									<Skeleton class="h-3 w-40" />
-								</div>
-								<div class="space-y-1">
-									<Skeleton class="ml-auto h-4 w-10" />
-									<Skeleton class="ml-auto h-3 w-12" />
-								</div>
-							</div>
-						</div>
-						<div class="flex items-center justify-between border-t border-border px-4 py-2.5">
-							<Skeleton class="h-3 w-20" />
-							<Skeleton class="h-8 w-20" />
-						</div>
-					</div>
-				{/each}
-			</div>
-			<div class="hidden overflow-hidden rounded-xl border border-border md:block">
-				{#each [0, 1, 2, 3, 4, 5] as index (index)}
-					<div
-						class="grid grid-cols-[10%_28%_27%_20%_15%] items-center gap-4 border-b border-border px-4 py-3.5 last:border-b-0"
-					>
-						<div class="space-y-1.5">
-							<Skeleton class="h-4 w-14" />
-							<Skeleton class="h-4 w-10 rounded-full" />
-						</div>
-						<Skeleton class="h-4 w-40" />
-						<div class="space-y-1.5">
-							<Skeleton class="h-4 w-32" />
-							<Skeleton class="h-3 w-36" />
-						</div>
-						<Skeleton class="h-4 w-12" />
-						<div class="flex justify-end">
-							<Skeleton class="h-8 w-20" />
-						</div>
-					</div>
-				{/each}
-			</div>
-		{:else if !currentWorkspace}
-			<div
-				class="rounded-xl border border-dashed border-border p-12 text-center text-sm text-muted-foreground"
-			>
-				Workspace not found.
-			</div>
-		{:else if bookings.length === 0}
-			<div
-				class="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border bg-card/30 px-4 py-16 text-center"
-			>
-				<div
-					class="flex size-10 items-center justify-center rounded-full bg-muted text-muted-foreground"
-				>
-					<CalendarOffIcon class="size-5" aria-hidden="true" />
-				</div>
-				<div class="space-y-1">
-					<p class="text-sm font-medium">
-						{searchQuery || statusFilter !== 'all'
-							? 'No matching bookings'
-							: hideDone && isToday
-								? 'No unfinished bookings'
-								: 'No bookings synced for this day'}
-					</p>
-					<p class="text-xs text-muted-foreground">
-						{#if searchQuery || statusFilter !== 'all'}
-							Adjust search or filters for {formatSelectedDate(selectedDate)}.
-						{:else if hideDone && isToday}
-							Show done bookings to review rooms that have already ended.
-						{:else}
-							Try a different date or check the booking integration.
-						{/if}
-					</p>
-				</div>
-			</div>
-		{:else}
-			<div class="space-y-3 md:hidden">
-				{#each bookings as booking (booking.bookingId)}
-					{@const isCanceled = booking.status === 'canceled'}
-					{@const isNextUpcoming = booking.bookingId === bookingPage?.nextUpcomingBookingId}
-					{@const complete =
-						booking.participantCount > 0 && booking.signedCount >= booking.participantCount}
-					{@const time = formatTime(booking.startTime)}
-					{@const status = timeStatus(booking)}
-					<div
+						role="tab"
+						aria-selected={active}
+						onclick={() => setStatusFilter(filter.value)}
 						class={cn(
-							'overflow-hidden rounded-xl border border-border bg-card/30',
-							isNextUpcoming && !isCanceled && 'border-primary/40',
-							isCanceled && 'opacity-60'
+							'inline-flex h-9 items-center justify-center rounded-md px-1.5 text-xs font-medium whitespace-nowrap transition-all focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none lg:h-8 lg:px-3',
+							active
+								? 'bg-background text-foreground shadow-sm'
+								: 'text-muted-foreground hover:text-foreground'
 						)}
 					>
-						<button
-							type="button"
-							class="block w-full p-4 text-left transition-colors hover:bg-muted/30 focus-visible:bg-muted/30 focus-visible:outline-none"
-							onclick={() => openBooking(booking.bookingId)}
+						<span>{filter.label}</span>
+						<span
+							class={cn(
+								'ml-1 rounded-sm px-1 py-0.5 text-[10px] tabular-nums lg:ml-1.5 lg:px-1.5',
+								active ? 'bg-muted text-muted-foreground' : 'bg-muted/60 text-muted-foreground'
+							)}
 						>
-							<div class="flex items-start justify-between gap-3">
-								<div class="min-w-0">
-									<div class="flex flex-wrap items-center gap-2">
-										<p class="text-sm font-semibold tabular-nums">
-											{time ?? 'Not set'}
-										</p>
-										{#if isCanceled}
-											<span
-												class="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-muted-foreground uppercase"
-											>
-												Canceled
-											</span>
-										{:else if status}
-											<span
-												class={cn(
-													'rounded-full px-1.5 py-0.5 text-[10px] font-semibold tracking-wide uppercase tabular-nums',
-													timeStatusClass(status.tone)
-												)}
-											>
-												{status.label}
-											</span>
-										{:else if isNextUpcoming}
-											<span
-												class="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-primary uppercase"
-											>
-												Next up
-											</span>
-										{/if}
-									</div>
-									<p
-										class={cn(
-											'mt-2 truncate text-base font-semibold',
-											isCanceled && 'line-through decoration-muted-foreground/60'
-										)}
-									>
-										{booking.activityName}
-									</p>
-									<p class="mt-0.5 truncate text-sm text-muted-foreground">
-										{booking.leadCustomerName ?? 'Unknown customer'}
-									</p>
-									<p class="truncate text-xs text-muted-foreground/80">
-										{booking.leadCustomerEmail ?? 'No email on booking'}
-									</p>
-								</div>
-								<div class="shrink-0 text-right">
-									<p
-										class={cn(
-											'text-sm font-semibold tabular-nums',
-											complete
-												? 'text-emerald-600 dark:text-emerald-400'
-												: booking.signedCount === 0 && booking.participantCount > 0
-													? 'text-muted-foreground'
-													: 'text-foreground'
-										)}
-									>
-										{booking.signedCount}
-										<span class="font-normal text-muted-foreground"
-											>/ {booking.participantCount}</span
-										>
-									</p>
-									<p
-										class="mt-0.5 text-[10px] font-semibold tracking-wide text-muted-foreground uppercase"
-									>
-										Signed
-									</p>
-								</div>
-							</div>
-						</button>
-						<div class="flex items-center justify-between border-t border-border px-4 py-2.5">
-							<p class="text-xs text-muted-foreground">
-								{complete && !isCanceled
-									? 'All waivers signed'
-									: isCanceled
-										? 'Canceled booking'
-										: `${Math.max(0, booking.participantCount - booking.signedCount)} incomplete`}
-							</p>
-							<Button
-								size="sm"
-								variant="outline"
-								onclick={(event) => copyBookingLink(booking, event)}
-								disabled={!publicSlug || isCanceled}
-								aria-label="Copy booking waiver link"
-								title={isCanceled
-									? 'Canceled bookings cannot be shared'
-									: !publicSlug
-										? 'Publish a waiver to share links'
-										: 'Copy booking waiver link'}
-							>
-								<CopyIcon class="size-3" aria-hidden="true" />
-								Share
-							</Button>
-						</div>
-					</div>
+							{#if isInitialLoading}
+								<Skeleton class="h-2.5 w-2.5" />
+							{:else if filterCount === null}
+								&mdash;
+							{:else}
+								{filterCount}
+							{/if}
+						</span>
+					</button>
 				{/each}
 			</div>
+		</div>
+	</div>
 
-			<div class="hidden overflow-hidden rounded-xl border border-border md:block">
-				<Table class="table-fixed">
-					<colgroup>
-						<col class="w-[10%]" />
-						<col class="w-[28%]" />
-						<col class="w-[27%]" />
-						<col class="w-[20%]" />
-						<col class="w-[15%]" />
-					</colgroup>
-					<TableHeader>
-						<TableRow class="border-border hover:bg-transparent">
-							<TableHead
-								class="text-xs font-semibold tracking-widest text-muted-foreground uppercase"
-							>
-								Time
-							</TableHead>
-							<TableHead
-								class="text-xs font-semibold tracking-widest text-muted-foreground uppercase"
-							>
-								Activity
-							</TableHead>
-							<TableHead
-								class="text-xs font-semibold tracking-widest text-muted-foreground uppercase"
-							>
-								Customer
-							</TableHead>
-							<TableHead
-								class="text-xs font-semibold tracking-widest text-muted-foreground uppercase"
-							>
-								Signed
-							</TableHead>
-							<TableHead class="text-right">
-								<span class="sr-only">Actions</span>
-							</TableHead>
-						</TableRow>
-					</TableHeader>
-					<TableBody>
-						{#each bookings as booking (booking.bookingId)}
-							{@const isCanceled = booking.status === 'canceled'}
-							{@const isNextUpcoming = booking.bookingId === bookingPage?.nextUpcomingBookingId}
-							{@const complete =
-								booking.participantCount > 0 && booking.signedCount >= booking.participantCount}
-							<TableRow
-								class={cn(
-									'relative cursor-pointer border-border transition-colors hover:bg-muted/30 focus-visible:bg-muted/30 focus-visible:outline-none',
-									isCanceled && 'opacity-55'
-								)}
-								role="button"
-								tabindex={0}
-								onclick={() => openBooking(booking.bookingId)}
-								onkeydown={(event) => handleBookingRowKeydown(event, booking.bookingId)}
-							>
-								<TableCell class="relative align-top">
-									{#if isNextUpcoming}
-										<span class="absolute inset-y-0 left-0 w-0.5 bg-primary" aria-hidden="true"
-										></span>
-									{/if}
-									{@const time = formatTime(booking.startTime)}
-									{@const status = timeStatus(booking)}
-									{#if time}
-										<p class="text-sm font-medium tabular-nums">{time}</p>
-									{:else}
-										<p class="text-sm text-muted-foreground">Not set</p>
-									{/if}
-									{#if status && !isCanceled}
+	{#if isLoading}
+		<div class="space-y-3 md:hidden">
+			{#each [0, 1, 2, 3, 4, 5] as index (index)}
+				<div class="overflow-hidden rounded-xl border border-border bg-card/30">
+					<div class="p-4">
+						<div class="flex items-start justify-between gap-3">
+							<div class="min-w-0 flex-1 space-y-2">
+								<div class="flex items-center gap-2">
+									<Skeleton class="h-4 w-16" />
+									<Skeleton class="h-5 w-12 rounded-full" />
+								</div>
+								<Skeleton class="h-5 w-32" />
+								<Skeleton class="h-4 w-28" />
+								<Skeleton class="h-3 w-40" />
+							</div>
+							<div class="space-y-1">
+								<Skeleton class="ml-auto h-4 w-10" />
+								<Skeleton class="ml-auto h-3 w-12" />
+							</div>
+						</div>
+					</div>
+					<div class="flex items-center justify-between border-t border-border px-4 py-2.5">
+						<Skeleton class="h-3 w-20" />
+						<Skeleton class="h-8 w-20" />
+					</div>
+				</div>
+			{/each}
+		</div>
+		<div class="hidden overflow-hidden rounded-xl border border-border md:block">
+			{#each [0, 1, 2, 3, 4, 5] as index (index)}
+				<div
+					class="grid grid-cols-[10%_28%_27%_20%_15%] items-center gap-4 border-b border-border px-4 py-3.5 last:border-b-0"
+				>
+					<div class="space-y-1.5">
+						<Skeleton class="h-4 w-14" />
+						<Skeleton class="h-4 w-10 rounded-full" />
+					</div>
+					<Skeleton class="h-4 w-40" />
+					<div class="space-y-1.5">
+						<Skeleton class="h-4 w-32" />
+						<Skeleton class="h-3 w-36" />
+					</div>
+					<Skeleton class="h-4 w-12" />
+					<div class="flex justify-end">
+						<Skeleton class="h-8 w-20" />
+					</div>
+				</div>
+			{/each}
+		</div>
+	{:else if !currentWorkspace}
+		<div
+			class="rounded-xl border border-dashed border-border p-12 text-center text-sm text-muted-foreground"
+		>
+			Workspace not found.
+		</div>
+	{:else if bookings.length === 0}
+		<div
+			class="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border bg-card/30 px-4 py-16 text-center"
+		>
+			<div
+				class="flex size-10 items-center justify-center rounded-full bg-muted text-muted-foreground"
+			>
+				<CalendarOffIcon class="size-5" aria-hidden="true" />
+			</div>
+			<div class="space-y-1">
+				<p class="text-sm font-medium">
+					{searchQuery || statusFilter !== 'all'
+						? 'No matching bookings'
+						: hideDone && isToday
+							? 'No unfinished bookings'
+							: 'No bookings synced for this day'}
+				</p>
+				<p class="text-xs text-muted-foreground">
+					{#if searchQuery || statusFilter !== 'all'}
+						Adjust search or filters for {formatSelectedDate(selectedDate)}.
+					{:else if hideDone && isToday}
+						Show done bookings to review rooms that have already ended.
+					{:else}
+						Try a different date or check the booking integration.
+					{/if}
+				</p>
+			</div>
+		</div>
+	{:else}
+		<div class="space-y-3 md:hidden">
+			{#each bookings as booking (booking.bookingId)}
+				{@const isCanceled = booking.status === 'canceled'}
+				{@const isNextUpcoming = booking.bookingId === bookingPage?.nextUpcomingBookingId}
+				{@const complete =
+					booking.participantCount > 0 && booking.signedCount >= booking.participantCount}
+				{@const time = formatTime(booking.startTime)}
+				{@const status = timeStatus(booking)}
+				<div
+					class={cn(
+						'overflow-hidden rounded-xl border border-border bg-card/30',
+						isNextUpcoming && !isCanceled && 'border-primary/40',
+						isCanceled && 'opacity-60'
+					)}
+				>
+					<button
+						type="button"
+						class="block w-full p-4 text-left transition-colors hover:bg-muted/30 focus-visible:bg-muted/30 focus-visible:outline-none"
+						onclick={() => openBooking(booking.bookingId)}
+					>
+						<div class="flex items-start justify-between gap-3">
+							<div class="min-w-0">
+								<div class="flex flex-wrap items-center gap-2">
+									<p class="text-sm font-semibold tabular-nums">
+										{time ?? 'Not set'}
+									</p>
+									{#if isCanceled}
+										<span
+											class="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-muted-foreground uppercase"
+										>
+											Canceled
+										</span>
+									{:else if status}
 										<span
 											class={cn(
-												'mt-0.5 inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold tracking-wide uppercase tabular-nums',
+												'rounded-full px-1.5 py-0.5 text-[10px] font-semibold tracking-wide uppercase tabular-nums',
 												timeStatusClass(status.tone)
 											)}
 										>
 											{status.label}
 										</span>
 									{:else if isNextUpcoming}
-										<p
-											class="mt-0.5 text-[10px] font-semibold tracking-wider text-primary uppercase"
+										<span
+											class="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-primary uppercase"
 										>
 											Next up
-										</p>
+										</span>
 									{/if}
-								</TableCell>
-								<TableCell class="align-top">
-									<p
-										class={cn(
-											'truncate text-sm font-medium',
-											isCanceled && 'line-through decoration-muted-foreground/60'
-										)}
+								</div>
+								<p
+									class={cn(
+										'mt-2 truncate text-base font-semibold',
+										isCanceled && 'line-through decoration-muted-foreground/60'
+									)}
+								>
+									{booking.activityName}
+								</p>
+								<p class="mt-0.5 truncate text-sm text-muted-foreground">
+									{booking.leadCustomerName ?? 'Unknown customer'}
+								</p>
+								<p class="truncate text-xs text-muted-foreground/80">
+									{booking.leadCustomerEmail ?? 'No email on booking'}
+								</p>
+							</div>
+							<div class="shrink-0 text-right">
+								<p
+									class={cn(
+										'text-sm font-semibold tabular-nums',
+										complete
+											? 'text-emerald-600 dark:text-emerald-400'
+											: booking.signedCount === 0 && booking.participantCount > 0
+												? 'text-muted-foreground'
+												: 'text-foreground'
+									)}
+								>
+									{booking.signedCount}
+									<span class="font-normal text-muted-foreground">/ {booking.participantCount}</span
 									>
-										{booking.activityName}
-									</p>
-								</TableCell>
-								<TableCell class="align-top">
-									<p class="truncate text-sm font-medium">
-										{booking.leadCustomerName ?? 'Unknown customer'}
-									</p>
-									<p class="truncate text-xs text-muted-foreground">
-										{booking.leadCustomerEmail ?? 'No email on booking'}
-									</p>
-								</TableCell>
-								<TableCell class="align-top">
+								</p>
+								<p
+									class="mt-0.5 text-[10px] font-semibold tracking-wide text-muted-foreground uppercase"
+								>
+									Signed
+								</p>
+							</div>
+						</div>
+					</button>
+					<div class="flex items-center justify-between border-t border-border px-4 py-2.5">
+						<p class="text-xs text-muted-foreground">
+							{complete && !isCanceled
+								? 'All waivers signed'
+								: isCanceled
+									? 'Canceled booking'
+									: `${Math.max(0, booking.participantCount - booking.signedCount)} incomplete`}
+						</p>
+						<Button
+							size="sm"
+							variant="outline"
+							onclick={(event) => copyBookingLink(booking, event)}
+							disabled={!publicSlug || isCanceled}
+							aria-label="Copy booking waiver link"
+							title={isCanceled
+								? 'Canceled bookings cannot be shared'
+								: !publicSlug
+									? 'Publish a waiver to share links'
+									: 'Copy booking waiver link'}
+						>
+							<CopyIcon class="size-3" aria-hidden="true" />
+							Share
+						</Button>
+					</div>
+				</div>
+			{/each}
+		</div>
+
+		<div class="hidden overflow-hidden rounded-xl border border-border md:block">
+			<Table class="table-fixed">
+				<colgroup>
+					<col class="w-[10%]" />
+					<col class="w-[28%]" />
+					<col class="w-[27%]" />
+					<col class="w-[20%]" />
+					<col class="w-[15%]" />
+				</colgroup>
+				<TableHeader>
+					<TableRow class="border-border hover:bg-transparent">
+						<TableHead
+							class="text-xs font-semibold tracking-widest text-muted-foreground uppercase"
+						>
+							Time
+						</TableHead>
+						<TableHead
+							class="text-xs font-semibold tracking-widest text-muted-foreground uppercase"
+						>
+							Activity
+						</TableHead>
+						<TableHead
+							class="text-xs font-semibold tracking-widest text-muted-foreground uppercase"
+						>
+							Customer
+						</TableHead>
+						<TableHead
+							class="text-xs font-semibold tracking-widest text-muted-foreground uppercase"
+						>
+							Signed
+						</TableHead>
+						<TableHead class="text-right">
+							<span class="sr-only">Actions</span>
+						</TableHead>
+					</TableRow>
+				</TableHeader>
+				<TableBody>
+					{#each bookings as booking (booking.bookingId)}
+						{@const isCanceled = booking.status === 'canceled'}
+						{@const isNextUpcoming = booking.bookingId === bookingPage?.nextUpcomingBookingId}
+						{@const complete =
+							booking.participantCount > 0 && booking.signedCount >= booking.participantCount}
+						<TableRow
+							class={cn(
+								'relative cursor-pointer border-border transition-colors hover:bg-muted/30 focus-visible:bg-muted/30 focus-visible:outline-none',
+								isCanceled && 'opacity-55'
+							)}
+							role="button"
+							tabindex={0}
+							onclick={() => openBooking(booking.bookingId)}
+							onkeydown={(event) => handleBookingRowKeydown(event, booking.bookingId)}
+						>
+							<TableCell class="relative align-top">
+								{#if isNextUpcoming}
+									<span class="absolute inset-y-0 left-0 w-0.5 bg-primary" aria-hidden="true"
+									></span>
+								{/if}
+								{@const time = formatTime(booking.startTime)}
+								{@const status = timeStatus(booking)}
+								{#if time}
+									<p class="text-sm font-medium tabular-nums">{time}</p>
+								{:else}
+									<p class="text-sm text-muted-foreground">Not set</p>
+								{/if}
+								{#if status && !isCanceled}
 									<span
 										class={cn(
-											'text-sm font-medium tabular-nums',
-											complete
-												? 'text-emerald-600 dark:text-emerald-400'
-												: booking.signedCount === 0 && booking.participantCount > 0
-													? 'text-muted-foreground'
-													: 'text-foreground'
+											'mt-0.5 inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold tracking-wide uppercase tabular-nums',
+											timeStatusClass(status.tone)
 										)}
 									>
-										{booking.signedCount}
-										<span class="font-normal text-muted-foreground"
-											>/ {booking.participantCount}</span
-										>
+										{status.label}
 									</span>
-								</TableCell>
-								<TableCell class="text-right align-top">
-									{#if complete && !isCanceled}
-										<span
-											class="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground"
-										>
-											<CircleCheckIcon class="size-3 text-emerald-500" aria-hidden="true" />
-											Signed
-										</span>
-									{:else}
-										<Button
-											size="sm"
-											variant="outline"
-											onclick={(event) => copyBookingLink(booking, event)}
-											onkeydown={(event) => event.stopPropagation()}
-											disabled={!publicSlug || isCanceled}
-											aria-label="Copy booking waiver link"
-											title={isCanceled
-												? 'Canceled bookings cannot be shared'
-												: !publicSlug
-													? 'Publish a waiver to share links'
-													: 'Copy booking waiver link'}
-										>
-											<CopyIcon class="size-3" aria-hidden="true" />
-											Share
-										</Button>
-									{/if}
-								</TableCell>
-							</TableRow>
-						{/each}
-					</TableBody>
-				</Table>
+								{:else if isNextUpcoming}
+									<p class="mt-0.5 text-[10px] font-semibold tracking-wider text-primary uppercase">
+										Next up
+									</p>
+								{/if}
+							</TableCell>
+							<TableCell class="align-top">
+								<p
+									class={cn(
+										'truncate text-sm font-medium',
+										isCanceled && 'line-through decoration-muted-foreground/60'
+									)}
+								>
+									{booking.activityName}
+								</p>
+							</TableCell>
+							<TableCell class="align-top">
+								<p class="truncate text-sm font-medium">
+									{booking.leadCustomerName ?? 'Unknown customer'}
+								</p>
+								<p class="truncate text-xs text-muted-foreground">
+									{booking.leadCustomerEmail ?? 'No email on booking'}
+								</p>
+							</TableCell>
+							<TableCell class="align-top">
+								<span
+									class={cn(
+										'text-sm font-medium tabular-nums',
+										complete
+											? 'text-emerald-600 dark:text-emerald-400'
+											: booking.signedCount === 0 && booking.participantCount > 0
+												? 'text-muted-foreground'
+												: 'text-foreground'
+									)}
+								>
+									{booking.signedCount}
+									<span class="font-normal text-muted-foreground">/ {booking.participantCount}</span
+									>
+								</span>
+							</TableCell>
+							<TableCell class="text-right align-top">
+								{#if complete && !isCanceled}
+									<span
+										class="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground"
+									>
+										<CircleCheckIcon class="size-3 text-emerald-500" aria-hidden="true" />
+										Signed
+									</span>
+								{:else}
+									<Button
+										size="sm"
+										variant="outline"
+										onclick={(event) => copyBookingLink(booking, event)}
+										onkeydown={(event) => event.stopPropagation()}
+										disabled={!publicSlug || isCanceled}
+										aria-label="Copy booking waiver link"
+										title={isCanceled
+											? 'Canceled bookings cannot be shared'
+											: !publicSlug
+												? 'Publish a waiver to share links'
+												: 'Copy booking waiver link'}
+									>
+										<CopyIcon class="size-3" aria-hidden="true" />
+										Share
+									</Button>
+								{/if}
+							</TableCell>
+						</TableRow>
+					{/each}
+				</TableBody>
+			</Table>
+		</div>
+	{/if}
+
+	<div class={cn('flex items-center gap-3', hasPagination ? 'justify-between' : 'justify-end')}>
+		{#if bookingPage}
+			{@const visibleCount = bookings.length}
+			<p class="text-xs text-muted-foreground tabular-nums">
+				{#if hasPagination}Page {currentPage} ·
+				{/if}{visibleCount}
+				{visibleCount === 1 ? 'booking' : 'bookings'}
+			</p>
+		{/if}
+		{#if hasPagination}
+			<div class="flex items-center gap-2">
+				<Button
+					size="sm"
+					variant="outline"
+					disabled={!bookingPage?.hasPreviousPage}
+					onclick={goPreviousPage}
+				>
+					<ChevronLeftIcon class="size-4" aria-hidden="true" />
+					Previous
+				</Button>
+				<Button
+					size="sm"
+					variant="outline"
+					disabled={!bookingPage?.hasNextPage}
+					onclick={goNextPage}
+				>
+					Next
+					<ChevronRightIcon class="size-4" aria-hidden="true" />
+				</Button>
 			</div>
 		{/if}
-
-		<div class={cn('flex items-center gap-3', hasPagination ? 'justify-between' : 'justify-end')}>
-			{#if bookingPage}
-				{@const visibleCount = bookings.length}
-				<p class="text-xs text-muted-foreground tabular-nums">
-					{#if hasPagination}Page {currentPage} ·
-					{/if}{visibleCount}
-					{visibleCount === 1 ? 'booking' : 'bookings'}
-				</p>
-			{/if}
-			{#if hasPagination}
-				<div class="flex items-center gap-2">
-					<Button
-						size="sm"
-						variant="outline"
-						disabled={!bookingPage?.hasPreviousPage}
-						onclick={goPreviousPage}
-					>
-						<ChevronLeftIcon class="size-4" aria-hidden="true" />
-						Previous
-					</Button>
-					<Button
-						size="sm"
-						variant="outline"
-						disabled={!bookingPage?.hasNextPage}
-						onclick={goNextPage}
-					>
-						Next
-						<ChevronRightIcon class="size-4" aria-hidden="true" />
-					</Button>
-				</div>
-			{/if}
-		</div>
 	</div>
-</div>
+</PageShell>

@@ -10,7 +10,6 @@
 	import { Input } from '$lib/components/ui/input';
 	import { InputOTP, InputOTPGroup, InputOTPSlot } from '$lib/components/ui/input-otp';
 	import { REGEXP_ONLY_DIGITS } from 'bits-ui';
-	import MailIcon from '@lucide/svelte/icons/mail';
 	import MailCheckIcon from '@lucide/svelte/icons/mail-check';
 	import LoaderIcon from '@lucide/svelte/icons/loader';
 	import AtSignIcon from '@lucide/svelte/icons/at-sign';
@@ -20,7 +19,6 @@
 	import ClockIcon from '@lucide/svelte/icons/clock';
 	import CheckIcon from '@lucide/svelte/icons/check';
 	import SendHorizontalIcon from '@lucide/svelte/icons/send-horizontal';
-	import SparklesIcon from '@lucide/svelte/icons/sparkles';
 
 	interface Props {
 		workspaceId: Id<'workspaces'>;
@@ -235,19 +233,8 @@
 	}
 </script>
 
-<section class="sender-identity">
-	<header class="identity-header">
-		<div class="identity-title-row">
-			<div class="identity-mark">
-				<MailIcon class="size-[18px]" />
-			</div>
-			<div class="min-w-0">
-				<h2 class="text-[15px] font-semibold tracking-tight">Email identity</h2>
-				<p class="text-xs text-muted-foreground">
-					What customers see in their inbox — and where their replies land.
-				</p>
-			</div>
-		</div>
+<div class="sender-identity">
+	<div class="identity-status-row">
 		<span
 			class="identity-status"
 			data-state={workspaceCanSendEmail
@@ -259,13 +246,10 @@
 			<span class="status-dot"></span>
 			{senderStatusLabel}
 		</span>
-	</header>
+	</div>
 
 	<div class="inbox-frame">
-		<div class="inbox-frame-tag">
-			<SparklesIcon class="size-3" />
-			Live inbox preview
-		</div>
+		<div class="inbox-frame-tag">Inbox preview</div>
 
 		<article class="inbox-card">
 			<div class="inbox-avatar" aria-hidden="true">{businessInitials}</div>
@@ -510,85 +494,18 @@
 			</li>
 		</ol>
 	{/if}
-</section>
+</div>
 
 <style>
 	.sender-identity {
-		position: relative;
-		border-radius: 1.25rem;
-		border: 1px solid var(--border);
-		background:
-			radial-gradient(
-				120% 120% at 0% 0%,
-				color-mix(in srgb, var(--primary) 4%, transparent),
-				transparent 60%
-			),
-			color-mix(in srgb, var(--card) 70%, transparent);
-		padding: 1.25rem;
 		display: flex;
 		flex-direction: column;
-		gap: 1.25rem;
-		overflow: hidden;
+		gap: 1rem;
 	}
 
-	.sender-identity::before {
-		content: '';
-		position: absolute;
-		inset: 0;
-		pointer-events: none;
-		background-image: radial-gradient(
-			color-mix(in srgb, var(--foreground) 6%, transparent) 1px,
-			transparent 1px
-		);
-		background-size: 22px 22px;
-		background-position: 0 0;
-		mask-image: radial-gradient(120% 80% at 100% 0%, black, transparent 70%);
-		opacity: 0.6;
-	}
-
-	.sender-identity > * {
-		position: relative;
-	}
-
-	@media (min-width: 640px) {
-		.sender-identity {
-			padding: 1.5rem;
-		}
-	}
-
-	.identity-header {
+	.identity-status-row {
 		display: flex;
-		flex-direction: column;
-		gap: 0.75rem;
-		align-items: flex-start;
-		justify-content: space-between;
-	}
-
-	@media (min-width: 640px) {
-		.identity-header {
-			flex-direction: row;
-			align-items: center;
-		}
-	}
-
-	.identity-title-row {
-		display: flex;
-		gap: 0.75rem;
-		min-width: 0;
-		align-items: center;
-	}
-
-	.identity-mark {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		width: 2.25rem;
-		height: 2.25rem;
-		border-radius: 0.75rem;
-		background: color-mix(in srgb, var(--primary) 14%, transparent);
-		color: color-mix(in srgb, var(--primary) 60%, var(--foreground));
-		border: 1px solid color-mix(in srgb, var(--primary) 22%, transparent);
-		flex-shrink: 0;
+		justify-content: flex-end;
 	}
 
 	.identity-status {
@@ -601,10 +518,9 @@
 		font-weight: 500;
 		letter-spacing: 0.005em;
 		border: 1px solid var(--border);
-		background: color-mix(in srgb, var(--muted) 40%, transparent);
+		background: color-mix(in srgb, var(--muted) 25%, transparent);
 		color: var(--muted-foreground);
 		flex-shrink: 0;
-		transition: all 200ms ease;
 	}
 
 	.identity-status .status-dot {
@@ -616,15 +532,15 @@
 	}
 
 	.identity-status[data-state='verified'] {
-		color: oklch(0.72 0.16 152);
-		border-color: color-mix(in srgb, oklch(0.65 0.18 152) 35%, transparent);
-		background: color-mix(in srgb, oklch(0.65 0.18 152) 12%, transparent);
+		color: oklch(0.64 0.16 152);
+		border-color: color-mix(in srgb, oklch(0.65 0.18 152) 35%, var(--border));
+		background: color-mix(in srgb, oklch(0.65 0.18 152) 10%, transparent);
 	}
 
 	.identity-status[data-state='pending'] {
-		color: oklch(0.78 0.14 80);
-		border-color: color-mix(in srgb, oklch(0.78 0.14 80) 35%, transparent);
-		background: color-mix(in srgb, oklch(0.78 0.14 80) 12%, transparent);
+		color: oklch(0.62 0.13 78);
+		border-color: color-mix(in srgb, oklch(0.72 0.14 80) 35%, var(--border));
+		background: color-mix(in srgb, oklch(0.72 0.14 80) 11%, transparent);
 	}
 
 	.identity-status[data-state='pending'] .status-dot {
@@ -645,13 +561,9 @@
 
 	.inbox-frame {
 		position: relative;
-		border-radius: 1rem;
-		border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
-		background: linear-gradient(
-			180deg,
-			color-mix(in srgb, var(--background) 70%, var(--card) 30%),
-			var(--background)
-		);
+		border-radius: 0.5rem;
+		border: 1px solid color-mix(in srgb, var(--primary) 18%, var(--border));
+		background: color-mix(in srgb, var(--primary) 5%, var(--background));
 		padding: 0.85rem;
 		display: flex;
 		flex-direction: column;
@@ -659,21 +571,17 @@
 	}
 
 	.inbox-frame-tag {
-		position: absolute;
-		top: -0.6rem;
-		left: 1rem;
 		display: inline-flex;
 		align-items: center;
 		gap: 0.3rem;
-		padding: 0.18rem 0.55rem;
+		width: fit-content;
+		margin-bottom: 0.35rem;
+		padding: 0;
 		font-size: 0.62rem;
 		text-transform: uppercase;
-		letter-spacing: 0.18em;
+		letter-spacing: 0.12em;
 		font-weight: 600;
-		color: color-mix(in srgb, var(--primary) 50%, var(--foreground));
-		background: var(--background);
-		border: 1px solid color-mix(in srgb, var(--primary) 22%, var(--border));
-		border-radius: 9999px;
+		color: color-mix(in srgb, var(--primary) 62%, var(--foreground));
 	}
 
 	.inbox-card {
@@ -686,12 +594,9 @@
 		flex-shrink: 0;
 		width: 2.5rem;
 		height: 2.5rem;
-		border-radius: 0.75rem;
-		background: linear-gradient(
-			135deg,
-			color-mix(in srgb, var(--primary) 80%, transparent),
-			color-mix(in srgb, var(--primary) 40%, var(--foreground) 5%)
-		);
+		border-radius: 0.5rem;
+		background: color-mix(in srgb, var(--primary) 78%, var(--foreground) 4%);
+		border: 1px solid color-mix(in srgb, var(--primary) 35%, transparent);
 		color: var(--primary-foreground);
 		display: inline-flex;
 		align-items: center;
@@ -699,9 +604,6 @@
 		font-size: 0.78rem;
 		font-weight: 600;
 		letter-spacing: 0.02em;
-		box-shadow:
-			inset 0 0 0 1px color-mix(in srgb, var(--foreground) 8%, transparent),
-			0 1px 0 color-mix(in srgb, var(--foreground) 12%, transparent);
 	}
 
 	.inbox-card-body {
@@ -738,12 +640,12 @@
 		padding: 0.06rem 0.4rem;
 		font-size: 0.6rem;
 		text-transform: uppercase;
-		letter-spacing: 0.12em;
+		letter-spacing: 0.08em;
 		font-weight: 600;
-		color: color-mix(in srgb, var(--primary) 70%, var(--foreground));
+		color: color-mix(in srgb, var(--primary) 72%, var(--foreground));
 		background: color-mix(in srgb, var(--primary) 12%, transparent);
 		border-radius: 9999px;
-		border: 1px solid color-mix(in srgb, var(--primary) 22%, transparent);
+		border: 1px solid color-mix(in srgb, var(--primary) 24%, transparent);
 	}
 
 	.inbox-time {
@@ -792,13 +694,7 @@
 	.inbox-perforation {
 		height: 1px;
 		margin: 0.4rem -0.85rem 0;
-		background-image: linear-gradient(
-			to right,
-			color-mix(in srgb, var(--foreground) 15%, transparent) 50%,
-			transparent 50%
-		);
-		background-size: 8px 1px;
-		background-repeat: repeat-x;
+		border-top: 1px dashed color-mix(in srgb, var(--foreground) 15%, transparent);
 	}
 
 	.inbox-replyto {
@@ -831,7 +727,6 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
-		transition: all 200ms ease;
 	}
 
 	.inbox-replyto-value[data-state='unset'] {
@@ -842,9 +737,9 @@
 	}
 
 	.inbox-replyto-value[data-state='verified'] {
-		color: oklch(0.78 0.16 152);
+		color: oklch(0.64 0.16 152);
 		background: color-mix(in srgb, oklch(0.65 0.18 152) 10%, transparent);
-		border-color: color-mix(in srgb, oklch(0.65 0.18 152) 35%, transparent);
+		border-color: color-mix(in srgb, oklch(0.65 0.18 152) 32%, var(--border));
 	}
 
 	.verified-summary {
@@ -852,8 +747,8 @@
 		align-items: center;
 		gap: 0.85rem;
 		padding: 0.9rem 1rem;
-		border-radius: 0.85rem;
-		border: 1px solid color-mix(in srgb, oklch(0.65 0.18 152) 30%, transparent);
+		border-radius: 0.5rem;
+		border: 1px solid color-mix(in srgb, oklch(0.65 0.18 152) 28%, var(--border));
 		background: color-mix(in srgb, oklch(0.65 0.18 152) 7%, transparent);
 	}
 
@@ -863,9 +758,10 @@
 		justify-content: center;
 		width: 2.25rem;
 		height: 2.25rem;
-		border-radius: 9999px;
-		background: color-mix(in srgb, oklch(0.65 0.18 152) 18%, transparent);
-		color: oklch(0.78 0.18 152);
+		border-radius: 0.5rem;
+		background: color-mix(in srgb, oklch(0.65 0.18 152) 15%, transparent);
+		border: 1px solid color-mix(in srgb, oklch(0.65 0.18 152) 28%, var(--border));
+		color: oklch(0.64 0.16 152);
 		flex-shrink: 0;
 	}
 
@@ -959,36 +855,56 @@
 
 	.setup-step[data-state='active'] .step-marker {
 		color: var(--primary-foreground);
-		background: color-mix(in srgb, var(--primary) 90%, var(--foreground) 5%);
-		border: 1px solid color-mix(in srgb, var(--primary) 90%, transparent);
-		box-shadow:
-			0 0 0 4px color-mix(in srgb, var(--primary) 14%, transparent),
-			0 1px 0 color-mix(in srgb, var(--foreground) 12%, transparent);
+		background: color-mix(in srgb, var(--primary) 88%, var(--foreground) 5%);
+		border: 1px solid color-mix(in srgb, var(--primary) 88%, transparent);
+		box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 12%, transparent);
 	}
 
 	.setup-step[data-state='done'] .step-marker {
 		color: oklch(0.99 0 0);
-		background: oklch(0.6 0.16 152);
-		border: 1px solid oklch(0.55 0.16 152);
-		box-shadow: 0 0 0 4px color-mix(in srgb, oklch(0.6 0.16 152) 14%, transparent);
+		background: oklch(0.58 0.16 152);
+		border: 1px solid oklch(0.53 0.16 152);
 	}
 
 	.step-line {
 		flex: 1;
 		min-height: 1.5rem;
 		width: 1px;
-		background-image: linear-gradient(
-			to bottom,
-			color-mix(in srgb, var(--foreground) 18%, transparent) 50%,
-			transparent 50%
-		);
-		background-size: 1px 6px;
-		background-repeat: repeat-y;
-		transition: background-image 250ms ease;
+		border-left: 1px dashed color-mix(in srgb, var(--foreground) 18%, transparent);
 	}
 
 	.step-line[data-active='true'] {
-		background-image: linear-gradient(to bottom, oklch(0.6 0.16 152) 50%, transparent 50%);
+		border-left-color: color-mix(in srgb, oklch(0.58 0.16 152) 80%, transparent);
+	}
+
+	@media (max-width: 520px) {
+		.identity-status-row {
+			justify-content: flex-start;
+		}
+
+		.inbox-frame {
+			padding: 0.75rem;
+		}
+
+		.inbox-card {
+			gap: 0.65rem;
+			padding-inline: 0.2rem;
+		}
+
+		.inbox-avatar {
+			width: 2.15rem;
+			height: 2.15rem;
+			font-size: 0.72rem;
+		}
+
+		.inbox-time {
+			width: 100%;
+			margin-left: 0;
+		}
+
+		.inbox-replyto {
+			padding-inline: 0.2rem;
+		}
 	}
 
 	.step-body {
@@ -1138,15 +1054,18 @@
 		.otp-row {
 			flex-direction: row;
 			align-items: center;
+			flex-wrap: wrap;
 		}
 	}
 
 	.otp-row :global(.otp-input) {
 		display: inline-flex;
+		max-width: 100%;
 	}
 
 	.otp-row :global(.otp-group) {
 		gap: 0.4rem;
+		max-width: 100%;
 	}
 
 	.otp-row :global(.otp-group .otp-slot),
@@ -1165,6 +1084,24 @@
 	.otp-row :global(.otp-group [data-slot='input-otp-slot'][data-active='true']) {
 		border-color: color-mix(in srgb, var(--primary) 60%, var(--border)) !important;
 		box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 18%, transparent);
+	}
+
+	@media (max-width: 420px) {
+		.otp-row :global(.otp-group) {
+			gap: 0.25rem;
+		}
+
+		.otp-row :global(.otp-group .otp-slot),
+		.otp-row :global(.otp-group [data-slot='input-otp-slot']) {
+			width: 2.2rem;
+			height: 2.55rem;
+		}
+
+		.otp-row :global(.otp-verify),
+		.otp-row :global(.otp-cancel),
+		.step-form :global(.step-cta) {
+			width: 100%;
+		}
 	}
 
 	.otp-row :global(.otp-verify) {

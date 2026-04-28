@@ -2,9 +2,10 @@
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
 	import { useAppContext } from '$lib/components/app/app-context.svelte';
+	import PageShell from '$lib/components/app/PageShell.svelte';
+	import PageHeader from '$lib/components/app/PageHeader.svelte';
 	import Building2Icon from '@lucide/svelte/icons/building-2';
 	import MailIcon from '@lucide/svelte/icons/mail';
-	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 
 	let { children } = $props();
 
@@ -41,49 +42,43 @@
 	<title>{currentWorkspace?.name ?? 'Workspace'} Settings | Waiver Director</title>
 </svelte:head>
 
-<div class="w-full min-w-0 p-6">
-	<div class="mx-auto w-full max-w-7xl min-w-0 space-y-6">
-		<!-- Page header -->
-		<header class="space-y-1">
-			<h1 class="text-2xl font-semibold tracking-tight">Workspace settings</h1>
-			<p class="text-sm text-muted-foreground">
-				Configure how this workspace looks, sounds, and connects.
-			</p>
-		</header>
+<PageHeader
+	title="Workspace settings"
+	subtitle="Configure how this workspace looks, sounds, and connects."
+/>
 
-		<div class="settings-grid">
-			<!-- Sub-navigation -->
-			<aside class="settings-aside">
-				<nav class="settings-nav" aria-label="Settings sections">
-					{#each sections as section (section.href)}
-						{@const isActive = activeMatch === section.match}
-						{@const Icon = section.icon}
-						<a
-							href={resolve(section.href)}
-							class="settings-nav-item"
-							data-active={isActive}
-							aria-current={isActive ? 'page' : undefined}
-						>
-							<span class="settings-nav-icon">
-								<Icon class="size-[15px]" />
-							</span>
-							<span class="settings-nav-text">
-								<span class="settings-nav-label">{section.label}</span>
-								<span class="settings-nav-desc">{section.description}</span>
-							</span>
-							<ChevronRightIcon class="settings-nav-chevron size-3.5" />
-						</a>
-					{/each}
-				</nav>
-			</aside>
+<PageShell>
+	<div class="settings-grid">
+		<!-- Sub-navigation -->
+		<aside class="settings-aside">
+			<nav class="settings-nav" aria-label="Settings sections">
+				{#each sections as section (section.href)}
+					{@const isActive = activeMatch === section.match}
+					{@const Icon = section.icon}
+					<a
+						href={resolve(section.href)}
+						class="settings-nav-item"
+						data-active={isActive}
+						aria-current={isActive ? 'page' : undefined}
+					>
+						<span class="settings-nav-icon">
+							<Icon class="size-[14px]" />
+						</span>
+						<span class="settings-nav-text">
+							<span class="settings-nav-label">{section.label}</span>
+							<span class="settings-nav-desc">{section.description}</span>
+						</span>
+					</a>
+				{/each}
+			</nav>
+		</aside>
 
-			<!-- Content -->
-			<main class="settings-main">
-				{@render children?.()}
-			</main>
-		</div>
+		<!-- Content -->
+		<main class="settings-main">
+			{@render children?.()}
+		</main>
 	</div>
-</div>
+</PageShell>
 
 <style>
 	.settings-grid {
@@ -116,51 +111,55 @@
 	.settings-nav {
 		display: flex;
 		flex-direction: column;
-		gap: 0.25rem;
+		gap: 0.15rem;
 	}
 
 	.settings-nav-item {
 		display: flex;
-		align-items: center;
+		align-items: flex-start;
 		gap: 0.7rem;
-		padding: 0.65rem 0.7rem;
-		border-radius: 0.65rem;
-		border: 1px solid transparent;
-		background: transparent;
+		padding: 0.6rem 0.75rem;
+		border-radius: 0.5rem;
 		color: var(--muted-foreground);
 		text-decoration: none;
-		transition: all 150ms ease;
+		transition:
+			background 140ms ease,
+			color 140ms ease;
 		min-width: 0;
 	}
 
 	.settings-nav-item:hover {
 		color: var(--foreground);
-		background: color-mix(in srgb, var(--muted) 35%, transparent);
+		background: color-mix(in srgb, var(--muted) 40%, transparent);
+	}
+
+	.settings-nav-item:focus-visible {
+		outline: none;
+		color: var(--foreground);
+		background: color-mix(in srgb, var(--muted) 50%, transparent);
+		box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 25%, transparent);
 	}
 
 	.settings-nav-item[data-active='true'] {
 		color: var(--foreground);
-		background: color-mix(in srgb, var(--card) 70%, transparent);
-		border-color: color-mix(in srgb, var(--border) 80%, transparent);
-		box-shadow: 0 1px 0 color-mix(in srgb, var(--foreground) 4%, transparent);
+		background: color-mix(in srgb, var(--muted) 70%, transparent);
 	}
 
 	.settings-nav-icon {
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
-		width: 1.85rem;
-		height: 1.85rem;
-		border-radius: 0.5rem;
-		background: color-mix(in srgb, var(--muted) 50%, transparent);
-		color: currentColor;
+		width: 1rem;
+		height: 1rem;
+		margin-top: 0.15rem;
+		color: color-mix(in srgb, var(--muted-foreground) 90%, transparent);
 		flex-shrink: 0;
-		transition: all 150ms ease;
+		transition: color 140ms ease;
 	}
 
+	.settings-nav-item:hover .settings-nav-icon,
 	.settings-nav-item[data-active='true'] .settings-nav-icon {
-		background: color-mix(in srgb, var(--primary) 18%, transparent);
-		color: color-mix(in srgb, var(--primary) 60%, var(--foreground));
+		color: var(--foreground);
 	}
 
 	.settings-nav-text {
@@ -168,14 +167,15 @@
 		flex-direction: column;
 		min-width: 0;
 		flex: 1;
-		gap: 0.05rem;
+		gap: 0.1rem;
 	}
 
 	.settings-nav-label {
-		font-size: 0.85rem;
+		font-size: 0.8125rem;
 		font-weight: 500;
 		color: inherit;
 		letter-spacing: -0.005em;
+		line-height: 1.2;
 	}
 
 	.settings-nav-item[data-active='true'] .settings-nav-label {
@@ -183,65 +183,15 @@
 	}
 
 	.settings-nav-desc {
-		font-size: 0.7rem;
-		color: var(--muted-foreground);
-		opacity: 0.85;
-	}
-
-	:global(.settings-nav-chevron) {
-		opacity: 0;
-		color: var(--muted-foreground);
-		transition: all 150ms ease;
-		transform: translateX(-2px);
-	}
-
-	.settings-nav-item:hover :global(.settings-nav-chevron),
-	.settings-nav-item[data-active='true'] :global(.settings-nav-chevron) {
-		opacity: 0.7;
-		transform: translateX(0);
-	}
-
-	.settings-soon {
-		padding: 0.75rem 0.85rem;
-		border-radius: 0.65rem;
-		border: 1px dashed color-mix(in srgb, var(--border) 90%, transparent);
-		background: color-mix(in srgb, var(--muted) 25%, transparent);
-		display: flex;
-		flex-direction: column;
-		gap: 0.4rem;
-	}
-
-	.settings-soon-label {
-		font-size: 0.6rem;
-		text-transform: uppercase;
-		letter-spacing: 0.16em;
-		font-weight: 600;
+		font-size: 0.6875rem;
 		color: var(--muted-foreground);
 		opacity: 0.8;
-	}
-
-	.settings-soon-list {
-		list-style: none;
-		padding: 0;
-		margin: 0;
-		display: flex;
-		flex-direction: column;
-		gap: 0.18rem;
-		font-size: 0.78rem;
-		color: var(--muted-foreground);
-	}
-
-	.settings-soon-list li::before {
-		content: '·';
-		display: inline-block;
-		width: 0.85rem;
-		opacity: 0.5;
+		line-height: 1.3;
 	}
 
 	.settings-main {
 		min-width: 0;
 		display: flex;
 		flex-direction: column;
-		gap: 1.25rem;
 	}
 </style>

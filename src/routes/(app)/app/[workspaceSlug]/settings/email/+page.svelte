@@ -5,8 +5,7 @@
 	import { api } from '$convex/_generated/api';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import EmailIdentityCard from '$lib/components/emails/EmailIdentityCard.svelte';
-	import GlobeIcon from '@lucide/svelte/icons/globe';
-	import LockIcon from '@lucide/svelte/icons/lock';
+	import SettingsSection from '$lib/components/settings/SettingsSection.svelte';
 
 	const appContext = useAppContext();
 	const currentWorkspace = $derived(
@@ -35,21 +34,22 @@
 		<Skeleton class="h-32 w-full rounded-2xl" />
 	</div>
 {:else}
-	<EmailIdentityCard
-		workspaceId={currentWorkspace.workspaceId}
-		workspaceName={currentWorkspace.name}
-		{subjectPreview}
-	/>
+	<SettingsSection
+		title="Email identity"
+		description="What customers see in their inbox and where replies are sent."
+	>
+		<EmailIdentityCard
+			workspaceId={currentWorkspace.workspaceId}
+			workspaceName={currentWorkspace.name}
+			{subjectPreview}
+		/>
+	</SettingsSection>
 
-	<!-- Coming soon: custom domain -->
-	<section class="future-card">
-		<div class="future-card-mark">
-			<GlobeIcon class="size-[18px]" />
-			<span class="future-lock">
-				<LockIcon class="size-2.5" />
-			</span>
-		</div>
-		<div class="min-w-0 flex-1 space-y-1.5">
+	<SettingsSection
+		title="Custom domain"
+		description="Use your own sending domain instead of the shared Waiver Director domain."
+	>
+		<div class="future-card">
 			<div class="flex flex-wrap items-center gap-2">
 				<h3 class="future-title">Send from your own domain</h3>
 				<span class="future-pill">Coming soon</span>
@@ -62,7 +62,7 @@
 				to remove the third-party tag from your customer's inbox. Requires a one-time DNS setup.
 			</p>
 		</div>
-	</section>
+	</SettingsSection>
 {/if}
 
 <style>
@@ -74,50 +74,14 @@
 
 	.future-card {
 		display: flex;
-		gap: 0.85rem;
-		align-items: flex-start;
-		padding: 1.1rem 1.25rem;
-		border-radius: 1rem;
-		border: 1px dashed color-mix(in srgb, var(--border) 90%, transparent);
-		background: color-mix(in srgb, var(--muted) 18%, transparent);
-		opacity: 0.85;
-	}
-
-	.future-card-mark {
-		position: relative;
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		width: 2.25rem;
-		height: 2.25rem;
-		border-radius: 0.65rem;
-		background: color-mix(in srgb, var(--muted) 60%, transparent);
-		color: var(--muted-foreground);
-		border: 1px solid var(--border);
-		flex-shrink: 0;
-	}
-
-	.future-lock {
-		position: absolute;
-		bottom: -3px;
-		right: -3px;
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		width: 0.95rem;
-		height: 0.95rem;
-		border-radius: 9999px;
-		background: var(--background);
-		border: 1px solid var(--border);
-		color: var(--muted-foreground);
+		flex-direction: column;
+		gap: 0.45rem;
 	}
 
 	.future-title {
-		font-size: 0.92rem;
+		font-size: 0.875rem;
 		font-weight: 600;
-		letter-spacing: -0.01em;
 		color: var(--foreground);
-		opacity: 0.9;
 	}
 
 	.future-pill {
@@ -129,8 +93,8 @@
 		letter-spacing: 0.14em;
 		font-weight: 600;
 		color: var(--muted-foreground);
-		background: color-mix(in srgb, var(--background) 70%, transparent);
-		border: 1px solid var(--border);
+		background: color-mix(in srgb, var(--primary) 10%, transparent);
+		border: 1px solid color-mix(in srgb, var(--primary) 20%, var(--border));
 		border-radius: 9999px;
 	}
 
