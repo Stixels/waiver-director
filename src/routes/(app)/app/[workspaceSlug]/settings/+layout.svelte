@@ -75,15 +75,6 @@
 						</a>
 					{/each}
 				</nav>
-
-				<div class="settings-soon">
-					<span class="settings-soon-label">Coming soon</span>
-					<ul class="settings-soon-list">
-						<li>Branding</li>
-						<li>Members &amp; roles</li>
-						<li>Webhooks</li>
-					</ul>
-				</div>
 			</aside>
 
 			<!-- Content -->
