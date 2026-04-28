@@ -15,10 +15,18 @@
 	import WaiverReadonlyDocument from '$lib/components/waivers/WaiverReadonlyDocument.svelte';
 	import { formatBookingTimestamp } from '$lib/utils/date';
 	import { queryString } from '$lib/utils/url';
+	import ArrowRightIcon from '@lucide/svelte/icons/arrow-right';
 	import CalendarClockIcon from '@lucide/svelte/icons/calendar-clock';
 	import FileTextIcon from '@lucide/svelte/icons/file-text';
 	import TicketIcon from '@lucide/svelte/icons/ticket';
 	import UsersRoundIcon from '@lucide/svelte/icons/users-round';
+
+	const metaItemClass =
+		'min-w-0 border-t border-border pt-2 first:border-t-0 first:pt-0 sm:border-t-0 sm:border-l sm:px-3 sm:pt-0 sm:first:border-l-0 sm:first:pl-0 sm:last:pr-0';
+	const metaLabelClass =
+		'mb-1 flex items-center gap-1.5 text-[10px] font-semibold tracking-wide text-muted-foreground uppercase';
+	const metaLinkClass =
+		'group/link inline-flex max-w-full items-center gap-1.5 rounded-md border border-border bg-background px-2 py-1 text-xs font-medium text-foreground shadow-xs transition-colors hover:border-foreground/30 hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none';
 
 	interface Props {
 		open: boolean;
@@ -125,84 +133,121 @@
 				<p class="text-sm text-muted-foreground">Submission not found.</p>
 			</div>
 		{:else}
-			<DialogHeader class="shrink-0 border-b border-border px-4 py-4 pr-12 sm:px-6 sm:pr-14">
+			<DialogHeader class="shrink-0 border-b border-border px-4 py-4 sm:px-6">
 				<div class="space-y-3">
-					<div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+					<div
+						class="flex flex-col gap-2 pr-8 sm:flex-row sm:items-start sm:justify-between sm:pr-10"
+					>
 						<div class="min-w-0">
 							<DialogTitle class="truncate text-base font-semibold">
 								{submission.signerName}
 							</DialogTitle>
-							<DialogDescription class="text-xs text-muted-foreground">
+							<DialogDescription class="mt-0.5 truncate text-xs text-muted-foreground">
 								{submission.signerEmail}
 							</DialogDescription>
 						</div>
-						<div
-							class="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground tabular-nums"
-						>
-							<CalendarClockIcon class="size-3.5" aria-hidden="true" />
-							<span>
-								{formatTimestamp(submission.submittedAt)}
-							</span>
-						</div>
 					</div>
 
-					<div class="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
+					<div
+						class="grid gap-2 border-y border-border py-2 sm:grid-cols-[1fr_1.05fr_1.35fr_0.95fr] sm:gap-0"
+					>
+						<div class={metaItemClass}>
+							<div class={metaLabelClass}>
+								<CalendarClockIcon class="size-3" aria-hidden="true" />
+								Signed
+							</div>
+							<p class="min-w-0 truncate text-xs font-medium text-foreground tabular-nums">
+								{formatTimestamp(submission.submittedAt)}
+							</p>
+						</div>
+
 						{#if submission.customerId}
-							<a
-								href={resolve(customerPath(submission.customerId))}
-								class="-mx-1 inline-flex min-w-0 items-center gap-1.5 rounded-md px-1 py-0.5 font-medium text-foreground underline decoration-border underline-offset-4 transition-colors hover:bg-muted/60 hover:decoration-foreground focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
-							>
-								<UsersRoundIcon class="size-3" aria-hidden="true" />
-								<span class="truncate">Customer</span>
-							</a>
+							<div class={metaItemClass}>
+								<div class={metaLabelClass}>
+									<UsersRoundIcon class="size-3" aria-hidden="true" />
+									Customer
+								</div>
+								<a href={resolve(customerPath(submission.customerId))} class={metaLinkClass}>
+									<span class="truncate">{submission.signerName}</span>
+									<span
+										class="inline-flex size-4 shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors group-hover/link:border-foreground/30 group-hover/link:text-foreground"
+									>
+										<ArrowRightIcon class="size-2.5" aria-hidden="true" />
+									</span>
+								</a>
+							</div>
+						{:else}
+							<div class={metaItemClass}>
+								<div class={metaLabelClass}>
+									<UsersRoundIcon class="size-3" aria-hidden="true" />
+									Customer
+								</div>
+								<p class="min-w-0 truncate text-xs text-muted-foreground">No link</p>
+							</div>
 						{/if}
+
 						{#if submission.booking}
 							{@const formattedStart = formatBookingTimestamp(submission.booking.startTime, {
 								dateStyle: 'medium',
 								timeStyle: 'short'
 							})}
-							{#if submission.bookingId}
-								<a
-									href={resolve(bookingPath(submission.bookingId, submission.booking.startTime))}
-									class="-mx-1 inline-flex min-w-0 items-center gap-1.5 rounded-md px-1 py-0.5 font-medium text-foreground underline decoration-border underline-offset-4 transition-colors hover:bg-muted/60 hover:decoration-foreground focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
-								>
+							<div class={metaItemClass}>
+								<div class={metaLabelClass}>
 									<TicketIcon class="size-3" aria-hidden="true" />
-									<span class="shrink-0">#{submission.booking.providerBookingId}</span>
-									<span class="truncate font-normal text-muted-foreground">
-										{submission.booking.activityName}
-									</span>
-								</a>
-							{:else}
-								<div class="flex min-w-0 items-center gap-1.5">
-									<TicketIcon class="size-3" aria-hidden="true" />
-									<span class="shrink-0 font-medium text-foreground">
+									Booking
+								</div>
+								{#if submission.bookingId}
+									<a
+										href={resolve(bookingPath(submission.bookingId, submission.booking.startTime))}
+										class={metaLinkClass}
+									>
+										<span class="shrink-0">#{submission.booking.providerBookingId}</span>
+										<span class="truncate font-normal text-foreground/70">
+											{submission.booking.activityName}
+										</span>
+										<span
+											class="inline-flex size-4 shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors group-hover/link:border-foreground/30 group-hover/link:text-foreground"
+										>
+											<ArrowRightIcon class="size-2.5" aria-hidden="true" />
+										</span>
+									</a>
+								{:else}
+									<p class="min-w-0 truncate text-xs font-medium text-foreground">
 										#{submission.booking.providerBookingId}
-									</span>
-									<span class="truncate">
-										{submission.booking.activityName}
-									</span>
-								</div>
-							{/if}
-							{#if formattedStart}
-								<div class="flex items-center gap-1.5 tabular-nums">
-									<CalendarClockIcon class="size-3" aria-hidden="true" />
-									<span>{formattedStart}</span>
-								</div>
-							{/if}
+										<span class="font-normal text-muted-foreground">
+											{submission.booking.activityName}
+										</span>
+									</p>
+								{/if}
+								{#if formattedStart}
+									<p
+										class="hidden shrink-0 text-[11px] text-muted-foreground tabular-nums xl:block"
+									>
+										{formattedStart}
+									</p>
+								{/if}
+							</div>
 						{:else}
-							<div class="flex items-center gap-1.5">
-								<FileTextIcon class="size-3" aria-hidden="true" />
-								<span class="font-medium text-foreground">General waiver</span>
-								<span
-									class="rounded-full border border-dashed border-border bg-muted/40 px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-muted-foreground"
-								>
-									No booking attached
+							<div class={metaItemClass}>
+								<div class={metaLabelClass}>
+									<FileTextIcon class="size-3" aria-hidden="true" />
+									Booking
+								</div>
+								<span class="min-w-0 truncate text-xs font-medium text-foreground">
+									General waiver
 								</span>
+								<span class="ml-1 text-[11px] text-muted-foreground">No booking</span>
 							</div>
 						{/if}
-						<div class="flex items-center gap-1.5">
-							<UsersRoundIcon class="size-3" aria-hidden="true" />
-							<span>{participantSummary(submission.minors.length)}</span>
+
+						<div class={metaItemClass}>
+							<div class={metaLabelClass}>
+								<UsersRoundIcon class="size-3" aria-hidden="true" />
+								Participants
+							</div>
+							<p class="min-w-0 truncate text-xs font-medium text-foreground">
+								{participantSummary(submission.minors.length)}
+							</p>
 						</div>
 					</div>
 				</div>
