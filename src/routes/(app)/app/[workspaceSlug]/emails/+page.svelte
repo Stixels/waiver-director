@@ -40,6 +40,7 @@
 	import RichTextEditor from '$lib/components/emails/RichTextEditor.svelte';
 	import WaiverRichText from '$lib/components/waivers/WaiverRichText.svelte';
 	import ArrowRightIcon from '@lucide/svelte/icons/arrow-right';
+	import CalendarClockIcon from '@lucide/svelte/icons/calendar-clock';
 	import CloudIcon from '@lucide/svelte/icons/cloud';
 	import CloudCheckIcon from '@lucide/svelte/icons/cloud-check';
 	import CloudOffIcon from '@lucide/svelte/icons/cloud-off';
@@ -49,6 +50,8 @@
 	import LoaderIcon from '@lucide/svelte/icons/loader';
 	import ShieldCheckIcon from '@lucide/svelte/icons/shield-check';
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
+	import TicketIcon from '@lucide/svelte/icons/ticket';
+	import UsersRoundIcon from '@lucide/svelte/icons/users-round';
 
 	const convex = useConvexClient();
 	const appContext = useAppContext();
@@ -59,6 +62,10 @@
 	const AUTOSAVE_DELAY_MS = 1800;
 	const previewMetaLinkClass =
 		'group/link inline-flex max-w-full items-center gap-1.5 rounded-md border border-border bg-background px-2 py-1 text-xs font-medium text-foreground shadow-xs transition-colors hover:border-foreground/30 hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none';
+	const previewMetaItemClass =
+		'min-w-0 border-t border-border pt-2 first:border-t-0 first:pt-0 sm:border-t-0 sm:border-l sm:px-3 sm:pt-0 sm:first:border-l-0 sm:first:pl-0 sm:last:pr-0';
+	const previewMetaLabelClass =
+		'mb-1 flex items-center gap-1.5 text-[10px] font-semibold tracking-wide text-muted-foreground uppercase';
 
 	const currentWorkspace = $derived(
 		appContext.workspaces.find((w) => w.slug === page.params.workspaceSlug) ?? null
@@ -153,9 +160,7 @@
 		currentWorkspace ? { workspaceId: currentWorkspace.workspaceId } : 'skip'
 	);
 
-	type FollowUp = FunctionReturnType<typeof api.emails.listFollowUps>['page'][number] & {
-		bookingNumber?: string;
-	};
+	type FollowUp = FunctionReturnType<typeof api.emails.listFollowUps>['page'][number];
 	type EmailTemplate = FunctionReturnType<typeof api.emails.listEmailTemplates>[number];
 
 	const stats = $derived(statsQuery.data);
@@ -558,6 +563,11 @@
 			signerName: f.signerName,
 			signerEmail: f.signerEmail,
 			bookingId: f.bookingNumber ? `#${f.bookingNumber}` : null,
+			customerId: f.customerId,
+			bookingRecordId: f.bookingId,
+			bookingNumber: f.bookingNumber,
+			bookingActivityName: f.bookingActivityName,
+			bookingStartTime: f.bookingStartTime,
 			businessName: currentWorkspace?.name ?? '',
 			activityDate: new Intl.DateTimeFormat('en-US', { dateStyle: 'long' }).format(
 				new Date(f.submittedAt)
@@ -571,6 +581,31 @@
 	function submissionPath(submissionId: Id<'waiver_submissions'>) {
 		const query = queryString([['submissionId', submissionId]]);
 		return `/app/${page.params.workspaceSlug}/submissions?${query}` as `/app/${string}/submissions?${string}`;
+	}
+
+	function bookingDateParam(startTime: string | null | undefined) {
+		if (!startTime) return null;
+		const dateOnly = startTime.match(/^(\d{4}-\d{2}-\d{2})(?:[T\s]|$)/)?.[1];
+		if (dateOnly) return dateOnly;
+		const parsedDate = new Date(startTime);
+		if (Number.isNaN(parsedDate.getTime())) return null;
+		const year = parsedDate.getFullYear();
+		const month = String(parsedDate.getMonth() + 1).padStart(2, '0');
+		const day = String(parsedDate.getDate()).padStart(2, '0');
+		return `${year}-${month}-${day}`;
+	}
+
+	function bookingPath(bookingId: Id<'bookings'>, startTime: string | null | undefined) {
+		const query = queryString([
+			['date', bookingDateParam(startTime)],
+			['bookingId', bookingId]
+		]);
+		return `/app/${page.params.workspaceSlug}/bookings?${query}` as `/app/${string}/bookings?${string}`;
+	}
+
+	function customerPath(customerId: Id<'customers'>) {
+		const query = queryString([['customerId', customerId]]);
+		return `/app/${page.params.workspaceSlug}/customers?${query}` as `/app/${string}/customers?${string}`;
 	}
 
 	function resolveTemplate(template: string, vars: NonNullable<typeof previewVars>) {
@@ -815,70 +850,142 @@
 
 <!-- Follow-up preview modal -->
 <Dialog bind:open={previewOpen} onOpenChange={handlePreviewOpenChange}>
-	<DialogContent class="gap-0 overflow-hidden p-0 sm:max-w-2xl">
-		<DialogHeader class="border-b border-border px-6 py-4">
-			<DialogTitle>Email preview</DialogTitle>
-			<DialogDescription>
-				{#if previewVars}
-					Sending to <span class="font-medium text-foreground">{previewVars.signerName}</span>
-					— {previewVars.signerEmail}
-				{/if}
-			</DialogDescription>
-		</DialogHeader>
-
+	<DialogContent class="max-h-[92vh] gap-0 overflow-hidden p-0 sm:max-w-[860px]">
 		{#if previewVars}
-			<div class="max-h-[75vh] overflow-y-auto px-6 py-6">
-				<!-- Meta -->
-				<div class="mb-4 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-					{#if lastPreviewFollowUp}
-						<a
-							href={resolve(submissionPath(lastPreviewFollowUp.submissionId))}
-							class={previewMetaLinkClass}
-						>
-							<FileTextIcon class="size-3.5" aria-hidden="true" />
-							<span>Submission</span>
-							<span
-								class="inline-flex size-4 shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors group-hover/link:border-foreground/30 group-hover/link:text-foreground"
-							>
-								<ArrowRightIcon class="size-2.5" aria-hidden="true" />
-							</span>
-						</a>
-					{/if}
-					{#if previewVars.bookingId}
-						<span
-							><span class="font-medium text-foreground">Booking</span>
-							{previewVars.bookingId}</span
-						>
-					{/if}
-					<span
-						><span class="font-medium text-foreground">Signed</span>
-						{previewVars.activityDate}</span
+			<DialogHeader class="shrink-0 border-b border-border px-4 py-4 sm:px-6">
+				<div class="space-y-3">
+					<div class="min-w-0 pr-8 sm:pr-10">
+						<DialogTitle class="truncate text-base font-semibold">
+							{previewVars.signerName}
+						</DialogTitle>
+						<DialogDescription class="mt-0.5 truncate text-xs text-muted-foreground">
+							{previewVars.signerEmail}
+						</DialogDescription>
+					</div>
+
+					<div
+						class="grid gap-2 border-y border-border py-2 sm:grid-cols-[1fr_1.05fr_1.35fr_1.05fr] sm:gap-0"
 					>
-					{#if previewVars.status === 'queued'}
-						<span
-							><span class="font-medium text-foreground">Sends</span>
-							{formatScheduled(previewVars.scheduledAt)}</span
-						>
-					{/if}
-				</div>
+						<div class={previewMetaItemClass}>
+							<div class={previewMetaLabelClass}>
+								<CalendarClockIcon class="size-3" aria-hidden="true" />
+								Signed
+							</div>
+							<p class="min-w-0 truncate text-xs font-medium text-foreground tabular-nums">
+								{previewVars.activityDate}
+							</p>
+							{#if previewVars.status === 'queued'}
+								<p class="shrink-0 text-[11px] text-muted-foreground tabular-nums">
+									Sends {formatScheduled(previewVars.scheduledAt)}
+								</p>
+							{/if}
+						</div>
 
-				<!-- Subject -->
-				<div class="mb-4 space-y-1">
-					<p class="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase">
-						Subject
-					</p>
-					<p class="text-sm font-medium">{resolvedSubject}</p>
-				</div>
+						<div class={previewMetaItemClass}>
+							<div class={previewMetaLabelClass}>
+								<UsersRoundIcon class="size-3" aria-hidden="true" />
+								Customer
+							</div>
+							{#if previewVars.customerId}
+								<a
+									href={resolve(customerPath(previewVars.customerId))}
+									class={previewMetaLinkClass}
+								>
+									<span class="truncate">{previewVars.signerName}</span>
+									<span
+										class="inline-flex size-4 shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors group-hover/link:border-foreground/30 group-hover/link:text-foreground"
+									>
+										<ArrowRightIcon class="size-2.5" aria-hidden="true" />
+									</span>
+								</a>
+							{:else}
+								<p class="min-w-0 truncate text-xs text-muted-foreground">No link</p>
+							{/if}
+						</div>
 
-				<!-- Body rendered as HTML -->
-				<div class="space-y-1">
-					<p class="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase">
-						Body
-					</p>
-					<WaiverRichText
-						html={resolvedBodyHtml}
-						class="overflow-hidden rounded-xl border border-border bg-muted/10 px-4 py-3 text-sm leading-7 wrap-break-word text-foreground"
-					/>
+						<div class={previewMetaItemClass}>
+							<div class={previewMetaLabelClass}>
+								<TicketIcon class="size-3" aria-hidden="true" />
+								Booking
+							</div>
+							{#if previewVars.bookingRecordId && previewVars.bookingNumber}
+								<a
+									href={resolve(
+										bookingPath(previewVars.bookingRecordId, previewVars.bookingStartTime)
+									)}
+									class={previewMetaLinkClass}
+								>
+									<span class="shrink-0">#{previewVars.bookingNumber}</span>
+									{#if previewVars.bookingActivityName}
+										<span class="truncate font-normal text-foreground/70">
+											{previewVars.bookingActivityName}
+										</span>
+									{/if}
+									<span
+										class="inline-flex size-4 shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors group-hover/link:border-foreground/30 group-hover/link:text-foreground"
+									>
+										<ArrowRightIcon class="size-2.5" aria-hidden="true" />
+									</span>
+								</a>
+							{:else if previewVars.bookingNumber}
+								<p class="min-w-0 truncate text-xs font-medium text-foreground">
+									#{previewVars.bookingNumber}
+									{#if previewVars.bookingActivityName}
+										<span class="font-normal text-muted-foreground">
+											{previewVars.bookingActivityName}
+										</span>
+									{/if}
+								</p>
+							{:else}
+								<p class="min-w-0 truncate text-xs text-muted-foreground">No booking</p>
+							{/if}
+						</div>
+
+						<div class={previewMetaItemClass}>
+							<div class={previewMetaLabelClass}>
+								<FileTextIcon class="size-3" aria-hidden="true" />
+								Submission
+							</div>
+							{#if lastPreviewFollowUp}
+								<a
+									href={resolve(submissionPath(lastPreviewFollowUp.submissionId))}
+									class={previewMetaLinkClass}
+								>
+									<span class="truncate">Waiver</span>
+									<span
+										class="inline-flex size-4 shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors group-hover/link:border-foreground/30 group-hover/link:text-foreground"
+									>
+										<ArrowRightIcon class="size-2.5" aria-hidden="true" />
+									</span>
+								</a>
+							{:else}
+								<p class="min-w-0 truncate text-xs text-muted-foreground">No link</p>
+							{/if}
+						</div>
+					</div>
+				</div>
+			</DialogHeader>
+
+			<div class="min-h-0 flex-1 overflow-y-auto bg-muted/20 px-4 py-5 sm:px-6">
+				<div class="space-y-5">
+					<section class="space-y-1.5">
+						<p class="text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">
+							Subject
+						</p>
+						<p class="rounded-lg border border-border bg-background px-3 py-2 text-sm font-medium">
+							{resolvedSubject}
+						</p>
+					</section>
+
+					<section class="space-y-1.5">
+						<p class="text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">
+							Body
+						</p>
+						<WaiverRichText
+							html={resolvedBodyHtml}
+							class="overflow-hidden rounded-xl border border-border bg-background px-4 py-3 text-sm leading-7 wrap-break-word text-foreground shadow-sm"
+						/>
+					</section>
 				</div>
 			</div>
 

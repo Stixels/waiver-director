@@ -153,21 +153,27 @@ function validateEmailTemplateInput(args: {
 	return body;
 }
 
-async function resolveFollowUpBookingNumber(
-	ctx: Pick<QueryCtx, 'db'>,
-	followUp: Doc<'email_follow_ups'>
-) {
+async function withFollowUpContext(ctx: Pick<QueryCtx, 'db'>, followUp: Doc<'email_follow_ups'>) {
 	const submission = await ctx.db.get(followUp.submissionId);
-	if (!submission || submission.workspaceId !== followUp.workspaceId) return null;
-	return submission.bookingSnapshot?.providerBookingId ?? null;
-}
+	if (!submission || submission.workspaceId !== followUp.workspaceId) {
+		return {
+			...followUp,
+			customerId: null,
+			bookingId: null,
+			bookingNumber: null,
+			bookingActivityName: null,
+			bookingStartTime: null
+		};
+	}
 
-async function withResolvedBookingNumber(
-	ctx: Pick<QueryCtx, 'db'>,
-	followUp: Doc<'email_follow_ups'>
-) {
-	const bookingNumber = await resolveFollowUpBookingNumber(ctx, followUp);
-	return bookingNumber ? { ...followUp, bookingNumber } : followUp;
+	return {
+		...followUp,
+		customerId: submission.customerId ?? null,
+		bookingId: submission.bookingId ?? null,
+		bookingNumber: submission.bookingSnapshot?.providerBookingId ?? null,
+		bookingActivityName: submission.bookingSnapshot?.activityName ?? null,
+		bookingStartTime: submission.bookingSnapshot?.startTime ?? null
+	};
 }
 
 export const getEmailEditorContent = query({
@@ -513,9 +519,7 @@ export const listFollowUps = query({
 			const result = await q.paginate(args.paginationOpts);
 			return {
 				...result,
-				page: await Promise.all(
-					result.page.map((followUp) => withResolvedBookingNumber(ctx, followUp))
-				)
+				page: await Promise.all(result.page.map((followUp) => withFollowUpContext(ctx, followUp)))
 			};
 		}
 
@@ -545,9 +549,7 @@ export const listFollowUps = query({
 		const result = await q.paginate(args.paginationOpts);
 		return {
 			...result,
-			page: await Promise.all(
-				result.page.map((followUp) => withResolvedBookingNumber(ctx, followUp))
-			)
+			page: await Promise.all(result.page.map((followUp) => withFollowUpContext(ctx, followUp)))
 		};
 	}
 });
@@ -561,7 +563,7 @@ export const getFollowUp = query({
 		await requireWorkspaceMember(ctx, args.workspaceId);
 		const followUp = await ctx.db.get(args.followUpId);
 		if (!followUp || followUp.workspaceId !== args.workspaceId) return null;
-		return await withResolvedBookingNumber(ctx, followUp);
+		return await withFollowUpContext(ctx, followUp);
 	}
 });
 
@@ -916,7 +918,7 @@ export const getFollowUpForDelivery = internalQuery({
 	args: { followUpId: v.id('email_follow_ups') },
 	handler: async (ctx, args) => {
 		const followUp = await ctx.db.get(args.followUpId);
-		return followUp ? await withResolvedBookingNumber(ctx, followUp) : null;
+		return followUp ? await withFollowUpContext(ctx, followUp) : null;
 	}
 });
 
