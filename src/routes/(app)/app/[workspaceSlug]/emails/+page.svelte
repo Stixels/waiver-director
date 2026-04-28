@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
 	import { untrack } from 'svelte';
@@ -14,6 +15,7 @@
 	import { useProtectedQuery } from '$lib/components/auth/convex-auth.svelte';
 	import { getConvexErrorMessage } from '$lib/utils/convex-errors';
 	import { escapeHtml } from '$lib/utils/rich-text';
+	import { parseConvexId, queryString } from '$lib/utils/url';
 
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
@@ -37,9 +39,11 @@
 	import EmailSaveTemplateDialog from '$lib/components/emails/EmailSaveTemplateDialog.svelte';
 	import RichTextEditor from '$lib/components/emails/RichTextEditor.svelte';
 	import WaiverRichText from '$lib/components/waivers/WaiverRichText.svelte';
+	import ArrowRightIcon from '@lucide/svelte/icons/arrow-right';
 	import CloudIcon from '@lucide/svelte/icons/cloud';
 	import CloudCheckIcon from '@lucide/svelte/icons/cloud-check';
 	import CloudOffIcon from '@lucide/svelte/icons/cloud-off';
+	import FileTextIcon from '@lucide/svelte/icons/file-text';
 	import MailIcon from '@lucide/svelte/icons/mail';
 	import MailCheckIcon from '@lucide/svelte/icons/mail-check';
 	import LoaderIcon from '@lucide/svelte/icons/loader';
@@ -53,6 +57,8 @@
 	const DEFAULT_SEND_AFTER_AMOUNT = 2;
 	const DEFAULT_SEND_AFTER_UNIT: SendAfterUnit = 'hours';
 	const AUTOSAVE_DELAY_MS = 1800;
+	const previewMetaLinkClass =
+		'group/link inline-flex max-w-full items-center gap-1.5 rounded-md border border-border bg-background px-2 py-1 text-xs font-medium text-foreground shadow-xs transition-colors hover:border-foreground/30 hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none';
 
 	const currentWorkspace = $derived(
 		appContext.workspaces.find((w) => w.slug === page.params.workspaceSlug) ?? null
@@ -123,6 +129,22 @@
 		};
 	});
 
+	const followUpIdParam = $derived(
+		parseConvexId<'email_follow_ups'>(page.url.searchParams.get('followUpId'))
+	);
+
+	const selectedFollowUpQuery = useProtectedQuery(
+		api.emails.getFollowUp,
+		() =>
+			currentWorkspace && followUpIdParam
+				? {
+						workspaceId: currentWorkspace.workspaceId,
+						followUpId: followUpIdParam
+					}
+				: 'skip',
+		() => ({ keepPreviousData: false })
+	);
+
 	const templatesQuery = useProtectedQuery(api.emails.listEmailTemplates, () =>
 		currentWorkspace ? { workspaceId: currentWorkspace.workspaceId } : 'skip'
 	);
@@ -150,6 +172,7 @@
 			senderSettingsQuery.error ??
 			statsQuery.error ??
 			followUpsQuery.error ??
+			selectedFollowUpQuery.error ??
 			templatesQuery.error ??
 			null
 	);
@@ -466,17 +489,53 @@
 	let previewOpen = $state(false);
 	let previewFollowUpId = $state<FollowUp['_id'] | null>(null);
 	let previewSnapshot = $state<FollowUp | null>(null);
+	let isClosingPreview = $state(false);
 
 	function openPreview(followUp: FollowUp) {
+		isClosingPreview = false;
 		previewSnapshot = followUp;
 		previewFollowUpId = followUp._id;
 		previewOpen = true;
+		void updateFollowUpUrl(followUp._id, false);
+	}
+
+	function handlePreviewOpenChange(isOpen: boolean) {
+		previewOpen = isOpen;
+		if (isOpen) {
+			isClosingPreview = false;
+			return;
+		}
+
+		isClosingPreview = true;
+		previewFollowUpId = null;
+		previewSnapshot = null;
+		void updateFollowUpUrl(null, true).finally(() => {
+			isClosingPreview = false;
+		});
+	}
+
+	async function updateFollowUpUrl(followUpId: Id<'email_follow_ups'> | null, replaceState = true) {
+		const query = queryString([['followUpId', followUpId]]);
+		const pathname = `/app/${page.params.workspaceSlug}/emails` as `/app/${string}/emails`;
+		const href = (query ? `${pathname}?${query}` : pathname) as
+			| `/app/${string}/emails`
+			| `/app/${string}/emails?${string}`;
+
+		await goto(resolve(href), {
+			replaceState,
+			noScroll: true,
+			keepFocus: true
+		});
 	}
 
 	$effect(() => {
-		if (previewOpen) return;
-		previewFollowUpId = null;
-		previewSnapshot = null;
+		const selectedFollowUp = selectedFollowUpQuery.data as FollowUp | null | undefined;
+		if (isClosingPreview) return;
+		if (!followUpIdParam || !selectedFollowUp) return;
+		if (previewFollowUpId === followUpIdParam && previewOpen) return;
+		previewSnapshot = selectedFollowUp;
+		previewFollowUpId = followUpIdParam;
+		previewOpen = true;
 	});
 
 	const lastPreviewFollowUp = $derived.by(() => {
@@ -508,6 +567,11 @@
 			followUpId: f._id
 		};
 	});
+
+	function submissionPath(submissionId: Id<'waiver_submissions'>) {
+		const query = queryString([['submissionId', submissionId]]);
+		return `/app/${page.params.workspaceSlug}/submissions?${query}` as `/app/${string}/submissions?${string}`;
+	}
 
 	function resolveTemplate(template: string, vars: NonNullable<typeof previewVars>) {
 		return template
@@ -750,7 +814,7 @@
 </svelte:head>
 
 <!-- Follow-up preview modal -->
-<Dialog bind:open={previewOpen}>
+<Dialog bind:open={previewOpen} onOpenChange={handlePreviewOpenChange}>
 	<DialogContent class="gap-0 overflow-hidden p-0 sm:max-w-2xl">
 		<DialogHeader class="border-b border-border px-6 py-4">
 			<DialogTitle>Email preview</DialogTitle>
@@ -765,7 +829,21 @@
 		{#if previewVars}
 			<div class="max-h-[75vh] overflow-y-auto px-6 py-6">
 				<!-- Meta -->
-				<div class="mb-4 flex flex-wrap gap-x-5 gap-y-1 text-xs text-muted-foreground">
+				<div class="mb-4 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+					{#if lastPreviewFollowUp}
+						<a
+							href={resolve(submissionPath(lastPreviewFollowUp.submissionId))}
+							class={previewMetaLinkClass}
+						>
+							<FileTextIcon class="size-3.5" aria-hidden="true" />
+							<span>Submission</span>
+							<span
+								class="inline-flex size-4 shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors group-hover/link:border-foreground/30 group-hover/link:text-foreground"
+							>
+								<ArrowRightIcon class="size-2.5" aria-hidden="true" />
+							</span>
+						</a>
+					{/if}
 					{#if previewVars.bookingId}
 						<span
 							><span class="font-medium text-foreground">Booking</span>

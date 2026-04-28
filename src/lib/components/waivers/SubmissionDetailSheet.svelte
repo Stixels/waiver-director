@@ -18,6 +18,7 @@
 	import ArrowRightIcon from '@lucide/svelte/icons/arrow-right';
 	import CalendarClockIcon from '@lucide/svelte/icons/calendar-clock';
 	import FileTextIcon from '@lucide/svelte/icons/file-text';
+	import MailIcon from '@lucide/svelte/icons/mail';
 	import TicketIcon from '@lucide/svelte/icons/ticket';
 	import UsersRoundIcon from '@lucide/svelte/icons/users-round';
 
@@ -54,9 +55,9 @@
 		);
 	}
 
-	function participantSummary(minorCount: number) {
-		if (minorCount === 0) return '1 adult signer';
-		return `1 adult signer, ${minorCount} ${minorCount === 1 ? 'minor' : 'minors'}`;
+	function minorSummary(minorCount: number) {
+		if (minorCount === 0) return null;
+		return `${minorCount} ${minorCount === 1 ? 'minor' : 'minors'}`;
 	}
 
 	function bookingDateParam(startTime: string | undefined) {
@@ -82,6 +83,11 @@
 	function customerPath(customerId: Id<'customers'>) {
 		const query = queryString([['customerId', customerId]]);
 		return `/app/${workspaceSlug}/customers?${query}` as `/app/${string}/customers?${string}`;
+	}
+
+	function followUpPath(followUpId: Id<'email_follow_ups'>) {
+		const query = queryString([['followUpId', followUpId]]);
+		return `/app/${workspaceSlug}/emails?${query}` as `/app/${string}/emails?${string}`;
 	}
 </script>
 
@@ -149,7 +155,7 @@
 					</div>
 
 					<div
-						class="grid gap-2 border-y border-border py-2 sm:grid-cols-[1fr_1.05fr_1.35fr_0.95fr] sm:gap-0"
+						class="grid gap-2 border-y border-border py-2 sm:grid-cols-[1fr_1.05fr_1.35fr_1.05fr] sm:gap-0"
 					>
 						<div class={metaItemClass}>
 							<div class={metaLabelClass}>
@@ -175,6 +181,11 @@
 										<ArrowRightIcon class="size-2.5" aria-hidden="true" />
 									</span>
 								</a>
+								{#if minorSummary(submission.minors.length)}
+									<p class="shrink-0 text-[11px] text-muted-foreground tabular-nums">
+										+ {minorSummary(submission.minors.length)}
+									</p>
+								{/if}
 							</div>
 						{:else}
 							<div class={metaItemClass}>
@@ -183,6 +194,11 @@
 									Customer
 								</div>
 								<p class="min-w-0 truncate text-xs text-muted-foreground">No link</p>
+								{#if minorSummary(submission.minors.length)}
+									<p class="shrink-0 text-[11px] text-muted-foreground tabular-nums">
+										+ {minorSummary(submission.minors.length)}
+									</p>
+								{/if}
 							</div>
 						{/if}
 
@@ -242,12 +258,21 @@
 
 						<div class={metaItemClass}>
 							<div class={metaLabelClass}>
-								<UsersRoundIcon class="size-3" aria-hidden="true" />
-								Participants
+								<MailIcon class="size-3" aria-hidden="true" />
+								Follow-up
 							</div>
-							<p class="min-w-0 truncate text-xs font-medium text-foreground">
-								{participantSummary(submission.minors.length)}
-							</p>
+							{#if submission.followUpId}
+								<a href={resolve(followUpPath(submission.followUpId))} class={metaLinkClass}>
+									<span class="truncate">Email</span>
+									<span
+										class="inline-flex size-4 shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors group-hover/link:border-foreground/30 group-hover/link:text-foreground"
+									>
+										<ArrowRightIcon class="size-2.5" aria-hidden="true" />
+									</span>
+								</a>
+							{:else}
+								<p class="min-w-0 truncate text-xs text-muted-foreground">No follow-up</p>
+							{/if}
 						</div>
 					</div>
 				</div>

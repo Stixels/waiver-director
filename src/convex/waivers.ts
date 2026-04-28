@@ -279,6 +279,7 @@ export const getSubmission = query({
 			submissionId: v.id('waiver_submissions'),
 			customerId: v.union(v.id('customers'), v.null()),
 			bookingId: v.union(v.id('bookings'), v.null()),
+			followUpId: v.union(v.id('email_follow_ups'), v.null()),
 			signerName: v.string(),
 			signerEmail: v.string(),
 			signerDateOfBirth: v.string(),
@@ -310,10 +311,26 @@ export const getSubmission = query({
 			});
 		}
 
+		const followUp = await ctx.db
+			.query('email_follow_ups')
+			.withIndex('by_submissionId', (q) => q.eq('submissionId', submission._id))
+			.first();
+
+		if (followUp && followUp.workspaceId !== args.workspaceId) {
+			throw new ConvexError({
+				code: 'data_integrity_error',
+				message: 'Follow-up workspaceId mismatch.',
+				followUpId: followUp._id,
+				workspaceId: followUp.workspaceId,
+				expectedWorkspaceId: args.workspaceId
+			});
+		}
+
 		return {
 			submissionId: submission._id,
 			customerId: submission.customerId ?? null,
 			bookingId: submission.bookingId ?? null,
+			followUpId: followUp?._id ?? null,
 			signerName: submission.signerName,
 			signerEmail: submission.signerEmail,
 			signerDateOfBirth: submission.signerDateOfBirth,

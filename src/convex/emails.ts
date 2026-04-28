@@ -552,6 +552,19 @@ export const listFollowUps = query({
 	}
 });
 
+export const getFollowUp = query({
+	args: {
+		workspaceId: v.id('workspaces'),
+		followUpId: v.id('email_follow_ups')
+	},
+	handler: async (ctx, args) => {
+		await requireWorkspaceMember(ctx, args.workspaceId);
+		const followUp = await ctx.db.get(args.followUpId);
+		if (!followUp || followUp.workspaceId !== args.workspaceId) return null;
+		return await withResolvedBookingNumber(ctx, followUp);
+	}
+});
+
 export const cancelFollowUp = mutation({
 	args: { followUpId: v.id('email_follow_ups') },
 	handler: async (ctx, args) => {
