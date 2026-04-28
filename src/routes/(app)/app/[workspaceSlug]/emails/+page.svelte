@@ -978,6 +978,377 @@
 			</div>
 		</div>
 
+		<!-- Follow-ups table -->
+		<div class="space-y-4">
+			<div class="space-y-1.5">
+				<h2 class="text-xl font-semibold tracking-tight">Follow-ups</h2>
+				<p class="text-sm text-muted-foreground">
+					Select rows to act on them, or click a row to preview the email.
+				</p>
+			</div>
+
+			<!-- Status filter pills (multi-select) -->
+			<div
+				class="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-x-visible sm:px-0 sm:pb-0"
+			>
+				{#each STATUS_OPTIONS as opt (opt.value)}
+					{@const active = statusFilters.has(opt.value)}
+					<button
+						onclick={() => {
+							if (active) statusFilters.delete(opt.value);
+							else statusFilters.add(opt.value);
+						}}
+						class="inline-flex shrink-0 items-center gap-1 rounded-full border px-3 py-1 text-xs font-medium transition-colors {active
+							? 'border-primary bg-primary text-primary-foreground'
+							: 'border-border bg-transparent text-muted-foreground hover:border-foreground/30 hover:text-foreground'}"
+					>
+						{opt.label}
+						{#if active}<span class="pl-1 opacity-70">×</span>{/if}
+					</button>
+				{/each}
+			</div>
+
+			<!-- Filters + actions -->
+			<div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+				<Input
+					type="search"
+					placeholder="Search by name, email or booking…"
+					bind:value={searchQuery}
+					class="h-9 w-full text-sm sm:h-8 sm:min-w-48 sm:flex-1"
+				/>
+				<div class="grid grid-cols-2 gap-2 sm:flex sm:items-center sm:gap-3">
+					<div class="flex items-center gap-2 text-sm text-muted-foreground">
+						<label for="date-from" class="shrink-0">From</label>
+						<Input
+							id="date-from"
+							type="date"
+							bind:value={dateFrom}
+							class="h-9 w-full text-sm sm:h-8 sm:w-36"
+						/>
+					</div>
+					<div class="flex items-center gap-2 text-sm text-muted-foreground">
+						<label for="date-to" class="shrink-0">To</label>
+						<Input
+							id="date-to"
+							type="date"
+							bind:value={dateTo}
+							class="h-9 w-full text-sm sm:h-8 sm:w-36"
+						/>
+					</div>
+				</div>
+				<div class="flex gap-1.5 sm:ml-auto">
+					<span class="inline-block flex-1 sm:flex-none" title={sendSelectionTooltip}>
+						<Button
+							size="lg"
+							onclick={handleSendSelected}
+							disabled={selectionLoading !== null || !canSendSelected}
+							class="h-9 w-full sm:h-8 sm:w-auto"
+						>
+							{selectionLoading === 'send' ? 'Sending…' : 'Send'}
+						</Button>
+					</span>
+					<span
+						class="inline-block flex-1 sm:flex-none"
+						title={!canCancelSelected ? 'Select queued rows to cancel' : undefined}
+					>
+						<Button
+							size="lg"
+							variant="outline"
+							onclick={handleCancelSelected}
+							disabled={selectionLoading !== null || !canCancelSelected}
+							class="h-9 w-full sm:h-8 sm:w-auto"
+						>
+							{selectionLoading === 'cancel' ? 'Cancelling…' : 'Cancel'}
+						</Button>
+					</span>
+				</div>
+			</div>
+
+			<!-- List -->
+			<div class="flex h-[440px] min-h-0 flex-col md:h-[520px]">
+				{#snippet paginationFooter(border: boolean)}
+					<div
+						class="flex items-center justify-between {border
+							? 'border-t border-border'
+							: ''} px-4 py-3 sm:px-5"
+					>
+						<p class="text-xs text-muted-foreground">
+							{#if followUps.length === 0}
+								No entries
+							{:else}
+								Page {currentPage + 1} · Showing {followUps.length}
+								{followUps.length === 1 ? 'entry' : 'entries'}
+							{/if}
+						</p>
+						<div class="flex items-center gap-1">
+							<button
+								class="rounded px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
+								disabled={currentPage === 0}
+								onclick={goToPreviousPage}
+							>
+								← Prev
+							</button>
+							<span class="min-w-[64px] px-2 py-1 text-center text-xs text-muted-foreground">
+								Page {currentPage + 1}
+							</span>
+							<button
+								class="rounded px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
+								disabled={!hasNextPage}
+								onclick={goToNextPage}
+							>
+								Next →
+							</button>
+						</div>
+					</div>
+				{/snippet}
+
+				{#if followUpsQuery.isLoading || appContext.isLoading}
+					<!-- Desktop skeleton -->
+					<div class="hidden h-full rounded-xl border border-border md:block">
+						<Table class="table-fixed">
+							<colgroup>
+								<col class="w-[4%]" /><col class="w-[24%]" /><col class="w-[20%]" />
+								<col class="w-[20%]" /><col class="w-[18%]" /><col class="w-[14%]" />
+							</colgroup>
+							<TableHeader>
+								<TableRow class="border-border hover:bg-transparent">
+									{#each ['', 'Customer', 'Booking', 'Waiver signed', 'Scheduled for', 'Status'] as col (col)}
+										<TableHead
+											class="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase"
+											>{col}</TableHead
+										>
+									{/each}
+								</TableRow>
+							</TableHeader>
+							<TableBody>
+								{#each [0, 1, 2, 3] as i (i)}
+									<TableRow class="border-border hover:bg-transparent">
+										{#each [0, 1, 2, 3, 4, 5] as j (j)}
+											<TableCell><Skeleton class="h-4 w-full max-w-28" /></TableCell>
+										{/each}
+									</TableRow>
+								{/each}
+							</TableBody>
+						</Table>
+					</div>
+					<!-- Mobile skeleton -->
+					<div class="h-full space-y-3 overflow-hidden md:hidden">
+						{#each [0, 1, 2] as i (i)}
+							<div class="space-y-2 rounded-xl border border-border bg-card/30 p-4">
+								<Skeleton class="h-4 w-32" />
+								<Skeleton class="h-3 w-48" />
+								<Skeleton class="h-4 w-20" />
+							</div>
+						{/each}
+					</div>
+				{:else if followUps.length === 0}
+					<div
+						class="flex h-full items-center justify-center rounded-xl border border-dashed border-border bg-muted/20 px-4 py-16 text-center text-sm text-muted-foreground"
+					>
+						{searchQuery || dateFrom || dateTo || statusFilters.size > 0
+							? 'No follow-ups match your filters.'
+							: `No follow-ups yet for ${currentWorkspace?.name ?? 'this workspace'}. They appear here after guests sign a waiver.`}
+					</div>
+				{:else}
+					<!-- Desktop table -->
+					<div
+						class="hidden h-full flex-col overflow-hidden rounded-xl border border-border md:flex"
+					>
+						<div class="min-h-0 flex-1 overflow-auto">
+							<Table class="table-fixed">
+								<colgroup>
+									<col class="w-[4%]" /><col class="w-[24%]" /><col class="w-[20%]" />
+									<col class="w-[20%]" /><col class="w-[18%]" /><col class="w-[14%]" />
+								</colgroup>
+								<TableHeader>
+									<TableRow class="border-border hover:bg-transparent">
+										<TableHead class="pl-4">
+											<input
+												bind:this={headerCheckboxEl}
+												type="checkbox"
+												class="size-4 cursor-pointer rounded accent-primary"
+												checked={allVisibleSelected}
+												onchange={toggleAll}
+												onkeydown={handleHeaderCheckboxKeydown}
+											/>
+										</TableHead>
+										<TableHead
+											class="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase"
+											>Customer</TableHead
+										>
+										<TableHead
+											class="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase"
+											>Booking</TableHead
+										>
+										<TableHead
+											class="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase"
+											>Waiver signed</TableHead
+										>
+										<TableHead
+											class="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase"
+											>Scheduled for</TableHead
+										>
+										<TableHead
+											class="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase"
+											>Status</TableHead
+										>
+									</TableRow>
+								</TableHeader>
+								<TableBody>
+									{#each followUps as followUp (followUp._id)}
+										<TableRow
+											class="cursor-pointer border-border transition-colors hover:bg-muted/40 focus-visible:bg-muted/40 focus-visible:outline-none {selectedIds.has(
+												followUp._id
+											)
+												? 'bg-muted/20'
+												: ''}"
+											role="button"
+											tabindex={0}
+											onclick={(e) => {
+												if (isInteractiveEventTarget(e)) return;
+												openPreview(followUp);
+											}}
+											onkeydown={(e) => {
+												if (isInteractiveEventTarget(e)) return;
+												if (e.key === 'Enter' || e.key === ' ') {
+													e.preventDefault();
+													openPreview(followUp);
+												}
+											}}
+										>
+											<TableCell
+												class="pl-4"
+												onclick={(e) => e.stopPropagation()}
+												onkeydown={(e) => e.stopPropagation()}
+											>
+												<input
+													type="checkbox"
+													class="size-4 cursor-pointer rounded accent-primary"
+													checked={selectedIds.has(followUp._id)}
+													onchange={(e) => toggleRow(followUp._id, e)}
+													onkeydown={(e) => handleRowCheckboxKeydown(followUp._id, e)}
+												/>
+											</TableCell>
+											<TableCell>
+												<p class="truncate text-sm font-medium">{followUp.signerName}</p>
+												<p class="truncate text-xs text-muted-foreground">
+													{followUp.signerEmail}
+												</p>
+											</TableCell>
+											<TableCell class="min-w-0 font-mono text-sm text-muted-foreground">
+												<span class="block truncate" title={displayBookingId(followUp)}>
+													{displayBookingId(followUp)}
+												</span>
+											</TableCell>
+											<TableCell class="text-xs text-muted-foreground">
+												{formatTimestamp(followUp.submittedAt)}
+											</TableCell>
+											<TableCell class="text-xs text-muted-foreground">
+												{formatFollowUpSchedule(followUp)}
+											</TableCell>
+											<TableCell>
+												<span
+													class="inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium capitalize {STATUS_STYLES[
+														followUp.status
+													] ?? ''}"
+												>
+													<span
+														class="size-1.5 rounded-full {followUp.status === 'queued'
+															? 'bg-blue-400'
+															: followUp.status === 'sent'
+																? 'bg-green-400'
+																: followUp.status === 'paused'
+																	? 'bg-yellow-400'
+																	: followUp.status === 'failed'
+																		? 'bg-red-400'
+																		: 'bg-muted-foreground'}"
+													></span>
+													{followUp.status}
+												</span>
+											</TableCell>
+										</TableRow>
+									{/each}
+								</TableBody>
+							</Table>
+						</div>
+
+						{@render paginationFooter(true)}
+					</div>
+
+					<!-- Mobile cards -->
+					<div class="flex h-full flex-col md:hidden">
+						<div class="min-h-0 flex-1 space-y-3 overflow-auto">
+							{#each followUps as followUp (followUp._id)}
+								<div
+									class="overflow-hidden rounded-xl border border-border bg-card/30 transition-colors {selectedIds.has(
+										followUp._id
+									)
+										? 'ring-1 ring-ring/50'
+										: ''}"
+								>
+									<div class="flex items-stretch">
+										<label class="flex shrink-0 cursor-pointer items-center px-3">
+											<span class="sr-only">Select follow-up</span>
+											<input
+												type="checkbox"
+												class="size-4 cursor-pointer rounded accent-primary"
+												checked={selectedIds.has(followUp._id)}
+												onchange={() => toggleRowSelection(followUp._id)}
+											/>
+										</label>
+										<button
+											type="button"
+											class="min-w-0 flex-1 px-1 py-3 pr-4 text-left transition-colors hover:bg-muted/30 focus-visible:bg-muted/30 focus-visible:outline-none"
+											onclick={() => openPreview(followUp)}
+										>
+											<div class="flex items-start justify-between gap-2">
+												<div class="min-w-0 flex-1 space-y-0.5">
+													<p class="truncate text-sm font-medium">{followUp.signerName}</p>
+													<p class="truncate text-xs text-muted-foreground">
+														{followUp.signerEmail}
+													</p>
+												</div>
+												<span
+													class="inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium capitalize {STATUS_STYLES[
+														followUp.status
+													] ?? ''}"
+												>
+													<span
+														class="size-1.5 rounded-full {followUp.status === 'queued'
+															? 'bg-blue-400'
+															: followUp.status === 'sent'
+																? 'bg-green-400'
+																: followUp.status === 'paused'
+																	? 'bg-yellow-400'
+																	: followUp.status === 'failed'
+																		? 'bg-red-400'
+																		: 'bg-muted-foreground'}"
+													></span>
+													{followUp.status}
+												</span>
+											</div>
+											<div
+												class="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground"
+											>
+												<span
+													class="max-w-full truncate font-mono"
+													title={displayBookingId(followUp)}>{displayBookingId(followUp)}</span
+												>
+												<span>·</span>
+												<span>{formatFollowUpSchedule(followUp)}</span>
+											</div>
+										</button>
+									</div>
+								</div>
+							{/each}
+						</div>
+
+						{@render paginationFooter(false)}
+					</div>
+				{/if}
+			</div>
+		</div>
+
 		<!-- Editor content -->
 		{#if isLoading}
 			<div class="space-y-4">
@@ -1158,366 +1529,6 @@
 				</div>
 			</div>
 		{/if}
-
-		<!-- Follow-ups table -->
-		<div class="space-y-4">
-			<div class="space-y-1.5">
-				<h2 class="text-xl font-semibold tracking-tight">Follow-ups</h2>
-				<p class="text-sm text-muted-foreground">
-					Select rows to act on them, or click a row to preview the email.
-				</p>
-			</div>
-
-			<!-- Status filter pills (multi-select) -->
-			<div
-				class="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-x-visible sm:px-0 sm:pb-0"
-			>
-				{#each STATUS_OPTIONS as opt (opt.value)}
-					{@const active = statusFilters.has(opt.value)}
-					<button
-						onclick={() => {
-							if (active) statusFilters.delete(opt.value);
-							else statusFilters.add(opt.value);
-						}}
-						class="inline-flex shrink-0 items-center gap-1 rounded-full border px-3 py-1 text-xs font-medium transition-colors {active
-							? 'border-primary bg-primary text-primary-foreground'
-							: 'border-border bg-transparent text-muted-foreground hover:border-foreground/30 hover:text-foreground'}"
-					>
-						{opt.label}
-						{#if active}<span class="pl-1 opacity-70">×</span>{/if}
-					</button>
-				{/each}
-			</div>
-
-			<!-- Filters + actions -->
-			<div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-				<Input
-					type="search"
-					placeholder="Search by name, email or booking…"
-					bind:value={searchQuery}
-					class="h-9 w-full text-sm sm:h-8 sm:min-w-48 sm:flex-1"
-				/>
-				<div class="grid grid-cols-2 gap-2 sm:flex sm:items-center sm:gap-3">
-					<div class="flex items-center gap-2 text-sm text-muted-foreground">
-						<label for="date-from" class="shrink-0">From</label>
-						<Input
-							id="date-from"
-							type="date"
-							bind:value={dateFrom}
-							class="h-9 w-full text-sm sm:h-8 sm:w-36"
-						/>
-					</div>
-					<div class="flex items-center gap-2 text-sm text-muted-foreground">
-						<label for="date-to" class="shrink-0">To</label>
-						<Input
-							id="date-to"
-							type="date"
-							bind:value={dateTo}
-							class="h-9 w-full text-sm sm:h-8 sm:w-36"
-						/>
-					</div>
-				</div>
-				<div class="flex gap-1.5 sm:ml-auto">
-					<span class="inline-block flex-1 sm:flex-none" title={sendSelectionTooltip}>
-						<Button
-							size="lg"
-							onclick={handleSendSelected}
-							disabled={selectionLoading !== null || !canSendSelected}
-							class="h-9 w-full sm:h-8 sm:w-auto"
-						>
-							{selectionLoading === 'send' ? 'Sending…' : 'Send'}
-						</Button>
-					</span>
-					<span
-						class="inline-block flex-1 sm:flex-none"
-						title={!canCancelSelected ? 'Select queued rows to cancel' : undefined}
-					>
-						<Button
-							size="lg"
-							variant="outline"
-							onclick={handleCancelSelected}
-							disabled={selectionLoading !== null || !canCancelSelected}
-							class="h-9 w-full sm:h-8 sm:w-auto"
-						>
-							{selectionLoading === 'cancel' ? 'Cancelling…' : 'Cancel'}
-						</Button>
-					</span>
-				</div>
-			</div>
-
-			<!-- List -->
-			<div class="flex flex-col md:min-h-[520px]">
-				{#snippet paginationFooter(border: boolean)}
-					<div
-						class="flex items-center justify-between {border
-							? 'border-t border-border'
-							: ''} px-4 py-3 sm:px-5"
-					>
-						<p class="text-xs text-muted-foreground">
-							{#if followUps.length === 0}
-								No entries
-							{:else}
-								Page {currentPage + 1} · Showing {followUps.length}
-								{followUps.length === 1 ? 'entry' : 'entries'}
-							{/if}
-						</p>
-						<div class="flex items-center gap-1">
-							<button
-								class="rounded px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
-								disabled={currentPage === 0}
-								onclick={goToPreviousPage}
-							>
-								← Prev
-							</button>
-							<span class="min-w-[64px] px-2 py-1 text-center text-xs text-muted-foreground">
-								Page {currentPage + 1}
-							</span>
-							<button
-								class="rounded px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
-								disabled={!hasNextPage}
-								onclick={goToNextPage}
-							>
-								Next →
-							</button>
-						</div>
-					</div>
-				{/snippet}
-
-				{#if followUpsQuery.isLoading || appContext.isLoading}
-					<!-- Desktop skeleton -->
-					<div class="hidden flex-1 rounded-xl border border-border md:block">
-						<Table class="table-fixed">
-							<colgroup>
-								<col class="w-[4%]" /><col class="w-[24%]" /><col class="w-[20%]" />
-								<col class="w-[20%]" /><col class="w-[18%]" /><col class="w-[14%]" />
-							</colgroup>
-							<TableHeader>
-								<TableRow class="border-border hover:bg-transparent">
-									{#each ['', 'Customer', 'Booking', 'Waiver signed', 'Scheduled for', 'Status'] as col (col)}
-										<TableHead
-											class="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase"
-											>{col}</TableHead
-										>
-									{/each}
-								</TableRow>
-							</TableHeader>
-							<TableBody>
-								{#each [0, 1, 2, 3] as i (i)}
-									<TableRow class="border-border hover:bg-transparent">
-										{#each [0, 1, 2, 3, 4, 5] as j (j)}
-											<TableCell><Skeleton class="h-4 w-full max-w-28" /></TableCell>
-										{/each}
-									</TableRow>
-								{/each}
-							</TableBody>
-						</Table>
-					</div>
-					<!-- Mobile skeleton -->
-					<div class="space-y-3 md:hidden">
-						{#each [0, 1, 2] as i (i)}
-							<div class="space-y-2 rounded-xl border border-border bg-card/30 p-4">
-								<Skeleton class="h-4 w-32" />
-								<Skeleton class="h-3 w-48" />
-								<Skeleton class="h-4 w-20" />
-							</div>
-						{/each}
-					</div>
-				{:else if followUps.length === 0}
-					<div
-						class="rounded-xl border border-dashed border-border bg-muted/20 px-4 py-16 text-center text-sm text-muted-foreground"
-					>
-						{searchQuery || dateFrom || dateTo || statusFilters.size > 0
-							? 'No follow-ups match your filters.'
-							: `No follow-ups yet for ${currentWorkspace?.name ?? 'this workspace'}. They appear here after guests sign a waiver.`}
-					</div>
-				{:else}
-					<!-- Desktop table -->
-					<div class="hidden rounded-xl border border-border md:block">
-						<Table class="table-fixed">
-							<colgroup>
-								<col class="w-[4%]" /><col class="w-[24%]" /><col class="w-[20%]" />
-								<col class="w-[20%]" /><col class="w-[18%]" /><col class="w-[14%]" />
-							</colgroup>
-							<TableHeader>
-								<TableRow class="border-border hover:bg-transparent">
-									<TableHead class="pl-4">
-										<input
-											bind:this={headerCheckboxEl}
-											type="checkbox"
-											class="size-4 cursor-pointer rounded accent-primary"
-											checked={allVisibleSelected}
-											onchange={toggleAll}
-											onkeydown={handleHeaderCheckboxKeydown}
-										/>
-									</TableHead>
-									<TableHead
-										class="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase"
-										>Customer</TableHead
-									>
-									<TableHead
-										class="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase"
-										>Booking</TableHead
-									>
-									<TableHead
-										class="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase"
-										>Waiver signed</TableHead
-									>
-									<TableHead
-										class="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase"
-										>Scheduled for</TableHead
-									>
-									<TableHead
-										class="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase"
-										>Status</TableHead
-									>
-								</TableRow>
-							</TableHeader>
-							<TableBody>
-								{#each followUps as followUp (followUp._id)}
-									<TableRow
-										class="cursor-pointer border-border transition-colors hover:bg-muted/40 focus-visible:bg-muted/40 focus-visible:outline-none {selectedIds.has(
-											followUp._id
-										)
-											? 'bg-muted/20'
-											: ''}"
-										role="button"
-										tabindex={0}
-										onclick={(e) => {
-											if (isInteractiveEventTarget(e)) return;
-											openPreview(followUp);
-										}}
-										onkeydown={(e) => {
-											if (isInteractiveEventTarget(e)) return;
-											if (e.key === 'Enter' || e.key === ' ') {
-												e.preventDefault();
-												openPreview(followUp);
-											}
-										}}
-									>
-										<TableCell
-											class="pl-4"
-											onclick={(e) => e.stopPropagation()}
-											onkeydown={(e) => e.stopPropagation()}
-										>
-											<input
-												type="checkbox"
-												class="size-4 cursor-pointer rounded accent-primary"
-												checked={selectedIds.has(followUp._id)}
-												onchange={(e) => toggleRow(followUp._id, e)}
-												onkeydown={(e) => handleRowCheckboxKeydown(followUp._id, e)}
-											/>
-										</TableCell>
-										<TableCell>
-											<p class="truncate text-sm font-medium">{followUp.signerName}</p>
-											<p class="truncate text-xs text-muted-foreground">{followUp.signerEmail}</p>
-										</TableCell>
-										<TableCell class="min-w-0 font-mono text-sm text-muted-foreground">
-											<span class="block truncate" title={displayBookingId(followUp)}>
-												{displayBookingId(followUp)}
-											</span>
-										</TableCell>
-										<TableCell class="text-xs text-muted-foreground">
-											{formatTimestamp(followUp.submittedAt)}
-										</TableCell>
-										<TableCell class="text-xs text-muted-foreground">
-											{formatFollowUpSchedule(followUp)}
-										</TableCell>
-										<TableCell>
-											<span
-												class="inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium capitalize {STATUS_STYLES[
-													followUp.status
-												] ?? ''}"
-											>
-												<span
-													class="size-1.5 rounded-full {followUp.status === 'queued'
-														? 'bg-blue-400'
-														: followUp.status === 'sent'
-															? 'bg-green-400'
-															: followUp.status === 'paused'
-																? 'bg-yellow-400'
-																: followUp.status === 'failed'
-																	? 'bg-red-400'
-																	: 'bg-muted-foreground'}"
-												></span>
-												{followUp.status}
-											</span>
-										</TableCell>
-									</TableRow>
-								{/each}
-							</TableBody>
-						</Table>
-
-						{@render paginationFooter(true)}
-					</div>
-
-					<!-- Mobile cards -->
-					<div class="space-y-3 md:hidden">
-						{#each followUps as followUp (followUp._id)}
-							<div
-								class="overflow-hidden rounded-xl border border-border bg-card/30 transition-colors {selectedIds.has(
-									followUp._id
-								)
-									? 'ring-1 ring-ring/50'
-									: ''}"
-							>
-								<div class="flex items-stretch">
-									<label class="flex shrink-0 cursor-pointer items-center px-3">
-										<span class="sr-only">Select follow-up</span>
-										<input
-											type="checkbox"
-											class="size-4 cursor-pointer rounded accent-primary"
-											checked={selectedIds.has(followUp._id)}
-											onchange={() => toggleRowSelection(followUp._id)}
-										/>
-									</label>
-									<button
-										type="button"
-										class="min-w-0 flex-1 px-1 py-3 pr-4 text-left transition-colors hover:bg-muted/30 focus-visible:bg-muted/30 focus-visible:outline-none"
-										onclick={() => openPreview(followUp)}
-									>
-										<div class="flex items-start justify-between gap-2">
-											<div class="min-w-0 flex-1 space-y-0.5">
-												<p class="truncate text-sm font-medium">{followUp.signerName}</p>
-												<p class="truncate text-xs text-muted-foreground">
-													{followUp.signerEmail}
-												</p>
-											</div>
-											<span
-												class="inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium capitalize {STATUS_STYLES[
-													followUp.status
-												] ?? ''}"
-											>
-												<span
-													class="size-1.5 rounded-full {followUp.status === 'queued'
-														? 'bg-blue-400'
-														: followUp.status === 'sent'
-															? 'bg-green-400'
-															: followUp.status === 'paused'
-																? 'bg-yellow-400'
-																: followUp.status === 'failed'
-																	? 'bg-red-400'
-																	: 'bg-muted-foreground'}"
-												></span>
-												{followUp.status}
-											</span>
-										</div>
-										<div class="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
-											<span class="max-w-full truncate font-mono" title={displayBookingId(followUp)}
-												>{displayBookingId(followUp)}</span
-											>
-											<span>·</span>
-											<span>{formatFollowUpSchedule(followUp)}</span>
-										</div>
-									</button>
-								</div>
-							</div>
-						{/each}
-
-						{@render paginationFooter(false)}
-					</div>
-				{/if}
-			</div>
-		</div>
 	</div>
 </div>
 

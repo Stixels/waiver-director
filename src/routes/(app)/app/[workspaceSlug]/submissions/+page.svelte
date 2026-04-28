@@ -127,10 +127,14 @@
 		openSubmission(submissionId);
 	}
 
-	function formatTimestamp(timestamp: number) {
+	function formatSubmittedDate(timestamp: number) {
+		return new Intl.DateTimeFormat('en-US', { dateStyle: 'medium' }).format(new Date(timestamp));
+	}
+
+	function formatSubmittedTime(timestamp: number) {
 		return new Intl.DateTimeFormat('en-US', {
-			dateStyle: 'medium',
-			timeStyle: 'short'
+			hour: 'numeric',
+			minute: '2-digit'
 		}).format(new Date(timestamp));
 	}
 
@@ -271,13 +275,30 @@
 
 <PageShell>
 	{#if isLoadingSubmissions}
-		<div class="overflow-hidden rounded-xl border border-border">
+		<div class="space-y-2 md:hidden">
+			{#each [0, 1, 2, 3, 4, 5] as index (index)}
+				<div class="rounded-xl border border-border bg-background p-4">
+					<div class="flex items-start justify-between gap-3">
+						<div class="min-w-0 flex-1 space-y-2">
+							<Skeleton class="h-4 w-36" />
+							<Skeleton class="h-3.5 w-48 max-w-full" />
+						</div>
+						<Skeleton class="h-5 w-14 rounded-full" />
+					</div>
+					<div class="mt-4 grid grid-cols-2 gap-3">
+						<Skeleton class="h-4 w-24" />
+						<Skeleton class="h-4 w-28 justify-self-end" />
+					</div>
+				</div>
+			{/each}
+		</div>
+		<div class="hidden overflow-hidden rounded-xl border border-border md:block">
 			<Table class="table-fixed">
 				<colgroup>
-					<col class="w-[21.25%]" />
-					<col class="w-[38%]" />
-					<col class="w-[18.35%]" />
-					<col class="w-[22.4%]" />
+					<col class="w-[32%]" />
+					<col class="w-[30%]" />
+					<col class="w-[18%]" />
+					<col class="w-[20%]" />
 				</colgroup>
 				<TableHeader>
 					<TableRow class="border-border hover:bg-transparent">
@@ -289,7 +310,7 @@
 						<TableHead
 							class="text-xs font-semibold tracking-widest text-muted-foreground uppercase"
 						>
-							Email
+							Visit
 						</TableHead>
 						<TableHead
 							class="text-xs font-semibold tracking-widest text-muted-foreground uppercase"
@@ -305,18 +326,21 @@
 				</TableHeader>
 				<TableBody>
 					{#each [0, 1, 2, 3, 4, 5] as index (index)}
-						<TableRow class="border-border hover:bg-transparent">
-							<TableCell>
+						<TableRow class="h-17 border-border hover:bg-transparent">
+							<TableCell class="px-4 py-3">
 								<Skeleton class="h-5 w-32" />
+								<Skeleton class="mt-2 h-3.5 w-44" />
 							</TableCell>
-							<TableCell>
-								<Skeleton class="h-5 w-44" />
+							<TableCell class="px-4 py-3">
+								<Skeleton class="h-5 w-40" />
+								<Skeleton class="mt-2 h-3.5 w-28" />
 							</TableCell>
-							<TableCell>
+							<TableCell class="px-4 py-3">
 								<Skeleton class="h-5 w-28" />
 							</TableCell>
-							<TableCell>
-								<Skeleton class="h-5 w-36" />
+							<TableCell class="px-4 py-3">
+								<Skeleton class="h-5 w-32" />
+								<Skeleton class="mt-2 h-3.5 w-16" />
 							</TableCell>
 						</TableRow>
 					{/each}
@@ -350,13 +374,66 @@
 			</div>
 		</div>
 	{:else}
-		<div class="overflow-hidden rounded-xl border border-border">
+		<div class="space-y-2 md:hidden">
+			{#each recentSubmissions as submission (submission.submissionId)}
+				{@const bookingDate = formatBookingTimestamp(submission.bookingStartTime)}
+				<button
+					type="button"
+					class="group w-full rounded-xl border border-border bg-background p-4 text-left transition-colors hover:bg-muted/40 focus-visible:bg-muted/40 focus-visible:outline-none"
+					onclick={() => openSubmission(submission.submissionId)}
+				>
+					<div class="flex items-start justify-between gap-3">
+						<div class="min-w-0 flex-1">
+							<div class="flex min-w-0 items-center gap-2">
+								<p class="truncate text-sm font-medium">{submission.signerName}</p>
+								{#if submission.minorCount > 0}
+									<span
+										class="inline-flex shrink-0 items-center rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-muted-foreground tabular-nums"
+									>
+										+{submission.minorCount}
+										{submission.minorCount === 1 ? 'minor' : 'minors'}
+									</span>
+								{/if}
+							</div>
+							<p class="mt-1 truncate text-xs text-muted-foreground">{submission.signerEmail}</p>
+						</div>
+						<ChevronRightIcon
+							class="mt-0.5 size-4 shrink-0 text-muted-foreground/50 transition-transform group-hover:translate-x-0.5 group-hover:text-muted-foreground"
+							aria-hidden="true"
+						/>
+					</div>
+					<div class="mt-4 grid grid-cols-[minmax(0,1fr)_auto] gap-3 text-xs">
+						<div class="min-w-0">
+							<p class="truncate font-medium">
+								{submission.bookingActivityName ?? 'General waiver'}
+							</p>
+							{#if bookingDate}
+								<p class="mt-0.5 truncate text-muted-foreground">
+									{bookingDate}
+								</p>
+							{:else}
+								<span
+									class="mt-1 inline-flex items-center rounded-full border border-dashed border-border bg-muted/40 px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-muted-foreground"
+								>
+									No booking attached
+								</span>
+							{/if}
+						</div>
+						<div class="text-right text-muted-foreground tabular-nums">
+							<p>{formatSubmittedDate(submission.submittedAt)}</p>
+							<p class="mt-0.5">{formatSubmittedTime(submission.submittedAt)}</p>
+						</div>
+					</div>
+				</button>
+			{/each}
+		</div>
+		<div class="hidden overflow-hidden rounded-xl border border-border md:block">
 			<Table class="table-fixed">
 				<colgroup>
-					<col class="w-[21.25%]" />
-					<col class="w-[38%]" />
-					<col class="w-[18.35%]" />
-					<col class="w-[22.4%]" />
+					<col class="w-[32%]" />
+					<col class="w-[30%]" />
+					<col class="w-[18%]" />
+					<col class="w-[20%]" />
 				</colgroup>
 				<TableHeader>
 					<TableRow class="border-border hover:bg-transparent">
@@ -368,7 +445,7 @@
 						<TableHead
 							class="text-xs font-semibold tracking-widest text-muted-foreground uppercase"
 						>
-							Email
+							Visit
 						</TableHead>
 						<TableHead
 							class="text-xs font-semibold tracking-widest text-muted-foreground uppercase"
@@ -384,39 +461,52 @@
 				</TableHeader>
 				<TableBody>
 					{#each recentSubmissions as submission (submission.submissionId)}
+						{@const bookingDate = formatBookingTimestamp(submission.bookingStartTime)}
 						<TableRow
-							class="cursor-pointer border-border transition-colors hover:bg-muted/40 focus-visible:bg-muted/40 focus-visible:outline-none"
+							class="h-17 cursor-pointer border-border transition-colors hover:bg-muted/40 focus-visible:bg-muted/40 focus-visible:outline-none"
 							role="button"
 							tabindex={0}
 							onclick={() => openSubmission(submission.submissionId)}
 							onkeydown={(event) => handleSubmissionRowKeydown(event, submission.submissionId)}
 						>
-							<TableCell>
-								<p class="text-sm font-medium">{submission.signerName}</p>
-								{#if submission.minorCount > 0}
-									<p class="mt-0.5 text-xs text-muted-foreground">
-										+{submission.minorCount}
-										{submission.minorCount === 1 ? 'minor' : 'minors'}
+							<TableCell class="px-4 py-3">
+								<div class="flex min-w-0 items-center gap-2">
+									<p class="truncate text-sm font-medium">{submission.signerName}</p>
+									{#if submission.minorCount > 0}
+										<span
+											class="inline-flex shrink-0 items-center rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-muted-foreground tabular-nums"
+										>
+											+{submission.minorCount}
+											{submission.minorCount === 1 ? 'minor' : 'minors'}
+										</span>
+									{/if}
+								</div>
+								<p class="mt-1 truncate text-xs text-muted-foreground">
+									{submission.signerEmail}
+								</p>
+							</TableCell>
+							<TableCell class="px-4 py-3">
+								<p class="truncate text-sm font-medium">
+									{submission.bookingActivityName ?? 'General waiver'}
+								</p>
+								{#if bookingDate}
+									<p class="mt-1 truncate text-xs text-muted-foreground tabular-nums">
+										{bookingDate}
 									</p>
-								{/if}
-								{#if submission.bookingActivityName}
-									{@const bookingDate = formatBookingTimestamp(submission.bookingStartTime)}
-									<p class="mt-0.5 truncate text-xs text-muted-foreground">
-										{submission.bookingActivityName}
-										{#if bookingDate}
-											- {bookingDate}
-										{/if}
-									</p>
+								{:else}
+									<span
+										class="mt-1 inline-flex items-center rounded-full border border-dashed border-border bg-muted/40 px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-muted-foreground"
+									>
+										No booking attached
+									</span>
 								{/if}
 							</TableCell>
-							<TableCell class="text-sm text-muted-foreground">
-								{submission.signerEmail}
-							</TableCell>
-							<TableCell class="text-sm text-muted-foreground">
+							<TableCell class="px-4 py-3 text-sm text-muted-foreground">
 								{formatDob(submission.signerDateOfBirth)}
 							</TableCell>
-							<TableCell class="text-xs text-muted-foreground">
-								{formatTimestamp(submission.submittedAt)}
+							<TableCell class="px-4 py-3 text-xs text-muted-foreground tabular-nums">
+								<p>{formatSubmittedDate(submission.submittedAt)}</p>
+								<p class="mt-1">{formatSubmittedTime(submission.submittedAt)}</p>
 							</TableCell>
 						</TableRow>
 					{/each}
