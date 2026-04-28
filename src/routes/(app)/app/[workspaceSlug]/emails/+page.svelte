@@ -9,6 +9,8 @@
 	import type { Id } from '$convex/_generated/dataModel';
 	import { api } from '$convex/_generated/api';
 	import { useAppContext } from '$lib/components/app/app-context.svelte';
+	import PageHeader from '$lib/components/app/PageHeader.svelte';
+	import PageShell from '$lib/components/app/PageShell.svelte';
 	import { useProtectedQuery } from '$lib/components/auth/convex-auth.svelte';
 	import { getConvexErrorMessage } from '$lib/utils/convex-errors';
 	import { escapeHtml } from '$lib/utils/rich-text';
@@ -852,16 +854,12 @@
 	onDelete={deleteTemplate}
 />
 
-<div class="w-full min-w-0 p-6">
-	<div class="mx-auto w-full max-w-7xl min-w-0 space-y-6">
-		<!-- Page header -->
-		<header class="space-y-1">
-			<h1 class="text-2xl font-semibold tracking-tight">Email Follow-ups</h1>
-			<p class="text-sm text-muted-foreground">
-				Automatically send thank-you emails after guests sign a waiver.
-			</p>
-		</header>
+<PageHeader
+	title="Email follow-ups"
+	subtitle="Automatically send thank-you emails after guests sign a waiver."
+/>
 
+<PageShell>
 		<!-- Sender status strip / blocking banner -->
 		{#if isLoading}
 			<Skeleton class="h-12 w-full rounded-xl" />
@@ -1529,8 +1527,7 @@
 				</div>
 			</div>
 		{/if}
-	</div>
-</div>
+</PageShell>
 
 <style>
 	.save-indicator {
