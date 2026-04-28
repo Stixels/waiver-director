@@ -547,10 +547,16 @@
 					<div class="border-b border-border px-5 py-4">
 						<Skeleton class="h-4 w-28" />
 					</div>
-					<div class="space-y-3 p-5">
-						<Skeleton class="h-12 w-full" />
-						<Skeleton class="h-12 w-full" />
-						<Skeleton class="h-12 w-full" />
+					<div class="divide-y divide-border">
+						{#each [0, 1, 2] as item (item)}
+							<div class="flex items-start gap-3 px-4 py-3">
+								<Skeleton class="mt-0.5 size-7 shrink-0 rounded-full" />
+								<div class="min-w-0 flex-1 space-y-1.5">
+									<Skeleton class="h-4 w-36 max-w-full" />
+									<Skeleton class="h-3 w-44 max-w-full" />
+								</div>
+							</div>
+						{/each}
 					</div>
 				</div>
 			{:else if selectedCustomerDetail}

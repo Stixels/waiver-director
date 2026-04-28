@@ -177,7 +177,7 @@
 				<div class="space-y-1">
 					{#each [0, 1, 2, 3, 4] as index (index)}
 						<div class="flex h-9 items-center gap-2 rounded-md px-2">
-							<Skeleton class="h-4 w-4 rounded bg-sidebar-foreground/10" />
+							<Skeleton class="h-4 w-4 rounded-xs bg-sidebar-foreground/10" />
 							<Skeleton class="h-3.5 w-24 bg-sidebar-foreground/10" />
 						</div>
 					{/each}

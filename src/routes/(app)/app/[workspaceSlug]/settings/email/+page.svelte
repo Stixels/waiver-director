@@ -30,8 +30,8 @@
 
 {#if !currentWorkspace}
 	<div class="loading-stack">
-		<Skeleton class="h-[420px] w-full rounded-2xl" />
-		<Skeleton class="h-32 w-full rounded-2xl" />
+		<Skeleton class="h-[420px] w-full rounded-md" />
+		<Skeleton class="h-32 w-full rounded-md" />
 	</div>
 {:else}
 	<SettingsSection

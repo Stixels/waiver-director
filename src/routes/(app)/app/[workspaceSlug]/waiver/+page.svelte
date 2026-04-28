@@ -470,8 +470,8 @@
 					<Skeleton class="h-5 w-24" />
 					<Skeleton class="h-4 w-64" />
 					<div class="ml-auto flex items-center gap-2">
-						<Skeleton class="h-8 w-20" />
-						<Skeleton class="h-8 w-24" />
+						<Skeleton class="h-8 w-20 rounded-md" />
+						<Skeleton class="h-8 w-24 rounded-md" />
 					</div>
 				</div>
 			{:else if activePublicUrl && workspaceWaiver}
@@ -666,7 +666,7 @@
 							<div class="space-y-1.5">
 								{#each [0, 1, 2] as index (index)}
 									<div
-										class="flex min-w-0 overflow-hidden rounded-3xl border border-border bg-card/20"
+										class="flex min-w-0 overflow-hidden rounded-lg border border-border bg-card/20"
 									>
 										<Skeleton class="w-6 shrink-0 rounded-none bg-muted/30" />
 										<div class="min-w-0 flex-1 px-2.5 py-1.5">
@@ -676,7 +676,7 @@
 													<Skeleton class="h-[0.85rem] w-6 rounded-full" />
 													<Skeleton class="h-2.5 w-12" />
 												</div>
-												<Skeleton class="h-6 w-6 rounded-md" />
+												<Skeleton class="h-6 w-6 rounded-sm" />
 											</div>
 											<Skeleton class="mt-1.5 h-[1.9rem] w-full rounded-md" />
 										</div>
@@ -686,8 +686,73 @@
 						</div>
 					</div>
 				</aside>
-				<section class="min-h-0 flex-1 p-8">
-					<Skeleton class="mx-auto h-[70vh] w-full max-w-3xl rounded-4xl" />
+				<section class="flex min-h-0 min-w-0 flex-1 flex-col bg-muted/10">
+					<div
+						class="canvas-toolbar flex shrink-0 items-center gap-2 border-b border-border/80 bg-card/40 px-4 py-2 backdrop-blur-sm"
+					>
+						<div class="flex min-w-0 flex-1 items-center gap-2">
+							<Skeleton class="h-[1.7rem] w-36 rounded-full" />
+						</div>
+
+						<div class="flex items-center gap-1">
+							<Skeleton class="h-[1.85rem] w-16 rounded-md" />
+							<Skeleton class="h-[1.85rem] w-[1.85rem] rounded-md" />
+
+							<span class="mx-1 h-5 w-px shrink-0 bg-border/80"></span>
+
+							<Skeleton class="h-[1.85rem] w-[1.85rem] rounded-md" />
+							<Skeleton class="h-[1.85rem] w-[1.85rem] rounded-md" />
+							<Skeleton class="h-[1.85rem] w-[1.85rem] rounded-md" />
+							<Skeleton class="h-[1.85rem] w-[1.85rem] rounded-md" />
+
+							<span class="mx-1 h-5 w-px shrink-0 bg-border/80"></span>
+
+							<Skeleton class="h-[1.85rem] w-[1.85rem] rounded-md" />
+							<Skeleton class="h-[1.85rem] w-[1.85rem] rounded-md" />
+
+							<span class="mx-1 h-5 w-px shrink-0 bg-border/80"></span>
+
+							<Skeleton class="h-[1.85rem] w-[1.85rem] rounded-md" />
+							<Skeleton class="h-[1.85rem] w-[1.85rem] rounded-md" />
+						</div>
+					</div>
+
+					<div class="flex-1 overflow-y-auto overscroll-y-contain">
+						<div class="mx-auto w-full max-w-3xl px-4 py-8 sm:px-8 sm:py-12">
+							<div class="space-y-6">
+								<section class="rounded-4xl border border-border bg-card p-6 shadow-sm sm:p-8">
+									<div class="space-y-3">
+										<Skeleton class="h-4 w-11/12" />
+										<Skeleton class="h-4 w-full" />
+										<Skeleton class="h-4 w-5/6" />
+										<Skeleton class="h-4 w-2/3" />
+									</div>
+								</section>
+
+								<section class="rounded-4xl border border-border bg-card p-6 shadow-sm sm:p-8">
+									<Skeleton class="h-6 w-36" />
+									<div class="mt-8 space-y-6">
+										<div class="space-y-2">
+											<Skeleton class="h-3 w-20" />
+											<Skeleton class="h-8 w-full rounded-none" />
+										</div>
+										<div class="space-y-2">
+											<Skeleton class="h-3 w-12" />
+											<Skeleton class="h-8 w-full rounded-none" />
+										</div>
+										<div class="space-y-2">
+											<Skeleton class="h-3 w-24" />
+											<Skeleton class="h-8 w-full rounded-none" />
+										</div>
+										<div class="border-t border-border pt-8">
+											<Skeleton class="h-6 w-24" />
+											<Skeleton class="mt-7 h-[180px] w-full rounded-2xl" />
+										</div>
+									</div>
+								</section>
+							</div>
+						</div>
+					</div>
 				</section>
 			</div>
 		{:else if !workspaceWaiver}

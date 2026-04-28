@@ -303,10 +303,10 @@
 			</div>
 			<div class="border-b border-border/70 bg-card/30 p-3">
 				<div class="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-					<Skeleton class="h-20 w-full rounded-lg" />
-					<Skeleton class="h-20 w-full rounded-lg" />
-					<Skeleton class="h-20 w-full rounded-lg" />
-					<Skeleton class="h-20 w-full rounded-lg" />
+					<Skeleton class="h-18 w-full rounded-lg" />
+					<Skeleton class="h-18 w-full rounded-lg" />
+					<Skeleton class="h-18 w-full rounded-lg" />
+					<Skeleton class="h-18 w-full rounded-lg" />
 				</div>
 			</div>
 			<div class="p-5">

@@ -1550,7 +1550,7 @@
 				<!-- Subject -->
 				<div class="space-y-3">
 					<Skeleton class="h-3 w-24" />
-					<Skeleton class="h-9 w-full" />
+					<Skeleton class="h-7 w-full" />
 				</div>
 
 				<!-- Body -->

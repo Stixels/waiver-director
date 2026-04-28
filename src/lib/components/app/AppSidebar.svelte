@@ -310,7 +310,7 @@
 						<div class="space-y-1 px-2 py-1.5">
 							{#each [0, 1] as item (item)}
 								<div class="flex items-center gap-2.5 rounded-md px-2 py-1.5">
-									<Skeleton class="h-5 w-5 shrink-0 rounded" />
+									<Skeleton class="h-5 w-5 shrink-0 rounded-xs" />
 									<div class="min-w-0 flex-1 space-y-1">
 										<Skeleton class="h-3 w-24" />
 										<Skeleton class="h-2.5 w-12" />

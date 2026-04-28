@@ -56,9 +56,18 @@
 				class="max-h-48 shrink-0 overflow-y-auto border-b border-border md:max-h-none md:w-72 md:border-r md:border-b-0"
 			>
 				{#if isLoading}
-					<div class="space-y-2 px-4 py-4">
+					<div class="divide-y divide-border">
 						{#each [0, 1, 2] as i (i)}
-							<Skeleton class="h-16 w-full rounded-lg" />
+							<div class="flex items-center gap-2 px-4 py-3">
+								<div class="min-w-0 flex-1 space-y-1.5">
+									<Skeleton class="h-4 w-32 max-w-full" />
+									<Skeleton class="h-3 w-20" />
+								</div>
+								<div class="flex shrink-0 items-center gap-1">
+									<Skeleton class="h-6 w-12 rounded-md" />
+									<Skeleton class="size-6 rounded-xs" />
+								</div>
+							</div>
 						{/each}
 					</div>
 				{:else if templates.length === 0}
