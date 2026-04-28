@@ -3,10 +3,10 @@
 	import { resolve } from '$app/paths';
 	import type { FunctionReturnType } from 'convex/server';
 	import { page } from '$app/state';
-	import { toast } from 'svelte-sonner';
 	import { api } from '$convex/_generated/api';
 	import type { Id } from '$convex/_generated/dataModel';
 	import BookingDetailSheet from '$lib/components/bookings/BookingDetailSheet.svelte';
+	import QrCodeDialog from '$lib/components/waivers/QrCodeDialog.svelte';
 	import { useAppContext } from '$lib/components/app/app-context.svelte';
 	import PageShell from '$lib/components/app/PageShell.svelte';
 	import PageHeader from '$lib/components/app/PageHeader.svelte';
@@ -27,11 +27,11 @@
 	import { onMount } from 'svelte';
 	import ChevronLeftIcon from '@lucide/svelte/icons/chevron-left';
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
-	import CopyIcon from '@lucide/svelte/icons/copy';
 	import CalendarDaysIcon from '@lucide/svelte/icons/calendar-days';
 	import CalendarOffIcon from '@lucide/svelte/icons/calendar-off';
 	import CircleCheckIcon from '@lucide/svelte/icons/circle-check';
 	import EyeOffIcon from '@lucide/svelte/icons/eye-off';
+	import QrCodeIcon from '@lucide/svelte/icons/qr-code';
 	import SearchIcon from '@lucide/svelte/icons/search';
 	import XIcon from '@lucide/svelte/icons/x';
 
@@ -63,6 +63,8 @@
 	let isClearingWorkspaceUrl = $state(false);
 	let selectedBookingId = $state<Id<'bookings'> | null>(null);
 	let detailOpen = $state(false);
+	let shareBooking = $state<Booking | null>(null);
+	let shareDialogOpen = $state(false);
 	let now = $state(Date.now());
 
 	onMount(() => {
@@ -366,17 +368,10 @@
 		return new URL(`/w/${publicSlug}/b/${booking.lookupToken}`, baseUrl).toString();
 	}
 
-	async function copyBookingLink(booking: Booking, event?: MouseEvent) {
+	function openBookingQrCode(booking: Booking, event?: MouseEvent | KeyboardEvent) {
 		event?.stopPropagation();
-		const url = bookingPublicUrl(booking);
-		if (!url) return;
-		try {
-			await navigator.clipboard.writeText(url);
-			toast.success('Booking waiver link copied.');
-		} catch (error) {
-			console.error('[bookings] unable to copy booking link', error);
-			toast.error('Unable to copy booking link.');
-		}
+		shareBooking = booking;
+		shareDialogOpen = true;
 	}
 
 	function openBooking(bookingId: Id<'bookings'>) {
@@ -438,6 +433,18 @@
 		workspaceSlug={currentWorkspace.slug}
 		bookingId={selectedBookingId}
 		{publicSlug}
+	/>
+{/if}
+
+{#if shareBooking && publicSlug}
+	<QrCodeDialog
+		bind:open={shareDialogOpen}
+		title="Booking QR code"
+		description="Scan to open the waiver for {shareBooking.activityName}."
+		url={bookingPublicUrl(shareBooking)}
+		copySuccessMessage="Booking waiver link copied."
+		copyErrorMessage="Unable to copy booking link."
+		logContext="bookings"
 	/>
 {/if}
 
@@ -756,16 +763,16 @@
 						<Button
 							size="sm"
 							variant="outline"
-							onclick={(event) => copyBookingLink(booking, event)}
+							onclick={(event) => openBookingQrCode(booking, event)}
 							disabled={!publicSlug || isCanceled}
-							aria-label="Copy booking waiver link"
+							aria-label="Show booking QR code"
 							title={isCanceled
 								? 'Canceled bookings cannot be shared'
 								: !publicSlug
-									? 'Publish a waiver to share links'
-									: 'Copy booking waiver link'}
+									? 'Publish a waiver to share QR codes'
+									: 'Show booking QR code'}
 						>
-							<CopyIcon class="size-3" aria-hidden="true" />
+							<QrCodeIcon class="size-3" aria-hidden="true" />
 							Share
 						</Button>
 					</div>
@@ -898,17 +905,17 @@
 									<Button
 										size="sm"
 										variant="outline"
-										onclick={(event) => copyBookingLink(booking, event)}
+										onclick={(event) => openBookingQrCode(booking, event)}
 										onkeydown={(event) => event.stopPropagation()}
 										disabled={!publicSlug || isCanceled}
-										aria-label="Copy booking waiver link"
+										aria-label="Show booking QR code"
 										title={isCanceled
 											? 'Canceled bookings cannot be shared'
 											: !publicSlug
-												? 'Publish a waiver to share links'
-												: 'Copy booking waiver link'}
+												? 'Publish a waiver to share QR codes'
+												: 'Show booking QR code'}
 									>
-										<CopyIcon class="size-3" aria-hidden="true" />
+										<QrCodeIcon class="size-3" aria-hidden="true" />
 										Share
 									</Button>
 								{/if}

@@ -11,7 +11,7 @@
 	import { useProtectedQuery } from '$lib/components/auth/convex-auth.svelte';
 	import { publicEnv } from '$lib/config/public';
 	import ConfirmDialog from '$lib/components/ui/ConfirmDialog.svelte';
-	import QrCodePreview from '$lib/components/waivers/QrCodePreview.svelte';
+	import QrCodeDialog from '$lib/components/waivers/QrCodeDialog.svelte';
 	import WaiverVersionHistorySheet from '$lib/components/waivers/WaiverVersionHistorySheet.svelte';
 	import WaiverBuilderCanvas, {
 		type SaveState
@@ -19,13 +19,6 @@
 	import WaiverBuilderPanel from '$lib/components/waivers/WaiverBuilderPanel.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { Skeleton } from '$lib/components/ui/skeleton';
-	import {
-		Dialog,
-		DialogContent,
-		DialogDescription,
-		DialogHeader,
-		DialogTitle
-	} from '$lib/components/ui/dialog';
 	import {
 		DropdownMenu,
 		DropdownMenuContent,
@@ -455,37 +448,15 @@
 {/if}
 
 {#if activePublicUrl}
-	<Dialog bind:open={qrDialogOpen}>
-		<DialogContent class="max-w-xs gap-0 overflow-hidden p-0">
-			<DialogHeader class="border-b border-border px-5 py-4">
-				<DialogTitle>QR Code</DialogTitle>
-				<DialogDescription>Scan to open the live waiver form.</DialogDescription>
-			</DialogHeader>
-			<div class="flex flex-col items-center gap-4 p-6">
-				<QrCodePreview text={activePublicUrl} size={200} />
-				<button
-					type="button"
-					class="public-url-copy public-url-copy-dialog"
-					class:is-copied={copiedKey === 'link'}
-					onclick={() => copyText('link', activePublicUrl)}
-					disabled={copyingKey === 'link'}
-					aria-label="Copy waiver link"
-				>
-					<span class="public-url-copy-text">{activePublicUrl}</span>
-					<span class="public-url-copy-icon" aria-hidden="true">
-						{#if copiedKey === 'link'}
-							<CheckIcon class="size-3.5" />
-						{:else}
-							<ClipboardIcon class="size-3.5" />
-						{/if}
-					</span>
-				</button>
-				<Button variant="outline" class="w-full" onclick={() => copyText('link', activePublicUrl)}>
-					{copiedKey === 'link' ? 'Copied link' : 'Copy link'}
-				</Button>
-			</div>
-		</DialogContent>
-	</Dialog>
+	<QrCodeDialog
+		bind:open={qrDialogOpen}
+		title="Waiver QR code"
+		description="Scan to open the live waiver form."
+		url={activePublicUrl}
+		copySuccessMessage="Waiver link copied."
+		copyErrorMessage="Unable to copy waiver link."
+		logContext="waiver/qr-dialog"
+	/>
 {/if}
 
 <TooltipProvider delayDuration={200}>
@@ -966,19 +937,6 @@
 	.public-url-copy.is-copied .public-url-copy-icon {
 		color: oklch(0.596 0.145 163.225);
 		transform: scale(1.12);
-	}
-
-	.public-url-copy-dialog {
-		width: 100%;
-		justify-content: center;
-		padding: 0.5rem 0.75rem;
-		height: auto;
-		text-align: center;
-	}
-
-	.public-url-copy-dialog .public-url-copy-text {
-		white-space: normal;
-		overflow-wrap: anywhere;
 	}
 
 	.title-bar {

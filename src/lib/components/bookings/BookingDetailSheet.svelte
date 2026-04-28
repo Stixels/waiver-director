@@ -5,15 +5,8 @@
 	import { toast } from 'svelte-sonner';
 	import { useProtectedQuery } from '$lib/components/auth/convex-auth.svelte';
 	import SubmissionDetailSheet from '$lib/components/waivers/SubmissionDetailSheet.svelte';
-	import QrCodePreview from '$lib/components/waivers/QrCodePreview.svelte';
+	import QrCodeDialog from '$lib/components/waivers/QrCodeDialog.svelte';
 	import { Button } from '$lib/components/ui/button';
-	import {
-		Dialog,
-		DialogContent,
-		DialogDescription,
-		DialogHeader,
-		DialogTitle
-	} from '$lib/components/ui/dialog';
 	import {
 		Sheet,
 		SheetContent,
@@ -113,23 +106,15 @@
 {/if}
 
 {#if detail && canShare}
-	<Dialog bind:open={qrDialogOpen}>
-		<DialogContent class="max-w-xs gap-0 overflow-hidden p-0">
-			<DialogHeader class="border-b border-border px-5 py-4">
-				<DialogTitle>Booking QR code</DialogTitle>
-				<DialogDescription>
-					Scan to open the waiver for {detail.booking.activityName}.
-				</DialogDescription>
-			</DialogHeader>
-			<div class="flex flex-col items-center gap-4 p-6">
-				<QrCodePreview text={bookingPublicUrl()} size={200} />
-				<Button variant="outline" class="w-full" onclick={copyBookingLink}>
-					<LinkIcon class="size-3.5" aria-hidden="true" />
-					Copy link
-				</Button>
-			</div>
-		</DialogContent>
-	</Dialog>
+	<QrCodeDialog
+		bind:open={qrDialogOpen}
+		title="Booking QR code"
+		description="Scan to open the waiver for {detail.booking.activityName}."
+		url={bookingPublicUrl()}
+		copySuccessMessage="Booking waiver link copied."
+		copyErrorMessage="Unable to copy booking link."
+		logContext="bookings/detail"
+	/>
 {/if}
 
 <Sheet bind:open>
