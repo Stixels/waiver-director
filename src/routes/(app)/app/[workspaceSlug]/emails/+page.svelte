@@ -1712,7 +1712,7 @@
 		align-items: center;
 		gap: 0.4rem;
 		padding: 0.25rem 0.55rem;
-		border-radius: 9999px;
+		border-radius: var(--radius-full);
 		font-size: 0.7rem;
 		font-weight: 500;
 		letter-spacing: 0.01em;
@@ -1748,7 +1748,7 @@
 		align-items: center;
 		gap: 0.65rem;
 		padding: 0.55rem 0.85rem 0.55rem 0.65rem;
-		border-radius: 0.7rem;
+		border-radius: var(--radius-xl);
 		border: 1px solid color-mix(in srgb, oklch(0.65 0.18 152) 25%, var(--border));
 		background:
 			linear-gradient(
@@ -1780,7 +1780,7 @@
 		justify-content: center;
 		width: 1.65rem;
 		height: 1.65rem;
-		border-radius: 0.45rem;
+		border-radius: var(--radius-md);
 		background: color-mix(in srgb, oklch(0.6 0.16 152) 18%, transparent);
 		color: oklch(0.78 0.18 152);
 		flex-shrink: 0;
@@ -1802,7 +1802,7 @@
 		padding: 0.05rem 0.4rem;
 		background: color-mix(in srgb, var(--muted) 50%, transparent);
 		border: 1px solid var(--border);
-		border-radius: 0.3rem;
+		border-radius: var(--radius-sm);
 		color: var(--foreground);
 		font-weight: 500;
 	}
@@ -1827,7 +1827,7 @@
 		align-items: center;
 		gap: 0.85rem;
 		padding: 0.95rem 1rem;
-		border-radius: 0.85rem;
+		border-radius: var(--radius-xl);
 		border: 1px solid var(--border);
 		background: color-mix(in srgb, var(--card) 70%, transparent);
 		min-width: 0;
@@ -1861,7 +1861,7 @@
 		justify-content: center;
 		width: 2.25rem;
 		height: 2.25rem;
-		border-radius: 0.7rem;
+		border-radius: var(--radius-xl);
 		flex-shrink: 0;
 	}
 
@@ -1918,7 +1918,7 @@
 		font-weight: 600;
 		color: var(--primary-foreground);
 		background: var(--primary);
-		border-radius: 0.5rem;
+		border-radius: var(--radius-md);
 		text-decoration: none;
 		flex-shrink: 0;
 		transition: all 150ms ease;

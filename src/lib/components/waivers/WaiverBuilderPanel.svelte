@@ -374,7 +374,7 @@
 		min-width: 0;
 		border: 1px solid var(--border);
 		background: color-mix(in srgb, var(--card) 50%, transparent);
-		border-radius: 0.55rem;
+		border-radius: var(--radius-lg);
 		overflow: hidden;
 		transition:
 			border-color 160ms ease,
@@ -451,7 +451,7 @@
 		gap: 0.28rem;
 		height: 1.2rem;
 		padding: 0 0.5rem 0 0.38rem;
-		border-radius: 999px;
+		border-radius: var(--radius-full);
 		border: 1px solid var(--border);
 		background: color-mix(in srgb, var(--muted) 40%, transparent);
 		font-size: 0.6rem;
@@ -495,7 +495,7 @@
 		display: inline-block;
 		width: 1.5rem;
 		height: 0.85rem;
-		border-radius: 999px;
+		border-radius: var(--radius-full);
 		background: color-mix(in srgb, var(--muted-foreground) 25%, var(--border));
 		transition: background 180ms ease;
 	}
@@ -506,7 +506,7 @@
 		left: 0.1rem;
 		width: 0.65rem;
 		height: 0.65rem;
-		border-radius: 999px;
+		border-radius: var(--radius-full);
 		background: var(--background);
 		box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
 		transition: transform 180ms ease;
@@ -537,7 +537,7 @@
 		justify-content: center;
 		width: 1.5rem;
 		height: 1.5rem;
-		border-radius: 0.35rem;
+		border-radius: var(--radius-sm);
 		color: color-mix(in srgb, var(--muted-foreground) 70%, transparent);
 		transition:
 			background 150ms ease,
@@ -552,7 +552,7 @@
 	.options-card {
 		position: relative;
 		padding: 0.45rem 0.55rem 0.45rem 0.6rem;
-		border-radius: 0.45rem;
+		border-radius: var(--radius-md);
 		border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
 		background: color-mix(in srgb, var(--muted) 18%, transparent);
 	}
@@ -564,7 +564,7 @@
 		top: 0.4rem;
 		bottom: 0.4rem;
 		width: 2px;
-		border-radius: 999px;
+		border-radius: var(--radius-full);
 		background: color-mix(in srgb, var(--primary) 45%, var(--border));
 		opacity: 0.6;
 	}
@@ -592,7 +592,7 @@
 		min-width: 0;
 		border: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
 		background: color-mix(in srgb, var(--background) 55%, transparent);
-		border-radius: 0.4rem;
+		border-radius: var(--radius-md);
 		overflow: hidden;
 		transition:
 			border-color 150ms ease,
@@ -699,7 +699,7 @@
 		margin-top: 0.4rem;
 		height: 1.4rem;
 		padding: 0 0.5rem 0 0.4rem;
-		border-radius: 999px;
+		border-radius: var(--radius-full);
 		border: 1px dashed color-mix(in srgb, var(--primary) 35%, var(--border));
 		background: transparent;
 		font-size: 0.62rem;

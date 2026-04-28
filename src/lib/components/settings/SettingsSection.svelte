@@ -85,7 +85,7 @@
 		max-width: 100%;
 		overflow: hidden;
 		border: 1px solid var(--border);
-		border-radius: 0.5rem;
+		border-radius: var(--radius-md);
 		background: color-mix(in srgb, var(--card) 92%, var(--background));
 	}
 

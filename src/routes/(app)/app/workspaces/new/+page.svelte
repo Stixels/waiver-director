@@ -74,7 +74,7 @@
 
 	.workspace-blob {
 		position: absolute;
-		border-radius: 9999px;
+		border-radius: var(--radius-full);
 		pointer-events: none;
 		filter: blur(96px);
 	}

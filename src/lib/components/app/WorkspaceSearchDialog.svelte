@@ -948,7 +948,7 @@
 		min-width: 1.125rem;
 		height: 1.125rem;
 		padding: 0 0.25rem;
-		border-radius: 0.3125rem;
+		border-radius: var(--radius-sm);
 		background: color-mix(in oklch, var(--foreground) 4%, var(--popover));
 		color: var(--muted-foreground);
 		font-family:

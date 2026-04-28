@@ -95,7 +95,7 @@
 		color: var(--muted-foreground);
 		background: color-mix(in srgb, var(--primary) 10%, transparent);
 		border: 1px solid color-mix(in srgb, var(--primary) 20%, var(--border));
-		border-radius: 9999px;
+		border-radius: var(--radius-full);
 	}
 
 	.future-desc {
@@ -109,7 +109,7 @@
 		font-size: 0.72rem;
 		padding: 0.05rem 0.3rem;
 		background: color-mix(in srgb, var(--muted) 50%, transparent);
-		border-radius: 0.25rem;
+		border-radius: var(--radius-xs);
 		color: color-mix(in srgb, var(--foreground) 85%, var(--muted-foreground));
 	}
 </style>

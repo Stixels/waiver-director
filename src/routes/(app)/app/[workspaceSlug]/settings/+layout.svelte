@@ -119,7 +119,7 @@
 		align-items: flex-start;
 		gap: 0.7rem;
 		padding: 0.6rem 0.75rem;
-		border-radius: 0.5rem;
+		border-radius: var(--radius-md);
 		color: var(--muted-foreground);
 		text-decoration: none;
 		transition:

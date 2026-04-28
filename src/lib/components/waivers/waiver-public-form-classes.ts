@@ -1,6 +1,6 @@
 /** Shared Tailwind classes for the public waiver form — keep preview and live in sync. */
 export const waiverSectionCardClass =
-	'rounded-[28px] border border-border bg-card p-6 shadow-sm sm:p-8';
+	'rounded-4xl border border-border bg-card p-6 shadow-sm sm:p-8';
 
 export const waiverFieldLabelClass =
 	'mb-1 block text-xs font-medium tracking-[0.14em] text-muted-foreground uppercase';

@@ -195,7 +195,7 @@
 
 	.mkt-brand-link:focus-visible {
 		outline: none;
-		border-radius: 0.6rem;
+		border-radius: var(--radius-lg);
 		box-shadow:
 			0 0 0 2px oklch(0.09 0.006 286),
 			0 0 0 4px oklch(0.52 0.22 277 / 45%);
@@ -207,7 +207,7 @@
 		min-height: 2rem;
 		color: var(--muted-foreground);
 		padding: 0.4rem 0.8rem;
-		border-radius: 0.5rem;
+		border-radius: var(--radius-md);
 		letter-spacing: -0.01em;
 		line-height: 1.2;
 		white-space: nowrap;
@@ -242,7 +242,7 @@
 		position: relative;
 		overflow: hidden;
 		border: 1px solid oklch(1 0 0 / 8%);
-		border-radius: 1rem;
+		border-radius: var(--radius-2xl);
 		background: oklch(0.1 0.008 286 / 96%);
 		box-shadow: 0 12px 32px oklch(0 0 0 / 24%);
 		-webkit-backdrop-filter: blur(16px) saturate(160%);
@@ -276,7 +276,7 @@
 		align-items: center;
 		min-height: 2.75rem;
 		padding: 0.85rem 1rem;
-		border-radius: 0.75rem;
+		border-radius: var(--radius-xl);
 		font-family: 'Bricolage Grotesque', sans-serif;
 		font-size: clamp(1.1rem, 4vw, 1.3rem);
 		font-weight: 700;

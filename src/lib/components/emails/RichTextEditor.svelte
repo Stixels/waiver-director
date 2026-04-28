@@ -693,7 +693,7 @@
 		width: 1.85rem;
 		align-items: center;
 		justify-content: center;
-		border-radius: 0.45rem;
+		border-radius: var(--radius-md);
 		color: var(--muted-foreground);
 		transition:
 			background-color 150ms ease,
@@ -721,7 +721,7 @@
 		height: 1.85rem;
 		align-items: center;
 		gap: 0.25rem;
-		border-radius: 0.45rem;
+		border-radius: var(--radius-md);
 		padding: 0 0.55rem;
 		font-size: 0.72rem;
 		font-weight: 500;

@@ -534,7 +534,7 @@
 		align-items: center;
 		gap: 0.45rem;
 		padding: 0.32rem 0.7rem 0.32rem 0.55rem;
-		border-radius: 9999px;
+		border-radius: var(--radius-full);
 		font-size: 0.72rem;
 		font-weight: 500;
 		letter-spacing: 0.005em;
@@ -547,7 +547,7 @@
 	.identity-status .status-dot {
 		width: 0.4rem;
 		height: 0.4rem;
-		border-radius: 9999px;
+		border-radius: var(--radius-full);
 		background: currentColor;
 		opacity: 0.7;
 	}
@@ -582,7 +582,7 @@
 
 	.inbox-frame {
 		position: relative;
-		border-radius: 0.5rem;
+		border-radius: var(--radius-md);
 		border: 1px solid color-mix(in srgb, var(--primary) 18%, var(--border));
 		background: color-mix(in srgb, var(--primary) 5%, var(--background));
 		padding: 0.85rem;
@@ -615,7 +615,7 @@
 		flex-shrink: 0;
 		width: 2.5rem;
 		height: 2.5rem;
-		border-radius: 0.5rem;
+		border-radius: var(--radius-md);
 		background: color-mix(in srgb, var(--primary) 78%, var(--foreground) 4%);
 		border: 1px solid color-mix(in srgb, var(--primary) 35%, transparent);
 		color: var(--primary-foreground);
@@ -665,7 +665,7 @@
 		font-weight: 600;
 		color: color-mix(in srgb, var(--primary) 72%, var(--foreground));
 		background: color-mix(in srgb, var(--primary) 12%, transparent);
-		border-radius: 9999px;
+		border-radius: var(--radius-full);
 		border: 1px solid color-mix(in srgb, var(--primary) 24%, transparent);
 	}
 
@@ -743,7 +743,7 @@
 		color: var(--foreground);
 		background: color-mix(in srgb, var(--muted) 60%, transparent);
 		border: 1px solid var(--border);
-		border-radius: 0.4rem;
+		border-radius: var(--radius-md);
 		max-width: 100%;
 		overflow: hidden;
 		text-overflow: ellipsis;
@@ -768,7 +768,7 @@
 		align-items: center;
 		gap: 0.85rem;
 		padding: 0.9rem 1rem;
-		border-radius: 0.5rem;
+		border-radius: var(--radius-md);
 		border: 1px solid color-mix(in srgb, oklch(0.65 0.18 152) 28%, var(--border));
 		background: color-mix(in srgb, oklch(0.65 0.18 152) 7%, transparent);
 	}
@@ -779,7 +779,7 @@
 		justify-content: center;
 		width: 2.25rem;
 		height: 2.25rem;
-		border-radius: 0.5rem;
+		border-radius: var(--radius-md);
 		background: color-mix(in srgb, oklch(0.65 0.18 152) 15%, transparent);
 		border: 1px solid color-mix(in srgb, oklch(0.65 0.18 152) 28%, var(--border));
 		color: oklch(0.64 0.16 152);
@@ -817,7 +817,7 @@
 		color: var(--muted-foreground);
 		background: color-mix(in srgb, var(--background) 80%, transparent);
 		border: 1px solid var(--border);
-		border-radius: 0.5rem;
+		border-radius: var(--radius-md);
 		flex-shrink: 0;
 		cursor: pointer;
 		transition: all 150ms ease;
@@ -861,7 +861,7 @@
 	.step-marker {
 		width: 1.75rem;
 		height: 1.75rem;
-		border-radius: 9999px;
+		border-radius: var(--radius-full);
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
@@ -987,7 +987,7 @@
 		font-size: 0.7rem;
 		padding: 0.05rem 0.35rem;
 		background: color-mix(in srgb, var(--destructive) 12%, transparent);
-		border-radius: 0.25rem;
+		border-radius: var(--radius-xs);
 	}
 
 	.step-form {
@@ -1042,7 +1042,7 @@
 		font-variant-numeric: tabular-nums;
 		color: var(--muted-foreground);
 		padding: 0.2rem 0.5rem;
-		border-radius: 9999px;
+		border-radius: var(--radius-full);
 		background: color-mix(in srgb, var(--muted) 50%, transparent);
 		border: 1px solid var(--border);
 	}
@@ -1096,7 +1096,7 @@
 		font-size: 1.05rem;
 		font-weight: 600;
 		font-variant-numeric: tabular-nums;
-		border-radius: 0.55rem !important;
+		border-radius: var(--radius-lg) !important;
 		border: 1px solid var(--border) !important;
 		background: var(--background);
 		transition: all 150ms ease;

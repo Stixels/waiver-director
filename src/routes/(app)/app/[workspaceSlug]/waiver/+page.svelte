@@ -687,7 +687,7 @@
 					</div>
 				</aside>
 				<section class="min-h-0 flex-1 p-8">
-					<Skeleton class="mx-auto h-[70vh] w-full max-w-3xl rounded-[28px]" />
+					<Skeleton class="mx-auto h-[70vh] w-full max-w-3xl rounded-4xl" />
 				</section>
 			</div>
 		{:else if !workspaceWaiver}
@@ -807,7 +807,7 @@
 		justify-content: center;
 		height: 2rem;
 		width: 2rem;
-		border-radius: 0.5rem;
+		border-radius: var(--radius-md);
 		color: var(--muted-foreground);
 		transition:
 			background 150ms ease,
@@ -832,7 +832,7 @@
 		gap: 0.5rem;
 		height: 1.65rem;
 		padding: 0 0.55rem 0 0.5rem;
-		border-radius: 9999px;
+		border-radius: var(--radius-full);
 		border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
 		background: color-mix(in srgb, var(--muted) 35%, transparent);
 		font-family: var(--font-sans);
@@ -963,7 +963,7 @@
 		align-items: center;
 		gap: 0.4rem;
 		padding: 0 0.45rem;
-		border-radius: 0.4rem;
+		border-radius: var(--radius-md);
 		text-align: left;
 		transition:
 			background 160ms ease,
@@ -1022,7 +1022,7 @@
 		min-width: 0;
 		height: 1.85rem;
 		padding: 0 0.55rem;
-		border-radius: 0.4rem;
+		border-radius: var(--radius-md);
 		border: 1px solid color-mix(in srgb, var(--primary) 45%, var(--border));
 		background: var(--background);
 		font-size: 0.8125rem;
@@ -1039,7 +1039,7 @@
 		justify-content: center;
 		height: 1.5rem;
 		width: 1.5rem;
-		border-radius: 0.3rem;
+		border-radius: var(--radius-sm);
 		color: color-mix(in srgb, var(--muted-foreground) 80%, transparent);
 		transition:
 			background 150ms ease,

@@ -373,7 +373,7 @@
 		font-size: 0.7rem;
 		padding: 0.05rem 0.35rem;
 		background: color-mix(in srgb, var(--muted) 60%, transparent);
-		border-radius: 0.25rem;
+		border-radius: var(--radius-xs);
 		color: var(--foreground);
 	}
 
@@ -406,7 +406,7 @@
 		gap: 0.65rem;
 		align-items: flex-start;
 		padding: 0.85rem 1rem;
-		border-radius: 0.5rem;
+		border-radius: var(--radius-md);
 		background: color-mix(in srgb, var(--destructive) 6%, transparent);
 		border: 1px solid color-mix(in srgb, var(--destructive) 20%, var(--border));
 		color: color-mix(in srgb, var(--destructive) 70%, var(--foreground));

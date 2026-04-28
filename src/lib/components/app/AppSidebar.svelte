@@ -583,7 +583,7 @@
 <style>
 	.sidebar-brand-link:focus-visible {
 		outline: none;
-		border-radius: 0.5rem;
+		border-radius: var(--radius-md);
 		box-shadow:
 			0 0 0 2px var(--sidebar),
 			0 0 0 4px oklch(0.52 0.22 277 / 42%);
