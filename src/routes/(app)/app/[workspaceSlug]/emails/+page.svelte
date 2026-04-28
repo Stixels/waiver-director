@@ -853,56 +853,6 @@
 			</p>
 		</header>
 
-		{#if pageError}
-			<div
-				class="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
-			>
-				{getConvexErrorMessage(pageError, 'Unable to load email follow-ups.')}
-			</div>
-		{:else if !appContext.isLoading && !currentWorkspace}
-			<div
-				class="rounded-xl border border-border bg-muted/20 px-4 py-3 text-sm text-muted-foreground"
-			>
-				No workspace was found for <span class="font-medium text-foreground"
-					>{page.params.workspaceSlug}</span
-				>.
-			</div>
-		{/if}
-
-		<!-- Stats cards -->
-		<div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
-			<div class="rounded-xl border border-border bg-card/30 p-4">
-				<p class="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase">
-					Emails sent today
-				</p>
-				{#if statsQuery.isLoading}
-					<Skeleton class="mt-2 h-8 w-16" />
-				{:else}
-					<p class="mt-1 text-3xl font-semibold tabular-nums">{stats?.sentToday ?? 0}</p>
-				{/if}
-			</div>
-			<div class="rounded-xl border border-border bg-card/30 p-4">
-				<p class="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase">
-					Pending queue
-				</p>
-				{#if statsQuery.isLoading}
-					<Skeleton class="mt-2 h-8 w-10" />
-				{:else}
-					<p class="mt-1 text-3xl font-semibold tabular-nums">{stats?.pendingCount ?? 0}</p>
-				{/if}
-			</div>
-			<div class="rounded-xl border border-border bg-card/30 p-4">
-				<p class="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase">
-					Total sent
-				</p>
-				{#if statsQuery.isLoading}
-					<Skeleton class="mt-2 h-8 w-14" />
-				{:else}
-					<p class="mt-1 text-3xl font-semibold tabular-nums">{stats?.totalSent ?? 0}</p>
-				{/if}
-			</div>
-		</div>
-
 		<!-- Sender status strip / blocking banner -->
 		{#if isLoading}
 			<Skeleton class="h-12 w-full rounded-xl" />
@@ -959,6 +909,56 @@
 				</div>
 			{/if}
 		{/if}
+
+		{#if pageError}
+			<div
+				class="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+			>
+				{getConvexErrorMessage(pageError, 'Unable to load email follow-ups.')}
+			</div>
+		{:else if !appContext.isLoading && !currentWorkspace}
+			<div
+				class="rounded-xl border border-border bg-muted/20 px-4 py-3 text-sm text-muted-foreground"
+			>
+				No workspace was found for <span class="font-medium text-foreground"
+					>{page.params.workspaceSlug}</span
+				>.
+			</div>
+		{/if}
+
+		<!-- Stats cards -->
+		<div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+			<div class="rounded-xl border border-border bg-card/30 p-4">
+				<p class="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase">
+					Emails sent today
+				</p>
+				{#if statsQuery.isLoading}
+					<Skeleton class="mt-2 h-8 w-16" />
+				{:else}
+					<p class="mt-1 text-3xl font-semibold tabular-nums">{stats?.sentToday ?? 0}</p>
+				{/if}
+			</div>
+			<div class="rounded-xl border border-border bg-card/30 p-4">
+				<p class="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase">
+					Pending queue
+				</p>
+				{#if statsQuery.isLoading}
+					<Skeleton class="mt-2 h-8 w-10" />
+				{:else}
+					<p class="mt-1 text-3xl font-semibold tabular-nums">{stats?.pendingCount ?? 0}</p>
+				{/if}
+			</div>
+			<div class="rounded-xl border border-border bg-card/30 p-4">
+				<p class="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase">
+					Total sent
+				</p>
+				{#if statsQuery.isLoading}
+					<Skeleton class="mt-2 h-8 w-14" />
+				{:else}
+					<p class="mt-1 text-3xl font-semibold tabular-nums">{stats?.totalSent ?? 0}</p>
+				{/if}
+			</div>
+		</div>
 
 		<!-- Editor content -->
 		{#if isLoading}
