@@ -439,7 +439,7 @@
 {/if}
 
 <div class="w-full min-w-0 p-6">
-	<div class="mx-auto w-full max-w-6xl min-w-0 space-y-6">
+	<div class="mx-auto w-full max-w-7xl min-w-0 space-y-6">
 		<div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
 			<div class="min-w-0 space-y-1">
 				<h1 class="text-2xl font-semibold tracking-tight">Check-ins</h1>

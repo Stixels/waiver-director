@@ -2,7 +2,6 @@
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
 	import { useAppContext } from '$lib/components/app/app-context.svelte';
-	import SettingsIcon from '@lucide/svelte/icons/sliders-horizontal';
 	import Building2Icon from '@lucide/svelte/icons/building-2';
 	import MailIcon from '@lucide/svelte/icons/mail';
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
@@ -42,20 +41,14 @@
 	<title>{currentWorkspace?.name ?? 'Workspace'} Settings | Waiver Director</title>
 </svelte:head>
 
-<div class="settings-shell">
-	<div class="settings-container">
+<div class="w-full min-w-0 p-6">
+	<div class="mx-auto w-full max-w-7xl min-w-0 space-y-6">
 		<!-- Page header -->
-		<header class="settings-header">
-			<div class="settings-header-text">
-				<div class="settings-eyebrow">
-					<SettingsIcon class="size-3.5" />
-					<span>Workspace settings</span>
-				</div>
-				<h1 class="settings-title">
-					{currentWorkspace?.name ?? page.params.workspaceSlug}
-				</h1>
-				<p class="settings-sub">Configure how this workspace looks, sounds, and connects.</p>
-			</div>
+		<header class="space-y-1">
+			<h1 class="text-2xl font-semibold tracking-tight">Workspace settings</h1>
+			<p class="text-sm text-muted-foreground">
+				Configure how this workspace looks, sounds, and connects.
+			</p>
 		</header>
 
 		<div class="settings-grid">
@@ -102,66 +95,6 @@
 </div>
 
 <style>
-	.settings-shell {
-		width: 100%;
-		min-width: 0;
-		padding: 1rem;
-	}
-
-	@media (min-width: 640px) {
-		.settings-shell {
-			padding: 1.5rem;
-		}
-	}
-
-	.settings-container {
-		margin-inline: auto;
-		width: 100%;
-		max-width: 76rem;
-		min-width: 0;
-		display: flex;
-		flex-direction: column;
-		gap: 1.75rem;
-	}
-
-	.settings-header {
-		display: flex;
-		flex-direction: column;
-		gap: 0.5rem;
-	}
-
-	.settings-eyebrow {
-		display: inline-flex;
-		align-items: center;
-		gap: 0.4rem;
-		font-size: 0.66rem;
-		text-transform: uppercase;
-		letter-spacing: 0.18em;
-		font-weight: 600;
-		color: color-mix(in srgb, var(--primary) 55%, var(--muted-foreground));
-	}
-
-	.settings-title {
-		font-size: 1.6rem;
-		font-weight: 700;
-		letter-spacing: -0.02em;
-		color: var(--foreground);
-		line-height: 1.15;
-	}
-
-	@media (min-width: 768px) {
-		.settings-title {
-			font-size: 1.85rem;
-		}
-	}
-
-	.settings-sub {
-		font-size: 0.85rem;
-		color: var(--muted-foreground);
-		max-width: 38rem;
-		line-height: 1.5;
-	}
-
 	.settings-grid {
 		display: grid;
 		grid-template-columns: 1fr;

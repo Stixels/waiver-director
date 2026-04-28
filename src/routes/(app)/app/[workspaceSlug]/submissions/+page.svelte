@@ -240,11 +240,11 @@
 {/if}
 
 <div class="w-full min-w-0 p-6">
-	<div class="mx-auto w-full max-w-6xl min-w-0 space-y-6">
-		<div class="space-y-1">
+	<div class="mx-auto w-full max-w-7xl min-w-0 space-y-6">
+		<header class="space-y-1">
 			<h1 class="text-2xl font-semibold tracking-tight">Signed waiver records</h1>
 			<p class="text-sm text-muted-foreground">Click any row to view the full signed waiver.</p>
-		</div>
+		</header>
 
 		<div class="relative w-full lg:max-w-md">
 			<SearchIcon

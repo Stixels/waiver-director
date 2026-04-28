@@ -843,15 +843,15 @@
 	onDelete={deleteTemplate}
 />
 
-<div class="w-full min-w-0 p-4 sm:p-6">
-	<div class="mx-auto w-full max-w-5xl min-w-0 space-y-6 sm:space-y-8">
+<div class="w-full min-w-0 p-6">
+	<div class="mx-auto w-full max-w-7xl min-w-0 space-y-6">
 		<!-- Page header -->
-		<div class="space-y-1">
+		<header class="space-y-1">
 			<h1 class="text-2xl font-semibold tracking-tight">Email Follow-ups</h1>
 			<p class="text-sm text-muted-foreground">
 				Automatically send thank-you emails after guests sign a waiver.
 			</p>
-		</div>
+		</header>
 
 		{#if pageError}
 			<div
