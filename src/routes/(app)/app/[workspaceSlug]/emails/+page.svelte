@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
+	import { resolve } from '$app/paths';
 	import { untrack } from 'svelte';
 	import { SvelteSet } from 'svelte/reactivity';
 	import { useConvexClient } from 'convex-svelte';
@@ -37,7 +38,11 @@
 	import CloudIcon from '@lucide/svelte/icons/cloud';
 	import CloudCheckIcon from '@lucide/svelte/icons/cloud-check';
 	import CloudOffIcon from '@lucide/svelte/icons/cloud-off';
+	import MailIcon from '@lucide/svelte/icons/mail';
+	import MailCheckIcon from '@lucide/svelte/icons/mail-check';
 	import LoaderIcon from '@lucide/svelte/icons/loader';
+	import ShieldCheckIcon from '@lucide/svelte/icons/shield-check';
+	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 
 	const convex = useConvexClient();
 	const appContext = useAppContext();
@@ -64,6 +69,7 @@
 	const PAGE_SIZE = 25;
 	const STATUS_OPTIONS = [
 		{ value: 'queued', label: 'Queued' },
+		{ value: 'paused', label: 'Paused' },
 		{ value: 'sent', label: 'Sent' },
 		{ value: 'cancelled', label: 'Cancelled' },
 		{ value: 'failed', label: 'Failed' }
@@ -100,7 +106,13 @@
 			},
 			...(statusFilters.size > 0
 				? {
-						statuses: [...statusFilters] as ('queued' | 'sent' | 'cancelled' | 'failed')[]
+						statuses: [...statusFilters] as (
+							| 'queued'
+							| 'paused'
+							| 'sent'
+							| 'cancelled'
+							| 'failed'
+						)[]
 					}
 				: {}),
 			...(searchQuery.trim() ? { searchQuery: searchQuery.trim() } : {}),
@@ -113,6 +125,10 @@
 		currentWorkspace ? { workspaceId: currentWorkspace.workspaceId } : 'skip'
 	);
 
+	const senderSettingsQuery = useProtectedQuery(api.emails.getWorkspaceEmailSenderSettings, () =>
+		currentWorkspace ? { workspaceId: currentWorkspace.workspaceId } : 'skip'
+	);
+
 	type FollowUp = FunctionReturnType<typeof api.emails.listFollowUps>['page'][number] & {
 		bookingNumber?: string;
 	};
@@ -122,15 +138,25 @@
 	const followUpsPage = $derived(followUpsQuery.data);
 	const followUps = $derived((followUpsPage?.page ?? []) as FollowUp[]);
 	const templates = $derived((templatesQuery.data ?? []) as EmailTemplate[]);
-	const isLoading = $derived(appContext.isLoading || editorContentQuery.isLoading);
+	const senderSettings = $derived(senderSettingsQuery.data);
+	const isLoading = $derived(
+		appContext.isLoading || editorContentQuery.isLoading || senderSettingsQuery.isLoading
+	);
 	const pageError = $derived(
 		appContext.error ??
 			editorContentQuery.error ??
+			senderSettingsQuery.error ??
 			statsQuery.error ??
 			followUpsQuery.error ??
 			templatesQuery.error ??
 			null
 	);
+
+	// ─── Sender summary (read-only on this page) ──────────────────────────────
+
+	const businessName = $derived(currentWorkspace?.name ?? 'Your business');
+	const workspaceCanSendEmail = $derived(Boolean(senderSettings?.canSendEmails));
+	const replyToPendingVerification = $derived(Boolean(senderSettings?.pendingReplyToEmail));
 
 	// ─── Editor content state ──────────────────────────────────────────────────
 
@@ -519,7 +545,8 @@
 
 	const selectedFollowUps = $derived(followUps.filter((f) => selectedIds.has(f._id)));
 	const canSendSelected = $derived(
-		selectedFollowUps.some((f) => ['queued', 'paused', 'cancelled', 'failed'].includes(f.status))
+		workspaceCanSendEmail &&
+			selectedFollowUps.some((f) => ['queued', 'paused', 'cancelled', 'failed'].includes(f.status))
 	);
 	const canCancelSelected = $derived(selectedFollowUps.some((f) => f.status === 'queued'));
 
@@ -597,6 +624,10 @@
 
 	async function handleSendSelected() {
 		if (!currentWorkspace || selectedIds.size === 0) return;
+		if (!workspaceCanSendEmail) {
+			toast.error('Verify a reply-to email before sending follow-ups.');
+			return;
+		}
 		selectionLoading = 'send';
 		try {
 			await convex.mutation(api.emails.sendSelected, {
@@ -632,6 +663,10 @@
 	let rowLoading = $state<Id<'email_follow_ups'> | null>(null);
 
 	async function handleRowAction(action: 'send' | 'cancel', followUpId: Id<'email_follow_ups'>) {
+		if (action === 'send' && !workspaceCanSendEmail) {
+			toast.error('Verify a reply-to email before sending follow-ups.');
+			return;
+		}
 		rowLoading = followUpId;
 		try {
 			if (action === 'send') {
@@ -772,13 +807,17 @@
 						<span></span>
 					{/if}
 					<div class="flex gap-2">
-						<Button
-							size="sm"
-							onclick={() => handleRowAction('send', previewVars!.followUpId)}
-							disabled={rowLoading === previewVars.followUpId}
+						<span
+							title={!workspaceCanSendEmail ? 'Verify a reply-to email before sending' : undefined}
 						>
-							{rowLoading === previewVars.followUpId ? 'Sending…' : 'Send now'}
-						</Button>
+							<Button
+								size="sm"
+								onclick={() => handleRowAction('send', previewVars!.followUpId)}
+								disabled={rowLoading === previewVars.followUpId || !workspaceCanSendEmail}
+							>
+								{rowLoading === previewVars.followUpId ? 'Sending…' : 'Send now'}
+							</Button>
+						</span>
 					</div>
 				</div>
 			{/if}
@@ -863,6 +902,63 @@
 				{/if}
 			</div>
 		</div>
+
+		<!-- Sender status strip / blocking banner -->
+		{#if isLoading}
+			<Skeleton class="h-12 w-full rounded-xl" />
+		{:else if currentWorkspace}
+			{@const settingsHref = resolve(`/app/${currentWorkspace.slug}/settings/email` as const)}
+			{#if workspaceCanSendEmail}
+				<a class="sender-strip" data-state="ready" href={settingsHref}>
+					<span class="sender-strip-mark">
+						<ShieldCheckIcon class="size-3.5" />
+					</span>
+					<span class="sender-strip-text">
+						Sending as
+						<strong class="font-semibold text-foreground">{businessName}</strong>
+						· replies route to
+						<span class="sender-strip-mono">{senderSettings?.replyToEmail}</span>
+					</span>
+					<span class="sender-strip-cta">
+						Edit
+						<ChevronRightIcon class="size-3" />
+					</span>
+				</a>
+			{:else}
+				<div class="sender-banner" data-state={replyToPendingVerification ? 'pending' : 'unset'}>
+					<div class="sender-banner-mark">
+						{#if replyToPendingVerification}
+							<MailCheckIcon class="size-[18px]" />
+						{:else}
+							<MailIcon class="size-[18px]" />
+						{/if}
+					</div>
+					<div class="sender-banner-body">
+						<p class="sender-banner-title">
+							{#if replyToPendingVerification}
+								Almost there — verify your reply-to email
+							{:else}
+								Set up your sender to start sending follow-ups
+							{/if}
+						</p>
+						<p class="sender-banner-desc">
+							{#if replyToPendingVerification}
+								We sent a code to
+								<strong class="font-medium text-foreground"
+									>{senderSettings?.pendingReplyToEmail}</strong
+								>. Paste it on the email settings page to finish.
+							{:else}
+								Follow-ups can't go out until you verify a reply-to inbox. Takes about a minute.
+							{/if}
+						</p>
+					</div>
+					<a class="sender-banner-cta" href={settingsHref}>
+						{replyToPendingVerification ? 'Continue' : 'Set up'}
+						<ChevronRightIcon class="size-3.5" />
+					</a>
+				</div>
+			{/if}
+		{/if}
 
 		<!-- Editor content -->
 		{#if isLoading}
@@ -1107,7 +1203,9 @@
 					<span
 						class="inline-block flex-1 sm:flex-none"
 						title={!canSendSelected
-							? 'Select queued, cancelled, or failed rows to send'
+							? workspaceCanSendEmail
+								? 'Select queued, paused, cancelled, or failed rows to send'
+								: 'Verify a reply-to email before sending'
 							: undefined}
 					>
 						<Button
@@ -1446,5 +1544,193 @@
 
 	.save-indicator[data-state='dirty'] {
 		color: color-mix(in srgb, var(--primary) 70%, var(--foreground));
+	}
+
+	/* ─── Sender status strip + blocking banner ─────────────────────────────── */
+
+	.sender-strip {
+		display: flex;
+		align-items: center;
+		gap: 0.65rem;
+		padding: 0.55rem 0.85rem 0.55rem 0.65rem;
+		border-radius: 0.7rem;
+		border: 1px solid color-mix(in srgb, oklch(0.65 0.18 152) 25%, var(--border));
+		background:
+			linear-gradient(
+				90deg,
+				color-mix(in srgb, oklch(0.6 0.16 152) 8%, transparent),
+				color-mix(in srgb, oklch(0.6 0.16 152) 3%, transparent)
+			),
+			color-mix(in srgb, var(--card) 60%, transparent);
+		text-decoration: none;
+		color: var(--foreground);
+		transition: all 150ms ease;
+		min-width: 0;
+	}
+
+	.sender-strip:hover {
+		border-color: color-mix(in srgb, oklch(0.6 0.16 152) 45%, var(--border));
+		background:
+			linear-gradient(
+				90deg,
+				color-mix(in srgb, oklch(0.6 0.16 152) 12%, transparent),
+				color-mix(in srgb, oklch(0.6 0.16 152) 5%, transparent)
+			),
+			var(--card);
+	}
+
+	.sender-strip-mark {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 1.65rem;
+		height: 1.65rem;
+		border-radius: 0.45rem;
+		background: color-mix(in srgb, oklch(0.6 0.16 152) 18%, transparent);
+		color: oklch(0.78 0.18 152);
+		flex-shrink: 0;
+	}
+
+	.sender-strip-text {
+		font-size: 0.78rem;
+		color: var(--muted-foreground);
+		min-width: 0;
+		flex: 1;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.sender-strip-mono {
+		font-family: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, monospace;
+		font-size: 0.72rem;
+		padding: 0.05rem 0.4rem;
+		background: color-mix(in srgb, var(--muted) 50%, transparent);
+		border: 1px solid var(--border);
+		border-radius: 0.3rem;
+		color: var(--foreground);
+		font-weight: 500;
+	}
+
+	.sender-strip-cta {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.2rem;
+		font-size: 0.72rem;
+		font-weight: 500;
+		color: var(--muted-foreground);
+		flex-shrink: 0;
+		transition: color 150ms ease;
+	}
+
+	.sender-strip:hover .sender-strip-cta {
+		color: var(--foreground);
+	}
+
+	.sender-banner {
+		display: flex;
+		align-items: center;
+		gap: 0.85rem;
+		padding: 0.95rem 1rem;
+		border-radius: 0.85rem;
+		border: 1px solid var(--border);
+		background: color-mix(in srgb, var(--card) 70%, transparent);
+		min-width: 0;
+	}
+
+	.sender-banner[data-state='unset'] {
+		border-color: color-mix(in srgb, oklch(0.6 0.18 28) 30%, var(--border));
+		background:
+			linear-gradient(
+				90deg,
+				color-mix(in srgb, oklch(0.6 0.18 28) 8%, transparent),
+				color-mix(in srgb, oklch(0.6 0.18 28) 2%, transparent)
+			),
+			color-mix(in srgb, var(--card) 60%, transparent);
+	}
+
+	.sender-banner[data-state='pending'] {
+		border-color: color-mix(in srgb, oklch(0.78 0.14 80) 35%, var(--border));
+		background:
+			linear-gradient(
+				90deg,
+				color-mix(in srgb, oklch(0.78 0.14 80) 10%, transparent),
+				color-mix(in srgb, oklch(0.78 0.14 80) 3%, transparent)
+			),
+			color-mix(in srgb, var(--card) 60%, transparent);
+	}
+
+	.sender-banner-mark {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 2.25rem;
+		height: 2.25rem;
+		border-radius: 0.7rem;
+		flex-shrink: 0;
+	}
+
+	.sender-banner[data-state='unset'] .sender-banner-mark {
+		background: color-mix(in srgb, oklch(0.6 0.18 28) 14%, transparent);
+		color: oklch(0.7 0.18 28);
+		border: 1px solid color-mix(in srgb, oklch(0.6 0.18 28) 25%, transparent);
+	}
+
+	.sender-banner[data-state='pending'] .sender-banner-mark {
+		background: color-mix(in srgb, oklch(0.78 0.14 80) 16%, transparent);
+		color: oklch(0.82 0.14 80);
+		border: 1px solid color-mix(in srgb, oklch(0.78 0.14 80) 30%, transparent);
+		animation: banner-pulse 1.8s ease-in-out infinite;
+	}
+
+	@keyframes banner-pulse {
+		0%,
+		100% {
+			box-shadow: 0 0 0 0 color-mix(in srgb, oklch(0.78 0.14 80) 25%, transparent);
+		}
+		50% {
+			box-shadow: 0 0 0 5px color-mix(in srgb, oklch(0.78 0.14 80) 0%, transparent);
+		}
+	}
+
+	.sender-banner-body {
+		min-width: 0;
+		flex: 1;
+		display: flex;
+		flex-direction: column;
+		gap: 0.15rem;
+	}
+
+	.sender-banner-title {
+		font-size: 0.85rem;
+		font-weight: 600;
+		letter-spacing: -0.005em;
+		color: var(--foreground);
+	}
+
+	.sender-banner-desc {
+		font-size: 0.74rem;
+		line-height: 1.45;
+		color: var(--muted-foreground);
+	}
+
+	.sender-banner-cta {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.3rem;
+		padding: 0.45rem 0.85rem;
+		font-size: 0.78rem;
+		font-weight: 600;
+		color: var(--primary-foreground);
+		background: var(--primary);
+		border-radius: 0.5rem;
+		text-decoration: none;
+		flex-shrink: 0;
+		transition: all 150ms ease;
+		box-shadow: 0 1px 0 color-mix(in srgb, var(--foreground) 8%, transparent);
+	}
+
+	.sender-banner-cta:hover {
+		background: color-mix(in srgb, var(--primary) 90%, var(--foreground) 10%);
 	}
 </style>

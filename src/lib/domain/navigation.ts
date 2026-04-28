@@ -5,6 +5,7 @@ import UsersRoundIcon from '@lucide/svelte/icons/users-round';
 import LayersIcon from '@lucide/svelte/icons/layers';
 import MailIcon from '@lucide/svelte/icons/mail';
 import PlugZapIcon from '@lucide/svelte/icons/plug-zap';
+import SlidersHorizontalIcon from '@lucide/svelte/icons/sliders-horizontal';
 
 /**
  * Primary daily-workflow navigation items.
@@ -57,6 +58,12 @@ export const appConfigNavItems = [
 		href: '/app/[workspaceSlug]/integrations',
 		icon: PlugZapIcon,
 		description: 'Booking providers and email service connections.'
+	},
+	{
+		label: 'Settings',
+		href: '/app/[workspaceSlug]/settings',
+		icon: SlidersHorizontalIcon,
+		description: 'Workspace identity, email, branding, and team.'
 	}
 ] as const;
 
