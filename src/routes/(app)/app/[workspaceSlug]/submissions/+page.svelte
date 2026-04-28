@@ -6,6 +6,8 @@
 	import type { Id } from '$convex/_generated/dataModel';
 	import { page } from '$app/state';
 	import { useAppContext } from '$lib/components/app/app-context.svelte';
+	import PageShell from '$lib/components/app/PageShell.svelte';
+	import PageHeader from '$lib/components/app/PageHeader.svelte';
 	import { useProtectedQuery } from '$lib/components/auth/convex-auth.svelte';
 	import SubmissionDetailSheet from '$lib/components/waivers/SubmissionDetailSheet.svelte';
 	import { Button } from '$lib/components/ui/button';
@@ -239,13 +241,8 @@
 	/>
 {/if}
 
-<div class="w-full min-w-0 p-6">
-	<div class="mx-auto w-full max-w-6xl min-w-0 space-y-6">
-		<div class="space-y-1">
-			<h1 class="text-2xl font-semibold tracking-tight">Signed waiver records</h1>
-			<p class="text-sm text-muted-foreground">Click any row to view the full signed waiver.</p>
-		</div>
-
+<PageHeader title="Signed waiver records" subtitle="Click any row to view the full signed waiver.">
+	{#snippet meta()}
 		<div class="relative w-full lg:max-w-md">
 			<SearchIcon
 				class="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground"
@@ -255,7 +252,7 @@
 				type="search"
 				placeholder="Search by customer, activity, or booking number"
 				bind:value={searchInput}
-				class="h-10 w-full rounded-lg border border-input bg-card/50 pr-10 pl-11 text-sm shadow-xs transition-all placeholder:text-muted-foreground/70 hover:bg-card focus-visible:border-ring focus-visible:bg-background focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
+				class="h-9 w-full rounded-lg border border-input bg-background/60 pr-10 pl-11 text-sm shadow-xs transition-all placeholder:text-muted-foreground/70 hover:bg-background focus-visible:border-ring focus-visible:bg-background focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
 				aria-label="Search submissions"
 			/>
 			{#if searchInput}
@@ -269,181 +266,183 @@
 				</button>
 			{/if}
 		</div>
+	{/snippet}
+</PageHeader>
 
-		{#if isLoadingSubmissions}
-			<div class="overflow-hidden rounded-xl border border-border">
-				<Table class="table-fixed">
-					<colgroup>
-						<col class="w-[21.25%]" />
-						<col class="w-[38%]" />
-						<col class="w-[18.35%]" />
-						<col class="w-[22.4%]" />
-					</colgroup>
-					<TableHeader>
+<PageShell>
+	{#if isLoadingSubmissions}
+		<div class="overflow-hidden rounded-xl border border-border">
+			<Table class="table-fixed">
+				<colgroup>
+					<col class="w-[21.25%]" />
+					<col class="w-[38%]" />
+					<col class="w-[18.35%]" />
+					<col class="w-[22.4%]" />
+				</colgroup>
+				<TableHeader>
+					<TableRow class="border-border hover:bg-transparent">
+						<TableHead
+							class="text-xs font-semibold tracking-widest text-muted-foreground uppercase"
+						>
+							Name
+						</TableHead>
+						<TableHead
+							class="text-xs font-semibold tracking-widest text-muted-foreground uppercase"
+						>
+							Email
+						</TableHead>
+						<TableHead
+							class="text-xs font-semibold tracking-widest text-muted-foreground uppercase"
+						>
+							Date of birth
+						</TableHead>
+						<TableHead
+							class="text-xs font-semibold tracking-widest text-muted-foreground uppercase"
+						>
+							Submitted
+						</TableHead>
+					</TableRow>
+				</TableHeader>
+				<TableBody>
+					{#each [0, 1, 2, 3, 4, 5] as index (index)}
 						<TableRow class="border-border hover:bg-transparent">
-							<TableHead
-								class="text-xs font-semibold tracking-widest text-muted-foreground uppercase"
-							>
-								Name
-							</TableHead>
-							<TableHead
-								class="text-xs font-semibold tracking-widest text-muted-foreground uppercase"
-							>
-								Email
-							</TableHead>
-							<TableHead
-								class="text-xs font-semibold tracking-widest text-muted-foreground uppercase"
-							>
-								Date of birth
-							</TableHead>
-							<TableHead
-								class="text-xs font-semibold tracking-widest text-muted-foreground uppercase"
-							>
-								Submitted
-							</TableHead>
+							<TableCell>
+								<Skeleton class="h-5 w-32" />
+							</TableCell>
+							<TableCell>
+								<Skeleton class="h-5 w-44" />
+							</TableCell>
+							<TableCell>
+								<Skeleton class="h-5 w-28" />
+							</TableCell>
+							<TableCell>
+								<Skeleton class="h-5 w-36" />
+							</TableCell>
 						</TableRow>
-					</TableHeader>
-					<TableBody>
-						{#each [0, 1, 2, 3, 4, 5] as index (index)}
-							<TableRow class="border-border hover:bg-transparent">
-								<TableCell>
-									<Skeleton class="h-5 w-32" />
-								</TableCell>
-								<TableCell>
-									<Skeleton class="h-5 w-44" />
-								</TableCell>
-								<TableCell>
-									<Skeleton class="h-5 w-28" />
-								</TableCell>
-								<TableCell>
-									<Skeleton class="h-5 w-36" />
-								</TableCell>
-							</TableRow>
-						{/each}
-					</TableBody>
-				</Table>
-			</div>
-		{:else if !currentWorkspace}
+					{/each}
+				</TableBody>
+			</Table>
+		</div>
+	{:else if !currentWorkspace}
+		<div
+			class="rounded-xl border border-dashed border-border p-12 text-center text-sm text-muted-foreground"
+		>
+			Workspace not found.
+		</div>
+	{:else if recentSubmissions.length === 0}
+		<div
+			class="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border bg-card/30 px-4 py-16 text-center"
+		>
 			<div
-				class="rounded-xl border border-dashed border-border p-12 text-center text-sm text-muted-foreground"
+				class="flex size-10 items-center justify-center rounded-full bg-muted text-muted-foreground"
 			>
-				Workspace not found.
+				<FileTextIcon class="size-5" aria-hidden="true" />
 			</div>
-		{:else if recentSubmissions.length === 0}
-			<div
-				class="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border bg-card/30 px-4 py-16 text-center"
-			>
-				<div
-					class="flex size-10 items-center justify-center rounded-full bg-muted text-muted-foreground"
+			<div class="space-y-1">
+				<p class="text-sm font-medium">
+					{searchQuery ? 'No matching submissions' : 'No submissions yet'}
+				</p>
+				<p class="text-xs text-muted-foreground">
+					{searchQuery
+						? 'Try a different name, email, or booking number.'
+						: 'Once guests sign the live waiver, records will appear here.'}
+				</p>
+			</div>
+		</div>
+	{:else}
+		<div class="overflow-hidden rounded-xl border border-border">
+			<Table class="table-fixed">
+				<colgroup>
+					<col class="w-[21.25%]" />
+					<col class="w-[38%]" />
+					<col class="w-[18.35%]" />
+					<col class="w-[22.4%]" />
+				</colgroup>
+				<TableHeader>
+					<TableRow class="border-border hover:bg-transparent">
+						<TableHead
+							class="text-xs font-semibold tracking-widest text-muted-foreground uppercase"
+						>
+							Name
+						</TableHead>
+						<TableHead
+							class="text-xs font-semibold tracking-widest text-muted-foreground uppercase"
+						>
+							Email
+						</TableHead>
+						<TableHead
+							class="text-xs font-semibold tracking-widest text-muted-foreground uppercase"
+						>
+							Date of birth
+						</TableHead>
+						<TableHead
+							class="text-xs font-semibold tracking-widest text-muted-foreground uppercase"
+						>
+							Submitted
+						</TableHead>
+					</TableRow>
+				</TableHeader>
+				<TableBody>
+					{#each recentSubmissions as submission (submission.submissionId)}
+						<TableRow
+							class="cursor-pointer border-border transition-colors hover:bg-muted/40 focus-visible:bg-muted/40 focus-visible:outline-none"
+							role="button"
+							tabindex={0}
+							onclick={() => openSubmission(submission.submissionId)}
+							onkeydown={(event) => handleSubmissionRowKeydown(event, submission.submissionId)}
+						>
+							<TableCell>
+								<p class="text-sm font-medium">{submission.signerName}</p>
+								{#if submission.minorCount > 0}
+									<p class="mt-0.5 text-xs text-muted-foreground">
+										+{submission.minorCount}
+										{submission.minorCount === 1 ? 'minor' : 'minors'}
+									</p>
+								{/if}
+								{#if submission.bookingActivityName}
+									{@const bookingDate = formatBookingTimestamp(submission.bookingStartTime)}
+									<p class="mt-0.5 truncate text-xs text-muted-foreground">
+										{submission.bookingActivityName}
+										{#if bookingDate}
+											- {bookingDate}
+										{/if}
+									</p>
+								{/if}
+							</TableCell>
+							<TableCell class="text-sm text-muted-foreground">
+								{submission.signerEmail}
+							</TableCell>
+							<TableCell class="text-sm text-muted-foreground">
+								{formatDob(submission.signerDateOfBirth)}
+							</TableCell>
+							<TableCell class="text-xs text-muted-foreground">
+								{formatTimestamp(submission.submittedAt)}
+							</TableCell>
+						</TableRow>
+					{/each}
+				</TableBody>
+			</Table>
+		</div>
+	{/if}
+
+	{#if submissionPage && (cursorHistory.length > 0 || !submissionPage.isDone)}
+		<div class="flex items-center justify-between gap-3">
+			<p class="text-xs text-muted-foreground">Page {currentPage}</p>
+			<div class="flex items-center gap-2">
+				<Button
+					size="sm"
+					variant="outline"
+					disabled={cursorHistory.length === 0}
+					onclick={goPreviousPage}
 				>
-					<FileTextIcon class="size-5" aria-hidden="true" />
-				</div>
-				<div class="space-y-1">
-					<p class="text-sm font-medium">
-						{searchQuery ? 'No matching submissions' : 'No submissions yet'}
-					</p>
-					<p class="text-xs text-muted-foreground">
-						{searchQuery
-							? 'Try a different name, email, or booking number.'
-							: 'Once guests sign the live waiver, records will appear here.'}
-					</p>
-				</div>
+					<ChevronLeftIcon class="size-4" aria-hidden="true" />
+					Previous
+				</Button>
+				<Button size="sm" variant="outline" disabled={submissionPage.isDone} onclick={goNextPage}>
+					Next
+					<ChevronRightIcon class="size-4" aria-hidden="true" />
+				</Button>
 			</div>
-		{:else}
-			<div class="overflow-hidden rounded-xl border border-border">
-				<Table class="table-fixed">
-					<colgroup>
-						<col class="w-[21.25%]" />
-						<col class="w-[38%]" />
-						<col class="w-[18.35%]" />
-						<col class="w-[22.4%]" />
-					</colgroup>
-					<TableHeader>
-						<TableRow class="border-border hover:bg-transparent">
-							<TableHead
-								class="text-xs font-semibold tracking-widest text-muted-foreground uppercase"
-							>
-								Name
-							</TableHead>
-							<TableHead
-								class="text-xs font-semibold tracking-widest text-muted-foreground uppercase"
-							>
-								Email
-							</TableHead>
-							<TableHead
-								class="text-xs font-semibold tracking-widest text-muted-foreground uppercase"
-							>
-								Date of birth
-							</TableHead>
-							<TableHead
-								class="text-xs font-semibold tracking-widest text-muted-foreground uppercase"
-							>
-								Submitted
-							</TableHead>
-						</TableRow>
-					</TableHeader>
-					<TableBody>
-						{#each recentSubmissions as submission (submission.submissionId)}
-							<TableRow
-								class="cursor-pointer border-border transition-colors hover:bg-muted/40 focus-visible:bg-muted/40 focus-visible:outline-none"
-								role="button"
-								tabindex={0}
-								onclick={() => openSubmission(submission.submissionId)}
-								onkeydown={(event) => handleSubmissionRowKeydown(event, submission.submissionId)}
-							>
-								<TableCell>
-									<p class="text-sm font-medium">{submission.signerName}</p>
-									{#if submission.minorCount > 0}
-										<p class="mt-0.5 text-xs text-muted-foreground">
-											+{submission.minorCount}
-											{submission.minorCount === 1 ? 'minor' : 'minors'}
-										</p>
-									{/if}
-									{#if submission.bookingActivityName}
-										{@const bookingDate = formatBookingTimestamp(submission.bookingStartTime)}
-										<p class="mt-0.5 truncate text-xs text-muted-foreground">
-											{submission.bookingActivityName}
-											{#if bookingDate}
-												- {bookingDate}
-											{/if}
-										</p>
-									{/if}
-								</TableCell>
-								<TableCell class="text-sm text-muted-foreground">
-									{submission.signerEmail}
-								</TableCell>
-								<TableCell class="text-sm text-muted-foreground">
-									{formatDob(submission.signerDateOfBirth)}
-								</TableCell>
-								<TableCell class="text-xs text-muted-foreground">
-									{formatTimestamp(submission.submittedAt)}
-								</TableCell>
-							</TableRow>
-						{/each}
-					</TableBody>
-				</Table>
-			</div>
-		{/if}
-
-		{#if submissionPage && (cursorHistory.length > 0 || !submissionPage.isDone)}
-			<div class="flex items-center justify-between gap-3">
-				<p class="text-xs text-muted-foreground">Page {currentPage}</p>
-				<div class="flex items-center gap-2">
-					<Button
-						size="sm"
-						variant="outline"
-						disabled={cursorHistory.length === 0}
-						onclick={goPreviousPage}
-					>
-						<ChevronLeftIcon class="size-4" aria-hidden="true" />
-						Previous
-					</Button>
-					<Button size="sm" variant="outline" disabled={submissionPage.isDone} onclick={goNextPage}>
-						Next
-						<ChevronRightIcon class="size-4" aria-hidden="true" />
-					</Button>
-				</div>
-			</div>
-		{/if}
-	</div>
-</div>
+		</div>
+	{/if}
+</PageShell>

@@ -204,6 +204,18 @@ export default defineSchema({
 		createdAt: v.number()
 	}).index('by_workspaceId', ['workspaceId']),
 
+	workspace_email_settings: defineTable({
+		workspaceId: v.id('workspaces'),
+		replyToEmail: v.optional(v.string()),
+		replyToVerifiedAt: v.optional(v.number()),
+		pendingReplyToEmail: v.optional(v.string()),
+		verificationCodeHash: v.optional(v.string()),
+		verificationCodeExpiresAt: v.optional(v.number()),
+		verificationCodeSentAt: v.optional(v.number()),
+		verificationAttempts: v.number(),
+		updatedAt: v.number()
+	}).index('by_workspaceId', ['workspaceId']),
+
 	email_follow_ups: defineTable({
 		workspaceId: v.id('workspaces'),
 		submissionId: v.id('waiver_submissions'),
@@ -225,6 +237,9 @@ export default defineSchema({
 		sentAt: v.optional(v.number()),
 		sentSubject: v.optional(v.string()),
 		sentBodyHtml: v.optional(v.string()),
+		sentFrom: v.optional(v.string()),
+		sentReplyTo: v.optional(v.string()),
+		resendMessageId: v.optional(v.string()),
 		failedAt: v.optional(v.number()),
 		failureReason: v.optional(v.string()),
 		cancelledAt: v.optional(v.number())

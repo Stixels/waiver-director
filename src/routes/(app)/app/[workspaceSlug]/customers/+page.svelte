@@ -6,6 +6,8 @@
 	import type { Id } from '$convex/_generated/dataModel';
 	import { page } from '$app/state';
 	import { useAppContext } from '$lib/components/app/app-context.svelte';
+	import PageShell from '$lib/components/app/PageShell.svelte';
+	import PageHeader from '$lib/components/app/PageHeader.svelte';
 	import { useProtectedQuery } from '$lib/components/auth/convex-auth.svelte';
 	import SubmissionDetailSheet from '$lib/components/waivers/SubmissionDetailSheet.svelte';
 	import { Button } from '$lib/components/ui/button';
@@ -350,364 +352,345 @@
 	/>
 {/if}
 
-<div class="w-full min-w-0 p-6">
-	<div class="mx-auto w-full max-w-6xl min-w-0 space-y-6">
-		<div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-			<div class="min-w-0 space-y-1">
-				<h1 class="text-2xl font-semibold tracking-tight">Signer contacts</h1>
-				<p class="text-sm text-muted-foreground">
-					Track waiver signers and their repeat-visit history.
-				</p>
-			</div>
-			<div class="flex items-center gap-2 lg:justify-end">
-				<span
-					class="inline-flex items-center gap-2 rounded-full border border-border bg-card/40 px-3 py-1.5 text-xs font-medium text-muted-foreground"
+<PageHeader title="Signer contacts" subtitle="Track waiver signers and their repeat-visit history.">
+	{#snippet actions()}
+		<span
+			class="inline-flex h-10 items-center gap-2 rounded-full border border-border bg-card/40 px-3 text-xs font-medium text-muted-foreground"
+		>
+			<UsersRoundIcon class="size-3.5" aria-hidden="true" />
+			{#if isLoadingCustomers && !customerPage}
+				<Skeleton class="h-3 w-10" />
+			{:else}
+				<span class="text-foreground tabular-nums">{totalCount ?? 0}</span>
+				{(totalCount ?? 0) === 1 ? 'customer' : 'customers'}
+			{/if}
+		</span>
+	{/snippet}
+	{#snippet meta()}
+		<div class="relative w-full lg:max-w-md">
+			<SearchIcon
+				class="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground"
+				aria-hidden="true"
+			/>
+			<input
+				type="search"
+				placeholder="Search by name or email"
+				bind:value={searchInput}
+				class="h-9 w-full rounded-lg border border-input bg-background/60 pr-10 pl-11 text-sm shadow-xs transition-all placeholder:text-muted-foreground/70 hover:bg-background focus-visible:border-ring focus-visible:bg-background focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
+				aria-label="Search customers"
+			/>
+			{#if searchInput}
+				<button
+					type="button"
+					onclick={clearSearch}
+					class="absolute top-1/2 right-2 inline-flex size-6 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
+					aria-label="Clear search"
 				>
-					<UsersRoundIcon class="size-3.5" aria-hidden="true" />
-					{#if isLoadingCustomers && !customerPage}
-						<Skeleton class="h-3 w-10" />
-					{:else}
-						<span class="text-foreground tabular-nums">{totalCount ?? 0}</span>
-						{(totalCount ?? 0) === 1 ? 'customer' : 'customers'}
-					{/if}
-				</span>
-			</div>
+					<XIcon class="size-3.5" aria-hidden="true" />
+				</button>
+			{/if}
 		</div>
+	{/snippet}
+</PageHeader>
 
-		<div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-			<div class="relative w-full lg:max-w-md">
-				<SearchIcon
-					class="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground"
-					aria-hidden="true"
-				/>
-				<input
-					type="search"
-					placeholder="Search by name or email"
-					bind:value={searchInput}
-					class="h-10 w-full rounded-lg border border-input bg-card/50 pr-10 pl-11 text-sm shadow-xs transition-all placeholder:text-muted-foreground/70 hover:bg-card focus-visible:border-ring focus-visible:bg-background focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
-					aria-label="Search customers"
-				/>
-				{#if searchInput}
-					<button
-						type="button"
-						onclick={clearSearch}
-						class="absolute top-1/2 right-2 inline-flex size-6 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
-						aria-label="Clear search"
-					>
-						<XIcon class="size-3.5" aria-hidden="true" />
-					</button>
-				{/if}
-			</div>
-		</div>
-
-		<div class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_24rem]">
-			<section class="min-w-0 space-y-4">
-				{#if isLoadingCustomers}
-					<div class="overflow-hidden rounded-xl border border-border">
-						{#each [0, 1, 2, 3, 4, 5] as item (item)}
-							<div
-								class="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 border-b border-border px-4 py-3.5 last:border-b-0"
-							>
-								<Skeleton class="size-9 rounded-full" />
-								<div class="min-w-0 space-y-1.5">
-									<Skeleton class="h-4 w-40" />
-									<Skeleton class="h-3 w-52" />
-								</div>
-								<div class="space-y-1.5 text-right">
-									<Skeleton class="ml-auto h-4 w-16" />
-									<Skeleton class="ml-auto h-3 w-20" />
-								</div>
-							</div>
-						{/each}
-					</div>
-				{:else if !currentWorkspace}
-					<div
-						class="rounded-xl border border-dashed border-border p-12 text-center text-sm text-muted-foreground"
-					>
-						Workspace not found.
-					</div>
-				{:else if customers.length === 0}
-					<div
-						class="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border bg-card/30 px-4 py-16 text-center"
-					>
+<PageShell>
+	<div class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_24rem]">
+		<section class="min-w-0 space-y-4">
+			{#if isLoadingCustomers}
+				<div class="overflow-hidden rounded-xl border border-border">
+					{#each [0, 1, 2, 3, 4, 5] as item (item)}
 						<div
-							class="flex size-10 items-center justify-center rounded-full bg-muted text-muted-foreground"
+							class="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 border-b border-border px-4 py-3.5 last:border-b-0"
 						>
-							<UsersRoundIcon class="size-5" aria-hidden="true" />
+							<Skeleton class="size-9 rounded-full" />
+							<div class="min-w-0 space-y-1.5">
+								<Skeleton class="h-4 w-40" />
+								<Skeleton class="h-3 w-52" />
+							</div>
+							<div class="space-y-1.5 text-right">
+								<Skeleton class="ml-auto h-4 w-16" />
+								<Skeleton class="ml-auto h-3 w-20" />
+							</div>
 						</div>
-						<div class="space-y-1">
-							<p class="text-sm font-medium">
-								{searchQuery.trim() ? 'No matching customers' : 'No customers yet'}
-							</p>
-							<p class="text-xs text-muted-foreground">
-								{searchQuery.trim()
-									? 'Try a different name or email.'
-									: 'Adult signers appear here after they submit a waiver.'}
-							</p>
-						</div>
+					{/each}
+				</div>
+			{:else if !currentWorkspace}
+				<div
+					class="rounded-xl border border-dashed border-border p-12 text-center text-sm text-muted-foreground"
+				>
+					Workspace not found.
+				</div>
+			{:else if customers.length === 0}
+				<div
+					class="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border bg-card/30 px-4 py-16 text-center"
+				>
+					<div
+						class="flex size-10 items-center justify-center rounded-full bg-muted text-muted-foreground"
+					>
+						<UsersRoundIcon class="size-5" aria-hidden="true" />
 					</div>
-				{:else}
-					<div class="overflow-hidden rounded-xl border border-border">
-						{#each customers as customer (customer.customerId)}
-							{@const tier = frequencyTier(customer.visitCount)}
-							{@const isSelected = selectedCustomerId === customer.customerId}
-							<button
-								type="button"
-								class={cn(
-									'group relative grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 border-b border-border px-4 py-3.5 text-left transition-colors last:border-b-0 hover:bg-muted/40 focus-visible:bg-muted/40 focus-visible:outline-none',
-									isSelected && 'bg-muted/60'
-								)}
-								onclick={() => selectCustomer(customer.customerId)}
-								aria-current={isSelected ? 'true' : undefined}
-							>
-								{#if isSelected}
-									<span class="absolute inset-y-0 left-0 w-0.5 bg-primary" aria-hidden="true"
-									></span>
-								{/if}
-								<div
-									class="flex size-9 shrink-0 items-center justify-center rounded-full border border-border bg-background text-xs font-semibold tracking-tight text-foreground"
-								>
-									{initialsFor(customer.displayName)}
-								</div>
-								<div class="min-w-0">
-									<div class="flex items-center gap-2">
-										<p class="truncate text-sm font-medium">{customer.displayName}</p>
-										<span
-											class={cn(
-												'inline-flex shrink-0 items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold tracking-wide uppercase',
-												frequencyClass(tier.tone)
-											)}
-										>
-											{tier.label}
-										</span>
-									</div>
-									<p class="mt-0.5 truncate text-xs text-muted-foreground">
-										{customer.primaryEmail}
-									</p>
-								</div>
-								<div class="hidden text-right sm:block">
-									<p class="text-sm font-semibold tabular-nums">
-										{customer.visitCount}
-										<span class="text-xs font-normal text-muted-foreground">
-											{customer.visitCount === 1 ? 'visit' : 'visits'}
-										</span>
-									</p>
-									<p class="mt-0.5 text-xs text-muted-foreground tabular-nums">
-										{relativeFromNow(customer.lastSeenAt)}
-									</p>
-								</div>
-								<ChevronRightIcon
-									class="size-4 shrink-0 text-muted-foreground/50 transition-transform group-hover:translate-x-0.5 group-hover:text-muted-foreground sm:hidden"
-									aria-hidden="true"
-								/>
-							</button>
-						{/each}
-					</div>
-				{/if}
-
-				{#if customerPage && (hasPreviousPage || !customerPage.isDone)}
-					<div class="flex items-center justify-between gap-3">
-						<p class="text-xs text-muted-foreground tabular-nums">
-							Page {currentPage}
+					<div class="space-y-1">
+						<p class="text-sm font-medium">
+							{searchQuery.trim() ? 'No matching customers' : 'No customers yet'}
 						</p>
-						<div class="flex items-center gap-2">
-							<Button
-								size="sm"
-								variant="outline"
-								disabled={!hasPreviousPage}
-								onclick={goPreviousPage}
+						<p class="text-xs text-muted-foreground">
+							{searchQuery.trim()
+								? 'Try a different name or email.'
+								: 'Adult signers appear here after they submit a waiver.'}
+						</p>
+					</div>
+				</div>
+			{:else}
+				<div class="overflow-hidden rounded-xl border border-border">
+					{#each customers as customer (customer.customerId)}
+						{@const tier = frequencyTier(customer.visitCount)}
+						{@const isSelected = selectedCustomerId === customer.customerId}
+						<button
+							type="button"
+							class={cn(
+								'group relative grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 border-b border-border px-4 py-3.5 text-left transition-colors last:border-b-0 hover:bg-muted/40 focus-visible:bg-muted/40 focus-visible:outline-none',
+								isSelected && 'bg-muted/60'
+							)}
+							onclick={() => selectCustomer(customer.customerId)}
+							aria-current={isSelected ? 'true' : undefined}
+						>
+							{#if isSelected}
+								<span class="absolute inset-y-0 left-0 w-0.5 bg-primary" aria-hidden="true"></span>
+							{/if}
+							<div
+								class="flex size-9 shrink-0 items-center justify-center rounded-full border border-border bg-background text-xs font-semibold tracking-tight text-foreground"
 							>
-								<ChevronLeftIcon class="size-4" aria-hidden="true" />
-								Previous
-							</Button>
-							<Button
-								size="sm"
-								variant="outline"
-								disabled={customerPage.isDone}
-								onclick={goNextPage}
-							>
-								Next
-								<ChevronRightIcon class="size-4" aria-hidden="true" />
-							</Button>
-						</div>
-					</div>
-				{/if}
-			</section>
-
-			<aside class="min-w-0 space-y-4">
-				{#if isLoadingDetail}
-					<div class="overflow-hidden rounded-xl border border-border bg-card/30">
-						<div class="space-y-4 p-4">
-							<div class="flex items-start gap-3">
-								<Skeleton class="size-10 rounded-full" />
-								<div class="min-w-0 flex-1 space-y-1.5">
-									<Skeleton class="h-4 w-36" />
-									<Skeleton class="h-3 w-44" />
-								</div>
-								<Skeleton class="h-4 w-14 rounded-full" />
+								{initialsFor(customer.displayName)}
 							</div>
-							<div class="space-y-2 border-t border-border pt-3">
-								<Skeleton class="h-4 w-full" />
-								<Skeleton class="h-4 w-full" />
-								<Skeleton class="h-4 w-full" />
-								<Skeleton class="h-4 w-full" />
-							</div>
-						</div>
-					</div>
-					<div class="rounded-xl border border-border">
-						<div class="border-b border-border px-5 py-4">
-							<Skeleton class="h-4 w-28" />
-						</div>
-						<div class="space-y-3 p-5">
-							<Skeleton class="h-12 w-full" />
-							<Skeleton class="h-12 w-full" />
-							<Skeleton class="h-12 w-full" />
-						</div>
-					</div>
-				{:else if selectedCustomerDetail}
-					{@const tier = frequencyTier(selectedCustomerDetail.customer.visitCount)}
-					<div class="rounded-xl border border-border bg-card/30">
-						<div class="space-y-4 p-4">
-							<div class="flex items-start gap-3">
-								<div
-									class="flex size-10 shrink-0 items-center justify-center rounded-full border border-border bg-background text-xs font-semibold text-foreground"
-								>
-									{initialsFor(selectedCustomerDetail.customer.displayName)}
-								</div>
-								<div class="min-w-0 flex-1">
-									<h2 class="truncate text-base font-semibold tracking-tight">
-										{selectedCustomerDetail.customer.displayName}
-									</h2>
-									<p
-										class="mt-0.5 flex items-center gap-1.5 truncate text-xs text-muted-foreground"
+							<div class="min-w-0">
+								<div class="flex items-center gap-2">
+									<p class="truncate text-sm font-medium">{customer.displayName}</p>
+									<span
+										class={cn(
+											'inline-flex shrink-0 items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold tracking-wide uppercase',
+											frequencyClass(tier.tone)
+										)}
 									>
-										<MailIcon class="size-3 shrink-0" aria-hidden="true" />
-										<span class="truncate">{selectedCustomerDetail.customer.primaryEmail}</span>
-									</p>
+										{tier.label}
+									</span>
 								</div>
-								<span
-									class={cn(
-										'inline-flex shrink-0 items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold tracking-wide uppercase',
-										frequencyClass(tier.tone)
-									)}
-								>
-									{#if tier.tone === 'vip'}
-										<SparklesIcon class="size-3" aria-hidden="true" />
-									{/if}
-									{tier.label}
-								</span>
+								<p class="mt-0.5 truncate text-xs text-muted-foreground">
+									{customer.primaryEmail}
+								</p>
 							</div>
+							<div class="hidden text-right sm:block">
+								<p class="text-sm font-semibold tabular-nums">
+									{customer.visitCount}
+									<span class="text-xs font-normal text-muted-foreground">
+										{customer.visitCount === 1 ? 'visit' : 'visits'}
+									</span>
+								</p>
+								<p class="mt-0.5 text-xs text-muted-foreground tabular-nums">
+									{relativeFromNow(customer.lastSeenAt)}
+								</p>
+							</div>
+							<ChevronRightIcon
+								class="size-4 shrink-0 text-muted-foreground/50 transition-transform group-hover:translate-x-0.5 group-hover:text-muted-foreground sm:hidden"
+								aria-hidden="true"
+							/>
+						</button>
+					{/each}
+				</div>
+			{/if}
 
-							<dl class="space-y-2 border-t border-border pt-3 text-sm">
-								<div class="flex items-baseline justify-between gap-3">
-									<dt class="text-xs text-muted-foreground">Visits</dt>
-									<dd class="font-medium tabular-nums">
-										{selectedCustomerDetail.customer.visitCount}
-									</dd>
-								</div>
-								<div class="flex items-baseline justify-between gap-3">
-									<dt class="text-xs text-muted-foreground">First seen</dt>
-									<dd class="font-medium">
-										{formatTimestamp(selectedCustomerDetail.customer.firstSeenAt)}
-									</dd>
-								</div>
-								<div class="flex items-baseline justify-between gap-3">
-									<dt class="text-xs text-muted-foreground">Last seen</dt>
-									<dd class="font-medium">
-										<span class="ml-1 text-xs font-normal text-muted-foreground tabular-nums">
-											{relativeFromNow(selectedCustomerDetail.customer.lastSeenAt)} ·
-										</span>
-										{formatTimestamp(selectedCustomerDetail.customer.lastSeenAt)}
-									</dd>
-								</div>
-							</dl>
+			{#if customerPage && (hasPreviousPage || !customerPage.isDone)}
+				<div class="flex items-center justify-between gap-3">
+					<p class="text-xs text-muted-foreground tabular-nums">
+						Page {currentPage}
+					</p>
+					<div class="flex items-center gap-2">
+						<Button
+							size="sm"
+							variant="outline"
+							disabled={!hasPreviousPage}
+							onclick={goPreviousPage}
+						>
+							<ChevronLeftIcon class="size-4" aria-hidden="true" />
+							Previous
+						</Button>
+						<Button size="sm" variant="outline" disabled={customerPage.isDone} onclick={goNextPage}>
+							Next
+							<ChevronRightIcon class="size-4" aria-hidden="true" />
+						</Button>
+					</div>
+				</div>
+			{/if}
+		</section>
+
+		<aside class="min-w-0 space-y-4">
+			{#if isLoadingDetail}
+				<div class="overflow-hidden rounded-xl border border-border bg-card/30">
+					<div class="space-y-4 p-4">
+						<div class="flex items-start gap-3">
+							<Skeleton class="size-10 rounded-full" />
+							<div class="min-w-0 flex-1 space-y-1.5">
+								<Skeleton class="h-4 w-36" />
+								<Skeleton class="h-3 w-44" />
+							</div>
+							<Skeleton class="h-4 w-14 rounded-full" />
+						</div>
+						<div class="space-y-2 border-t border-border pt-3">
+							<Skeleton class="h-4 w-full" />
+							<Skeleton class="h-4 w-full" />
+							<Skeleton class="h-4 w-full" />
+							<Skeleton class="h-4 w-full" />
 						</div>
 					</div>
-
-					<div class="overflow-hidden rounded-xl border border-border">
-						<div class="flex items-center justify-between border-b border-border px-4 py-3">
-							<h2 class="text-sm font-semibold tracking-tight">Visit history</h2>
-							<span class="text-xs text-muted-foreground tabular-nums">
-								{selectedCustomerDetail.visits.length}
-								{selectedCustomerDetail.visits.length === 1 ? 'record' : 'records'}
+				</div>
+				<div class="rounded-xl border border-border">
+					<div class="border-b border-border px-5 py-4">
+						<Skeleton class="h-4 w-28" />
+					</div>
+					<div class="space-y-3 p-5">
+						<Skeleton class="h-12 w-full" />
+						<Skeleton class="h-12 w-full" />
+						<Skeleton class="h-12 w-full" />
+					</div>
+				</div>
+			{:else if selectedCustomerDetail}
+				{@const tier = frequencyTier(selectedCustomerDetail.customer.visitCount)}
+				<div class="rounded-xl border border-border bg-card/30">
+					<div class="space-y-4 p-4">
+						<div class="flex items-start gap-3">
+							<div
+								class="flex size-10 shrink-0 items-center justify-center rounded-full border border-border bg-background text-xs font-semibold text-foreground"
+							>
+								{initialsFor(selectedCustomerDetail.customer.displayName)}
+							</div>
+							<div class="min-w-0 flex-1">
+								<h2 class="truncate text-base font-semibold tracking-tight">
+									{selectedCustomerDetail.customer.displayName}
+								</h2>
+								<p class="mt-0.5 flex items-center gap-1.5 truncate text-xs text-muted-foreground">
+									<MailIcon class="size-3 shrink-0" aria-hidden="true" />
+									<span class="truncate">{selectedCustomerDetail.customer.primaryEmail}</span>
+								</p>
+							</div>
+							<span
+								class={cn(
+									'inline-flex shrink-0 items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold tracking-wide uppercase',
+									frequencyClass(tier.tone)
+								)}
+							>
+								{#if tier.tone === 'vip'}
+									<SparklesIcon class="size-3" aria-hidden="true" />
+								{/if}
+								{tier.label}
 							</span>
 						</div>
-						{#if selectedCustomerDetail.visits.length === 0}
-							<div class="px-4 py-8 text-center text-sm text-muted-foreground">
-								No visits found.
+
+						<dl class="space-y-2 border-t border-border pt-3 text-sm">
+							<div class="flex items-baseline justify-between gap-3">
+								<dt class="text-xs text-muted-foreground">Visits</dt>
+								<dd class="font-medium tabular-nums">
+									{selectedCustomerDetail.customer.visitCount}
+								</dd>
 							</div>
-						{:else}
-							<ul class="divide-y divide-border">
-								{#each selectedCustomerDetail.visits as visit (visit.submissionId)}
-									{@const dateLabel = visit.booking?.startTime
-										? formatBookingTimestamp(visit.booking.startTime, {
-												dateStyle: 'medium',
-												timeStyle: 'short'
-											})
-										: formatTimestamp(visit.submittedAt, {
-												dateStyle: 'medium',
-												timeStyle: 'short'
-											})}
-									<li>
-										<button
-											type="button"
-											class="group flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/40 focus-visible:bg-muted/40 focus-visible:outline-none"
-											onclick={() => openSubmission(visit.submissionId)}
+							<div class="flex items-baseline justify-between gap-3">
+								<dt class="text-xs text-muted-foreground">First seen</dt>
+								<dd class="font-medium">
+									{formatTimestamp(selectedCustomerDetail.customer.firstSeenAt)}
+								</dd>
+							</div>
+							<div class="flex items-baseline justify-between gap-3">
+								<dt class="text-xs text-muted-foreground">Last seen</dt>
+								<dd class="font-medium">
+									<span class="ml-1 text-xs font-normal text-muted-foreground tabular-nums">
+										{relativeFromNow(selectedCustomerDetail.customer.lastSeenAt)} ·
+									</span>
+									{formatTimestamp(selectedCustomerDetail.customer.lastSeenAt)}
+								</dd>
+							</div>
+						</dl>
+					</div>
+				</div>
+
+				<div class="overflow-hidden rounded-xl border border-border">
+					<div class="flex items-center justify-between border-b border-border px-4 py-3">
+						<h2 class="text-sm font-semibold tracking-tight">Visit history</h2>
+						<span class="text-xs text-muted-foreground tabular-nums">
+							{selectedCustomerDetail.visits.length}
+							{selectedCustomerDetail.visits.length === 1 ? 'record' : 'records'}
+						</span>
+					</div>
+					{#if selectedCustomerDetail.visits.length === 0}
+						<div class="px-4 py-8 text-center text-sm text-muted-foreground">No visits found.</div>
+					{:else}
+						<ul class="divide-y divide-border">
+							{#each selectedCustomerDetail.visits as visit (visit.submissionId)}
+								{@const dateLabel = visit.booking?.startTime
+									? formatBookingTimestamp(visit.booking.startTime, {
+											dateStyle: 'medium',
+											timeStyle: 'short'
+										})
+									: formatTimestamp(visit.submittedAt, {
+											dateStyle: 'medium',
+											timeStyle: 'short'
+										})}
+								<li>
+									<button
+										type="button"
+										class="group flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/40 focus-visible:bg-muted/40 focus-visible:outline-none"
+										onclick={() => openSubmission(visit.submissionId)}
+									>
+										<div
+											class="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full border border-border bg-background text-muted-foreground transition-colors group-hover:border-primary/30 group-hover:text-primary"
 										>
-											<div
-												class="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full border border-border bg-background text-muted-foreground transition-colors group-hover:border-primary/30 group-hover:text-primary"
-											>
-												<CalendarClockIcon class="size-3" aria-hidden="true" />
-											</div>
-											<div class="min-w-0 flex-1">
-												<p class="truncate text-sm font-medium">
-													{visit.booking?.activityName ?? 'General waiver'}
+											<CalendarClockIcon class="size-3" aria-hidden="true" />
+										</div>
+										<div class="min-w-0 flex-1">
+											<p class="truncate text-sm font-medium">
+												{visit.booking?.activityName ?? 'General waiver'}
+											</p>
+											<p class="mt-0.5 truncate text-xs text-muted-foreground tabular-nums">
+												{dateLabel}
+											</p>
+											{#if visit.minorCount > 0}
+												<p
+													class="mt-1 inline-flex items-center rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-muted-foreground tabular-nums"
+												>
+													+{visit.minorCount}
+													{visit.minorCount === 1 ? 'minor' : 'minors'}
 												</p>
-												<p class="mt-0.5 truncate text-xs text-muted-foreground tabular-nums">
-													{dateLabel}
-												</p>
-												{#if visit.minorCount > 0}
-													<p
-														class="mt-1 inline-flex items-center rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-muted-foreground tabular-nums"
-													>
-														+{visit.minorCount}
-														{visit.minorCount === 1 ? 'minor' : 'minors'}
-													</p>
-												{/if}
-											</div>
-											<ChevronRightIcon
-												class="mt-0.5 size-4 shrink-0 text-muted-foreground/50 transition-transform group-hover:translate-x-0.5 group-hover:text-muted-foreground"
-												aria-hidden="true"
-											/>
-										</button>
-									</li>
-								{/each}
-							</ul>
-							{#if selectedCustomerDetail.hasMore}
-								<p class="border-t border-border px-4 py-3 text-xs text-muted-foreground">
-									Showing the most recent {selectedCustomerDetail.visits.length} visits.
-								</p>
-							{/if}
-						{/if}
-					</div>
-				{:else}
-					<div
-						class="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border bg-card/30 px-4 py-12 text-center"
-					>
-						<div
-							class="flex size-10 items-center justify-center rounded-full bg-muted text-muted-foreground"
-						>
-							<UserRoundIcon class="size-5" aria-hidden="true" />
-						</div>
-						<div class="space-y-1">
-							<p class="text-sm font-medium">Select a contact</p>
-							<p class="text-xs text-muted-foreground">
-								Choose a signer to view their waiver visit history.
+											{/if}
+										</div>
+										<ChevronRightIcon
+											class="mt-0.5 size-4 shrink-0 text-muted-foreground/50 transition-transform group-hover:translate-x-0.5 group-hover:text-muted-foreground"
+											aria-hidden="true"
+										/>
+									</button>
+								</li>
+							{/each}
+						</ul>
+						{#if selectedCustomerDetail.hasMore}
+							<p class="border-t border-border px-4 py-3 text-xs text-muted-foreground">
+								Showing the most recent {selectedCustomerDetail.visits.length} visits.
 							</p>
-						</div>
+						{/if}
+					{/if}
+				</div>
+			{:else}
+				<div
+					class="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border bg-card/30 px-4 py-12 text-center"
+				>
+					<div
+						class="flex size-10 items-center justify-center rounded-full bg-muted text-muted-foreground"
+					>
+						<UserRoundIcon class="size-5" aria-hidden="true" />
 					</div>
-				{/if}
-			</aside>
-		</div>
+					<div class="space-y-1">
+						<p class="text-sm font-medium">Select a contact</p>
+						<p class="text-xs text-muted-foreground">
+							Choose a signer to view their waiver visit history.
+						</p>
+					</div>
+				</div>
+			{/if}
+		</aside>
 	</div>
-</div>
+</PageShell>

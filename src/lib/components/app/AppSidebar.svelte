@@ -446,7 +446,7 @@
 						aria-hidden="true"
 					/>
 					<span
-						class="sidebar-copy nav-item-label text-[13px] leading-none transition-colors {active
+						class="sidebar-copy nav-item-label text-[13px] leading-tight transition-colors {active
 							? 'font-medium text-sidebar-foreground'
 							: 'text-muted-foreground group-hover:text-sidebar-foreground'}"
 					>
@@ -485,7 +485,7 @@
 						aria-hidden="true"
 					/>
 					<span
-						class="sidebar-copy nav-item-label text-[13px] leading-none transition-colors {active
+						class="sidebar-copy nav-item-label text-[13px] leading-tight transition-colors {active
 							? 'font-medium text-sidebar-foreground'
 							: 'text-muted-foreground group-hover:text-sidebar-foreground'}"
 					>
