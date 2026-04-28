@@ -34,11 +34,12 @@
 	interface Props {
 		open: boolean;
 		workspaceId: Id<'workspaces'>;
+		workspaceSlug: string;
 		bookingId: Id<'bookings'>;
 		publicSlug: string | null;
 	}
 
-	let { open = $bindable(), workspaceId, bookingId, publicSlug }: Props = $props();
+	let { open = $bindable(), workspaceId, workspaceSlug, bookingId, publicSlug }: Props = $props();
 	let selectedSubmissionId = $state<Id<'waiver_submissions'> | null>(null);
 	let submissionDetailOpen = $state(false);
 	let qrDialogOpen = $state(false);
@@ -106,6 +107,7 @@
 	<SubmissionDetailSheet
 		bind:open={submissionDetailOpen}
 		{workspaceId}
+		{workspaceSlug}
 		submissionId={selectedSubmissionId}
 	/>
 {/if}

@@ -277,6 +277,8 @@ export const getSubmission = query({
 		v.null(),
 		v.object({
 			submissionId: v.id('waiver_submissions'),
+			customerId: v.union(v.id('customers'), v.null()),
+			bookingId: v.union(v.id('bookings'), v.null()),
 			signerName: v.string(),
 			signerEmail: v.string(),
 			signerDateOfBirth: v.string(),
@@ -310,6 +312,8 @@ export const getSubmission = query({
 
 		return {
 			submissionId: submission._id,
+			customerId: submission.customerId ?? null,
+			bookingId: submission.bookingId ?? null,
 			signerName: submission.signerName,
 			signerEmail: submission.signerEmail,
 			signerDateOfBirth: submission.signerDateOfBirth,

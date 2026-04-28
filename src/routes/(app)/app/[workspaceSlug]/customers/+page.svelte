@@ -348,6 +348,7 @@
 	<SubmissionDetailSheet
 		bind:open={detailOpen}
 		workspaceId={currentWorkspace.workspaceId}
+		workspaceSlug={currentWorkspace.slug}
 		submissionId={selectedSubmissionId}
 	/>
 {/if}
