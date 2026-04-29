@@ -412,7 +412,12 @@
 		if (navigation.willUnload) return;
 
 		if (saveState === 'error' || lastSaveError) {
-			toast.message('Autosave failed - your changes may not be saved.');
+			if (
+				confirm('Autosave failed and your latest email changes may not be saved. Leave anyway?')
+			) {
+				return;
+			}
+			navigation.cancel();
 			return;
 		}
 
@@ -674,9 +679,14 @@
 
 	async function updateFollowUpUrl(followUpId: Id<'email_follow_ups'> | null, replaceState = true) {
 		const query = queryString([['followUpId', followUpId]]);
-		const pathname =
-			`/app/${page.params.workspaceSlug}/emails/follow-ups` as `/app/${string}/emails/follow-ups`;
+		const pathname = (
+			page.url.pathname.endsWith('/emails/follow-ups')
+				? `/app/${page.params.workspaceSlug}/emails/follow-ups`
+				: `/app/${page.params.workspaceSlug}/emails`
+		) as `/app/${string}/emails` | `/app/${string}/emails/follow-ups`;
 		const href = (query ? `${pathname}?${query}` : pathname) as
+			| `/app/${string}/emails`
+			| `/app/${string}/emails?${string}`
 			| `/app/${string}/emails/follow-ups`
 			| `/app/${string}/emails/follow-ups?${string}`;
 
