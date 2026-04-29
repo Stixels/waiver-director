@@ -2023,7 +2023,7 @@
 								bind:this={subjectInputRef}
 								type="text"
 								bind:value={subject}
-								placeholder="Thank you for visiting, {'{{customer_name}}'}!"
+								placeholder="Thank you for visiting {'{{business_name}}'}!"
 								spellcheck="true"
 								autocomplete="off"
 								class="compose-subject-input"
