@@ -42,10 +42,10 @@ export const appMainNavItems = [
 		description: 'Edit, publish, and share the workspace waiver.'
 	},
 	{
-		label: 'Email follow-ups',
+		label: 'Emails',
 		href: '/app/[workspaceSlug]/emails',
 		icon: MailIcon,
-		description: 'Reminder rules, queues, and follow-up sequences.'
+		description: 'Follow-up queue, templates, and email editor.'
 	}
 ] as const;
 

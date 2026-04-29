@@ -167,10 +167,10 @@
 		},
 		{
 			key: 'emails',
-			label: 'Email follow-ups',
-			description: 'Reminder rules and queues',
+			label: 'Emails',
+			description: 'Follow-up queue and editor',
 			path: 'emails',
-			aliases: ['email', 'follow ups', 'followups', 'reminders'],
+			aliases: ['email', 'email follow-ups', 'follow ups', 'followups', 'reminders'],
 			icon: MailIcon
 		},
 		{
