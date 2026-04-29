@@ -44,6 +44,8 @@
 	interface Props {
 		value?: string;
 		id?: string;
+		label?: string;
+		class?: string;
 		disabled?: boolean;
 		placeholder?: string;
 	}
@@ -72,6 +74,8 @@
 	let {
 		value = $bindable('<p></p>'),
 		id = 'rich-text-editor',
+		label = undefined,
+		class: className = '',
 		disabled = false,
 		placeholder = 'Write your content here...'
 	}: Props = $props();
@@ -313,7 +317,7 @@
 				attributes: {
 					id,
 					class:
-						'rich-text-editor-body min-h-[260px] rounded-lg bg-background px-4 py-3 text-sm leading-7 text-foreground outline-none'
+						'rich-text-editor-body min-h-[300px] bg-transparent text-sm leading-7 text-foreground outline-none'
 				}
 			},
 			onCreate: ({ editor }) => {
@@ -366,14 +370,19 @@
 </script>
 
 <div
-	class="flex flex-col overflow-hidden rounded-xl border bg-card transition-shadow"
+	class={`flex flex-col overflow-hidden border-t border-border/70 bg-background transition-shadow ${className}`}
 	class:border-ring={hasFocus}
 	class:shadow-[0_0_0_3px_color-mix(in_srgb,var(--ring)_22%,transparent)]={hasFocus}
 	class:border-border={!hasFocus}
 >
-	<div class="shrink-0 border-b border-border/80 bg-card/40 px-4 py-2 backdrop-blur-sm">
+	<div
+		class="order-first flex shrink-0 flex-col gap-2 border-b border-border/70 bg-muted/20 px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
+	>
+		{#if label}
+			<label for={id} class="editor-label">{label}</label>
+		{/if}
 		<div
-			class="editor-toolbar flex flex-nowrap items-center gap-1 overflow-x-auto"
+			class="editor-toolbar flex min-w-0 flex-wrap items-center gap-1 sm:justify-end"
 			role="toolbar"
 			aria-label="Rich text formatting"
 			tabindex="-1"
@@ -645,7 +654,7 @@
 	</div>
 
 	<div
-		class="rich-text-editor-viewport min-h-0 shrink-0 overflow-y-auto overscroll-y-contain px-3 py-3"
+		class="rich-text-editor-viewport min-h-[300px] overflow-y-auto overscroll-y-contain px-4 py-4"
 		role="region"
 		aria-label="Rich text editing area"
 	>
@@ -685,6 +694,27 @@
 <style>
 	.rich-text-editor-viewport {
 		max-height: min(50vh, 28rem);
+	}
+
+	.editor-label {
+		flex-shrink: 0;
+		font-size: 0.63rem;
+		font-weight: 700;
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+		color: color-mix(in srgb, var(--muted-foreground) 70%, transparent);
+		user-select: none;
+	}
+
+	@media (max-width: 760px) {
+		:global(.rich-text-editor-body) {
+			min-height: 260px;
+		}
+
+		.rich-text-editor-viewport {
+			min-height: 260px;
+			max-height: none;
+		}
 	}
 
 	.toolbar-button {

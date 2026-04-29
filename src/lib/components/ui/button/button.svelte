@@ -48,7 +48,8 @@
 
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import type { Pathname } from '$app/types';
+
+	const resolvePathname = resolve as unknown as (path: string) => string;
 
 	/** Root-relative path for this app — not `https:…` / `mailto:…`, and not `//…` (protocol-relative). */
 	function isAppPathname(path: string): boolean {
@@ -73,7 +74,7 @@
 		bind:this={ref}
 		data-slot="button"
 		class={cn(buttonVariants({ variant, size }), className)}
-		href={disabled ? undefined : isAppPathname(href) ? resolve(href as Pathname) : href}
+		href={disabled ? undefined : isAppPathname(href) ? resolvePathname(href) : href}
 		aria-disabled={disabled}
 		role={disabled ? 'link' : undefined}
 		tabindex={disabled ? -1 : undefined}

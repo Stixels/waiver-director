@@ -1,8 +1,8 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
+	import { beforeNavigate, goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
-	import { untrack } from 'svelte';
+	import { onMount, tick, untrack } from 'svelte';
 	import { SvelteSet } from 'svelte/reactivity';
 	import { useConvexClient } from 'convex-svelte';
 	import { toast } from 'svelte-sonner';
@@ -54,6 +54,7 @@
 	import CloudIcon from '@lucide/svelte/icons/cloud';
 	import CloudCheckIcon from '@lucide/svelte/icons/cloud-check';
 	import CloudOffIcon from '@lucide/svelte/icons/cloud-off';
+	import EyeIcon from '@lucide/svelte/icons/eye';
 	import FileTextIcon from '@lucide/svelte/icons/file-text';
 	import MailIcon from '@lucide/svelte/icons/mail';
 	import MailCheckIcon from '@lucide/svelte/icons/mail-check';
@@ -70,9 +71,15 @@
 	const appContext = useAppContext();
 	const SEND_AFTER_UNITS = ['minutes', 'hours', 'days'] as const;
 	type SendAfterUnit = (typeof SEND_AFTER_UNITS)[number];
+	type EditorContentSnapshot = {
+		subject: string;
+		body: string;
+		sendAfterAmount: number;
+		sendAfterUnit: SendAfterUnit;
+	};
 	const DEFAULT_SEND_AFTER_AMOUNT = 2;
 	const DEFAULT_SEND_AFTER_UNIT: SendAfterUnit = 'hours';
-	const AUTOSAVE_DELAY_MS = 1800;
+	const AUTOSAVE_DELAY_MS = 800;
 	const previewMetaLinkClass =
 		'group/link inline-flex max-w-full items-center gap-1.5 rounded-md border border-border bg-background px-2 py-1 text-xs font-medium text-foreground shadow-xs transition-colors hover:border-foreground/30 hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none';
 	const previewMetaItemClass =
@@ -284,6 +291,10 @@
 	let lastSaveError = $state<string | null>(null);
 	let autosaveTimer: ReturnType<typeof setTimeout> | null = null;
 	let editorRef = $state<{ insertText: (text: string) => void } | null>(null);
+	let subjectInputRef = $state<HTMLInputElement | null>(null);
+	let insertTarget = $state<'subject' | 'body'>('body');
+	let subjectSelectionStart = $state(0);
+	let subjectSelectionEnd = $state(0);
 	let loadedEditorContentWorkspaceId = $state<Id<'workspaces'> | null>(null);
 
 	const normalizedSendAfterAmount = $derived(clampSendAfterAmount(sendAfterAmount));
@@ -298,10 +309,36 @@
 		savedBody = '<p></p>';
 		savedSendAfterAmount = DEFAULT_SEND_AFTER_AMOUNT;
 		savedSendAfterUnit = DEFAULT_SEND_AFTER_UNIT;
+		isSavingEditorContent = false;
 		lastSavedAt = null;
 		lastSaveError = null;
 		editorContentLoaded = false;
 		loadedEditorContentWorkspaceId = null;
+	}
+
+	function currentEditorContentSnapshot(): EditorContentSnapshot {
+		return {
+			subject,
+			body,
+			sendAfterAmount: clampSendAfterAmount(sendAfterAmount),
+			sendAfterUnit
+		};
+	}
+
+	function editorContentMatchesSnapshot(snapshot: EditorContentSnapshot) {
+		return (
+			subject === snapshot.subject &&
+			body === snapshot.body &&
+			clampSendAfterAmount(sendAfterAmount) === snapshot.sendAfterAmount &&
+			sendAfterUnit === snapshot.sendAfterUnit
+		);
+	}
+
+	function syncSavedEditorContent(snapshot: EditorContentSnapshot) {
+		savedSubject = snapshot.subject;
+		savedBody = snapshot.body;
+		savedSendAfterAmount = snapshot.sendAfterAmount;
+		savedSendAfterUnit = snapshot.sendAfterUnit;
 	}
 
 	$effect(() => {
@@ -370,6 +407,32 @@
 		return `Last saved at ${time}`;
 	});
 
+	beforeNavigate((navigation) => {
+		if (!isDirty && !isSavingEditorContent) return;
+		if (navigation.willUnload) return;
+
+		if (saveState === 'error' || lastSaveError) {
+			if (
+				confirm('Autosave failed and your latest email changes may not be saved. Leave anyway?')
+			) {
+				return;
+			}
+			navigation.cancel();
+			return;
+		}
+
+		if (isSavingEditorContent) {
+			navigation.cancel();
+			toast.message('Still saving your latest changes. Give it a moment and try again.');
+			return;
+		}
+
+		if (convex.disabled) {
+			navigation.cancel();
+			toast.message('Email autosave is unavailable right now.');
+		}
+	});
+
 	$effect(() => {
 		const currentFingerprint = editorContentFingerprint;
 
@@ -398,6 +461,7 @@
 			if (!isSendAfterValid) return;
 			if (isSavingEditorContent) return;
 			if (lastSaveError) return;
+			if (convex.disabled) return;
 
 			autosaveTimer = setTimeout(() => {
 				void persistEditorContent({ showToast: false });
@@ -409,6 +473,19 @@
 				clearTimeout(autosaveTimer);
 				autosaveTimer = null;
 			}
+		};
+	});
+
+	onMount(() => {
+		const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+			if (!isDirty && !isSavingEditorContent) return;
+			event.preventDefault();
+			event.returnValue = '';
+		};
+
+		window.addEventListener('beforeunload', handleBeforeUnload);
+		return () => {
+			window.removeEventListener('beforeunload', handleBeforeUnload);
 		};
 	});
 
@@ -433,36 +510,56 @@
 		sendAfterAmount = clampSendAfterAmount(sendAfterAmount);
 	}
 
+	function captureSubjectSelection() {
+		if (!subjectInputRef) return;
+		insertTarget = 'subject';
+		subjectSelectionStart = subjectInputRef.selectionStart ?? subject.length;
+		subjectSelectionEnd = subjectInputRef.selectionEnd ?? subjectSelectionStart;
+	}
+
+	async function insertSubjectVariable(variable: string) {
+		const start = Math.max(0, Math.min(subjectSelectionStart, subject.length));
+		const end = Math.max(start, Math.min(subjectSelectionEnd, subject.length));
+		subject = `${subject.slice(0, start)}${variable}${subject.slice(end)}`;
+		const nextCursor = start + variable.length;
+		subjectSelectionStart = nextCursor;
+		subjectSelectionEnd = nextCursor;
+		await tick();
+		subjectInputRef?.focus();
+		subjectInputRef?.setSelectionRange(nextCursor, nextCursor);
+	}
+
+	function markBodyInsertTarget() {
+		insertTarget = 'body';
+	}
+
 	function insertVariable(variable: string) {
+		if (insertTarget === 'subject') {
+			void insertSubjectVariable(variable);
+			return;
+		}
 		editorRef?.insertText(variable);
 	}
 
 	async function persistEditorContent(options: { showToast?: boolean } = {}) {
-		if (!currentWorkspace) return;
+		if (!currentWorkspace || convex.disabled) return;
+		if (isSavingEditorContent) return;
 		const showToast = options.showToast ?? true;
 		const workspaceId = currentWorkspace.workspaceId;
-		const editorContentToSave = {
-			subject,
-			body,
-			sendAfterAmount: clampSendAfterAmount(sendAfterAmount),
-			sendAfterUnit
-		};
+		const snapshot = currentEditorContentSnapshot();
 		isSavingEditorContent = true;
 		lastSaveError = null;
 		try {
 			await convex.mutation(api.emails.upsertEmailEditorContent, {
 				workspaceId,
-				subject: editorContentToSave.subject,
-				body: editorContentToSave.body,
-				sendAfterAmount: editorContentToSave.sendAfterAmount,
-				sendAfterUnit: editorContentToSave.sendAfterUnit
+				subject: snapshot.subject,
+				body: snapshot.body,
+				sendAfterAmount: snapshot.sendAfterAmount,
+				sendAfterUnit: snapshot.sendAfterUnit
 			});
 
-			if (currentWorkspace?.workspaceId === workspaceId) {
-				savedSubject = editorContentToSave.subject;
-				savedBody = editorContentToSave.body;
-				savedSendAfterAmount = editorContentToSave.sendAfterAmount;
-				savedSendAfterUnit = editorContentToSave.sendAfterUnit;
+			if (currentWorkspace?.workspaceId === workspaceId && editorContentMatchesSnapshot(snapshot)) {
+				syncSavedEditorContent(snapshot);
 				lastSavedAt = Date.now();
 				if (showToast) toast.success('Email content saved.');
 			}
@@ -590,10 +687,16 @@
 
 	async function updateFollowUpUrl(followUpId: Id<'email_follow_ups'> | null, replaceState = true) {
 		const query = queryString([['followUpId', followUpId]]);
-		const pathname = `/app/${page.params.workspaceSlug}/emails` as `/app/${string}/emails`;
+		const pathname = (
+			page.url.pathname.endsWith('/emails/follow-ups')
+				? `/app/${page.params.workspaceSlug}/emails/follow-ups`
+				: `/app/${page.params.workspaceSlug}/emails`
+		) as `/app/${string}/emails` | `/app/${string}/emails/follow-ups`;
 		const href = (query ? `${pathname}?${query}` : pathname) as
 			| `/app/${string}/emails`
-			| `/app/${string}/emails?${string}`;
+			| `/app/${string}/emails?${string}`
+			| `/app/${string}/emails/follow-ups`
+			| `/app/${string}/emails/follow-ups?${string}`;
 
 		await goto(resolve(href), {
 			replaceState,
@@ -912,11 +1015,16 @@
 		return status.charAt(0).toUpperCase() + status.slice(1);
 	}
 
+	function followUpSelectionLabel(followUp: FollowUp) {
+		const subject = followUp.sentSubject ?? followUp.subjectTemplate ?? 'no subject';
+		return `Select follow-up email for ${followUp.signerName} with subject ${subject}`;
+	}
+
 	const VARIABLES = [
-		{ label: '{{customer_name}}', value: '{{customer_name}}' },
-		{ label: '{{booking_id}}', value: '{{booking_id}}' },
-		{ label: '{{business_name}}', value: '{{business_name}}' },
-		{ label: '{{activity_date}}', value: '{{activity_date}}' }
+		{ label: '{{customer_name}}', description: 'Customer name', value: '{{customer_name}}' },
+		{ label: '{{booking_id}}', description: 'Booking number', value: '{{booking_id}}' },
+		{ label: '{{business_name}}', description: 'Business name', value: '{{business_name}}' },
+		{ label: '{{activity_date}}', description: 'Visit date', value: '{{activity_date}}' }
 	];
 
 	const STATUS_STYLES: Record<string, string> = {
@@ -926,6 +1034,28 @@
 		blocked: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
 		failed: 'bg-red-500/10 text-red-400 border-red-500/20'
 	};
+
+	const activeTab = $derived<'queue' | 'email'>(
+		page.url.pathname.endsWith('/emails/editor') ? 'email' : 'queue'
+	);
+
+	let emailPreviewMode = $state(false);
+
+	const emailPreviewSubject = $derived(
+		(subject || savedSubject)
+			.replace(/\{\{customer_name\}\}|\{customer_name\}/g, 'Jane Smith')
+			.replace(/\{\{booking_id\}\}|\{booking_id\}/g, '#4821')
+			.replace(/\{\{business_name\}\}|\{business_name\}/g, businessName)
+			.replace(/\{\{activity_date\}\}|\{activity_date\}/g, 'April 27, 2026')
+	);
+
+	const emailPreviewBody = $derived(
+		(body || savedBody)
+			.replace(/\{\{customer_name\}\}|\{customer_name\}/g, escapeHtml('Jane Smith'))
+			.replace(/\{\{booking_id\}\}|\{booking_id\}/g, escapeHtml('#4821'))
+			.replace(/\{\{business_name\}\}|\{business_name\}/g, escapeHtml(businessName))
+			.replace(/\{\{activity_date\}\}|\{activity_date\}/g, escapeHtml('April 27, 2026'))
+	);
 </script>
 
 <svelte:head>
@@ -1126,31 +1256,600 @@
 <PageHeader
 	title="Email follow-ups"
 	subtitle="Automatically send thank-you emails after booking-linked waiver submissions."
-/>
+>
+	{#snippet actions()}
+		{#if !isLoading && currentWorkspace}
+			{#if workspaceCanSendEmail}
+				<a
+					href={resolve(`/app/${currentWorkspace.slug}/settings/email` as const)}
+					class="sender-chip"
+					data-state="ready"
+				>
+					<ShieldCheckIcon class="size-3" aria-hidden="true" />
+					<span class="sender-chip-label">Sending as {businessName}</span>
+					{#if senderSettings?.replyToEmail}
+						<span class="sender-chip-reply">
+							<span class="sender-chip-reply-label">Reply-to</span>
+							<span class="sender-chip-reply-email">{senderSettings.replyToEmail}</span>
+						</span>
+					{/if}
+				</a>
+			{:else if replyToPendingVerification && hasPlatformFromEmail}
+				<a
+					href={resolve(`/app/${currentWorkspace.slug}/settings/email` as const)}
+					class="sender-chip"
+					data-state="pending"
+				>
+					<MailCheckIcon class="size-3" aria-hidden="true" />
+					<span>Verify reply-to</span>
+				</a>
+			{:else if hasPlatformFromEmail}
+				<a
+					href={resolve(`/app/${currentWorkspace.slug}/settings/email` as const)}
+					class="sender-chip"
+					data-state="unset"
+				>
+					<MailIcon class="size-3" aria-hidden="true" />
+					<span>Configure reply-to</span>
+				</a>
+			{:else}
+				<a
+					href={resolve(`/app/${currentWorkspace.slug}/settings/email` as const)}
+					class="sender-chip"
+					data-state="unset"
+				>
+					<MailIcon class="size-3" aria-hidden="true" />
+					<span>Sender not configured</span>
+				</a>
+			{/if}
+		{/if}
+	{/snippet}
+	{#snippet meta()}
+		<nav class="header-tabs" aria-label="Email follow-up sections">
+			<a
+				href={resolve(`/app/${page.params.workspaceSlug}/emails/follow-ups` as const)}
+				aria-current={activeTab === 'queue' ? 'page' : undefined}
+				class="header-tab-btn"
+			>
+				Queue
+				{#if !statsQuery.isLoading}
+					<span class="tab-badge">{stats?.pendingCount ?? 0}</span>
+				{/if}
+			</a>
+			<a
+				href={resolve(`/app/${page.params.workspaceSlug}/emails/editor` as const)}
+				aria-current={activeTab === 'email' ? 'page' : undefined}
+				class="header-tab-btn"
+			>
+				Email
+			</a>
+		</nav>
+	{/snippet}
+</PageHeader>
 
 <PageShell>
-	<!-- Sender status strip / blocking banner -->
-	{#if isLoading}
-		<Skeleton class="h-12 w-full rounded-xl" />
-	{:else if currentWorkspace}
-		{@const settingsHref = resolve(`/app/${currentWorkspace.slug}/settings/email` as const)}
-		{#if workspaceCanSendEmail}
-			<a class="sender-strip" data-state="ready" href={settingsHref}>
-				<span class="sender-strip-mark">
-					<ShieldCheckIcon class="size-3.5" />
-				</span>
-				<span class="sender-strip-text">
-					Sending as
-					<strong class="font-semibold text-foreground">{businessName}</strong>
-					· replies route to
-					<span class="sender-strip-mono">{senderSettings?.replyToEmail}</span>
-				</span>
-				<span class="sender-strip-cta">
-					Edit
-					<ChevronRightIcon class="size-3" />
-				</span>
-			</a>
-		{:else}
+	{#if pageError}
+		<div
+			class="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+		>
+			{getConvexErrorMessage(pageError, 'Unable to load email follow-ups.')}
+		</div>
+	{:else if !appContext.isLoading && !currentWorkspace}
+		<div
+			class="rounded-xl border border-border bg-muted/20 px-4 py-3 text-sm text-muted-foreground"
+		>
+			No workspace was found for <span class="font-medium text-foreground"
+				>{page.params.workspaceSlug}</span
+			>.
+		</div>
+	{/if}
+
+	{#if activeTab === 'queue'}
+		<!-- Stats cards -->
+		<div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+			<div class="rounded-xl border border-border bg-card/30 p-4">
+				<p class="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase">
+					Emails sent today
+				</p>
+				{#if statsQuery.isLoading}
+					<Skeleton class="mt-2 h-8 w-16" />
+				{:else}
+					<p class="mt-1 text-3xl font-semibold tabular-nums">{stats?.sentToday ?? 0}</p>
+				{/if}
+			</div>
+			<div class="rounded-xl border border-border bg-card/30 p-4">
+				<p class="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase">
+					Pending queue
+				</p>
+				{#if statsQuery.isLoading}
+					<Skeleton class="mt-2 h-8 w-10" />
+				{:else}
+					<p class="mt-1 text-3xl font-semibold tabular-nums">{stats?.pendingCount ?? 0}</p>
+				{/if}
+			</div>
+			<div class="rounded-xl border border-border bg-card/30 p-4">
+				<p class="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase">
+					Total sent
+				</p>
+				{#if statsQuery.isLoading}
+					<Skeleton class="mt-2 h-8 w-14" />
+				{:else}
+					<p class="mt-1 text-3xl font-semibold tabular-nums">{stats?.totalSent ?? 0}</p>
+				{/if}
+			</div>
+		</div>
+
+		<!-- Follow-ups table -->
+		<div class="space-y-4">
+			<!-- Filters + actions -->
+			<div class="space-y-2">
+				<div class="flex flex-col gap-3 lg:flex-row lg:items-center">
+					<div class="relative w-full lg:max-w-md">
+						<SearchIcon
+							class="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground"
+							aria-hidden="true"
+						/>
+						<input
+							type="search"
+							placeholder="Search by name, email, or booking number"
+							bind:value={searchQuery}
+							class="h-9 w-full rounded-lg border border-input bg-background/60 pr-10 pl-11 text-sm shadow-xs transition-all placeholder:text-muted-foreground/70 hover:bg-background focus-visible:border-ring focus-visible:bg-background focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
+							aria-label="Search follow-ups"
+						/>
+						{#if searchQuery}
+							<button
+								type="button"
+								onclick={clearSearch}
+								class="absolute top-1/2 right-2 inline-flex size-6 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
+								aria-label="Clear search"
+							>
+								<XIcon class="size-3.5" aria-hidden="true" />
+							</button>
+						{/if}
+					</div>
+
+					<div class="flex flex-col gap-2 sm:flex-row sm:items-center lg:ml-auto">
+						<DropdownMenu>
+							<DropdownMenuTrigger>
+								{#snippet child({ props })}
+									<Button
+										{...props}
+										type="button"
+										size="lg"
+										variant={statusFilters.size > 0 ? 'secondary' : 'outline'}
+										class="h-9 w-full justify-between gap-2 sm:w-auto sm:min-w-32"
+									>
+										<span class="inline-flex min-w-0 items-center gap-1.5">
+											<SlidersHorizontalIcon class="size-3.5 shrink-0" aria-hidden="true" />
+											<span class="truncate">{statusFilterLabel}</span>
+										</span>
+										<ChevronDownIcon class="size-3.5 text-muted-foreground" aria-hidden="true" />
+									</Button>
+								{/snippet}
+							</DropdownMenuTrigger>
+							<DropdownMenuContent align="end" class="w-48">
+								{#each STATUS_OPTIONS as opt (opt.value)}
+									{@const active = statusFilters.has(opt.value)}
+									<DropdownMenuCheckboxItem
+										checked={active}
+										closeOnSelect={false}
+										onCheckedChange={(checked) => setStatusFilter(opt.value, checked)}
+									>
+										{opt.label}
+									</DropdownMenuCheckboxItem>
+								{/each}
+								{#if statusFilters.size > 0}
+									<div class="mt-1 border-t border-foreground/5 pt-1">
+										<button
+											type="button"
+											onclick={() => statusFilters.clear()}
+											class="flex min-h-7 w-full items-center rounded-md px-2 text-left text-xs text-muted-foreground outline-hidden transition-colors hover:bg-foreground/10 hover:text-foreground focus:bg-foreground/10 focus:text-foreground"
+										>
+											Clear status
+										</button>
+									</div>
+								{/if}
+							</DropdownMenuContent>
+						</DropdownMenu>
+
+						<Popover bind:open={dateCalendarOpen}>
+							<PopoverTrigger>
+								{#snippet child({ props })}
+									<Button
+										{...props}
+										type="button"
+										size="lg"
+										variant={dateFrom || dateTo ? 'secondary' : 'outline'}
+										class="h-9 w-full justify-between gap-2 sm:w-auto sm:max-w-64"
+									>
+										<span class="inline-flex min-w-0 items-center gap-1.5">
+											<CalendarClockIcon class="size-3.5 shrink-0" aria-hidden="true" />
+											<span class="truncate">{dateFilterLabel}</span>
+										</span>
+										<ChevronDownIcon class="size-3.5 text-muted-foreground" aria-hidden="true" />
+									</Button>
+								{/snippet}
+							</PopoverTrigger>
+							<PopoverContent align="end" class="w-auto p-2">
+								<RangeCalendar bind:value={dateRangeValue} class="w-fit" />
+								{#if dateFrom || dateTo}
+									<div class="flex justify-end border-t border-border px-1 pt-2">
+										<button
+											type="button"
+											onclick={clearDateRange}
+											class="rounded-md px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
+										>
+											Clear dates
+										</button>
+									</div>
+								{/if}
+							</PopoverContent>
+						</Popover>
+					</div>
+
+					<div class="flex gap-1.5">
+						<span class="inline-block flex-1 sm:flex-none" title={sendSelectionTooltip}>
+							<Button
+								size="lg"
+								onclick={handleSendSelected}
+								disabled={selectionLoading !== null || !canSendSelected}
+								class="h-9 w-full sm:h-8 sm:w-auto"
+							>
+								{selectionLoading === 'send' ? 'Sending…' : 'Send'}
+							</Button>
+						</span>
+						<span
+							class="inline-block flex-1 sm:flex-none"
+							title={!canUnscheduleSelected ? 'Select queued rows to unschedule' : undefined}
+						>
+							<Button
+								size="lg"
+								variant="outline"
+								onclick={handleUnscheduleSelected}
+								disabled={selectionLoading !== null || !canUnscheduleSelected}
+								class="h-9 w-full sm:h-8 sm:w-auto"
+							>
+								{selectionLoading === 'unschedule' ? 'Unscheduling…' : 'Unschedule'}
+							</Button>
+						</span>
+					</div>
+				</div>
+			</div>
+
+			<!-- List -->
+			<div class="flex h-[440px] min-h-0 flex-col md:h-[520px]">
+				{#snippet paginationFooter(border: boolean)}
+					<div
+						class="flex items-center justify-between {border
+							? 'border-t border-border'
+							: ''} px-4 py-3 sm:px-5"
+					>
+						<p class="text-xs text-muted-foreground">
+							{#if followUps.length === 0}
+								No entries
+							{:else}
+								Page {currentPage + 1} · Showing {followUps.length}
+								{followUps.length === 1 ? 'entry' : 'entries'}
+							{/if}
+						</p>
+						<div class="flex items-center gap-1">
+							<button
+								class="rounded px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
+								disabled={currentPage === 0}
+								onclick={goToPreviousPage}
+							>
+								← Prev
+							</button>
+							<span class="min-w-[64px] px-2 py-1 text-center text-xs text-muted-foreground">
+								Page {currentPage + 1}
+							</span>
+							<button
+								class="rounded px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
+								disabled={!hasNextPage}
+								onclick={goToNextPage}
+							>
+								Next →
+							</button>
+						</div>
+					</div>
+				{/snippet}
+
+				{#if followUpsQuery.isLoading || appContext.isLoading}
+					<!-- Desktop skeleton -->
+					<div class="hidden h-full rounded-xl border border-border md:block">
+						<Table class="table-fixed">
+							<colgroup>
+								<col class="w-[4%]" /><col class="w-[24%]" /><col class="w-[20%]" />
+								<col class="w-[20%]" /><col class="w-[18%]" /><col class="w-[14%]" />
+							</colgroup>
+							<TableHeader>
+								<TableRow class="border-border hover:bg-transparent">
+									{#each ['', 'Customer', 'Booking', 'Waiver signed', 'Scheduled for', 'Status'] as col (col)}
+										<TableHead
+											class="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase"
+											>{col}</TableHead
+										>
+									{/each}
+								</TableRow>
+							</TableHeader>
+							<TableBody>
+								{#each [0, 1, 2, 3] as i (i)}
+									<TableRow class="border-border hover:bg-transparent">
+										{#each [0, 1, 2, 3, 4, 5] as j (j)}
+											<TableCell><Skeleton class="h-4 w-full max-w-28" /></TableCell>
+										{/each}
+									</TableRow>
+								{/each}
+							</TableBody>
+						</Table>
+					</div>
+					<!-- Mobile skeleton -->
+					<div class="h-full space-y-3 overflow-hidden md:hidden">
+						{#each [0, 1, 2] as i (i)}
+							<div class="space-y-2 rounded-xl border border-border bg-card/30 p-4">
+								<Skeleton class="h-4 w-32" />
+								<Skeleton class="h-3 w-48" />
+								<Skeleton class="h-4 w-20" />
+							</div>
+						{/each}
+					</div>
+				{:else if followUps.length === 0}
+					<div
+						class="hidden h-full flex-col overflow-hidden rounded-xl border border-border md:flex"
+					>
+						<div class="min-h-0 flex-1 overflow-auto">
+							<Table class="table-fixed">
+								<colgroup>
+									<col class="w-[4%]" /><col class="w-[24%]" /><col class="w-[20%]" />
+									<col class="w-[18%]" /><col class="w-[20%]" /><col class="w-[14%]" />
+								</colgroup>
+								<TableHeader>
+									<TableRow class="border-border hover:bg-transparent">
+										<TableHead class="pl-4">
+											<input
+												type="checkbox"
+												class="size-4 rounded accent-primary opacity-40"
+												disabled
+												aria-label="Select all follow-ups"
+											/>
+										</TableHead>
+										{#each ['Customer', 'Booking', 'Waiver signed', 'Scheduled for', 'Status'] as col (col)}
+											<TableHead
+												class="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase"
+												>{col}</TableHead
+											>
+										{/each}
+									</TableRow>
+								</TableHeader>
+							</Table>
+							<div
+								class="flex min-h-[320px] items-center justify-center border-t border-border px-4 text-center text-sm text-muted-foreground"
+							>
+								{searchQuery || dateFrom || dateTo || statusFilters.size > 0
+									? 'No follow-ups match your filters.'
+									: `No follow-ups yet for ${currentWorkspace?.name ?? 'this workspace'}. They appear here after guests sign a waiver.`}
+							</div>
+						</div>
+
+						{@render paginationFooter(true)}
+					</div>
+					<div
+						class="flex h-full flex-col overflow-hidden rounded-xl border border-border md:hidden"
+					>
+						<div
+							class="flex min-h-0 flex-1 items-center justify-center px-4 text-center text-sm text-muted-foreground"
+						>
+							{searchQuery || dateFrom || dateTo || statusFilters.size > 0
+								? 'No follow-ups match your filters.'
+								: `No follow-ups yet for ${currentWorkspace?.name ?? 'this workspace'}. They appear here after guests sign a waiver.`}
+						</div>
+						{@render paginationFooter(true)}
+					</div>
+				{:else}
+					<!-- Desktop table -->
+					<div
+						class="hidden h-full flex-col overflow-hidden rounded-xl border border-border md:flex"
+					>
+						<div class="min-h-0 flex-1 overflow-auto">
+							<Table class="table-fixed">
+								<colgroup>
+									<col class="w-[4%]" /><col class="w-[24%]" /><col class="w-[20%]" />
+									<col class="w-[18%]" /><col class="w-[20%]" /><col class="w-[14%]" />
+								</colgroup>
+								<TableHeader>
+									<TableRow class="border-border hover:bg-transparent">
+										<TableHead class="pl-4">
+											<input
+												bind:this={headerCheckboxEl}
+												type="checkbox"
+												class="size-4 cursor-pointer rounded accent-primary"
+												checked={allVisibleSelected}
+												onchange={toggleAll}
+												onkeydown={handleHeaderCheckboxKeydown}
+												aria-label="Select all visible emails"
+											/>
+										</TableHead>
+										<TableHead
+											class="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase"
+											>Customer</TableHead
+										>
+										<TableHead
+											class="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase"
+											>Booking</TableHead
+										>
+										<TableHead
+											class="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase"
+											>Waiver signed</TableHead
+										>
+										<TableHead
+											class="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase"
+											>Scheduled for</TableHead
+										>
+										<TableHead
+											class="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase"
+											>Status</TableHead
+										>
+									</TableRow>
+								</TableHeader>
+								<TableBody>
+									{#each followUps as followUp (followUp._id)}
+										<TableRow
+											class="cursor-pointer border-border transition-colors hover:bg-muted/40 focus-visible:bg-muted/40 focus-visible:outline-none {selectedIds.has(
+												followUp._id
+											)
+												? 'bg-muted/20'
+												: ''}"
+											role="button"
+											tabindex={0}
+											onclick={(e) => {
+												if (isInteractiveEventTarget(e)) return;
+												openPreview(followUp);
+											}}
+											onkeydown={(e) => {
+												if (isInteractiveEventTarget(e)) return;
+												if (e.key === 'Enter' || e.key === ' ') {
+													e.preventDefault();
+													openPreview(followUp);
+												}
+											}}
+										>
+											<TableCell
+												class="pl-4"
+												onclick={(e) => e.stopPropagation()}
+												onkeydown={(e) => e.stopPropagation()}
+											>
+												<input
+													type="checkbox"
+													class="size-4 cursor-pointer rounded accent-primary"
+													checked={selectedIds.has(followUp._id)}
+													onchange={(e) => toggleRow(followUp._id, e)}
+													onkeydown={(e) => handleRowCheckboxKeydown(followUp._id, e)}
+													aria-label={followUpSelectionLabel(followUp)}
+												/>
+											</TableCell>
+											<TableCell>
+												<p class="truncate text-sm font-medium">{followUp.signerName}</p>
+												<p class="truncate text-xs text-muted-foreground">
+													{followUp.signerEmail}
+												</p>
+											</TableCell>
+											<TableCell class="min-w-0 font-mono text-sm text-muted-foreground">
+												<span class="block truncate" title={displayBookingId(followUp)}>
+													{displayBookingId(followUp)}
+												</span>
+											</TableCell>
+											<TableCell class="text-xs text-muted-foreground">
+												{formatTimestamp(followUp.submittedAt)}
+											</TableCell>
+											<TableCell class="text-xs text-muted-foreground">
+												{formatFollowUpSchedule(followUp)}
+											</TableCell>
+											<TableCell>
+												<span
+													class="inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium capitalize {STATUS_STYLES[
+														followUp.status
+													] ?? ''}"
+												>
+													<span
+														class="size-1.5 rounded-full {followUp.status === 'queued'
+															? 'bg-blue-400'
+															: followUp.status === 'sent'
+																? 'bg-green-400'
+																: followUp.status === 'blocked'
+																	? 'bg-yellow-400'
+																	: followUp.status === 'failed'
+																		? 'bg-red-400'
+																		: 'bg-muted-foreground'}"
+													></span>
+													{statusLabel(followUp.status)}
+												</span>
+											</TableCell>
+										</TableRow>
+									{/each}
+								</TableBody>
+							</Table>
+						</div>
+
+						{@render paginationFooter(true)}
+					</div>
+
+					<!-- Mobile cards -->
+					<div class="flex h-full flex-col md:hidden">
+						<div class="min-h-0 flex-1 space-y-3 overflow-auto">
+							{#each followUps as followUp (followUp._id)}
+								<div
+									class="overflow-hidden rounded-xl border border-border bg-card/30 transition-colors {selectedIds.has(
+										followUp._id
+									)
+										? 'ring-1 ring-ring/50'
+										: ''}"
+								>
+									<div class="flex items-stretch">
+										<label class="flex shrink-0 cursor-pointer items-center px-3">
+											<span class="sr-only">Select follow-up</span>
+											<input
+												type="checkbox"
+												class="size-4 cursor-pointer rounded accent-primary"
+												checked={selectedIds.has(followUp._id)}
+												onchange={() => toggleRowSelection(followUp._id)}
+												aria-label={followUpSelectionLabel(followUp)}
+											/>
+										</label>
+										<button
+											type="button"
+											class="min-w-0 flex-1 px-1 py-3 pr-4 text-left transition-colors hover:bg-muted/30 focus-visible:bg-muted/30 focus-visible:outline-none"
+											onclick={() => openPreview(followUp)}
+										>
+											<div class="flex items-start justify-between gap-2">
+												<div class="min-w-0 flex-1 space-y-0.5">
+													<p class="truncate text-sm font-medium">{followUp.signerName}</p>
+													<p class="truncate text-xs text-muted-foreground">
+														{followUp.signerEmail}
+													</p>
+												</div>
+												<span
+													class="inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium capitalize {STATUS_STYLES[
+														followUp.status
+													] ?? ''}"
+												>
+													<span
+														class="size-1.5 rounded-full {followUp.status === 'queued'
+															? 'bg-blue-400'
+															: followUp.status === 'sent'
+																? 'bg-green-400'
+																: followUp.status === 'blocked'
+																	? 'bg-yellow-400'
+																	: followUp.status === 'failed'
+																		? 'bg-red-400'
+																		: 'bg-muted-foreground'}"
+													></span>
+													{statusLabel(followUp.status)}
+												</span>
+											</div>
+											<div
+												class="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground"
+											>
+												<span
+													class="max-w-full truncate font-mono"
+													title={displayBookingId(followUp)}>{displayBookingId(followUp)}</span
+												>
+												<span>·</span>
+												<span>{formatFollowUpSchedule(followUp)}</span>
+											</div>
+										</button>
+									</div>
+								</div>
+							{/each}
+						</div>
+
+						{@render paginationFooter(false)}
+					</div>
+				{/if}
+			</div>
+		</div>
+	{:else}
+		<!-- Email tab: sender context + editor -->
+		{#if !isLoading && currentWorkspace && !workspaceCanSendEmail}
 			<div
 				class="sender-banner"
 				data-state={replyToPendingVerification && hasPlatformFromEmail ? 'pending' : 'unset'}
@@ -1187,706 +1886,230 @@
 						{/if}
 					</p>
 				</div>
-				<a class="sender-banner-cta" href={settingsHref}>
+				<a
+					class="sender-banner-cta"
+					href={resolve(`/app/${currentWorkspace.slug}/settings/email` as const)}
+				>
 					{replyToPendingVerification && hasPlatformFromEmail ? 'Continue' : 'Set up'}
 					<ChevronRightIcon class="size-3.5" />
 				</a>
 			</div>
 		{/if}
-	{/if}
+		<!-- Editor content -->
+		{#if isLoading}
+			<div class="email-layout">
+				<div class="composer">
+					<div class="compose-meta">
+						<div class="compose-meta-row">
+							<Skeleton class="h-4 w-60" />
+							<Skeleton class="h-4 w-28 rounded-full" />
+						</div>
+					</div>
+					<div class="compose-subject-row">
+						<Skeleton class="h-5 w-full" />
+					</div>
+					<div class="compose-body-section">
+						<div class="border-t border-border/70 bg-background">
+							<div
+								class="flex flex-col gap-2 border-b border-border/70 bg-muted/20 px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
+							>
+								<Skeleton class="h-2.5 w-10" />
+								<div class="flex flex-wrap gap-1 sm:justify-end">
+									<Skeleton class="h-7 w-16" />
+									<Skeleton class="h-7 w-7" />
+									<Skeleton class="h-7 w-24" />
+									<Skeleton class="h-7 w-14" />
+									<Skeleton class="size-7" />
+									<Skeleton class="size-7" />
+									<Skeleton class="size-7" />
+									<Skeleton class="size-7" />
+								</div>
+							</div>
+							<div class="min-h-[300px] space-y-3 p-4">
+								<Skeleton class="h-4 w-full" />
+								<Skeleton class="h-4 w-10/12" />
+								<Skeleton class="h-4 w-3/4" />
+							</div>
+						</div>
+					</div>
+				</div>
+				<div class="email-rail">
+					<div class="rail-section">
+						<Skeleton class="mb-2 h-2 w-16" />
+						<Skeleton class="mb-3 h-3 w-32" />
+						{#each [0, 1, 2, 3] as i (i)}
+							<Skeleton class="mb-1.5 h-9 w-full rounded" />
+						{/each}
+					</div>
+					<div class="rail-section">
+						<Skeleton class="mb-3 h-2 w-20" />
+						<Skeleton class="mb-2 h-8 w-full rounded-md" />
+						<Skeleton class="h-8 w-full rounded-md" />
+					</div>
+				</div>
+			</div>
+		{:else}
+			<div class="email-layout">
+				<!-- Composer (left column) -->
+				<div class="composer">
+					<!-- Timing / metadata card -->
+					<div class="compose-meta">
+						<div class="compose-meta-row">
+							<span class="compose-key">Delay</span>
+							<div class="compose-meta-controls">
+								<Input
+									type="number"
+									min="1"
+									value={sendAfterAmount}
+									oninput={sanitizeSendAfterAmount}
+									onblur={sanitizeSendAfterAmount}
+									class="compose-num h-[26px] w-14 px-1.5 text-center text-sm tabular-nums"
+									aria-invalid={!isSendAfterValid}
+									aria-describedby="send-after-error"
+								/>
+								<select
+									value={sendAfterUnit}
+									onchange={updateSendAfterUnit}
+									class="compose-select"
+									aria-label="Send after unit"
+								>
+									{#each SEND_AFTER_UNITS as unit (unit)}
+										<option value={unit}>{unit}</option>
+									{/each}
+								</select>
+								<span class="compose-meta-prose">
+									after booking · unlinked waivers unscheduled
+								</span>
+							</div>
+							<span class="save-indicator shrink-0" data-state={saveState}>
+								{#if saveState === 'saving'}
+									<LoaderIcon class="size-3.5 animate-spin" />
+								{:else if saveState === 'error'}
+									<CloudOffIcon class="size-3.5" />
+								{:else if saveState === 'dirty'}
+									<CloudIcon class="size-3.5" />
+								{:else}
+									<CloudCheckIcon class="size-3.5" />
+								{/if}
+								<span class="truncate">{savedLabel}</span>
+							</span>
+							<button
+								type="button"
+								onclick={() => (emailPreviewMode = !emailPreviewMode)}
+								class="preview-toggle"
+								data-active={emailPreviewMode}
+							>
+								<EyeIcon class="size-3" />
+								{emailPreviewMode ? 'Edit' : 'Preview'}
+							</button>
+						</div>
+						{#if !isSendAfterValid}
+							<p id="send-after-error" class="compose-error">Enter a positive whole number.</p>
+						{/if}
+					</div>
 
-	{#if pageError}
-		<div
-			class="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
-		>
-			{getConvexErrorMessage(pageError, 'Unable to load email follow-ups.')}
-		</div>
-	{:else if !appContext.isLoading && !currentWorkspace}
-		<div
-			class="rounded-xl border border-border bg-muted/20 px-4 py-3 text-sm text-muted-foreground"
-		>
-			No workspace was found for <span class="font-medium text-foreground"
-				>{page.params.workspaceSlug}</span
-			>.
-		</div>
-	{/if}
+					{#if emailPreviewMode}
+						<!-- Email preview -->
+						<div class="email-preview-shell">
+							<div class="email-preview-card">
+								<div class="email-preview-from-row">
+									<div class="email-preview-avatar">
+										{businessName[0]?.toUpperCase() ?? 'B'}
+									</div>
+									<div class="email-preview-from-info">
+										<span class="email-preview-from-name">{businessName}</span>
+										<span class="email-preview-from-to">to Jane Smith</span>
+									</div>
+								</div>
+								<div class="email-preview-subject-line">
+									{emailPreviewSubject || '(no subject)'}
+								</div>
+								<WaiverRichText html={emailPreviewBody} class="email-preview-body-wrap" />
+							</div>
+							<p class="preview-sample-notice">
+								Preview uses sample data — Jane Smith, #4821, April 27, 2026.
+							</p>
+						</div>
+					{:else}
+						<!-- Subject row -->
+						<div class="compose-subject-row">
+							<label for="email-subject" class="compose-key compose-key--subject">Subject</label>
+							<input
+								id="email-subject"
+								bind:this={subjectInputRef}
+								type="text"
+								bind:value={subject}
+								placeholder="Thank you for visiting {'{{business_name}}'}!"
+								spellcheck="true"
+								autocomplete="off"
+								class="compose-subject-input"
+								onfocus={captureSubjectSelection}
+								onclick={captureSubjectSelection}
+								onkeyup={captureSubjectSelection}
+								onselect={captureSubjectSelection}
+								oninput={captureSubjectSelection}
+							/>
+						</div>
 
-	<!-- Stats cards -->
-	<div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
-		<div class="rounded-xl border border-border bg-card/30 p-4">
-			<p class="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase">
-				Emails sent today
-			</p>
-			{#if statsQuery.isLoading}
-				<Skeleton class="mt-2 h-8 w-16" />
-			{:else}
-				<p class="mt-1 text-3xl font-semibold tabular-nums">{stats?.sentToday ?? 0}</p>
-			{/if}
-		</div>
-		<div class="rounded-xl border border-border bg-card/30 p-4">
-			<p class="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase">
-				Pending queue
-			</p>
-			{#if statsQuery.isLoading}
-				<Skeleton class="mt-2 h-8 w-10" />
-			{:else}
-				<p class="mt-1 text-3xl font-semibold tabular-nums">{stats?.pendingCount ?? 0}</p>
-			{/if}
-		</div>
-		<div class="rounded-xl border border-border bg-card/30 p-4">
-			<p class="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase">
-				Total sent
-			</p>
-			{#if statsQuery.isLoading}
-				<Skeleton class="mt-2 h-8 w-14" />
-			{:else}
-				<p class="mt-1 text-3xl font-semibold tabular-nums">{stats?.totalSent ?? 0}</p>
-			{/if}
-		</div>
-	</div>
-
-	<!-- Follow-ups table -->
-	<div class="space-y-4">
-		<div class="space-y-1.5">
-			<h2 class="text-xl font-semibold tracking-tight">Follow-ups</h2>
-			<p class="text-sm text-muted-foreground">
-				Select rows to act on them, or click a row to preview the email.
-			</p>
-		</div>
-
-		<!-- Filters + actions -->
-		<div class="space-y-2">
-			<div class="flex flex-col gap-3 lg:flex-row lg:items-center">
-				<div class="relative w-full lg:max-w-md">
-					<SearchIcon
-						class="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground"
-						aria-hidden="true"
-					/>
-					<input
-						type="search"
-						placeholder="Search by name, email, or booking number"
-						bind:value={searchQuery}
-						class="h-9 w-full rounded-lg border border-input bg-background/60 pr-10 pl-11 text-sm shadow-xs transition-all placeholder:text-muted-foreground/70 hover:bg-background focus-visible:border-ring focus-visible:bg-background focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
-						aria-label="Search follow-ups"
-					/>
-					{#if searchQuery}
-						<button
-							type="button"
-							onclick={clearSearch}
-							class="absolute top-1/2 right-2 inline-flex size-6 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
-							aria-label="Clear search"
-						>
-							<XIcon class="size-3.5" aria-hidden="true" />
-						</button>
+						<!-- Body -->
+						<div class="compose-body-section" onfocusin={markBodyInsertTarget}>
+							<RichTextEditor
+								id="email-body"
+								label="Body"
+								class="email-rich-editor"
+								bind:value={body}
+								bind:this={editorRef}
+							/>
+						</div>
 					{/if}
 				</div>
 
-				<div class="flex flex-col gap-2 sm:flex-row sm:items-center lg:ml-auto">
-					<DropdownMenu>
-						<DropdownMenuTrigger>
-							{#snippet child({ props })}
-								<Button
-									{...props}
-									type="button"
-									size="lg"
-									variant={statusFilters.size > 0 ? 'secondary' : 'outline'}
-									class="h-9 w-full justify-between gap-2 sm:w-auto sm:min-w-32"
-								>
-									<span class="inline-flex min-w-0 items-center gap-1.5">
-										<SlidersHorizontalIcon class="size-3.5 shrink-0" aria-hidden="true" />
-										<span class="truncate">{statusFilterLabel}</span>
-									</span>
-									<ChevronDownIcon class="size-3.5 text-muted-foreground" aria-hidden="true" />
-								</Button>
-							{/snippet}
-						</DropdownMenuTrigger>
-						<DropdownMenuContent align="end" class="w-48">
-							{#each STATUS_OPTIONS as opt (opt.value)}
-								{@const active = statusFilters.has(opt.value)}
-								<DropdownMenuCheckboxItem
-									checked={active}
-									closeOnSelect={false}
-									onCheckedChange={(checked) => setStatusFilter(opt.value, checked)}
-								>
-									{opt.label}
-								</DropdownMenuCheckboxItem>
-							{/each}
-							{#if statusFilters.size > 0}
-								<div class="mt-1 border-t border-foreground/5 pt-1">
-									<button
-										type="button"
-										onclick={() => statusFilters.clear()}
-										class="flex min-h-7 w-full items-center rounded-md px-2 text-left text-xs text-muted-foreground outline-hidden transition-colors hover:bg-foreground/10 hover:text-foreground focus:bg-foreground/10 focus:text-foreground"
-									>
-										Clear status
-									</button>
-								</div>
-							{/if}
-						</DropdownMenuContent>
-					</DropdownMenu>
-
-					<Popover bind:open={dateCalendarOpen}>
-						<PopoverTrigger>
-							{#snippet child({ props })}
-								<Button
-									{...props}
-									type="button"
-									size="lg"
-									variant={dateFrom || dateTo ? 'secondary' : 'outline'}
-									class="h-9 w-full justify-between gap-2 sm:w-auto sm:max-w-64"
-								>
-									<span class="inline-flex min-w-0 items-center gap-1.5">
-										<CalendarClockIcon class="size-3.5 shrink-0" aria-hidden="true" />
-										<span class="truncate">{dateFilterLabel}</span>
-									</span>
-									<ChevronDownIcon class="size-3.5 text-muted-foreground" aria-hidden="true" />
-								</Button>
-							{/snippet}
-						</PopoverTrigger>
-						<PopoverContent align="end" class="w-auto p-2">
-							<RangeCalendar bind:value={dateRangeValue} class="w-fit" />
-							{#if dateFrom || dateTo}
-								<div class="flex justify-end border-t border-border px-1 pt-2">
-									<button
-										type="button"
-										onclick={clearDateRange}
-										class="rounded-md px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
-									>
-										Clear dates
-									</button>
-								</div>
-							{/if}
-						</PopoverContent>
-					</Popover>
-				</div>
-
-				<div class="flex gap-1.5">
-					<span class="inline-block flex-1 sm:flex-none" title={sendSelectionTooltip}>
-						<Button
-							size="lg"
-							onclick={handleSendSelected}
-							disabled={selectionLoading !== null || !canSendSelected}
-							class="h-9 w-full sm:h-8 sm:w-auto"
-						>
-							{selectionLoading === 'send' ? 'Sending…' : 'Send'}
-						</Button>
-					</span>
-					<span
-						class="inline-block flex-1 sm:flex-none"
-						title={!canUnscheduleSelected ? 'Select queued rows to unschedule' : undefined}
-					>
-						<Button
-							size="lg"
-							variant="outline"
-							onclick={handleUnscheduleSelected}
-							disabled={selectionLoading !== null || !canUnscheduleSelected}
-							class="h-9 w-full sm:h-8 sm:w-auto"
-						>
-							{selectionLoading === 'unschedule' ? 'Unscheduling…' : 'Unschedule'}
-						</Button>
-					</span>
-				</div>
-			</div>
-		</div>
-
-		<!-- List -->
-		<div class="flex h-[440px] min-h-0 flex-col md:h-[520px]">
-			{#snippet paginationFooter(border: boolean)}
-				<div
-					class="flex items-center justify-between {border
-						? 'border-t border-border'
-						: ''} px-4 py-3 sm:px-5"
-				>
-					<p class="text-xs text-muted-foreground">
-						{#if followUps.length === 0}
-							No entries
-						{:else}
-							Page {currentPage + 1} · Showing {followUps.length}
-							{followUps.length === 1 ? 'entry' : 'entries'}
-						{/if}
-					</p>
-					<div class="flex items-center gap-1">
-						<button
-							class="rounded px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
-							disabled={currentPage === 0}
-							onclick={goToPreviousPage}
-						>
-							← Prev
-						</button>
-						<span class="min-w-[64px] px-2 py-1 text-center text-xs text-muted-foreground">
-							Page {currentPage + 1}
-						</span>
-						<button
-							class="rounded px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
-							disabled={!hasNextPage}
-							onclick={goToNextPage}
-						>
-							Next →
-						</button>
-					</div>
-				</div>
-			{/snippet}
-
-			{#if followUpsQuery.isLoading || appContext.isLoading}
-				<!-- Desktop skeleton -->
-				<div class="hidden h-full rounded-xl border border-border md:block">
-					<Table class="table-fixed">
-						<colgroup>
-							<col class="w-[4%]" /><col class="w-[24%]" /><col class="w-[20%]" />
-							<col class="w-[20%]" /><col class="w-[18%]" /><col class="w-[14%]" />
-						</colgroup>
-						<TableHeader>
-							<TableRow class="border-border hover:bg-transparent">
-								{#each ['', 'Customer', 'Booking', 'Waiver signed', 'Scheduled for', 'Status'] as col (col)}
-									<TableHead
-										class="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase"
-										>{col}</TableHead
-									>
-								{/each}
-							</TableRow>
-						</TableHeader>
-						<TableBody>
-							{#each [0, 1, 2, 3] as i (i)}
-								<TableRow class="border-border hover:bg-transparent">
-									{#each [0, 1, 2, 3, 4, 5] as j (j)}
-										<TableCell><Skeleton class="h-4 w-full max-w-28" /></TableCell>
-									{/each}
-								</TableRow>
-							{/each}
-						</TableBody>
-					</Table>
-				</div>
-				<!-- Mobile skeleton -->
-				<div class="h-full space-y-3 overflow-hidden md:hidden">
-					{#each [0, 1, 2] as i (i)}
-						<div class="space-y-2 rounded-xl border border-border bg-card/30 p-4">
-							<Skeleton class="h-4 w-32" />
-							<Skeleton class="h-3 w-48" />
-							<Skeleton class="h-4 w-20" />
-						</div>
-					{/each}
-				</div>
-			{:else if followUps.length === 0}
-				<div class="hidden h-full flex-col overflow-hidden rounded-xl border border-border md:flex">
-					<div class="min-h-0 flex-1 overflow-auto">
-						<Table class="table-fixed">
-							<colgroup>
-								<col class="w-[4%]" /><col class="w-[24%]" /><col class="w-[20%]" />
-								<col class="w-[18%]" /><col class="w-[20%]" /><col class="w-[14%]" />
-							</colgroup>
-							<TableHeader>
-								<TableRow class="border-border hover:bg-transparent">
-									<TableHead class="pl-4">
-										<input
-											type="checkbox"
-											class="size-4 rounded accent-primary opacity-40"
-											disabled
-											aria-label="Select all follow-ups"
-										/>
-									</TableHead>
-									{#each ['Customer', 'Booking', 'Waiver signed', 'Scheduled for', 'Status'] as col (col)}
-										<TableHead
-											class="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase"
-											>{col}</TableHead
-										>
-									{/each}
-								</TableRow>
-							</TableHeader>
-						</Table>
-						<div
-							class="flex min-h-[320px] items-center justify-center border-t border-border px-4 text-center text-sm text-muted-foreground"
-						>
-							{searchQuery || dateFrom || dateTo || statusFilters.size > 0
-								? 'No follow-ups match your filters.'
-								: `No follow-ups yet for ${currentWorkspace?.name ?? 'this workspace'}. They appear here after guests sign a waiver.`}
-						</div>
-					</div>
-
-					{@render paginationFooter(true)}
-				</div>
-				<div class="flex h-full flex-col overflow-hidden rounded-xl border border-border md:hidden">
-					<div
-						class="flex min-h-0 flex-1 items-center justify-center px-4 text-center text-sm text-muted-foreground"
-					>
-						{searchQuery || dateFrom || dateTo || statusFilters.size > 0
-							? 'No follow-ups match your filters.'
-							: `No follow-ups yet for ${currentWorkspace?.name ?? 'this workspace'}. They appear here after guests sign a waiver.`}
-					</div>
-					{@render paginationFooter(true)}
-				</div>
-			{:else}
-				<!-- Desktop table -->
-				<div class="hidden h-full flex-col overflow-hidden rounded-xl border border-border md:flex">
-					<div class="min-h-0 flex-1 overflow-auto">
-						<Table class="table-fixed">
-							<colgroup>
-								<col class="w-[4%]" /><col class="w-[24%]" /><col class="w-[20%]" />
-								<col class="w-[18%]" /><col class="w-[20%]" /><col class="w-[14%]" />
-							</colgroup>
-							<TableHeader>
-								<TableRow class="border-border hover:bg-transparent">
-									<TableHead class="pl-4">
-										<input
-											bind:this={headerCheckboxEl}
-											type="checkbox"
-											class="size-4 cursor-pointer rounded accent-primary"
-											checked={allVisibleSelected}
-											onchange={toggleAll}
-											onkeydown={handleHeaderCheckboxKeydown}
-										/>
-									</TableHead>
-									<TableHead
-										class="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase"
-										>Customer</TableHead
-									>
-									<TableHead
-										class="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase"
-										>Booking</TableHead
-									>
-									<TableHead
-										class="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase"
-										>Waiver signed</TableHead
-									>
-									<TableHead
-										class="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase"
-										>Scheduled for</TableHead
-									>
-									<TableHead
-										class="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase"
-										>Status</TableHead
-									>
-								</TableRow>
-							</TableHeader>
-							<TableBody>
-								{#each followUps as followUp (followUp._id)}
-									<TableRow
-										class="cursor-pointer border-border transition-colors hover:bg-muted/40 focus-visible:bg-muted/40 focus-visible:outline-none {selectedIds.has(
-											followUp._id
-										)
-											? 'bg-muted/20'
-											: ''}"
-										role="button"
-										tabindex={0}
-										onclick={(e) => {
-											if (isInteractiveEventTarget(e)) return;
-											openPreview(followUp);
-										}}
-										onkeydown={(e) => {
-											if (isInteractiveEventTarget(e)) return;
-											if (e.key === 'Enter' || e.key === ' ') {
-												e.preventDefault();
-												openPreview(followUp);
-											}
-										}}
-									>
-										<TableCell
-											class="pl-4"
-											onclick={(e) => e.stopPropagation()}
-											onkeydown={(e) => e.stopPropagation()}
-										>
-											<input
-												type="checkbox"
-												class="size-4 cursor-pointer rounded accent-primary"
-												checked={selectedIds.has(followUp._id)}
-												onchange={(e) => toggleRow(followUp._id, e)}
-												onkeydown={(e) => handleRowCheckboxKeydown(followUp._id, e)}
-											/>
-										</TableCell>
-										<TableCell>
-											<p class="truncate text-sm font-medium">{followUp.signerName}</p>
-											<p class="truncate text-xs text-muted-foreground">
-												{followUp.signerEmail}
-											</p>
-										</TableCell>
-										<TableCell class="min-w-0 font-mono text-sm text-muted-foreground">
-											<span class="block truncate" title={displayBookingId(followUp)}>
-												{displayBookingId(followUp)}
-											</span>
-										</TableCell>
-										<TableCell class="text-xs text-muted-foreground">
-											{formatTimestamp(followUp.submittedAt)}
-										</TableCell>
-										<TableCell class="text-xs text-muted-foreground">
-											{formatFollowUpSchedule(followUp)}
-										</TableCell>
-										<TableCell>
-											<span
-												class="inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium capitalize {STATUS_STYLES[
-													followUp.status
-												] ?? ''}"
-											>
-												<span
-													class="size-1.5 rounded-full {followUp.status === 'queued'
-														? 'bg-blue-400'
-														: followUp.status === 'sent'
-															? 'bg-green-400'
-															: followUp.status === 'blocked'
-																? 'bg-yellow-400'
-																: followUp.status === 'failed'
-																	? 'bg-red-400'
-																	: 'bg-muted-foreground'}"
-												></span>
-												{statusLabel(followUp.status)}
-											</span>
-										</TableCell>
-									</TableRow>
-								{/each}
-							</TableBody>
-						</Table>
-					</div>
-
-					{@render paginationFooter(true)}
-				</div>
-
-				<!-- Mobile cards -->
-				<div class="flex h-full flex-col md:hidden">
-					<div class="min-h-0 flex-1 space-y-3 overflow-auto">
-						{#each followUps as followUp (followUp._id)}
-							<div
-								class="overflow-hidden rounded-xl border border-border bg-card/30 transition-colors {selectedIds.has(
-									followUp._id
-								)
-									? 'ring-1 ring-ring/50'
-									: ''}"
-							>
-								<div class="flex items-stretch">
-									<label class="flex shrink-0 cursor-pointer items-center px-3">
-										<span class="sr-only">Select follow-up</span>
-										<input
-											type="checkbox"
-											class="size-4 cursor-pointer rounded accent-primary"
-											checked={selectedIds.has(followUp._id)}
-											onchange={() => toggleRowSelection(followUp._id)}
-										/>
-									</label>
-									<button
-										type="button"
-										class="min-w-0 flex-1 px-1 py-3 pr-4 text-left transition-colors hover:bg-muted/30 focus-visible:bg-muted/30 focus-visible:outline-none"
-										onclick={() => openPreview(followUp)}
-									>
-										<div class="flex items-start justify-between gap-2">
-											<div class="min-w-0 flex-1 space-y-0.5">
-												<p class="truncate text-sm font-medium">{followUp.signerName}</p>
-												<p class="truncate text-xs text-muted-foreground">
-													{followUp.signerEmail}
-												</p>
-											</div>
-											<span
-												class="inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium capitalize {STATUS_STYLES[
-													followUp.status
-												] ?? ''}"
-											>
-												<span
-													class="size-1.5 rounded-full {followUp.status === 'queued'
-														? 'bg-blue-400'
-														: followUp.status === 'sent'
-															? 'bg-green-400'
-															: followUp.status === 'blocked'
-																? 'bg-yellow-400'
-																: followUp.status === 'failed'
-																	? 'bg-red-400'
-																	: 'bg-muted-foreground'}"
-												></span>
-												{statusLabel(followUp.status)}
-											</span>
-										</div>
-										<div class="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
-											<span class="max-w-full truncate font-mono" title={displayBookingId(followUp)}
-												>{displayBookingId(followUp)}</span
-											>
-											<span>·</span>
-											<span>{formatFollowUpSchedule(followUp)}</span>
-										</div>
-									</button>
-								</div>
-							</div>
-						{/each}
-					</div>
-
-					{@render paginationFooter(false)}
-				</div>
-			{/if}
-		</div>
-	</div>
-
-	<!-- Editor content -->
-	{#if isLoading}
-		<div class="space-y-4">
-			<!-- Editor section header skeleton -->
-			<div class="space-y-1.5">
-				<div class="flex items-center justify-between gap-3">
-					<Skeleton class="h-7 w-44" />
-					<Skeleton class="h-5 w-36 rounded-full" />
-				</div>
-				<div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-					<Skeleton class="h-5 w-64" />
-					<div class="flex shrink-0 items-center gap-1.5">
-						<Skeleton class="h-8 flex-1 sm:w-32 sm:flex-none" />
-						<Skeleton class="h-8 flex-1 sm:w-28 sm:flex-none" />
-					</div>
-				</div>
-			</div>
-
-			<!-- Fields skeleton -->
-			<div class="space-y-5">
-				<!-- Subject -->
-				<div class="space-y-3">
-					<Skeleton class="h-3 w-24" />
-					<Skeleton class="h-7 w-full" />
-				</div>
-
-				<!-- Body -->
-				<div class="space-y-2">
-					<div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-						<Skeleton class="h-3 w-20" />
-						<div class="flex gap-1.5">
-							<Skeleton class="h-9 w-32" />
-							<Skeleton class="h-9 w-24" />
-							<Skeleton class="h-9 w-32" />
-						</div>
-					</div>
-					<div class="overflow-hidden rounded-xl border border-border bg-background">
-						<div class="flex flex-wrap items-center gap-1.5 border-b border-border px-3 py-2">
-							<Skeleton class="h-7 w-20" />
-							<Skeleton class="h-7 w-9" />
-							<Skeleton class="h-7 w-24" />
-							<Skeleton class="h-7 w-14" />
-							<Skeleton class="h-7 w-32" />
-							<Skeleton class="h-7 w-16" />
-							<Skeleton class="h-7 w-7" />
-							<Skeleton class="h-7 w-7" />
-						</div>
-						<div class="min-h-[260px] space-y-3 p-4">
-							<Skeleton class="h-4 w-full" />
-							<Skeleton class="h-4 w-10/12" />
-							<Skeleton class="h-4 w-3/4" />
-						</div>
-					</div>
-				</div>
-			</div>
-		</div>
-	{:else}
-		<div class="space-y-4">
-			<!-- Editor section header -->
-			<div class="space-y-1.5">
-				<div class="flex items-center justify-between gap-3">
-					<div class="min-w-0">
-						<h2 class="text-xl font-semibold tracking-tight">Follow-up email</h2>
-					</div>
-					<span class="save-indicator shrink-0" data-state={saveState}>
-						{#if saveState === 'saving'}
-							<LoaderIcon class="size-3.5 animate-spin" />
-						{:else if saveState === 'error'}
-							<CloudOffIcon class="size-3.5" />
-						{:else if saveState === 'dirty'}
-							<CloudIcon class="size-3.5" />
-						{:else}
-							<CloudCheckIcon class="size-3.5" />
-						{/if}
-						<span class="truncate">{savedLabel}</span>
-					</span>
-				</div>
-				<div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-					<div class="space-y-1">
-						<div class="flex flex-wrap items-center gap-1.5 text-sm text-muted-foreground">
-							<span>Sent to booking-linked signers</span>
-							<Input
-								type="number"
-								min="1"
-								value={sendAfterAmount}
-								oninput={sanitizeSendAfterAmount}
-								onblur={sanitizeSendAfterAmount}
-								class="h-7 w-16 px-2 text-center text-sm tabular-nums"
-								aria-invalid={!isSendAfterValid}
-								aria-describedby="send-after-error"
-							/>
-							<select
-								value={sendAfterUnit}
-								onchange={updateSendAfterUnit}
-								class="h-7 rounded-md border border-input bg-input/20 px-2 py-0.5 text-sm text-muted-foreground shadow-xs transition-colors outline-none hover:text-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 md:text-xs/relaxed dark:bg-input/30"
-								aria-label="Send after unit"
-							>
-								{#each SEND_AFTER_UNITS as unit (unit)}
-									<option value={unit}>{unit}</option>
-								{/each}
-							</select>
-							<span>after booking time.</span>
-						</div>
-						<p class="text-xs text-muted-foreground">
-							General waivers appear as unscheduled follow-ups.
-						</p>
-						{#if !isSendAfterValid}
-							<p id="send-after-error" class="text-xs text-destructive">
-								Enter a positive whole number.
-							</p>
-						{/if}
-					</div>
-					<div class="flex shrink-0 items-center gap-1.5">
-						<Button
-							variant="outline"
-							size="sm"
-							onclick={openSaveTemplate}
-							disabled={isSavingEditorContent || !isSendAfterValid}
-							class="flex-1 sm:flex-none"
-						>
-							Save as template
-						</Button>
-						<Button
-							variant="outline"
-							size="sm"
-							onclick={() => (loadTemplateOpen = true)}
-							class="flex-1 sm:flex-none"
-						>
-							Load template
-						</Button>
-					</div>
-				</div>
-			</div>
-
-			<!-- Fields -->
-			<div class="space-y-5">
-				<!-- Subject -->
-				<div class="space-y-3">
-					<label
-						for="email-subject"
-						class="block pb-1 text-xs font-medium tracking-[0.14em] text-muted-foreground uppercase"
-					>
-						Email subject
-					</label>
-					<Input
-						id="email-subject"
-						bind:value={subject}
-						placeholder="Thank you for visiting, {'{{customer_name}}'}!"
-					/>
-				</div>
-
-				<!-- Body -->
-				<div class="space-y-2">
-					<div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-						<label
-							for="email-body"
-							class="text-xs font-medium tracking-[0.14em] text-muted-foreground uppercase"
-						>
-							Email body
-						</label>
-						<!-- Variable chips -->
-						<div
-							class="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-x-visible sm:px-0 sm:pb-0"
-						>
+				<!-- Tool rail (right column) -->
+				<div class="email-rail">
+					<div class="rail-section">
+						<p class="rail-label">Variables</p>
+						<p class="rail-hint">Click to insert at cursor.</p>
+						<div class="var-list">
 							{#each VARIABLES as variable (variable.value)}
 								<button
+									type="button"
 									onclick={() => insertVariable(variable.value)}
-									class="flex h-9 shrink-0 items-center rounded-md border border-border bg-muted/30 px-2.5 font-mono text-[11px] text-muted-foreground transition-colors hover:border-foreground/30 hover:bg-muted/60 hover:text-foreground"
+									class="var-item"
 								>
-									{variable.label}
+									<div class="var-item-text">
+										<span class="var-tag">{variable.label}</span>
+										<span class="var-desc">{variable.description}</span>
+									</div>
 								</button>
 							{/each}
 						</div>
 					</div>
-					<RichTextEditor id="email-body" bind:value={body} bind:this={editorRef} />
+
+					<div class="rail-section">
+						<p class="rail-label">Templates</p>
+						<div class="rail-template-btns">
+							<Button
+								variant="outline"
+								size="sm"
+								onclick={() => (loadTemplateOpen = true)}
+								class="w-full justify-start text-xs"
+							>
+								Load template
+							</Button>
+							<Button
+								variant="outline"
+								size="sm"
+								onclick={openSaveTemplate}
+								disabled={isSavingEditorContent || !isSendAfterValid}
+								class="w-full justify-start text-xs"
+							>
+								Save as template
+							</Button>
+						</div>
+					</div>
 				</div>
 			</div>
-		</div>
+		{/if}
 	{/if}
 </PageShell>
 
@@ -1926,86 +2149,432 @@
 		color: color-mix(in srgb, var(--primary) 70%, var(--foreground));
 	}
 
-	/* ─── Sender status strip + blocking banner ─────────────────────────────── */
+	/* ─── Sender status chip (header) ───────────────────────────────────────── */
 
-	.sender-strip {
-		display: flex;
+	.sender-chip {
+		display: inline-flex;
 		align-items: center;
-		gap: 0.65rem;
-		padding: 0.55rem 0.85rem 0.55rem 0.65rem;
-		border-radius: var(--radius-xl);
-		border: 1px solid color-mix(in srgb, oklch(0.65 0.18 152) 25%, var(--border));
-		background:
-			linear-gradient(
-				90deg,
-				color-mix(in srgb, oklch(0.6 0.16 152) 8%, transparent),
-				color-mix(in srgb, oklch(0.6 0.16 152) 3%, transparent)
-			),
-			color-mix(in srgb, var(--card) 60%, transparent);
+		gap: 0.4rem;
+		padding: 0.25rem 0.65rem 0.25rem 0.5rem;
+		border-radius: var(--radius-full);
+		border: 1px solid var(--border);
+		font-size: 0.72rem;
+		font-weight: 500;
 		text-decoration: none;
-		color: var(--foreground);
+		color: var(--muted-foreground);
+		background: color-mix(in srgb, var(--muted) 30%, transparent);
 		transition: all 150ms ease;
+		white-space: nowrap;
+		max-width: calc(100vw - 3rem);
+	}
+
+	.sender-chip:hover {
+		color: var(--foreground);
+		border-color: color-mix(in srgb, var(--border) 150%, transparent);
+		background: color-mix(in srgb, var(--muted) 50%, transparent);
+	}
+
+	.sender-chip[data-state='ready'] {
+		border-color: color-mix(in srgb, oklch(0.65 0.18 152) 30%, var(--border));
+		color: oklch(0.72 0.16 152);
+		background: color-mix(in srgb, oklch(0.6 0.16 152) 10%, transparent);
+	}
+
+	.sender-chip[data-state='ready']:hover {
+		border-color: color-mix(in srgb, oklch(0.65 0.18 152) 50%, var(--border));
+		background: color-mix(in srgb, oklch(0.6 0.16 152) 16%, transparent);
+		color: oklch(0.8 0.18 152);
+	}
+
+	.sender-chip[data-state='pending'] {
+		border-color: color-mix(in srgb, var(--destructive) 22%, var(--border));
+		color: color-mix(in srgb, var(--destructive) 80%, var(--foreground));
+		background: color-mix(in srgb, var(--destructive) 8%, transparent);
+	}
+
+	.sender-chip[data-state='unset'] {
+		border-color: color-mix(in srgb, var(--destructive) 22%, var(--border));
+		color: color-mix(in srgb, var(--destructive) 80%, var(--foreground));
+		background: color-mix(in srgb, var(--destructive) 8%, transparent);
+	}
+
+	.sender-chip-label,
+	.sender-chip-reply,
+	.sender-chip-reply-email {
 		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
 	}
 
-	.sender-strip:hover {
-		border-color: color-mix(in srgb, oklch(0.6 0.16 152) 45%, var(--border));
-		background:
-			linear-gradient(
-				90deg,
-				color-mix(in srgb, oklch(0.6 0.16 152) 12%, transparent),
-				color-mix(in srgb, oklch(0.6 0.16 152) 5%, transparent)
-			),
-			var(--card);
+	.sender-chip-label {
+		max-width: 14rem;
 	}
 
-	.sender-strip-mark {
+	.sender-chip-reply {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4rem;
+		max-width: 20rem;
+		margin-left: 0.15rem;
+		padding-left: 0.6rem;
+		border-left: 1px solid color-mix(in srgb, currentColor 32%, transparent);
+		color: color-mix(in srgb, currentColor 86%, var(--muted-foreground));
+	}
+
+	.sender-chip-reply-label {
+		flex-shrink: 0;
+		font-size: 0.62rem;
+		font-weight: 700;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		opacity: 0.72;
+	}
+
+	.sender-chip-reply-email {
+		font-family: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, monospace;
+		font-size: 0.68rem;
+	}
+
+	/* ─── Header tab strip ───────────────────────────────────────────────────── */
+
+	.header-tabs {
+		display: flex;
+		align-items: flex-end;
+		gap: 0;
+	}
+
+	.header-tab-btn {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.45rem;
+		padding: 0.5rem 0.1rem;
+		margin-right: 1.25rem;
+		font-size: 0.875rem;
+		font-weight: 500;
+		color: var(--muted-foreground);
+		background: none;
+		border: none;
+		border-bottom: 2px solid transparent;
+		margin-bottom: -1px;
+		cursor: pointer;
+		transition:
+			color 150ms ease,
+			border-color 150ms ease;
+		outline: none;
+	}
+
+	.header-tab-btn:hover {
+		color: var(--foreground);
+	}
+
+	.header-tab-btn[aria-current='page'] {
+		color: var(--foreground);
+		border-bottom-color: var(--primary);
+	}
+
+	.header-tab-btn:focus-visible {
+		outline: 2px solid color-mix(in srgb, var(--ring) 50%, transparent);
+		outline-offset: 2px;
+		border-radius: 2px;
+	}
+
+	.tab-badge {
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
-		width: 1.65rem;
-		height: 1.65rem;
-		border-radius: var(--radius-md);
-		background: color-mix(in srgb, oklch(0.6 0.16 152) 18%, transparent);
-		color: oklch(0.78 0.18 152);
-		flex-shrink: 0;
+		min-width: 1.25rem;
+		height: 1.25rem;
+		padding: 0 0.3rem;
+		border-radius: var(--radius-full);
+		font-size: 0.65rem;
+		font-weight: 600;
+		line-height: 1;
+		background: color-mix(in srgb, var(--muted) 70%, transparent);
+		color: var(--foreground);
+		border: 1px solid color-mix(in srgb, var(--border) 85%, transparent);
 	}
 
-	.sender-strip-text {
-		font-size: 0.78rem;
-		color: var(--muted-foreground);
+	/* ─── Email tab two-column layout ────────────────────────────────────────── */
+
+	.email-layout {
+		display: grid;
+		grid-template-columns: 1fr 220px;
+		gap: 1.25rem;
+		align-items: stretch;
+		min-height: calc(100svh - 14rem);
+	}
+
+	@media (max-width: 720px) {
+		.email-layout {
+			grid-template-columns: 1fr;
+			min-height: auto;
+		}
+	}
+
+	/* ─── Composer column ────────────────────────────────────────────────────── */
+
+	.composer {
+		display: flex;
+		flex-direction: column;
+		gap: 0;
 		min-width: 0;
-		flex: 1;
+		min-height: inherit;
+		border: 1px solid var(--border);
+		border-radius: var(--radius-md);
+		background: color-mix(in srgb, var(--background) 72%, var(--card));
 		overflow: hidden;
-		text-overflow: ellipsis;
+	}
+
+	/* Shared key label */
+	.compose-key {
+		flex-shrink: 0;
+		width: 52px;
+		font-size: 0.63rem;
+		font-weight: 700;
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+		color: color-mix(in srgb, var(--muted-foreground) 70%, transparent);
+		padding-top: 1px;
+		user-select: none;
+	}
+
+	/* Metadata card (timing + save indicator) */
+	.compose-meta {
+		padding: 0.7rem 1rem;
+		background: color-mix(in srgb, var(--card) 60%, transparent);
+		border-bottom: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+	}
+
+	.compose-meta-row {
+		display: flex;
+		align-items: center;
+		gap: 0.6rem;
+		flex-wrap: wrap;
+	}
+
+	.compose-meta-controls {
+		display: flex;
+		align-items: center;
+		gap: 0.4rem;
+		flex: 1;
+		flex-wrap: wrap;
+		min-width: 0;
+	}
+
+	.compose-select {
+		height: 26px;
+		background: color-mix(in srgb, var(--input) 20%, transparent);
+		border: 1px solid var(--input);
+		border-radius: var(--radius-sm);
+		padding: 0 0.45rem;
+		font-size: 0.8125rem;
+		color: var(--muted-foreground);
+		font-family: inherit;
+		outline: none;
+		cursor: pointer;
+		transition:
+			color 130ms ease,
+			border-color 130ms ease;
+	}
+
+	.compose-select:hover {
+		color: var(--foreground);
+		border-color: color-mix(in srgb, var(--border) 150%, transparent);
+	}
+
+	.compose-select:focus-visible {
+		border-color: var(--ring);
+		box-shadow: 0 0 0 2px color-mix(in srgb, var(--ring) 30%, transparent);
+	}
+
+	.compose-meta-prose {
+		font-size: 0.775rem;
+		color: color-mix(in srgb, var(--muted-foreground) 65%, transparent);
 		white-space: nowrap;
 	}
 
-	.sender-strip-mono {
-		font-family: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, monospace;
-		font-size: 0.72rem;
-		padding: 0.05rem 0.4rem;
-		background: color-mix(in srgb, var(--muted) 50%, transparent);
-		border: 1px solid var(--border);
-		border-radius: var(--radius-sm);
-		color: var(--foreground);
-		font-weight: 500;
+	.compose-error {
+		margin-top: 0.35rem;
+		font-size: 0.75rem;
+		color: var(--destructive);
 	}
 
-	.sender-strip-cta {
-		display: inline-flex;
+	/* Subject row */
+	.compose-subject-row {
+		display: flex;
 		align-items: center;
-		gap: 0.2rem;
-		font-size: 0.72rem;
-		font-weight: 500;
-		color: var(--muted-foreground);
-		flex-shrink: 0;
-		transition: color 150ms ease;
+		gap: 0.65rem;
+		padding: 0.8rem 1rem;
+		background: color-mix(in srgb, var(--background) 30%, transparent);
+		border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
 	}
 
-	.sender-strip:hover .sender-strip-cta {
-		color: var(--foreground);
+	.compose-key--subject {
+		padding-top: 0;
 	}
+
+	.compose-subject-input {
+		flex: 1;
+		min-width: 0;
+		background: transparent;
+		border: none;
+		outline: none;
+		font-family: inherit;
+		font-size: 0.9375rem;
+		font-weight: 500;
+		color: var(--foreground);
+		padding: 0;
+		line-height: 1.4;
+	}
+
+	.compose-subject-input::placeholder {
+		color: color-mix(in srgb, var(--muted-foreground) 45%, transparent);
+		font-weight: 400;
+	}
+
+	/* Body section */
+	.compose-body-section {
+		display: flex;
+		flex-direction: column;
+		gap: 0;
+		flex: 1;
+		min-height: 0;
+	}
+
+	.compose-body-section > .compose-key {
+		display: block;
+		width: auto;
+		padding: 0.7rem 1rem 0.55rem;
+	}
+
+	/* ─── Tool rail (right column) ───────────────────────────────────────────── */
+
+	.email-rail {
+		display: flex;
+		flex-direction: column;
+		gap: 0;
+		min-height: inherit;
+		background: color-mix(in srgb, var(--background) 60%, var(--card));
+		border: 1px solid var(--border);
+		border-radius: var(--radius-md);
+		overflow: hidden;
+	}
+
+	:global(.email-rich-editor) {
+		flex: 1;
+		min-height: 0;
+	}
+
+	:global(.email-rich-editor .rich-text-editor-viewport) {
+		display: flex;
+		flex: 1;
+		max-height: none;
+		min-height: 0;
+	}
+
+	:global(.email-rich-editor .rich-text-editor-viewport > div),
+	:global(.email-rich-editor .rich-text-editor-body) {
+		flex: 1;
+		min-height: 100%;
+		width: 100%;
+	}
+
+	.rail-section {
+		padding: 0.8rem 0.875rem;
+		border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+	}
+
+	.rail-section:last-child {
+		border-bottom: none;
+	}
+
+	.rail-label {
+		font-size: 0.6rem;
+		font-weight: 700;
+		letter-spacing: 0.12em;
+		text-transform: uppercase;
+		color: color-mix(in srgb, var(--muted-foreground) 65%, transparent);
+		margin-bottom: 0.25rem;
+	}
+
+	.rail-hint {
+		font-size: 0.7rem;
+		color: color-mix(in srgb, var(--muted-foreground) 55%, transparent);
+		line-height: 1.4;
+		margin-bottom: 0.55rem;
+	}
+
+	.var-list {
+		display: flex;
+		flex-direction: column;
+		gap: 0.2rem;
+	}
+
+	.var-item {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		background: transparent;
+		border: 1px solid transparent;
+		border-radius: var(--radius-sm);
+		padding: 0.4rem 0.5rem;
+		cursor: pointer;
+		font-family: inherit;
+		text-align: left;
+		width: 100%;
+		transition:
+			background 130ms ease,
+			border-color 130ms ease;
+	}
+
+	.var-item:hover {
+		background: color-mix(in srgb, var(--muted) 60%, transparent);
+		border-color: color-mix(in srgb, var(--border) 140%, transparent);
+	}
+
+	.var-item::after {
+		content: '+';
+		font-size: 0.875rem;
+		font-weight: 500;
+		color: var(--foreground);
+		opacity: 0;
+		transition: opacity 130ms ease;
+		flex-shrink: 0;
+	}
+
+	.var-item:hover::after {
+		opacity: 1;
+	}
+
+	.var-item-text {
+		display: flex;
+		flex-direction: column;
+		gap: 1px;
+	}
+
+	.var-tag {
+		width: fit-content;
+		border: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
+		border-radius: var(--radius-sm);
+		background: color-mix(in srgb, var(--muted) 55%, transparent);
+		padding: 0.05rem 0.25rem;
+		font-family: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, monospace;
+		font-size: 0.67rem;
+		color: color-mix(in srgb, var(--foreground) 88%, var(--muted-foreground));
+	}
+
+	.var-desc {
+		font-size: 0.67rem;
+		color: color-mix(in srgb, var(--muted-foreground) 75%, transparent);
+	}
+
+	.rail-template-btns {
+		display: flex;
+		flex-direction: column;
+		gap: 0.35rem;
+	}
+
+	/* ─── Sender blocking banner (email tab) ─────────────────────────────────── */
 
 	.sender-banner {
 		display: flex;
@@ -2112,5 +2681,159 @@
 
 	.sender-banner-cta:hover {
 		background: color-mix(in srgb, var(--primary) 90%, var(--foreground) 10%);
+	}
+
+	/* ─── Preview toggle button ──────────────────────────────────────────────── */
+
+	.preview-toggle {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.3rem;
+		padding: 0.22rem 0.6rem;
+		border-radius: var(--radius-full);
+		border: 1px solid var(--border);
+		background: transparent;
+		font-size: 0.7rem;
+		font-weight: 500;
+		font-family: inherit;
+		color: var(--muted-foreground);
+		cursor: pointer;
+		flex-shrink: 0;
+		transition: all 130ms ease;
+		white-space: nowrap;
+	}
+
+	.preview-toggle:hover {
+		color: var(--foreground);
+		border-color: color-mix(in srgb, var(--border) 150%, transparent);
+		background: color-mix(in srgb, var(--muted) 50%, transparent);
+	}
+
+	.preview-toggle[data-active='true'] {
+		color: var(--foreground);
+		border-color: color-mix(in srgb, var(--border) 140%, transparent);
+		background: color-mix(in srgb, var(--muted) 70%, transparent);
+	}
+
+	/* ─── Email preview panel ────────────────────────────────────────────────── */
+
+	.email-preview-shell {
+		background: #eef0f3;
+		padding: 1.5rem 1.25rem 1rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
+		min-height: 320px;
+	}
+
+	.email-preview-card {
+		background: #ffffff;
+		border-radius: 8px;
+		box-shadow:
+			0 1px 4px rgba(0, 0, 0, 0.08),
+			0 0 0 1px rgba(0, 0, 0, 0.06);
+		overflow: hidden;
+		color: #1a1a1a;
+	}
+
+	.email-preview-from-row {
+		display: flex;
+		align-items: center;
+		gap: 0.65rem;
+		padding: 0.9rem 1.1rem 0.75rem;
+		border-bottom: 1px solid #e8eaed;
+	}
+
+	.email-preview-avatar {
+		width: 2rem;
+		height: 2rem;
+		border-radius: 50%;
+		background: #4b5563;
+		color: #ffffff;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		font-size: 0.8rem;
+		font-weight: 600;
+		flex-shrink: 0;
+	}
+
+	.email-preview-from-info {
+		display: flex;
+		flex-direction: column;
+		gap: 0.1rem;
+		min-width: 0;
+	}
+
+	.email-preview-from-name {
+		font-size: 0.8125rem;
+		font-weight: 600;
+		color: #111827;
+		line-height: 1.3;
+	}
+
+	.email-preview-from-to {
+		font-size: 0.7rem;
+		color: #6b7280;
+	}
+
+	.email-preview-subject-line {
+		padding: 0.7rem 1.1rem 0.55rem;
+		font-size: 0.9375rem;
+		font-weight: 600;
+		color: #111827;
+		border-bottom: 1px solid #e8eaed;
+		line-height: 1.4;
+	}
+
+	:global(.email-preview-body-wrap) {
+		padding: 1rem 1.1rem 1.25rem;
+		font-size: 0.875rem;
+		line-height: 1.7;
+		color: #374151;
+	}
+
+	:global(.email-preview-body-wrap p) {
+		margin: 0 0 0.75em;
+		color: #374151;
+	}
+
+	:global(.email-preview-body-wrap p:last-child) {
+		margin-bottom: 0;
+	}
+
+	:global(.email-preview-body-wrap a) {
+		color: #2563eb;
+		text-decoration: underline;
+	}
+
+	:global(.email-preview-body-wrap strong),
+	:global(.email-preview-body-wrap b) {
+		color: #111827;
+	}
+
+	:global(.email-preview-body-wrap span) {
+		color: inherit;
+	}
+
+	:global(.email-preview-body-wrap h1),
+	:global(.email-preview-body-wrap h2),
+	:global(.email-preview-body-wrap h3),
+	:global(.email-preview-body-wrap h4),
+	:global(.email-preview-body-wrap h5),
+	:global(.email-preview-body-wrap h6) {
+		color: #111827;
+	}
+
+	:global(.email-preview-body-wrap ul),
+	:global(.email-preview-body-wrap ol) {
+		color: #374151;
+	}
+
+	.preview-sample-notice {
+		font-size: 0.68rem;
+		color: color-mix(in srgb, var(--muted-foreground) 60%, transparent);
+		text-align: center;
+		padding: 0 0.5rem;
 	}
 </style>

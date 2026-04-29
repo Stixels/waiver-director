@@ -1,5 +1,6 @@
 import { resolve } from '$app/paths';
-import type { Pathname } from '$app/types';
+
+const resolvePathname = resolve as unknown as (path: string) => string;
 
 type ClerkErrorLike = {
 	errors?: Array<{
@@ -36,5 +37,5 @@ export function getSafePostAuthRedirectHref(
 			? fallback
 			: redirectTo;
 	const url = new URL(safePath, 'http://waiver-director.local');
-	return `${resolve(url.pathname as Pathname)}${url.search}${url.hash}`;
+	return `${resolvePathname(url.pathname)}${url.search}${url.hash}`;
 }
