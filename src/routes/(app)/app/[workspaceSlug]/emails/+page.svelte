@@ -421,8 +421,16 @@
 			return;
 		}
 
-		navigation.cancel();
-		toast.message('Still saving your latest changes. Give it a moment and try again.');
+		if (isSavingEditorContent) {
+			navigation.cancel();
+			toast.message('Still saving your latest changes. Give it a moment and try again.');
+			return;
+		}
+
+		if (convex.disabled) {
+			navigation.cancel();
+			toast.message('Email autosave is unavailable right now.');
+		}
 	});
 
 	$effect(() => {
@@ -1005,6 +1013,11 @@
 
 	function statusLabel(status: FollowUp['status']) {
 		return status.charAt(0).toUpperCase() + status.slice(1);
+	}
+
+	function followUpSelectionLabel(followUp: FollowUp) {
+		const subject = followUp.sentSubject ?? followUp.subjectTemplate ?? 'no subject';
+		return `Select follow-up email for ${followUp.signerName} with subject ${subject}`;
 	}
 
 	const VARIABLES = [
@@ -1653,6 +1666,7 @@
 												checked={allVisibleSelected}
 												onchange={toggleAll}
 												onkeydown={handleHeaderCheckboxKeydown}
+												aria-label="Select all visible emails"
 											/>
 										</TableHead>
 										<TableHead
@@ -1710,6 +1724,7 @@
 													checked={selectedIds.has(followUp._id)}
 													onchange={(e) => toggleRow(followUp._id, e)}
 													onkeydown={(e) => handleRowCheckboxKeydown(followUp._id, e)}
+													aria-label={followUpSelectionLabel(followUp)}
 												/>
 											</TableCell>
 											<TableCell>
@@ -1777,6 +1792,7 @@
 												class="size-4 cursor-pointer rounded accent-primary"
 												checked={selectedIds.has(followUp._id)}
 												onchange={() => toggleRowSelection(followUp._id)}
+												aria-label={followUpSelectionLabel(followUp)}
 											/>
 										</label>
 										<button
