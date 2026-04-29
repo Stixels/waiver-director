@@ -853,17 +853,6 @@
 		);
 	}
 
-	function formatScheduled(ts: number) {
-		const now = Date.now();
-		const diff = ts - now;
-		if (diff <= 0) return 'Sending soon';
-		const h = Math.floor(diff / 3600000);
-		const m = Math.floor((diff % 3600000) / 60000);
-		if (h > 48) return formatTimestamp(ts);
-		if (h > 0) return `In ${h}h ${m}m`;
-		return `In ${m}m`;
-	}
-
 	function displayBookingId(followUp: FollowUp) {
 		return followUp.bookingNumber ? `#${followUp.bookingNumber}` : '—';
 	}
@@ -878,10 +867,10 @@
 		if (followUp.status === 'blocked') {
 			return followUp.scheduledAt === undefined
 				? 'Blocked'
-				: `Blocked · ${formatScheduled(followUp.scheduledAt)}`;
+				: `Blocked · ${formatTimestamp(followUp.scheduledAt)}`;
 		}
 		if (followUp.scheduledAt === undefined) return 'Sending soon';
-		return `After booking · ${formatScheduled(followUp.scheduledAt)}`;
+		return formatTimestamp(followUp.scheduledAt);
 	}
 
 	function statusLabel(status: FollowUp['status']) {
@@ -936,7 +925,7 @@
 							</p>
 							{#if previewVars.status === 'queued' && previewVars.scheduledAt !== null}
 								<p class="shrink-0 text-[11px] text-muted-foreground tabular-nums">
-									Sends {formatScheduled(previewVars.scheduledAt)}
+									Scheduled for {formatTimestamp(previewVars.scheduledAt)}
 								</p>
 							{/if}
 						</div>
@@ -1426,7 +1415,7 @@
 						<Table class="table-fixed">
 							<colgroup>
 								<col class="w-[4%]" /><col class="w-[24%]" /><col class="w-[20%]" />
-								<col class="w-[20%]" /><col class="w-[18%]" /><col class="w-[14%]" />
+								<col class="w-[18%]" /><col class="w-[20%]" /><col class="w-[14%]" />
 							</colgroup>
 							<TableHeader>
 								<TableRow class="border-border hover:bg-transparent">
