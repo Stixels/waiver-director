@@ -45,6 +45,7 @@
 		value?: string;
 		id?: string;
 		label?: string;
+		class?: string;
 		disabled?: boolean;
 		placeholder?: string;
 	}
@@ -74,6 +75,7 @@
 		value = $bindable('<p></p>'),
 		id = 'rich-text-editor',
 		label = undefined,
+		class: className = '',
 		disabled = false,
 		placeholder = 'Write your content here...'
 	}: Props = $props();
@@ -368,7 +370,7 @@
 </script>
 
 <div
-	class="flex flex-col overflow-hidden border-t border-border/70 bg-background transition-shadow"
+	class={`flex flex-col overflow-hidden border-t border-border/70 bg-background transition-shadow ${className}`}
 	class:border-ring={hasFocus}
 	class:shadow-[0_0_0_3px_color-mix(in_srgb,var(--ring)_22%,transparent)]={hasFocus}
 	class:border-border={!hasFocus}

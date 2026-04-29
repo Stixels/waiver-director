@@ -1253,7 +1253,13 @@
 					data-state="ready"
 				>
 					<ShieldCheckIcon class="size-3" aria-hidden="true" />
-					<span>Sending as {businessName}</span>
+					<span class="sender-chip-label">Sending as {businessName}</span>
+					{#if senderSettings?.replyToEmail}
+						<span class="sender-chip-reply">
+							<span class="sender-chip-reply-label">Reply-to</span>
+							<span class="sender-chip-reply-email">{senderSettings.replyToEmail}</span>
+						</span>
+					{/if}
 				</a>
 			{:else if replyToPendingVerification && hasPlatformFromEmail}
 				<a
@@ -2034,6 +2040,7 @@
 							<RichTextEditor
 								id="email-body"
 								label="Body"
+								class="email-rich-editor"
 								bind:value={body}
 								bind:this={editorRef}
 							/>
@@ -2132,7 +2139,7 @@
 		display: inline-flex;
 		align-items: center;
 		gap: 0.4rem;
-		padding: 0.3rem 0.65rem 0.3rem 0.5rem;
+		padding: 0.25rem 0.65rem 0.25rem 0.5rem;
 		border-radius: var(--radius-full);
 		border: 1px solid var(--border);
 		font-size: 0.72rem;
@@ -2142,6 +2149,7 @@
 		background: color-mix(in srgb, var(--muted) 30%, transparent);
 		transition: all 150ms ease;
 		white-space: nowrap;
+		max-width: calc(100vw - 3rem);
 	}
 
 	.sender-chip:hover {
@@ -2172,6 +2180,43 @@
 		border-color: color-mix(in srgb, var(--destructive) 22%, var(--border));
 		color: color-mix(in srgb, var(--destructive) 80%, var(--foreground));
 		background: color-mix(in srgb, var(--destructive) 8%, transparent);
+	}
+
+	.sender-chip-label,
+	.sender-chip-reply,
+	.sender-chip-reply-email {
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	.sender-chip-label {
+		max-width: 14rem;
+	}
+
+	.sender-chip-reply {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4rem;
+		max-width: 20rem;
+		margin-left: 0.15rem;
+		padding-left: 0.6rem;
+		border-left: 1px solid color-mix(in srgb, currentColor 32%, transparent);
+		color: color-mix(in srgb, currentColor 86%, var(--muted-foreground));
+	}
+
+	.sender-chip-reply-label {
+		flex-shrink: 0;
+		font-size: 0.62rem;
+		font-weight: 700;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		opacity: 0.72;
+	}
+
+	.sender-chip-reply-email {
+		font-family: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, monospace;
+		font-size: 0.68rem;
 	}
 
 	/* ─── Header tab strip ───────────────────────────────────────────────────── */
@@ -2239,12 +2284,14 @@
 		display: grid;
 		grid-template-columns: 1fr 220px;
 		gap: 1.25rem;
-		align-items: flex-start;
+		align-items: stretch;
+		min-height: calc(100svh - 14rem);
 	}
 
 	@media (max-width: 720px) {
 		.email-layout {
 			grid-template-columns: 1fr;
+			min-height: auto;
 		}
 	}
 
@@ -2255,6 +2302,7 @@
 		flex-direction: column;
 		gap: 0;
 		min-width: 0;
+		min-height: inherit;
 		border: 1px solid var(--border);
 		border-radius: var(--radius-md);
 		background: color-mix(in srgb, var(--background) 72%, var(--card));
@@ -2373,6 +2421,8 @@
 		display: flex;
 		flex-direction: column;
 		gap: 0;
+		flex: 1;
+		min-height: 0;
 	}
 
 	.compose-body-section > .compose-key {
@@ -2387,10 +2437,30 @@
 		display: flex;
 		flex-direction: column;
 		gap: 0;
+		min-height: inherit;
 		background: color-mix(in srgb, var(--background) 60%, var(--card));
 		border: 1px solid var(--border);
 		border-radius: var(--radius-md);
 		overflow: hidden;
+	}
+
+	:global(.email-rich-editor) {
+		flex: 1;
+		min-height: 0;
+	}
+
+	:global(.email-rich-editor .rich-text-editor-viewport) {
+		display: flex;
+		flex: 1;
+		max-height: none;
+		min-height: 0;
+	}
+
+	:global(.email-rich-editor .rich-text-editor-viewport > div),
+	:global(.email-rich-editor .rich-text-editor-body) {
+		flex: 1;
+		min-height: 100%;
+		width: 100%;
 	}
 
 	.rail-section {
