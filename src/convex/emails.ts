@@ -29,8 +29,8 @@ const EMAIL_ADDRESS_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const followUpStatusValue = v.union(
 	v.literal('queued'),
 	v.literal('sent'),
-	v.literal('cancelled'),
-	v.literal('paused'),
+	v.literal('unscheduled'),
+	v.literal('blocked'),
 	v.literal('failed')
 );
 
@@ -129,6 +129,12 @@ function sendAfterToMs(amount: number, unit: SendAfterUnit) {
 	if (unit === 'minutes') return amount * 60 * 1000;
 	if (unit === 'hours') return amount * 60 * 60 * 1000;
 	return amount * 24 * 60 * 60 * 1000;
+}
+
+function parseTimestamp(value: string | null | undefined): number | null {
+	if (!value) return null;
+	const timestamp = Date.parse(value);
+	return Number.isNaN(timestamp) ? null : timestamp;
 }
 
 function validateEmailTemplateInput(args: {
@@ -456,6 +462,12 @@ export const getFollowUpStats = query({
 				q.eq('workspaceId', args.workspaceId).eq('status', 'queued')
 			)
 			.take(FOLLOW_UP_STATS_LIMIT);
+		const blocked = await ctx.db
+			.query('email_follow_ups')
+			.withIndex('by_workspaceId_and_status', (q) =>
+				q.eq('workspaceId', args.workspaceId).eq('status', 'blocked')
+			)
+			.take(FOLLOW_UP_STATS_LIMIT);
 
 		const sent = await ctx.db
 			.query('email_follow_ups')
@@ -476,6 +488,7 @@ export const getFollowUpStats = query({
 		return {
 			sentToday,
 			pendingCount: queued.length,
+			blockedCount: blocked.length,
 			// This total is capped by FOLLOW_UP_STATS_LIMIT. Use a persisted counter if this needs
 			// to stay exact after a workspace has more sent follow-ups than the read limit.
 			totalSent: sent.length
@@ -567,7 +580,7 @@ export const getFollowUp = query({
 	}
 });
 
-export const cancelFollowUp = mutation({
+export const unscheduleFollowUp = mutation({
 	args: { followUpId: v.id('email_follow_ups') },
 	handler: async (ctx, args) => {
 		const followUp = await ctx.db.get(args.followUpId);
@@ -580,7 +593,7 @@ export const cancelFollowUp = mutation({
 		if (followUp.status !== 'queued') {
 			throw new ConvexError({
 				code: 'invalid_state',
-				message: 'Only queued follow-ups can be cancelled.'
+				message: 'Only queued follow-ups can be unscheduled.'
 			});
 		}
 
@@ -588,14 +601,72 @@ export const cancelFollowUp = mutation({
 			try {
 				await ctx.scheduler.cancel(followUp.scheduledFunctionId);
 			} catch {
-				// Already ran or was already cancelled
+				// Already ran or was already unscheduled.
 			}
 		}
 
 		await ctx.db.patch(args.followUpId, {
-			status: 'cancelled',
-			cancelledAt: Date.now()
+			status: 'unscheduled',
+			scheduledAt: undefined,
+			scheduledFunctionId: undefined,
+			unscheduledAt: Date.now()
 		});
+	}
+});
+
+export const queueBlockedFollowUps = mutation({
+	args: { workspaceId: v.id('workspaces') },
+	handler: async (ctx, args) => {
+		await requireWorkspaceMember(ctx, args.workspaceId);
+		await requireWorkspaceVerifiedReplyTo(ctx, args.workspaceId);
+
+		const blocked = await ctx.db
+			.query('email_follow_ups')
+			.withIndex('by_workspaceId_and_status', (q) =>
+				q.eq('workspaceId', args.workspaceId).eq('status', 'blocked')
+			)
+			.take(FOLLOW_UP_STATS_LIMIT);
+
+		const now = Date.now();
+		let queuedCount = 0;
+		let dueCount = 0;
+		let scheduledCount = 0;
+
+		for (const followUp of blocked) {
+			if (followUp.scheduledAt === undefined) {
+				await ctx.db.patch(followUp._id, {
+					status: 'unscheduled',
+					failureReason: undefined
+				});
+				continue;
+			}
+
+			if (followUp.scheduledFunctionId) {
+				try {
+					await ctx.scheduler.cancel(followUp.scheduledFunctionId);
+				} catch {
+					// Already completed or unscheduled; ignore.
+				}
+			}
+
+			const delayMs = Math.max(0, followUp.scheduledAt - now);
+			if (delayMs === 0) dueCount++;
+			else scheduledCount++;
+
+			const scheduledFunctionId = await ctx.scheduler.runAfter(
+				delayMs,
+				internal.emails.deliverFollowUpEmail,
+				{ followUpId: followUp._id }
+			);
+			queuedCount++;
+			await ctx.db.patch(followUp._id, {
+				scheduledFunctionId,
+				status: 'queued',
+				failureReason: undefined
+			});
+		}
+
+		return { queuedCount, dueCount, scheduledCount };
 	}
 });
 
@@ -610,7 +681,7 @@ export const sendFollowUpNow = mutation({
 		await requireWorkspaceMember(ctx, followUp.workspaceId);
 		await requireWorkspaceVerifiedReplyTo(ctx, followUp.workspaceId);
 
-		if (!['queued', 'paused', 'cancelled', 'failed'].includes(followUp.status)) {
+		if (!['queued', 'blocked', 'unscheduled', 'failed'].includes(followUp.status)) {
 			throw new ConvexError({
 				code: 'invalid_state',
 				message: 'Follow-up cannot be sent.'
@@ -633,8 +704,9 @@ export const sendFollowUpNow = mutation({
 
 		await ctx.db.patch(args.followUpId, {
 			scheduledFunctionId,
+			scheduledAt: Date.now(),
 			status: 'queued',
-			cancelledAt: undefined
+			unscheduledAt: undefined
 		});
 	}
 });
@@ -650,12 +722,12 @@ export const sendSelected = mutation({
 		for (const followUpId of args.followUpIds) {
 			const followUp = await ctx.db.get(followUpId);
 			if (!followUp || followUp.workspaceId !== args.workspaceId) continue;
-			if (!['queued', 'paused', 'cancelled', 'failed'].includes(followUp.status)) continue;
+			if (!['queued', 'blocked', 'unscheduled', 'failed'].includes(followUp.status)) continue;
 			if (followUp.scheduledFunctionId) {
 				try {
 					await ctx.scheduler.cancel(followUp.scheduledFunctionId);
 				} catch {
-					// Already completed or cancelled; ignore.
+					// Already completed or unscheduled; ignore.
 				}
 			}
 			const scheduledFunctionId = await ctx.scheduler.runAfter(
@@ -665,14 +737,15 @@ export const sendSelected = mutation({
 			);
 			await ctx.db.patch(followUpId, {
 				scheduledFunctionId,
+				scheduledAt: Date.now(),
 				status: 'queued',
-				cancelledAt: undefined
+				unscheduledAt: undefined
 			});
 		}
 	}
 });
 
-export const cancelSelected = mutation({
+export const unscheduleSelected = mutation({
 	args: {
 		workspaceId: v.id('workspaces'),
 		followUpIds: v.array(v.id('email_follow_ups'))
@@ -688,10 +761,15 @@ export const cancelSelected = mutation({
 				try {
 					await ctx.scheduler.cancel(followUp.scheduledFunctionId);
 				} catch {
-					// Already completed or cancelled; ignore.
+					// Already completed or unscheduled; ignore.
 				}
 			}
-			await ctx.db.patch(followUpId, { status: 'cancelled', cancelledAt: now });
+			await ctx.db.patch(followUpId, {
+				status: 'unscheduled',
+				scheduledAt: undefined,
+				scheduledFunctionId: undefined,
+				unscheduledAt: now
+			});
 		}
 	}
 });
@@ -875,17 +953,20 @@ export const scheduleFollowUpOnSubmission = internalMutation({
 			editorContent?.sendAfterAmount ?? DEFAULT_SEND_AFTER_AMOUNT,
 			editorContent?.sendAfterUnit ?? DEFAULT_SEND_AFTER_UNIT
 		);
-		const scheduledAt = args.submittedAt + sendAfterMs;
 		const submission = await ctx.db.get(args.submissionId);
-		const bookingNumber =
-			submission?.workspaceId === args.workspaceId
-				? submission.bookingSnapshot?.providerBookingId
-				: undefined;
+		if (!submission || submission.workspaceId !== args.workspaceId) return;
+
+		const bookingStartAt = parseTimestamp(submission.bookingSnapshot?.startTime);
+		const hasBookingSchedule = bookingStartAt !== null;
+
+		const scheduledAt = hasBookingSchedule ? bookingStartAt + sendAfterMs : undefined;
+		const bookingNumber = submission.bookingSnapshot?.providerBookingId;
 		const senderSettings = await ctx.db
 			.query('workspace_email_settings')
 			.withIndex('by_workspaceId', (q) => q.eq('workspaceId', args.workspaceId))
 			.unique();
 		const canSend = canSendWorkspaceEmail(senderSettings);
+		const status = hasBookingSchedule ? (canSend ? 'queued' : 'blocked') : 'unscheduled';
 
 		const followUpId = await ctx.db.insert('email_follow_ups', {
 			workspaceId: args.workspaceId,
@@ -898,14 +979,15 @@ export const scheduleFollowUpOnSubmission = internalMutation({
 			subjectTemplate,
 			bodyTemplate,
 			submittedAt: args.submittedAt,
-			scheduledAt,
-			status: canSend ? 'queued' : 'paused'
+			...(scheduledAt !== undefined ? { scheduledAt } : {}),
+			status
 		});
 
-		if (!canSend) return;
+		if (!hasBookingSchedule || scheduledAt === undefined || !canSend) return;
 
+		const delayMs = Math.max(0, scheduledAt - Date.now());
 		const scheduledFunctionId = await ctx.scheduler.runAfter(
-			sendAfterMs,
+			delayMs,
 			internal.emails.deliverFollowUpEmail,
 			{ followUpId }
 		);
@@ -983,7 +1065,7 @@ export const markFollowUpFailed = internalMutation({
 	}
 });
 
-export const markFollowUpPaused = internalMutation({
+export const markFollowUpBlocked = internalMutation({
 	args: {
 		followUpId: v.id('email_follow_ups'),
 		reason: v.optional(v.string())
@@ -993,7 +1075,7 @@ export const markFollowUpPaused = internalMutation({
 		if (!followUp || followUp.status === 'sent') return;
 
 		await ctx.db.patch(args.followUpId, {
-			status: 'paused',
+			status: 'blocked',
 			failureReason: args.reason,
 			scheduledFunctionId: undefined
 		});
@@ -1164,7 +1246,7 @@ export const deliverFollowUpEmail = internalAction({
 				workspaceId: followUp.workspaceId
 			});
 		} catch (err) {
-			await ctx.runMutation(internal.emails.markFollowUpPaused, {
+			await ctx.runMutation(internal.emails.markFollowUpBlocked, {
 				followUpId: args.followUpId,
 				reason:
 					err instanceof Error ? err.message : 'Verify a reply-to email before sending follow-ups.'
@@ -1176,8 +1258,9 @@ export const deliverFollowUpEmail = internalAction({
 		const bookingId = followUpWithBooking.bookingNumber
 			? `#${followUpWithBooking.bookingNumber}`
 			: '';
+		const bookingStartAt = parseTimestamp(followUp.bookingStartTime);
 		const activityDate = new Intl.DateTimeFormat('en-US', { dateStyle: 'long' }).format(
-			new Date(followUp.submittedAt)
+			new Date(bookingStartAt ?? followUp.submittedAt)
 		);
 
 		const vars = {

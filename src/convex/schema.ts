@@ -225,12 +225,12 @@ export default defineSchema({
 		subjectTemplate: v.optional(v.string()),
 		bodyTemplate: v.optional(v.string()),
 		submittedAt: v.number(),
-		scheduledAt: v.number(),
+		scheduledAt: v.optional(v.number()),
 		status: v.union(
 			v.literal('queued'),
 			v.literal('sent'),
-			v.literal('cancelled'),
-			v.literal('paused'),
+			v.literal('unscheduled'),
+			v.literal('blocked'),
 			v.literal('failed')
 		),
 		scheduledFunctionId: v.optional(v.id('_scheduled_functions')),
@@ -242,7 +242,7 @@ export default defineSchema({
 		resendMessageId: v.optional(v.string()),
 		failedAt: v.optional(v.number()),
 		failureReason: v.optional(v.string()),
-		cancelledAt: v.optional(v.number())
+		unscheduledAt: v.optional(v.number())
 	})
 		.index('by_workspaceId', ['workspaceId'])
 		.index('by_workspaceId_and_status', ['workspaceId', 'status'])

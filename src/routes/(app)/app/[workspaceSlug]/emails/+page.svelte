@@ -84,9 +84,9 @@
 	const PAGE_SIZE = 25;
 	const STATUS_OPTIONS = [
 		{ value: 'queued', label: 'Queued' },
-		{ value: 'paused', label: 'Paused' },
+		{ value: 'unscheduled', label: 'Unscheduled' },
+		{ value: 'blocked', label: 'Blocked' },
 		{ value: 'sent', label: 'Sent' },
-		{ value: 'cancelled', label: 'Cancelled' },
 		{ value: 'failed', label: 'Failed' }
 	] as const;
 
@@ -123,9 +123,9 @@
 				? {
 						statuses: [...statusFilters] as (
 							| 'queued'
-							| 'paused'
+							| 'unscheduled'
+							| 'blocked'
 							| 'sent'
-							| 'cancelled'
 							| 'failed'
 						)[]
 					}
@@ -164,6 +164,7 @@
 	type EmailTemplate = FunctionReturnType<typeof api.emails.listEmailTemplates>[number];
 
 	const stats = $derived(statsQuery.data);
+	const blockedCount = $derived(stats?.blockedCount ?? 0);
 	const followUpsPage = $derived(followUpsQuery.data);
 	const followUps = $derived((followUpsPage?.page ?? []) as FollowUp[]);
 	const templates = $derived((templatesQuery.data ?? []) as EmailTemplate[]);
@@ -196,7 +197,7 @@
 	const sendSelectionTooltip = $derived.by(() => {
 		if (canSendSelected) return undefined;
 		if (!workspaceCanSendEmail) return senderUnavailableMessage;
-		return 'Select queued, paused, cancelled, or failed rows to send';
+		return 'Select queued, unscheduled, blocked, or failed rows to send';
 	});
 
 	// ─── Editor content state ──────────────────────────────────────────────────
@@ -569,10 +570,8 @@
 			bookingActivityName: f.bookingActivityName,
 			bookingStartTime: f.bookingStartTime,
 			businessName: currentWorkspace?.name ?? '',
-			activityDate: new Intl.DateTimeFormat('en-US', { dateStyle: 'long' }).format(
-				new Date(f.submittedAt)
-			),
-			scheduledAt: f.scheduledAt,
+			activityDate: formatActivityDate(f),
+			scheduledAt: f.scheduledAt ?? null,
 			status: f.status,
 			followUpId: f._id
 		};
@@ -658,9 +657,11 @@
 	const selectedFollowUps = $derived(followUps.filter((f) => selectedIds.has(f._id)));
 	const canSendSelected = $derived(
 		workspaceCanSendEmail &&
-			selectedFollowUps.some((f) => ['queued', 'paused', 'cancelled', 'failed'].includes(f.status))
+			selectedFollowUps.some((f) =>
+				['queued', 'unscheduled', 'blocked', 'failed'].includes(f.status)
+			)
 	);
-	const canCancelSelected = $derived(selectedFollowUps.some((f) => f.status === 'queued'));
+	const canUnscheduleSelected = $derived(selectedFollowUps.some((f) => f.status === 'queued'));
 
 	$effect(() => {
 		if (headerCheckboxEl) {
@@ -732,7 +733,8 @@
 
 	// ─── Bulk / selection actions ──────────────────────────────────────────────
 
-	let selectionLoading = $state<'send' | 'cancel' | null>(null);
+	let selectionLoading = $state<'send' | 'unschedule' | null>(null);
+	let queueBlockedLoading = $state(false);
 
 	async function handleSendSelected() {
 		if (!currentWorkspace || selectedIds.size === 0) return;
@@ -755,26 +757,61 @@
 		}
 	}
 
-	async function handleCancelSelected() {
+	async function handleUnscheduleSelected() {
 		if (!currentWorkspace || selectedIds.size === 0) return;
-		selectionLoading = 'cancel';
+		selectionLoading = 'unschedule';
 		try {
-			await convex.mutation(api.emails.cancelSelected, {
+			await convex.mutation(api.emails.unscheduleSelected, {
 				workspaceId: currentWorkspace.workspaceId,
 				followUpIds: [...selectedIds] as Id<'email_follow_ups'>[]
 			});
 			selectedIds = new SvelteSet();
-			toast.success('Selected follow-ups cancelled.');
+			toast.success('Selected follow-ups unscheduled.');
 		} catch (err) {
-			toast.error(getConvexErrorMessage(err, 'Failed to cancel selected.'));
+			toast.error(getConvexErrorMessage(err, 'Failed to unschedule selected.'));
 		} finally {
 			selectionLoading = null;
 		}
 	}
 
+	async function handleQueueBlocked() {
+		if (!currentWorkspace || blockedCount === 0) return;
+		if (!workspaceCanSendEmail) {
+			toast.error(senderUnavailableMessage);
+			return;
+		}
+		queueBlockedLoading = true;
+		try {
+			const result = await convex.mutation(api.emails.queueBlockedFollowUps, {
+				workspaceId: currentWorkspace.workspaceId
+			});
+			const queuedCount = result.queuedCount;
+			const dueCount = result.dueCount;
+			const scheduledCount = result.scheduledCount;
+			if (queuedCount === 0) {
+				toast.message('No blocked follow-ups to queue.');
+			} else if (dueCount > 0 && scheduledCount > 0) {
+				toast.message(
+					`${queuedCount} blocked follow-ups queued. ${dueCount} due now, ${scheduledCount} scheduled.`
+				);
+			} else if (dueCount > 0) {
+				toast.message(`${queuedCount} blocked follow-ups queued for delivery.`);
+			} else {
+				toast.message(`${queuedCount} blocked follow-ups scheduled.`);
+			}
+		} catch (err) {
+			toast.error(getConvexErrorMessage(err, 'Failed to queue blocked follow-ups.'));
+		} finally {
+			queueBlockedLoading = false;
+		}
+	}
+
 	let rowLoading = $state<Id<'email_follow_ups'> | null>(null);
 
-	async function handleRowAction(action: 'send' | 'cancel', followUpId: Id<'email_follow_ups'>) {
+	async function handleRowAction(
+		action: 'send' | 'unschedule',
+		followUpId: Id<'email_follow_ups'>
+	) {
 		if (action === 'send' && !workspaceCanSendEmail) {
 			toast.error(senderUnavailableMessage);
 			return;
@@ -784,9 +821,9 @@
 			if (action === 'send') {
 				await convex.mutation(api.emails.sendFollowUpNow, { followUpId });
 				toast.message('Follow-up queued for delivery.');
-			} else if (action === 'cancel') {
-				await convex.mutation(api.emails.cancelFollowUp, { followUpId });
-				toast.success('Follow-up cancelled.');
+			} else if (action === 'unschedule') {
+				await convex.mutation(api.emails.unscheduleFollowUp, { followUpId });
+				toast.success('Follow-up unscheduled.');
 			}
 		} catch (err) {
 			toast.error(getConvexErrorMessage(err, 'Action failed.'));
@@ -800,6 +837,19 @@
 	function formatTimestamp(ts: number) {
 		return new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeStyle: 'short' }).format(
 			new Date(ts)
+		);
+	}
+
+	function parseTimestamp(value: string | null | undefined) {
+		if (!value) return null;
+		const timestamp = Date.parse(value);
+		return Number.isNaN(timestamp) ? null : timestamp;
+	}
+
+	function formatActivityDate(followUp: FollowUp) {
+		const bookingStartAt = parseTimestamp(followUp.bookingStartTime);
+		return new Intl.DateTimeFormat('en-US', { dateStyle: 'long' }).format(
+			new Date(bookingStartAt ?? followUp.submittedAt)
 		);
 	}
 
@@ -824,8 +874,18 @@
 		if (followUp.status === 'failed') {
 			return followUp.failedAt ? `Failed ${formatTimestamp(followUp.failedAt)}` : 'Failed';
 		}
-		if (followUp.status === 'cancelled') return '—';
-		return formatScheduled(followUp.scheduledAt);
+		if (followUp.status === 'unscheduled') return '—';
+		if (followUp.status === 'blocked') {
+			return followUp.scheduledAt === undefined
+				? 'Blocked'
+				: `Blocked · ${formatScheduled(followUp.scheduledAt)}`;
+		}
+		if (followUp.scheduledAt === undefined) return 'Sending soon';
+		return `After booking · ${formatScheduled(followUp.scheduledAt)}`;
+	}
+
+	function statusLabel(status: FollowUp['status']) {
+		return status.charAt(0).toUpperCase() + status.slice(1);
 	}
 
 	const VARIABLES = [
@@ -837,9 +897,9 @@
 
 	const STATUS_STYLES: Record<string, string> = {
 		queued: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
+		unscheduled: 'bg-muted text-muted-foreground border-border',
 		sent: 'bg-green-500/10 text-green-400 border-green-500/20',
-		paused: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
-		cancelled: 'bg-muted text-muted-foreground border-border',
+		blocked: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
 		failed: 'bg-red-500/10 text-red-400 border-red-500/20'
 	};
 </script>
@@ -874,7 +934,7 @@
 							<p class="min-w-0 truncate text-xs font-medium text-foreground tabular-nums">
 								{previewVars.activityDate}
 							</p>
-							{#if previewVars.status === 'queued'}
+							{#if previewVars.status === 'queued' && previewVars.scheduledAt !== null}
 								<p class="shrink-0 text-[11px] text-muted-foreground tabular-nums">
 									Sends {formatScheduled(previewVars.scheduledAt)}
 								</p>
@@ -990,16 +1050,16 @@
 			</div>
 
 			<!-- Footer actions -->
-			{#if ['queued', 'cancelled', 'failed', 'paused'].includes(previewVars.status)}
+			{#if ['queued', 'unscheduled', 'failed', 'blocked'].includes(previewVars.status)}
 				<div class="flex items-center justify-between border-t border-border px-6 py-4">
 					{#if previewVars.status === 'queued'}
 						<Button
 							variant="destructive"
 							size="sm"
-							onclick={() => handleRowAction('cancel', previewVars!.followUpId)}
+							onclick={() => handleRowAction('unschedule', previewVars!.followUpId)}
 							disabled={rowLoading === previewVars.followUpId}
 						>
-							Cancel follow-up
+							Unschedule follow-up
 						</Button>
 					{:else}
 						<span></span>
@@ -1041,7 +1101,7 @@
 
 <PageHeader
 	title="Email follow-ups"
-	subtitle="Automatically send thank-you emails after guests sign a waiver."
+	subtitle="Automatically send thank-you emails after booking-linked waiver submissions."
 />
 
 <PageShell>
@@ -1107,6 +1167,33 @@
 					{replyToPendingVerification && hasPlatformFromEmail ? 'Continue' : 'Set up'}
 					<ChevronRightIcon class="size-3.5" />
 				</a>
+			</div>
+		{/if}
+		{#if workspaceCanSendEmail && blockedCount > 0}
+			<div class="queue-blocked-banner">
+				<div class="queue-blocked-body">
+					<p class="queue-blocked-title">
+						{blockedCount}
+						{blockedCount === 1 ? 'follow-up is' : 'follow-ups are'} ready to queue
+					</p>
+					<p class="queue-blocked-desc">
+						Blocked follow-ups stay held after verification until you queue them.
+					</p>
+				</div>
+				<Button
+					type="button"
+					size="sm"
+					onclick={handleQueueBlocked}
+					disabled={queueBlockedLoading}
+					class="queue-blocked-cta gap-2"
+				>
+					{#if queueBlockedLoading}
+						<LoaderIcon class="size-4 animate-spin" />
+						Queueing
+					{:else}
+						Queue blocked follow-ups
+					{/if}
+				</Button>
 			</div>
 		{/if}
 	{/if}
@@ -1232,16 +1319,16 @@
 				</span>
 				<span
 					class="inline-block flex-1 sm:flex-none"
-					title={!canCancelSelected ? 'Select queued rows to cancel' : undefined}
+					title={!canUnscheduleSelected ? 'Select queued rows to unschedule' : undefined}
 				>
 					<Button
 						size="lg"
 						variant="outline"
-						onclick={handleCancelSelected}
-						disabled={selectionLoading !== null || !canCancelSelected}
+						onclick={handleUnscheduleSelected}
+						disabled={selectionLoading !== null || !canUnscheduleSelected}
 						class="h-9 w-full sm:h-8 sm:w-auto"
 					>
-						{selectionLoading === 'cancel' ? 'Cancelling…' : 'Cancel'}
+						{selectionLoading === 'unschedule' ? 'Unscheduling…' : 'Unschedule'}
 					</Button>
 				</span>
 			</div>
@@ -1438,13 +1525,13 @@
 														? 'bg-blue-400'
 														: followUp.status === 'sent'
 															? 'bg-green-400'
-															: followUp.status === 'paused'
+															: followUp.status === 'blocked'
 																? 'bg-yellow-400'
 																: followUp.status === 'failed'
 																	? 'bg-red-400'
 																	: 'bg-muted-foreground'}"
 												></span>
-												{followUp.status}
+												{statusLabel(followUp.status)}
 											</span>
 										</TableCell>
 									</TableRow>
@@ -1499,13 +1586,13 @@
 														? 'bg-blue-400'
 														: followUp.status === 'sent'
 															? 'bg-green-400'
-															: followUp.status === 'paused'
+															: followUp.status === 'blocked'
 																? 'bg-yellow-400'
 																: followUp.status === 'failed'
 																	? 'bg-red-400'
 																	: 'bg-muted-foreground'}"
 												></span>
-												{followUp.status}
+												{statusLabel(followUp.status)}
 											</span>
 										</div>
 										<div class="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
@@ -1607,7 +1694,7 @@
 				<div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 					<div class="space-y-1">
 						<div class="flex flex-wrap items-center gap-1.5 text-sm text-muted-foreground">
-							<span>Sent to every signer</span>
+							<span>Sent to booking-linked signers</span>
 							<Input
 								type="number"
 								min="1"
@@ -1628,8 +1715,11 @@
 									<option value={unit}>{unit}</option>
 								{/each}
 							</select>
-							<span>after they sign.</span>
+							<span>after booking time.</span>
 						</div>
+						<p class="text-xs text-muted-foreground">
+							General waivers appear as unscheduled follow-ups.
+						</p>
 						{#if !isSendAfterValid}
 							<p id="send-after-error" class="text-xs text-destructive">
 								Enter a positive whole number.
@@ -1834,25 +1924,15 @@
 	}
 
 	.sender-banner[data-state='unset'] {
-		border-color: color-mix(in srgb, oklch(0.6 0.18 28) 30%, var(--border));
-		background:
-			linear-gradient(
-				90deg,
-				color-mix(in srgb, oklch(0.6 0.18 28) 8%, transparent),
-				color-mix(in srgb, oklch(0.6 0.18 28) 2%, transparent)
-			),
-			color-mix(in srgb, var(--card) 60%, transparent);
+		border-color: color-mix(in srgb, var(--destructive) 20%, var(--border));
+		background: color-mix(in srgb, var(--destructive) 6%, transparent);
+		color: color-mix(in srgb, var(--destructive) 70%, var(--foreground));
 	}
 
 	.sender-banner[data-state='pending'] {
-		border-color: color-mix(in srgb, oklch(0.78 0.14 80) 35%, var(--border));
-		background:
-			linear-gradient(
-				90deg,
-				color-mix(in srgb, oklch(0.78 0.14 80) 10%, transparent),
-				color-mix(in srgb, oklch(0.78 0.14 80) 3%, transparent)
-			),
-			color-mix(in srgb, var(--card) 60%, transparent);
+		border-color: color-mix(in srgb, var(--destructive) 20%, var(--border));
+		background: color-mix(in srgb, var(--destructive) 6%, transparent);
+		color: color-mix(in srgb, var(--destructive) 70%, var(--foreground));
 	}
 
 	.sender-banner-mark {
@@ -1866,25 +1946,25 @@
 	}
 
 	.sender-banner[data-state='unset'] .sender-banner-mark {
-		background: color-mix(in srgb, oklch(0.6 0.18 28) 14%, transparent);
-		color: oklch(0.7 0.18 28);
-		border: 1px solid color-mix(in srgb, oklch(0.6 0.18 28) 25%, transparent);
+		background: color-mix(in srgb, var(--destructive) 12%, transparent);
+		color: var(--destructive);
+		border: 1px solid color-mix(in srgb, var(--destructive) 20%, transparent);
 	}
 
 	.sender-banner[data-state='pending'] .sender-banner-mark {
-		background: color-mix(in srgb, oklch(0.78 0.14 80) 16%, transparent);
-		color: oklch(0.82 0.14 80);
-		border: 1px solid color-mix(in srgb, oklch(0.78 0.14 80) 30%, transparent);
+		background: color-mix(in srgb, var(--destructive) 12%, transparent);
+		color: var(--destructive);
+		border: 1px solid color-mix(in srgb, var(--destructive) 20%, transparent);
 		animation: banner-pulse 1.8s ease-in-out infinite;
 	}
 
 	@keyframes banner-pulse {
 		0%,
 		100% {
-			box-shadow: 0 0 0 0 color-mix(in srgb, oklch(0.78 0.14 80) 25%, transparent);
+			box-shadow: 0 0 0 0 color-mix(in srgb, var(--destructive) 20%, transparent);
 		}
 		50% {
-			box-shadow: 0 0 0 5px color-mix(in srgb, oklch(0.78 0.14 80) 0%, transparent);
+			box-shadow: 0 0 0 5px color-mix(in srgb, var(--destructive) 0%, transparent);
 		}
 	}
 
@@ -1903,10 +1983,20 @@
 		color: var(--foreground);
 	}
 
+	.sender-banner[data-state='unset'] .sender-banner-title,
+	.sender-banner[data-state='pending'] .sender-banner-title {
+		color: color-mix(in srgb, var(--destructive) 70%, var(--foreground));
+	}
+
 	.sender-banner-desc {
 		font-size: 0.74rem;
 		line-height: 1.45;
 		color: var(--muted-foreground);
+	}
+
+	.sender-banner[data-state='unset'] .sender-banner-desc,
+	.sender-banner[data-state='pending'] .sender-banner-desc {
+		color: color-mix(in srgb, var(--destructive) 48%, var(--muted-foreground));
 	}
 
 	.sender-banner-cta {
@@ -1927,5 +2017,51 @@
 
 	.sender-banner-cta:hover {
 		background: color-mix(in srgb, var(--primary) 90%, var(--foreground) 10%);
+	}
+
+	.queue-blocked-banner {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.85rem;
+		padding: 0.8rem 0.95rem;
+		border-radius: var(--radius-xl);
+		border: 1px solid color-mix(in srgb, oklch(0.78 0.14 80) 32%, var(--border));
+		background: color-mix(in srgb, oklch(0.78 0.14 80) 8%, var(--card));
+		min-width: 0;
+	}
+
+	.queue-blocked-body {
+		min-width: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 0.1rem;
+	}
+
+	.queue-blocked-title {
+		font-size: 0.85rem;
+		font-weight: 600;
+		color: var(--foreground);
+	}
+
+	.queue-blocked-desc {
+		font-size: 0.74rem;
+		line-height: 1.45;
+		color: var(--muted-foreground);
+	}
+
+	.queue-blocked-cta {
+		flex-shrink: 0;
+	}
+
+	@media (max-width: 640px) {
+		.queue-blocked-banner {
+			align-items: stretch;
+			flex-direction: column;
+		}
+
+		.queue-blocked-cta {
+			width: 100%;
+		}
 	}
 </style>
