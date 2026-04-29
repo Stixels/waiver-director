@@ -9,7 +9,7 @@ import {
 	query
 } from './_generated/server';
 import type { Doc } from './_generated/dataModel';
-import type { QueryCtx } from './_generated/server';
+import type { MutationCtx, QueryCtx } from './_generated/server';
 import { Resend } from 'resend';
 import { internal } from './_generated/api';
 import { requireWorkspaceMember } from './lib/waivers';
@@ -129,6 +129,59 @@ function sendAfterToMs(amount: number, unit: SendAfterUnit) {
 	if (unit === 'minutes') return amount * 60 * 1000;
 	if (unit === 'hours') return amount * 60 * 60 * 1000;
 	return amount * 24 * 60 * 60 * 1000;
+}
+
+async function queueBlockedFollowUpsForWorkspace(
+	ctx: Pick<MutationCtx, 'db' | 'scheduler'>,
+	workspaceId: Doc<'workspaces'>['_id']
+) {
+	const blocked = await ctx.db
+		.query('email_follow_ups')
+		.withIndex('by_workspaceId_and_status', (q) =>
+			q.eq('workspaceId', workspaceId).eq('status', 'blocked')
+		)
+		.take(FOLLOW_UP_STATS_LIMIT);
+
+	const now = Date.now();
+	let queuedCount = 0;
+	let dueCount = 0;
+	let scheduledCount = 0;
+
+	for (const followUp of blocked) {
+		if (followUp.scheduledAt === undefined) {
+			await ctx.db.patch(followUp._id, {
+				status: 'unscheduled',
+				failureReason: undefined
+			});
+			continue;
+		}
+
+		if (followUp.scheduledFunctionId) {
+			try {
+				await ctx.scheduler.cancel(followUp.scheduledFunctionId);
+			} catch {
+				// Already completed or unscheduled; ignore.
+			}
+		}
+
+		const delayMs = Math.max(0, followUp.scheduledAt - now);
+		if (delayMs === 0) dueCount++;
+		else scheduledCount++;
+
+		const scheduledFunctionId = await ctx.scheduler.runAfter(
+			delayMs,
+			internal.emails.deliverFollowUpEmail,
+			{ followUpId: followUp._id }
+		);
+		queuedCount++;
+		await ctx.db.patch(followUp._id, {
+			scheduledFunctionId,
+			status: 'queued',
+			failureReason: undefined
+		});
+	}
+
+	return { queuedCount, dueCount, scheduledCount };
 }
 
 function parseTimestamp(value: string | null | undefined): number | null {
@@ -308,14 +361,15 @@ export const confirmReplyToVerification = action({
 			});
 		}
 
-		await ctx.runMutation(internal.emails.confirmReplyToVerificationWithHash, {
-			workspaceId: args.workspaceId,
-			verificationCodeHash: await verificationCodeHash({
-				email: pending.pendingReplyToEmail,
-				code
-			})
-		});
-		return null;
+		const result: { queuedCount: number; dueCount: number; scheduledCount: number } =
+			await ctx.runMutation(internal.emails.confirmReplyToVerificationWithHash, {
+				workspaceId: args.workspaceId,
+				verificationCodeHash: await verificationCodeHash({
+					email: pending.pendingReplyToEmail,
+					code
+				})
+			});
+		return result;
 	}
 });
 
@@ -614,62 +668,6 @@ export const unscheduleFollowUp = mutation({
 	}
 });
 
-export const queueBlockedFollowUps = mutation({
-	args: { workspaceId: v.id('workspaces') },
-	handler: async (ctx, args) => {
-		await requireWorkspaceMember(ctx, args.workspaceId);
-		await requireWorkspaceVerifiedReplyTo(ctx, args.workspaceId);
-
-		const blocked = await ctx.db
-			.query('email_follow_ups')
-			.withIndex('by_workspaceId_and_status', (q) =>
-				q.eq('workspaceId', args.workspaceId).eq('status', 'blocked')
-			)
-			.take(FOLLOW_UP_STATS_LIMIT);
-
-		const now = Date.now();
-		let queuedCount = 0;
-		let dueCount = 0;
-		let scheduledCount = 0;
-
-		for (const followUp of blocked) {
-			if (followUp.scheduledAt === undefined) {
-				await ctx.db.patch(followUp._id, {
-					status: 'unscheduled',
-					failureReason: undefined
-				});
-				continue;
-			}
-
-			if (followUp.scheduledFunctionId) {
-				try {
-					await ctx.scheduler.cancel(followUp.scheduledFunctionId);
-				} catch {
-					// Already completed or unscheduled; ignore.
-				}
-			}
-
-			const delayMs = Math.max(0, followUp.scheduledAt - now);
-			if (delayMs === 0) dueCount++;
-			else scheduledCount++;
-
-			const scheduledFunctionId = await ctx.scheduler.runAfter(
-				delayMs,
-				internal.emails.deliverFollowUpEmail,
-				{ followUpId: followUp._id }
-			);
-			queuedCount++;
-			await ctx.db.patch(followUp._id, {
-				scheduledFunctionId,
-				status: 'queued',
-				failureReason: undefined
-			});
-		}
-
-		return { queuedCount, dueCount, scheduledCount };
-	}
-});
-
 export const sendFollowUpNow = mutation({
 	args: { followUpId: v.id('email_follow_ups') },
 	handler: async (ctx, args) => {
@@ -918,6 +916,12 @@ export const confirmReplyToVerificationWithHash = internalMutation({
 			verificationAttempts: 0,
 			updatedAt: now
 		});
+
+		if (!configuredFromEmail()) {
+			return { queuedCount: 0, dueCount: 0, scheduledCount: 0 };
+		}
+
+		return await queueBlockedFollowUpsForWorkspace(ctx, args.workspaceId);
 	}
 });
 

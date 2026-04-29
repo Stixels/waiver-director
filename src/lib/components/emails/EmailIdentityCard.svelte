@@ -208,12 +208,16 @@
 		if (!canConfirmReplyToVerification) return;
 		isConfirmingVerification = true;
 		try {
-			await convex.action(api.emails.confirmReplyToVerification, {
+			const result = await convex.action(api.emails.confirmReplyToVerification, {
 				workspaceId,
 				code: verificationCode
 			});
 			verificationCode = '';
-			toast.success('Reply-to email verified.');
+			if (result.queuedCount > 0) {
+				toast.message('Reply-to email verified. Held follow-ups queued for delivery.');
+			} else {
+				toast.success('Reply-to email verified.');
+			}
 		} catch (err) {
 			toast.error(getConvexErrorMessage(err, 'Failed to verify reply-to email.'));
 		} finally {

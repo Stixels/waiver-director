@@ -164,7 +164,6 @@
 	type EmailTemplate = FunctionReturnType<typeof api.emails.listEmailTemplates>[number];
 
 	const stats = $derived(statsQuery.data);
-	const blockedCount = $derived(stats?.blockedCount ?? 0);
 	const followUpsPage = $derived(followUpsQuery.data);
 	const followUps = $derived((followUpsPage?.page ?? []) as FollowUp[]);
 	const templates = $derived((templatesQuery.data ?? []) as EmailTemplate[]);
@@ -734,7 +733,6 @@
 	// ─── Bulk / selection actions ──────────────────────────────────────────────
 
 	let selectionLoading = $state<'send' | 'unschedule' | null>(null);
-	let queueBlockedLoading = $state(false);
 
 	async function handleSendSelected() {
 		if (!currentWorkspace || selectedIds.size === 0) return;
@@ -771,38 +769,6 @@
 			toast.error(getConvexErrorMessage(err, 'Failed to unschedule selected.'));
 		} finally {
 			selectionLoading = null;
-		}
-	}
-
-	async function handleQueueBlocked() {
-		if (!currentWorkspace || blockedCount === 0) return;
-		if (!workspaceCanSendEmail) {
-			toast.error(senderUnavailableMessage);
-			return;
-		}
-		queueBlockedLoading = true;
-		try {
-			const result = await convex.mutation(api.emails.queueBlockedFollowUps, {
-				workspaceId: currentWorkspace.workspaceId
-			});
-			const queuedCount = result.queuedCount;
-			const dueCount = result.dueCount;
-			const scheduledCount = result.scheduledCount;
-			if (queuedCount === 0) {
-				toast.message('No blocked follow-ups to queue.');
-			} else if (dueCount > 0 && scheduledCount > 0) {
-				toast.message(
-					`${queuedCount} blocked follow-ups queued. ${dueCount} due now, ${scheduledCount} scheduled.`
-				);
-			} else if (dueCount > 0) {
-				toast.message(`${queuedCount} blocked follow-ups queued for delivery.`);
-			} else {
-				toast.message(`${queuedCount} blocked follow-ups scheduled.`);
-			}
-		} catch (err) {
-			toast.error(getConvexErrorMessage(err, 'Failed to queue blocked follow-ups.'));
-		} finally {
-			queueBlockedLoading = false;
 		}
 	}
 
@@ -1156,33 +1122,6 @@
 					{replyToPendingVerification && hasPlatformFromEmail ? 'Continue' : 'Set up'}
 					<ChevronRightIcon class="size-3.5" />
 				</a>
-			</div>
-		{/if}
-		{#if workspaceCanSendEmail && blockedCount > 0}
-			<div class="queue-blocked-banner">
-				<div class="queue-blocked-body">
-					<p class="queue-blocked-title">
-						{blockedCount}
-						{blockedCount === 1 ? 'follow-up is' : 'follow-ups are'} ready to queue
-					</p>
-					<p class="queue-blocked-desc">
-						Blocked follow-ups stay held after verification until you queue them.
-					</p>
-				</div>
-				<Button
-					type="button"
-					size="sm"
-					onclick={handleQueueBlocked}
-					disabled={queueBlockedLoading}
-					class="queue-blocked-cta gap-2"
-				>
-					{#if queueBlockedLoading}
-						<LoaderIcon class="size-4 animate-spin" />
-						Queueing
-					{:else}
-						Queue blocked follow-ups
-					{/if}
-				</Button>
 			</div>
 		{/if}
 	{/if}
@@ -2006,51 +1945,5 @@
 
 	.sender-banner-cta:hover {
 		background: color-mix(in srgb, var(--primary) 90%, var(--foreground) 10%);
-	}
-
-	.queue-blocked-banner {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 0.85rem;
-		padding: 0.8rem 0.95rem;
-		border-radius: var(--radius-xl);
-		border: 1px solid color-mix(in srgb, oklch(0.78 0.14 80) 32%, var(--border));
-		background: color-mix(in srgb, oklch(0.78 0.14 80) 8%, var(--card));
-		min-width: 0;
-	}
-
-	.queue-blocked-body {
-		min-width: 0;
-		display: flex;
-		flex-direction: column;
-		gap: 0.1rem;
-	}
-
-	.queue-blocked-title {
-		font-size: 0.85rem;
-		font-weight: 600;
-		color: var(--foreground);
-	}
-
-	.queue-blocked-desc {
-		font-size: 0.74rem;
-		line-height: 1.45;
-		color: var(--muted-foreground);
-	}
-
-	.queue-blocked-cta {
-		flex-shrink: 0;
-	}
-
-	@media (max-width: 640px) {
-		.queue-blocked-banner {
-			align-items: stretch;
-			flex-direction: column;
-		}
-
-		.queue-blocked-cta {
-			width: 100%;
-		}
 	}
 </style>
