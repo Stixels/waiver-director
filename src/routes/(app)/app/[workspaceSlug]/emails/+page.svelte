@@ -7,6 +7,7 @@
 	import { useConvexClient } from 'convex-svelte';
 	import { toast } from 'svelte-sonner';
 	import type { FunctionReturnType } from 'convex/server';
+	import type { DateValue } from '@internationalized/date';
 	import type { Id } from '$convex/_generated/dataModel';
 	import { api } from '$convex/_generated/api';
 	import { useAppContext } from '$lib/components/app/app-context.svelte';
@@ -35,12 +36,21 @@
 		DialogHeader,
 		DialogTitle
 	} from '$lib/components/ui/dialog';
+	import {
+		DropdownMenu,
+		DropdownMenuCheckboxItem,
+		DropdownMenuContent,
+		DropdownMenuTrigger
+	} from '$lib/components/ui/dropdown-menu';
+	import { Popover, PopoverContent, PopoverTrigger } from '$lib/components/ui/popover';
+	import { RangeCalendar } from '$lib/components/ui/range-calendar';
 	import EmailLoadTemplateDialog from '$lib/components/emails/EmailLoadTemplateDialog.svelte';
 	import EmailSaveTemplateDialog from '$lib/components/emails/EmailSaveTemplateDialog.svelte';
 	import RichTextEditor from '$lib/components/emails/RichTextEditor.svelte';
 	import WaiverRichText from '$lib/components/waivers/WaiverRichText.svelte';
 	import ArrowRightIcon from '@lucide/svelte/icons/arrow-right';
 	import CalendarClockIcon from '@lucide/svelte/icons/calendar-clock';
+	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
 	import CloudIcon from '@lucide/svelte/icons/cloud';
 	import CloudCheckIcon from '@lucide/svelte/icons/cloud-check';
 	import CloudOffIcon from '@lucide/svelte/icons/cloud-off';
@@ -48,10 +58,13 @@
 	import MailIcon from '@lucide/svelte/icons/mail';
 	import MailCheckIcon from '@lucide/svelte/icons/mail-check';
 	import LoaderIcon from '@lucide/svelte/icons/loader';
+	import SearchIcon from '@lucide/svelte/icons/search';
 	import ShieldCheckIcon from '@lucide/svelte/icons/shield-check';
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
+	import SlidersHorizontalIcon from '@lucide/svelte/icons/sliders-horizontal';
 	import TicketIcon from '@lucide/svelte/icons/ticket';
 	import UsersRoundIcon from '@lucide/svelte/icons/users-round';
+	import XIcon from '@lucide/svelte/icons/x';
 
 	const convex = useConvexClient();
 	const appContext = useAppContext();
@@ -94,12 +107,24 @@
 	let searchQuery = $state('');
 	let dateFrom = $state('');
 	let dateTo = $state('');
+	let dateRangeValue = $state<{ start: DateValue | undefined; end: DateValue | undefined }>();
+	let dateCalendarOpen = $state(false);
 	let currentPage = $state(0);
 	let pageCursors = $state<(string | null)[]>([null]);
 
 	const currentCursor = $derived(pageCursors[currentPage] ?? null);
 	const dateFromMillis = $derived(dateFrom ? parseLocalDateStart(dateFrom) : null);
 	const dateToMillis = $derived(dateTo ? parseLocalDateEnd(dateTo) : null);
+	const selectedStatusOptions = $derived(
+		STATUS_OPTIONS.filter((opt) => statusFilters.has(opt.value))
+	);
+	const statusFilterLabel = $derived.by(() => {
+		if (selectedStatusOptions.length === 0) return 'Status';
+		if (selectedStatusOptions.length === 1) return selectedStatusOptions[0]?.label ?? 'Status';
+		return `Status (${selectedStatusOptions.length})`;
+	});
+	const dateRangeLabel = $derived(formatDateRangeLabel(dateFrom, dateTo));
+	const dateFilterLabel = $derived(dateFrom || dateTo ? dateRangeLabel : 'Date range');
 
 	function parseLocalDateStart(value: string) {
 		const [year, month, day] = value.split('-').map(Number);
@@ -109,6 +134,43 @@
 	function parseLocalDateEnd(value: string) {
 		const [year, month, day] = value.split('-').map(Number);
 		return new Date(year, month - 1, day + 1).getTime();
+	}
+
+	function dateValueKey(value: DateValue | undefined) {
+		return value?.toString() ?? '';
+	}
+
+	function formatFilterDate(value: string) {
+		const [year, month, day] = value.split('-').map(Number);
+		if (!year || !month || !day) return value;
+		return new Intl.DateTimeFormat('en-US', {
+			month: 'short',
+			day: 'numeric',
+			year: 'numeric'
+		}).format(new Date(year, month - 1, day));
+	}
+
+	function formatDateRangeLabel(from: string, to: string) {
+		if (from && to) return `${formatFilterDate(from)} - ${formatFilterDate(to)}`;
+		if (from) return `From ${formatFilterDate(from)}`;
+		if (to) return `Until ${formatFilterDate(to)}`;
+		return 'All dates';
+	}
+
+	function setStatusFilter(value: string, selected: boolean) {
+		if (selected) statusFilters.add(value);
+		else statusFilters.delete(value);
+	}
+
+	function clearSearch() {
+		searchQuery = '';
+	}
+
+	function clearDateRange() {
+		dateFrom = '';
+		dateTo = '';
+		dateRangeValue = undefined;
+		dateCalendarOpen = false;
 	}
 
 	const followUpsQuery = useProtectedQuery(api.emails.listFollowUps, () => {
@@ -134,6 +196,13 @@
 			...(dateFromMillis !== null ? { dateFrom: dateFromMillis } : {}),
 			...(dateToMillis !== null ? { dateTo: dateToMillis } : {})
 		};
+	});
+
+	$effect(() => {
+		const nextFrom = dateValueKey(dateRangeValue?.start);
+		const nextTo = dateValueKey(dateRangeValue?.end);
+		if (dateFrom !== nextFrom) dateFrom = nextFrom;
+		if (dateTo !== nextTo) dateTo = nextTo;
 	});
 
 	const followUpIdParam = $derived(
@@ -1185,80 +1254,138 @@
 			</p>
 		</div>
 
-		<!-- Status filter pills (multi-select) -->
-		<div
-			class="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-x-visible sm:px-0 sm:pb-0"
-		>
-			{#each STATUS_OPTIONS as opt (opt.value)}
-				{@const active = statusFilters.has(opt.value)}
-				<button
-					onclick={() => {
-						if (active) statusFilters.delete(opt.value);
-						else statusFilters.add(opt.value);
-					}}
-					class="inline-flex shrink-0 items-center gap-1 rounded-full border px-3 py-1 text-xs font-medium transition-colors {active
-						? 'border-primary bg-primary text-primary-foreground'
-						: 'border-border bg-transparent text-muted-foreground hover:border-foreground/30 hover:text-foreground'}"
-				>
-					{opt.label}
-					{#if active}<span class="pl-1 opacity-70">×</span>{/if}
-				</button>
-			{/each}
-		</div>
-
 		<!-- Filters + actions -->
-		<div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-			<Input
-				type="search"
-				placeholder="Search by name, email or booking…"
-				bind:value={searchQuery}
-				class="h-9 w-full text-sm sm:h-8 sm:min-w-48 sm:flex-1"
-			/>
-			<div class="grid grid-cols-2 gap-2 sm:flex sm:items-center sm:gap-3">
-				<div class="flex items-center gap-2 text-sm text-muted-foreground">
-					<label for="date-from" class="shrink-0">From</label>
-					<Input
-						id="date-from"
-						type="date"
-						bind:value={dateFrom}
-						class="h-9 w-full text-sm sm:h-8 sm:w-36"
+		<div class="space-y-2">
+			<div class="flex flex-col gap-3 lg:flex-row lg:items-center">
+				<div class="relative w-full lg:max-w-md">
+					<SearchIcon
+						class="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground"
+						aria-hidden="true"
 					/>
-				</div>
-				<div class="flex items-center gap-2 text-sm text-muted-foreground">
-					<label for="date-to" class="shrink-0">To</label>
-					<Input
-						id="date-to"
-						type="date"
-						bind:value={dateTo}
-						class="h-9 w-full text-sm sm:h-8 sm:w-36"
+					<input
+						type="search"
+						placeholder="Search by name, email, or booking number"
+						bind:value={searchQuery}
+						class="h-9 w-full rounded-lg border border-input bg-background/60 pr-10 pl-11 text-sm shadow-xs transition-all placeholder:text-muted-foreground/70 hover:bg-background focus-visible:border-ring focus-visible:bg-background focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
+						aria-label="Search follow-ups"
 					/>
+					{#if searchQuery}
+						<button
+							type="button"
+							onclick={clearSearch}
+							class="absolute top-1/2 right-2 inline-flex size-6 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
+							aria-label="Clear search"
+						>
+							<XIcon class="size-3.5" aria-hidden="true" />
+						</button>
+					{/if}
 				</div>
-			</div>
-			<div class="flex gap-1.5 sm:ml-auto">
-				<span class="inline-block flex-1 sm:flex-none" title={sendSelectionTooltip}>
-					<Button
-						size="lg"
-						onclick={handleSendSelected}
-						disabled={selectionLoading !== null || !canSendSelected}
-						class="h-9 w-full sm:h-8 sm:w-auto"
+
+				<div class="flex flex-col gap-2 sm:flex-row sm:items-center lg:ml-auto">
+					<DropdownMenu>
+						<DropdownMenuTrigger>
+							{#snippet child({ props })}
+								<Button
+									{...props}
+									type="button"
+									size="lg"
+									variant={statusFilters.size > 0 ? 'secondary' : 'outline'}
+									class="h-9 w-full justify-between gap-2 sm:w-auto sm:min-w-32"
+								>
+									<span class="inline-flex min-w-0 items-center gap-1.5">
+										<SlidersHorizontalIcon class="size-3.5 shrink-0" aria-hidden="true" />
+										<span class="truncate">{statusFilterLabel}</span>
+									</span>
+									<ChevronDownIcon class="size-3.5 text-muted-foreground" aria-hidden="true" />
+								</Button>
+							{/snippet}
+						</DropdownMenuTrigger>
+						<DropdownMenuContent align="end" class="w-48">
+							{#each STATUS_OPTIONS as opt (opt.value)}
+								{@const active = statusFilters.has(opt.value)}
+								<DropdownMenuCheckboxItem
+									checked={active}
+									closeOnSelect={false}
+									onCheckedChange={(checked) => setStatusFilter(opt.value, checked)}
+								>
+									{opt.label}
+								</DropdownMenuCheckboxItem>
+							{/each}
+							{#if statusFilters.size > 0}
+								<div class="mt-1 border-t border-foreground/5 pt-1">
+									<button
+										type="button"
+										onclick={() => statusFilters.clear()}
+										class="flex min-h-7 w-full items-center rounded-md px-2 text-left text-xs text-muted-foreground outline-hidden transition-colors hover:bg-foreground/10 hover:text-foreground focus:bg-foreground/10 focus:text-foreground"
+									>
+										Clear status
+									</button>
+								</div>
+							{/if}
+						</DropdownMenuContent>
+					</DropdownMenu>
+
+					<Popover bind:open={dateCalendarOpen}>
+						<PopoverTrigger>
+							{#snippet child({ props })}
+								<Button
+									{...props}
+									type="button"
+									size="lg"
+									variant={dateFrom || dateTo ? 'secondary' : 'outline'}
+									class="h-9 w-full justify-between gap-2 sm:w-auto sm:max-w-64"
+								>
+									<span class="inline-flex min-w-0 items-center gap-1.5">
+										<CalendarClockIcon class="size-3.5 shrink-0" aria-hidden="true" />
+										<span class="truncate">{dateFilterLabel}</span>
+									</span>
+									<ChevronDownIcon class="size-3.5 text-muted-foreground" aria-hidden="true" />
+								</Button>
+							{/snippet}
+						</PopoverTrigger>
+						<PopoverContent align="end" class="w-auto p-2">
+							<RangeCalendar bind:value={dateRangeValue} class="w-fit" />
+							{#if dateFrom || dateTo}
+								<div class="flex justify-end border-t border-border px-1 pt-2">
+									<button
+										type="button"
+										onclick={clearDateRange}
+										class="rounded-md px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
+									>
+										Clear dates
+									</button>
+								</div>
+							{/if}
+						</PopoverContent>
+					</Popover>
+				</div>
+
+				<div class="flex gap-1.5">
+					<span class="inline-block flex-1 sm:flex-none" title={sendSelectionTooltip}>
+						<Button
+							size="lg"
+							onclick={handleSendSelected}
+							disabled={selectionLoading !== null || !canSendSelected}
+							class="h-9 w-full sm:h-8 sm:w-auto"
+						>
+							{selectionLoading === 'send' ? 'Sending…' : 'Send'}
+						</Button>
+					</span>
+					<span
+						class="inline-block flex-1 sm:flex-none"
+						title={!canUnscheduleSelected ? 'Select queued rows to unschedule' : undefined}
 					>
-						{selectionLoading === 'send' ? 'Sending…' : 'Send'}
-					</Button>
-				</span>
-				<span
-					class="inline-block flex-1 sm:flex-none"
-					title={!canUnscheduleSelected ? 'Select queued rows to unschedule' : undefined}
-				>
-					<Button
-						size="lg"
-						variant="outline"
-						onclick={handleUnscheduleSelected}
-						disabled={selectionLoading !== null || !canUnscheduleSelected}
-						class="h-9 w-full sm:h-8 sm:w-auto"
-					>
-						{selectionLoading === 'unschedule' ? 'Unscheduling…' : 'Unschedule'}
-					</Button>
-				</span>
+						<Button
+							size="lg"
+							variant="outline"
+							onclick={handleUnscheduleSelected}
+							disabled={selectionLoading !== null || !canUnscheduleSelected}
+							class="h-9 w-full sm:h-8 sm:w-auto"
+						>
+							{selectionLoading === 'unschedule' ? 'Unscheduling…' : 'Unschedule'}
+						</Button>
+					</span>
+				</div>
 			</div>
 		</div>
 
@@ -1340,12 +1467,52 @@
 					{/each}
 				</div>
 			{:else if followUps.length === 0}
-				<div
-					class="flex h-full items-center justify-center rounded-xl border border-dashed border-border bg-muted/20 px-4 py-16 text-center text-sm text-muted-foreground"
-				>
-					{searchQuery || dateFrom || dateTo || statusFilters.size > 0
-						? 'No follow-ups match your filters.'
-						: `No follow-ups yet for ${currentWorkspace?.name ?? 'this workspace'}. They appear here after guests sign a waiver.`}
+				<div class="hidden h-full flex-col overflow-hidden rounded-xl border border-border md:flex">
+					<div class="min-h-0 flex-1 overflow-auto">
+						<Table class="table-fixed">
+							<colgroup>
+								<col class="w-[4%]" /><col class="w-[24%]" /><col class="w-[20%]" />
+								<col class="w-[18%]" /><col class="w-[20%]" /><col class="w-[14%]" />
+							</colgroup>
+							<TableHeader>
+								<TableRow class="border-border hover:bg-transparent">
+									<TableHead class="pl-4">
+										<input
+											type="checkbox"
+											class="size-4 rounded accent-primary opacity-40"
+											disabled
+											aria-label="Select all follow-ups"
+										/>
+									</TableHead>
+									{#each ['Customer', 'Booking', 'Waiver signed', 'Scheduled for', 'Status'] as col (col)}
+										<TableHead
+											class="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase"
+											>{col}</TableHead
+										>
+									{/each}
+								</TableRow>
+							</TableHeader>
+						</Table>
+						<div
+							class="flex min-h-[320px] items-center justify-center border-t border-border px-4 text-center text-sm text-muted-foreground"
+						>
+							{searchQuery || dateFrom || dateTo || statusFilters.size > 0
+								? 'No follow-ups match your filters.'
+								: `No follow-ups yet for ${currentWorkspace?.name ?? 'this workspace'}. They appear here after guests sign a waiver.`}
+						</div>
+					</div>
+
+					{@render paginationFooter(true)}
+				</div>
+				<div class="flex h-full flex-col overflow-hidden rounded-xl border border-border md:hidden">
+					<div
+						class="flex min-h-0 flex-1 items-center justify-center px-4 text-center text-sm text-muted-foreground"
+					>
+						{searchQuery || dateFrom || dateTo || statusFilters.size > 0
+							? 'No follow-ups match your filters.'
+							: `No follow-ups yet for ${currentWorkspace?.name ?? 'this workspace'}. They appear here after guests sign a waiver.`}
+					</div>
+					{@render paginationFooter(true)}
 				</div>
 			{:else}
 				<!-- Desktop table -->
