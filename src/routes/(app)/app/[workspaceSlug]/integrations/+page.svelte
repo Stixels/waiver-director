@@ -567,7 +567,7 @@
 
 <PageShell>
 	{#if isLoading}
-		<section class="grid min-h-[32rem] overflow-hidden border-y md:grid-cols-[15rem_minmax(0,1fr)]">
+		<section class="grid min-h-128 overflow-hidden border-y md:grid-cols-[15rem_minmax(0,1fr)]">
 			<div class="flex min-h-60 flex-col gap-4 border-b p-3 md:border-r md:border-b-0">
 				<Skeleton class="h-4 w-24" />
 				<Skeleton class="h-10 w-full rounded-md" />
@@ -595,7 +595,7 @@
 			Workspace not found.
 		</div>
 	{:else}
-		<article class="grid min-h-[32rem] overflow-hidden border-y md:grid-cols-[15rem_minmax(0,1fr)]">
+		<article class="grid min-h-128 overflow-hidden border-y md:grid-cols-[15rem_minmax(0,1fr)]">
 			<aside
 				class="flex flex-col gap-4 border-b p-3 md:border-r md:border-b-0"
 				aria-label="Integration providers"
