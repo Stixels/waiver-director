@@ -4,6 +4,7 @@
 	import { useAppContext } from '$lib/components/app/app-context.svelte';
 	import PageShell from '$lib/components/app/PageShell.svelte';
 	import PageHeader from '$lib/components/app/PageHeader.svelte';
+	import { cn } from '$lib/utils';
 	import Building2Icon from '@lucide/svelte/icons/building-2';
 	import MailIcon from '@lucide/svelte/icons/mail';
 
@@ -48,150 +49,35 @@
 />
 
 <PageShell>
-	<div class="settings-grid">
-		<!-- Sub-navigation -->
-		<aside class="settings-aside">
-			<nav class="settings-nav" aria-label="Settings sections">
+	<div class="grid min-h-[32rem] overflow-hidden border-y md:grid-cols-[15rem_minmax(0,1fr)]">
+		<aside class="flex flex-col gap-4 border-b p-3 md:border-r md:border-b-0">
+			<p class="px-2 pb-0.5 text-sm font-semibold">Settings</p>
+			<nav class="flex flex-col gap-0.5" aria-label="Settings sections">
 				{#each sections as section (section.href)}
 					{@const isActive = activeMatch === section.match}
 					{@const Icon = section.icon}
 					<a
 						href={resolve(section.href)}
-						class="settings-nav-item"
-						data-active={isActive}
+						class={cn(
+							'flex min-w-0 items-start gap-2 rounded-md px-2 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground focus-visible:outline-none',
+							isActive && 'bg-muted text-foreground'
+						)}
 						aria-current={isActive ? 'page' : undefined}
 					>
-						<span class="settings-nav-icon">
-							<Icon class="size-[14px]" />
+						<span class="mt-0.5 inline-flex size-5 shrink-0 items-center justify-center">
+							<Icon class="size-3.5" />
 						</span>
-						<span class="settings-nav-text">
-							<span class="settings-nav-label">{section.label}</span>
-							<span class="settings-nav-desc">{section.description}</span>
+						<span class="flex min-w-0 flex-1 flex-col gap-0.5">
+							<span class="truncate font-medium">{section.label}</span>
+							<span class="truncate text-xs text-muted-foreground">{section.description}</span>
 						</span>
 					</a>
 				{/each}
 			</nav>
 		</aside>
 
-		<!-- Content -->
-		<main class="settings-main">
+		<main class="min-w-0 p-5">
 			{@render children?.()}
 		</main>
 	</div>
 </PageShell>
-
-<style>
-	.settings-grid {
-		display: grid;
-		grid-template-columns: 1fr;
-		gap: 1.25rem;
-	}
-
-	@media (min-width: 900px) {
-		.settings-grid {
-			grid-template-columns: 16rem 1fr;
-			gap: 2rem;
-			align-items: start;
-		}
-	}
-
-	.settings-aside {
-		display: flex;
-		flex-direction: column;
-		gap: 1.25rem;
-	}
-
-	@media (min-width: 900px) {
-		.settings-aside {
-			position: sticky;
-			top: 1.5rem;
-		}
-	}
-
-	.settings-nav {
-		display: flex;
-		flex-direction: column;
-		gap: 0.15rem;
-	}
-
-	.settings-nav-item {
-		display: flex;
-		align-items: flex-start;
-		gap: 0.7rem;
-		padding: 0.6rem 0.75rem;
-		border-radius: var(--radius-md);
-		color: var(--muted-foreground);
-		text-decoration: none;
-		transition:
-			background 140ms ease,
-			color 140ms ease;
-		min-width: 0;
-	}
-
-	.settings-nav-item:hover {
-		color: var(--foreground);
-		background: color-mix(in srgb, var(--muted) 40%, transparent);
-	}
-
-	.settings-nav-item:focus-visible {
-		outline: none;
-		color: var(--foreground);
-		background: color-mix(in srgb, var(--muted) 50%, transparent);
-		box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 25%, transparent);
-	}
-
-	.settings-nav-item[data-active='true'] {
-		color: var(--foreground);
-		background: color-mix(in srgb, var(--muted) 70%, transparent);
-	}
-
-	.settings-nav-icon {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		width: 1rem;
-		height: 1rem;
-		margin-top: 0.15rem;
-		color: color-mix(in srgb, var(--muted-foreground) 90%, transparent);
-		flex-shrink: 0;
-		transition: color 140ms ease;
-	}
-
-	.settings-nav-item:hover .settings-nav-icon,
-	.settings-nav-item[data-active='true'] .settings-nav-icon {
-		color: var(--foreground);
-	}
-
-	.settings-nav-text {
-		display: flex;
-		flex-direction: column;
-		min-width: 0;
-		flex: 1;
-		gap: 0.1rem;
-	}
-
-	.settings-nav-label {
-		font-size: 0.8125rem;
-		font-weight: 500;
-		color: inherit;
-		letter-spacing: -0.005em;
-		line-height: 1.2;
-	}
-
-	.settings-nav-item[data-active='true'] .settings-nav-label {
-		font-weight: 600;
-	}
-
-	.settings-nav-desc {
-		font-size: 0.6875rem;
-		color: var(--muted-foreground);
-		opacity: 0.8;
-		line-height: 1.3;
-	}
-
-	.settings-main {
-		min-width: 0;
-		display: flex;
-		flex-direction: column;
-	}
-</style>

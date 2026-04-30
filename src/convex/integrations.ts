@@ -71,9 +71,26 @@ const integrationSummaryValue = v.object({
 	permissions: v.array(v.string()),
 	missingRequiredPermissions: v.array(v.string()),
 	syncHorizonMonths: v.number(),
+	apiKeyLast4: v.union(v.string(), v.null()),
 	lastSyncError: v.union(v.string(), v.null()),
 	connectedAt: v.union(v.number(), v.null()),
 	canManage: v.boolean()
+});
+
+const webhookEventSummaryValue = v.object({
+	eventId: v.id('booking_webhook_events'),
+	integrationId: v.id('booking_integrations'),
+	eventType: v.string(),
+	itemId: v.string(),
+	status: v.union(
+		v.literal('received'),
+		v.literal('processed'),
+		v.literal('ignored'),
+		v.literal('failed')
+	),
+	receivedAt: v.number(),
+	processedAt: v.union(v.number(), v.null()),
+	errorMessage: v.union(v.string(), v.null())
 });
 
 function requiredEnv(name: string): string {
@@ -559,9 +576,40 @@ export const listWorkspaceIntegrations = query({
 					? missingBookeoRequiredPermissions(integration.permissions)
 					: [],
 			syncHorizonMonths: integration.syncHorizonMonths,
+			apiKeyLast4: integration.apiKeyLast4 ?? null,
 			lastSyncError: integration.lastSyncError ?? null,
 			connectedAt: integration.connectedAt ?? null,
 			canManage: membership.role === 'owner'
+		}));
+	}
+});
+
+export const listRecentWebhookEvents = query({
+	args: {
+		workspaceId: v.id('workspaces'),
+		integrationId: v.id('booking_integrations')
+	},
+	returns: v.array(webhookEventSummaryValue),
+	handler: async (ctx, args) => {
+		await requireWorkspaceMember(ctx, args.workspaceId);
+		const integration = await ctx.db.get(args.integrationId);
+		if (!integration || integration.workspaceId !== args.workspaceId) return [];
+
+		const events = await ctx.db
+			.query('booking_webhook_events')
+			.withIndex('by_integrationId', (q) => q.eq('integrationId', args.integrationId))
+			.order('desc')
+			.take(5);
+
+		return events.map((event) => ({
+			eventId: event._id,
+			integrationId: event.integrationId,
+			eventType: event.eventType,
+			itemId: event.itemId,
+			status: event.status,
+			receivedAt: event.receivedAt,
+			processedAt: event.processedAt ?? null,
+			errorMessage: event.errorMessage ?? null
 		}));
 	}
 });
