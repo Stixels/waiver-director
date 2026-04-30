@@ -719,11 +719,9 @@
 					<section class="flex min-w-0 flex-col gap-4 border-t pt-4">
 						<div class="grid gap-3 md:grid-cols-3">
 							<div class="rounded-lg border bg-card p-4">
-								<p class="text-xs font-medium text-muted-foreground">API key</p>
+								<p class="text-xs font-medium text-muted-foreground">Account ID</p>
 								<p class="mt-2 text-sm font-semibold">
-									{selectedIntegration.apiKeyLast4
-										? `Ending in ${selectedIntegration.apiKeyLast4}`
-										: 'Stored securely'}
+									{selectedIntegration.accountId ?? 'Connected'}
 								</p>
 							</div>
 							<div class="rounded-lg border bg-card p-4">

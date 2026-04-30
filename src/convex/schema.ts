@@ -263,7 +263,6 @@ export default defineSchema({
 			v.literal('disconnected')
 		),
 		encryptedApiKey: v.optional(v.string()),
-		apiKeyLast4: v.optional(v.string()),
 		accountId: v.optional(v.string()),
 		permissions: v.array(v.string()),
 		syncHorizonMonths: v.number(),

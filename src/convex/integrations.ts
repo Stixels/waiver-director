@@ -71,7 +71,6 @@ const integrationSummaryValue = v.object({
 	permissions: v.array(v.string()),
 	missingRequiredPermissions: v.array(v.string()),
 	syncHorizonMonths: v.number(),
-	apiKeyLast4: v.union(v.string(), v.null()),
 	lastSyncError: v.union(v.string(), v.null()),
 	connectedAt: v.union(v.number(), v.null()),
 	canManage: v.boolean()
@@ -576,7 +575,6 @@ export const listWorkspaceIntegrations = query({
 					? missingBookeoRequiredPermissions(integration.permissions)
 					: [],
 			syncHorizonMonths: integration.syncHorizonMonths,
-			apiKeyLast4: integration.apiKeyLast4 ?? null,
 			lastSyncError: integration.lastSyncError ?? null,
 			connectedAt: integration.connectedAt ?? null,
 			canManage: membership.role === 'owner'
@@ -728,7 +726,6 @@ export const connectBookeoManually = action({
 				{
 					workspaceId: args.workspaceId,
 					encryptedApiKey: await encryptSecret(apiKey),
-					apiKeyLast4: apiKey.slice(-4),
 					accountId: apiKeyInfo.accountId,
 					permissions: apiKeyInfo.permissions,
 					syncHorizonMonths
@@ -980,7 +977,6 @@ export const saveBookeoConnection = internalMutation({
 	args: {
 		workspaceId: v.id('workspaces'),
 		encryptedApiKey: v.string(),
-		apiKeyLast4: v.string(),
 		accountId: v.optional(v.string()),
 		permissions: v.array(v.string()),
 		syncHorizonMonths: syncHorizonMonthsValidator
@@ -1011,7 +1007,6 @@ export const saveBookeoConnection = internalMutation({
 				provider: 'bookeo',
 				status: 'syncing',
 				encryptedApiKey: args.encryptedApiKey,
-				apiKeyLast4: args.apiKeyLast4,
 				...(args.accountId ? { accountId: args.accountId } : {}),
 				permissions: args.permissions,
 				syncHorizonMonths,
@@ -1022,7 +1017,6 @@ export const saveBookeoConnection = internalMutation({
 		await ctx.db.patch(integration._id, {
 			status: 'syncing',
 			encryptedApiKey: args.encryptedApiKey,
-			apiKeyLast4: args.apiKeyLast4,
 			accountId: args.accountId,
 			permissions: args.permissions,
 			syncHorizonMonths,
@@ -1544,7 +1538,6 @@ export const completeBookeoCallback = internalAction({
 				{
 					workspaceId: session.workspaceId,
 					encryptedApiKey: await encryptSecret(apiKey),
-					apiKeyLast4: apiKey.slice(-4),
 					accountId: apiKeyInfo.accountId,
 					permissions: apiKeyInfo.permissions,
 					syncHorizonMonths: assertValidSyncHorizon(session.syncHorizonMonths)
