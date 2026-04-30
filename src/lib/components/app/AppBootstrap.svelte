@@ -44,8 +44,7 @@
 		convexAuth.status === 'authenticated' && !!appData && !appData.currentUser && !ensureError
 	);
 	const isLoading = $derived(
-		convexAuth.status === 'loading' ||
-			appQuery.isLoading ||
+		appQuery.isLoading ||
 			isEnsuringUser ||
 			isPreparingUser ||
 			(convexAuth.status === 'authenticated' && !appData && !ensureError)

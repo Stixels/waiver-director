@@ -19,6 +19,7 @@
 	const convex = useConvexClient();
 	const convexAuth = $state<ConvexAuthState>({
 		status: 'loading',
+		sessionId: null,
 		signOut
 	});
 	setConvexAuthContext(convexAuth);
@@ -46,7 +47,9 @@
 		if (!clerk.clerk) return;
 
 		const previousStatus = convexAuth.status;
+		const previousSessionId = convexAuth.sessionId;
 		convexAuth.status = 'unauthenticated';
+		convexAuth.sessionId = null;
 		await tick();
 
 		try {
@@ -54,6 +57,7 @@
 		} catch (error) {
 			if (getCurrentSessionId() === lastRegisteredSessionId) {
 				convexAuth.status = previousStatus;
+				convexAuth.sessionId = previousSessionId;
 			}
 			throw error;
 		}
@@ -61,13 +65,17 @@
 
 	function updateAuthStatusForSession(sessionId: string, isAuthenticated: boolean) {
 		if (!ownsCurrentTokenState(sessionId)) return;
-		convexAuth.status = isAuthenticated ? 'authenticated' : 'unauthenticated';
+		convexAuth.status = isAuthenticated ? 'authenticated' : 'loading';
+		if (isAuthenticated) {
+			convexAuth.sessionId = sessionId;
+		}
 	}
 
 	function beginUnauthenticatedTeardown() {
 		const previousSessionId = lastRegisteredSessionId;
 
 		convexAuth.status = 'unauthenticated';
+		convexAuth.sessionId = null;
 
 		if (previousSessionId) {
 			void clearConvexAuthAfterProtectedQueriesSkip(previousSessionId);
@@ -142,6 +150,9 @@
 
 		lastRegisteredSessionId = sessionId;
 		convexAuth.status = 'loading';
+		if (convexAuth.sessionId !== sessionId) {
+			convexAuth.sessionId = null;
+		}
 
 		// Set the Convex auth token for the current Clerk session
 		convexClient.setAuth(
@@ -156,6 +167,7 @@
 		}
 
 		convexAuth.status = 'unauthenticated';
+		convexAuth.sessionId = null;
 		convex.client.clearAuth();
 		lastRegisteredSessionId = null;
 	});
