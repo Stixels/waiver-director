@@ -39,6 +39,10 @@ export function useConvexAuthState(): ConvexAuthState {
 	);
 }
 
+export function clearProtectedQueryCache() {
+	protectedQueryCache.clear();
+}
+
 export function useProtectedQuery<Query extends FunctionReference<'query'>>(
 	query: Query,
 	args: FunctionArgs<Query> | 'skip' | (() => FunctionArgs<Query> | 'skip'),

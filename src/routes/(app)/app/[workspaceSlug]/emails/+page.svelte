@@ -3,7 +3,7 @@
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
 	import { onMount, tick, untrack } from 'svelte';
-	import { SvelteSet } from 'svelte/reactivity';
+	import { SvelteSet, SvelteURLSearchParams } from 'svelte/reactivity';
 	import { useConvexClient } from 'convex-svelte';
 	import { toast } from 'svelte-sonner';
 	import type { FunctionReturnType } from 'convex/server';
@@ -686,7 +686,14 @@
 	}
 
 	async function updateFollowUpUrl(followUpId: Id<'email_follow_ups'> | null, replaceState = true) {
-		const query = queryString([['followUpId', followUpId]]);
+		const params = new SvelteURLSearchParams(page.url.searchParams);
+		if (followUpId) {
+			params.set('followUpId', followUpId);
+		} else {
+			params.delete('followUpId');
+		}
+
+		const query = queryString([...params.entries()]);
 		const pathname = `/app/${page.params.workspaceSlug}/emails` as `/app/${string}/emails`;
 		const href = (query ? `${pathname}?${query}` : pathname) as
 			| `/app/${string}/emails`
