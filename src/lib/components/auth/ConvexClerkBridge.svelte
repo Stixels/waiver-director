@@ -4,6 +4,7 @@
 	import { useConvexClient } from 'convex-svelte';
 	import { useClerkContext } from 'svelte-clerk';
 	import {
+		clearProtectedQueryCache,
 		setConvexAuthContext,
 		type ConvexAuthState
 	} from '$lib/components/auth/convex-auth.svelte';
@@ -19,6 +20,7 @@
 	const convex = useConvexClient();
 	const convexAuth = $state<ConvexAuthState>({
 		status: 'loading',
+		sessionId: null,
 		signOut
 	});
 	setConvexAuthContext(convexAuth);
@@ -46,14 +48,22 @@
 		if (!clerk.clerk) return;
 
 		const previousStatus = convexAuth.status;
+		const previousSessionId = convexAuth.sessionId;
 		convexAuth.status = 'unauthenticated';
+		convexAuth.sessionId = null;
+		clearProtectedQueryCache();
 		await tick();
 
 		try {
 			await clerk.clerk.signOut({ redirectUrl });
 		} catch (error) {
-			if (getCurrentSessionId() === lastRegisteredSessionId) {
+			if (
+				previousSessionId &&
+				getCurrentSessionId() === previousSessionId &&
+				lastRegisteredSessionId === previousSessionId
+			) {
 				convexAuth.status = previousStatus;
+				convexAuth.sessionId = previousSessionId;
 			}
 			throw error;
 		}
@@ -61,13 +71,18 @@
 
 	function updateAuthStatusForSession(sessionId: string, isAuthenticated: boolean) {
 		if (!ownsCurrentTokenState(sessionId)) return;
-		convexAuth.status = isAuthenticated ? 'authenticated' : 'unauthenticated';
+		convexAuth.status = isAuthenticated ? 'authenticated' : 'loading';
+		if (isAuthenticated) {
+			convexAuth.sessionId = sessionId;
+		}
 	}
 
 	function beginUnauthenticatedTeardown() {
 		const previousSessionId = lastRegisteredSessionId;
 
 		convexAuth.status = 'unauthenticated';
+		convexAuth.sessionId = null;
+		clearProtectedQueryCache();
 
 		if (previousSessionId) {
 			void clearConvexAuthAfterProtectedQueriesSkip(previousSessionId);
@@ -140,8 +155,12 @@
 			return;
 		}
 
+		clearProtectedQueryCache();
 		lastRegisteredSessionId = sessionId;
 		convexAuth.status = 'loading';
+		if (convexAuth.sessionId !== sessionId) {
+			convexAuth.sessionId = null;
+		}
 
 		// Set the Convex auth token for the current Clerk session
 		convexClient.setAuth(
@@ -156,6 +175,8 @@
 		}
 
 		convexAuth.status = 'unauthenticated';
+		convexAuth.sessionId = null;
+		clearProtectedQueryCache();
 		convex.client.clearAuth();
 		lastRegisteredSessionId = null;
 	});

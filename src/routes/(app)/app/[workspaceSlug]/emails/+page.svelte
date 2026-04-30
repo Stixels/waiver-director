@@ -3,7 +3,7 @@
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
 	import { onMount, tick, untrack } from 'svelte';
-	import { SvelteSet } from 'svelte/reactivity';
+	import { SvelteSet, SvelteURLSearchParams } from 'svelte/reactivity';
 	import { useConvexClient } from 'convex-svelte';
 	import { toast } from 'svelte-sonner';
 	import type { FunctionReturnType } from 'convex/server';
@@ -686,17 +686,18 @@
 	}
 
 	async function updateFollowUpUrl(followUpId: Id<'email_follow_ups'> | null, replaceState = true) {
-		const query = queryString([['followUpId', followUpId]]);
-		const pathname = (
-			page.url.pathname.endsWith('/emails/follow-ups')
-				? `/app/${page.params.workspaceSlug}/emails/follow-ups`
-				: `/app/${page.params.workspaceSlug}/emails`
-		) as `/app/${string}/emails` | `/app/${string}/emails/follow-ups`;
+		const params = new SvelteURLSearchParams(page.url.searchParams);
+		if (followUpId) {
+			params.set('followUpId', followUpId);
+		} else {
+			params.delete('followUpId');
+		}
+
+		const query = queryString([...params.entries()]);
+		const pathname = `/app/${page.params.workspaceSlug}/emails` as `/app/${string}/emails`;
 		const href = (query ? `${pathname}?${query}` : pathname) as
 			| `/app/${string}/emails`
-			| `/app/${string}/emails?${string}`
-			| `/app/${string}/emails/follow-ups`
-			| `/app/${string}/emails/follow-ups?${string}`;
+			| `/app/${string}/emails?${string}`;
 
 		await goto(resolve(href), {
 			replaceState,
@@ -1036,7 +1037,9 @@
 	};
 
 	const activeTab = $derived<'queue' | 'email'>(
-		page.url.pathname.endsWith('/emails/editor') ? 'email' : 'queue'
+		page.url.searchParams.get('tab') === 'email' || page.url.pathname.endsWith('/emails/editor')
+			? 'email'
+			: 'queue'
 	);
 
 	let emailPreviewMode = $state(false);
@@ -1307,7 +1310,7 @@
 	{#snippet meta()}
 		<nav class="header-tabs" aria-label="Email follow-up sections">
 			<a
-				href={resolve(`/app/${page.params.workspaceSlug}/emails/follow-ups` as const)}
+				href={resolve(`/app/${page.params.workspaceSlug}/emails` as const)}
 				aria-current={activeTab === 'queue' ? 'page' : undefined}
 				class="header-tab-btn"
 			>
@@ -1317,7 +1320,7 @@
 				{/if}
 			</a>
 			<a
-				href={resolve(`/app/${page.params.workspaceSlug}/emails/editor` as const)}
+				href={resolve(`/app/${page.params.workspaceSlug}/emails?tab=email` as const)}
 				aria-current={activeTab === 'email' ? 'page' : undefined}
 				class="header-tab-btn"
 			>
