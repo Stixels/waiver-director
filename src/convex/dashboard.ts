@@ -11,6 +11,11 @@ const trendDayValue = v.object({
 	count: v.number()
 });
 
+const kpiComparisonValue = v.object({
+	currentTotal: v.number(),
+	previousTotal: v.number()
+});
+
 function floorToDay(epochMs: number): number {
 	const d = new Date(epochMs);
 	return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
@@ -44,6 +49,16 @@ function buildDayBuckets(
 	return buckets;
 }
 
+function sumCountsBetween(counts: Map<number, number>, startAt: number, endAt: number): number {
+	let total = 0;
+	for (const [dayStartAt, count] of counts) {
+		if (dayStartAt >= startAt && dayStartAt < endAt) {
+			total += count;
+		}
+	}
+	return total;
+}
+
 export const getDashboardSnapshot = query({
 	args: {
 		workspaceId: v.id('workspaces'),
@@ -64,6 +79,12 @@ export const getDashboardSnapshot = query({
 			submissionsToday: v.array(trendDayValue),
 			followUpsQueued: v.array(trendDayValue),
 			totalCustomers: v.array(trendDayValue)
+		}),
+		kpiComparisons: v.object({
+			bookingsToday: kpiComparisonValue,
+			submissionsToday: kpiComparisonValue,
+			followUpsQueued: kpiComparisonValue,
+			totalCustomers: kpiComparisonValue
 		}),
 		emailPipeline: v.object({
 			queued: v.number(),
@@ -126,6 +147,9 @@ export const getDashboardSnapshot = query({
 				.take(5000)
 		]);
 
+		const currentTrendStartAt = args.todayStartAt - 6 * DAY_MS;
+		const previousTrendEndAt = currentTrendStartAt;
+
 		const bookingsToday = trendBookings.filter(
 			(b) => (b.startAt ?? 0) >= args.todayStartAt && (b.startAt ?? 0) < args.todayEndAt
 		);
@@ -140,11 +164,15 @@ export const getDashboardSnapshot = query({
 			bookingTrendCounts.set(day, (bookingTrendCounts.get(day) ?? 0) + 1);
 		}
 		const bookingsTodayTrend = buildDayBuckets(
-			args.trendStartAt,
+			currentTrendStartAt,
 			args.todayStartAt,
 			bookingTrendCounts,
 			dayLabel
 		);
+		const bookingsComparison = {
+			currentTotal: sumCountsBetween(bookingTrendCounts, currentTrendStartAt, args.todayEndAt),
+			previousTotal: sumCountsBetween(bookingTrendCounts, args.trendStartAt, previousTrendEndAt)
+		};
 
 		const trendCounts = new Map<number, number>();
 		for (const s of trendSubmissions) {
@@ -153,11 +181,15 @@ export const getDashboardSnapshot = query({
 			trendCounts.set(day, (trendCounts.get(day) ?? 0) + 1);
 		}
 		const submissionsTodayTrend = buildDayBuckets(
-			args.trendStartAt,
+			currentTrendStartAt,
 			args.todayStartAt,
 			trendCounts,
 			dayLabel
 		);
+		const submissionsComparison = {
+			currentTotal: sumCountsBetween(trendCounts, currentTrendStartAt, args.todayEndAt),
+			previousTotal: sumCountsBetween(trendCounts, args.trendStartAt, previousTrendEndAt)
+		};
 
 		const followUpTrendCounts = new Map<number, number>();
 		for (const followUp of queuedFollowUps) {
@@ -168,11 +200,15 @@ export const getDashboardSnapshot = query({
 			followUpTrendCounts.set(day, (followUpTrendCounts.get(day) ?? 0) + 1);
 		}
 		const followUpsQueuedTrend = buildDayBuckets(
-			args.trendStartAt,
+			currentTrendStartAt,
 			args.todayStartAt,
 			followUpTrendCounts,
 			dayLabel
 		);
+		const followUpsComparison = {
+			currentTotal: sumCountsBetween(followUpTrendCounts, currentTrendStartAt, args.todayEndAt),
+			previousTotal: sumCountsBetween(followUpTrendCounts, args.trendStartAt, previousTrendEndAt)
+		};
 
 		const customerTrendCounts = new Map<number, number>();
 		for (const customer of customers) {
@@ -183,11 +219,15 @@ export const getDashboardSnapshot = query({
 			customerTrendCounts.set(day, (customerTrendCounts.get(day) ?? 0) + 1);
 		}
 		const totalCustomersTrend = buildDayBuckets(
-			args.trendStartAt,
+			currentTrendStartAt,
 			args.todayStartAt,
 			customerTrendCounts,
 			dayLabel
 		);
+		const customersComparison = {
+			currentTotal: sumCountsBetween(customerTrendCounts, currentTrendStartAt, args.todayEndAt),
+			previousTotal: sumCountsBetween(customerTrendCounts, args.trendStartAt, previousTrendEndAt)
+		};
 
 		// Email pipeline — run all status counts in parallel
 		const [sentCount, failedCount, blockedCount, unscheduledCount] = await Promise.all([
@@ -242,6 +282,12 @@ export const getDashboardSnapshot = query({
 				followUpsQueued: followUpsQueuedTrend,
 				totalCustomers: totalCustomersTrend
 			},
+			kpiComparisons: {
+				bookingsToday: bookingsComparison,
+				submissionsToday: submissionsComparison,
+				followUpsQueued: followUpsComparison,
+				totalCustomers: customersComparison
+			},
 			emailPipeline: {
 				queued: queuedFollowUps.length,
 				sent: sentCount,
@@ -288,7 +334,15 @@ export const getAnalyticsSeries = query({
 			});
 		}
 
-		const [submissions, bookings, customers, sentFollowUps, queuedFollowUps, failedFollowUps, blockedFollowUps] = await Promise.all([
+		const [
+			submissions,
+			bookings,
+			customers,
+			sentFollowUps,
+			queuedFollowUps,
+			failedFollowUps,
+			blockedFollowUps
+		] = await Promise.all([
 			ctx.db
 				.query('waiver_submissions')
 				.withIndex('by_workspaceId', (q) => q.eq('workspaceId', args.workspaceId))

@@ -23,12 +23,26 @@
 		totalCustomers: TrendDay[];
 	};
 
+	type KpiComparison = { currentTotal: number; previousTotal: number };
+
+	type KpiComparisons = {
+		bookingsToday: KpiComparison;
+		submissionsToday: KpiComparison;
+		followUpsQueued: KpiComparison;
+		totalCustomers: KpiComparison;
+	};
+
 	let {
 		kpi,
 		trends,
+		comparisons,
 		isLoading
-	}: { kpi: Kpi | null | undefined; trends: KpiTrends | null | undefined; isLoading: boolean } =
-		$props();
+	}: {
+		kpi: Kpi | null | undefined;
+		trends: KpiTrends | null | undefined;
+		comparisons: KpiComparisons | null | undefined;
+		isLoading: boolean;
+	} = $props();
 
 	const stats = $derived([
 		{
@@ -36,6 +50,7 @@
 			value: kpi?.bookingsToday ?? 0,
 			icon: CalendarCheckIcon,
 			trend: trends?.bookingsToday,
+			comparison: comparisons?.bookingsToday,
 			color: 'var(--color-primary)',
 			bgStyle: 'color-mix(in oklch, var(--color-primary) 12%, transparent)'
 		},
@@ -44,6 +59,7 @@
 			value: kpi?.submissionsToday ?? 0,
 			icon: ScrollTextIcon,
 			trend: trends?.submissionsToday,
+			comparison: comparisons?.submissionsToday,
 			color: 'oklch(0.627 0.194 149.21)',
 			bgStyle: 'color-mix(in oklch, oklch(0.627 0.194 149.21) 12%, transparent)'
 		},
@@ -52,6 +68,7 @@
 			value: kpi?.followUpsQueued ?? 0,
 			icon: MailIcon,
 			trend: trends?.followUpsQueued,
+			comparison: comparisons?.followUpsQueued,
 			color: 'oklch(0.7 0.15 60)',
 			bgStyle: 'color-mix(in oklch, oklch(0.7 0.15 60) 12%, transparent)'
 		},
@@ -60,6 +77,7 @@
 			value: kpi?.totalCustomers ?? 0,
 			icon: UsersRoundIcon,
 			trend: trends?.totalCustomers,
+			comparison: comparisons?.totalCustomers,
 			color: 'oklch(0.58 0.18 255)',
 			bgStyle: 'color-mix(in oklch, oklch(0.58 0.18 255) 12%, transparent)'
 		}
@@ -67,6 +85,23 @@
 
 	function trendTotal(trend: TrendDay[] | null | undefined) {
 		return trend?.reduce((total, point) => total + point.count, 0) ?? 0;
+	}
+
+	function comparisonLabel(comparison: KpiComparison | null | undefined) {
+		if (!comparison) return 'No data';
+		if (comparison.previousTotal === 0) {
+			if (comparison.currentTotal === 0) return '0% this week';
+			return 'New this week';
+		}
+		const change = Math.round(
+			((comparison.currentTotal - comparison.previousTotal) / comparison.previousTotal) * 100
+		);
+		return `${change > 0 ? '+' : ''}${change.toLocaleString()}% this week`;
+	}
+
+	function comparisonTitle(comparison: KpiComparison | null | undefined) {
+		if (!comparison) return 'No prior-week comparison available';
+		return `${comparison.currentTotal.toLocaleString()} this week, ${comparison.previousTotal.toLocaleString()} prior week`;
 	}
 </script>
 
@@ -92,20 +127,26 @@
 						<stat.icon class="size-5" />
 					</div>
 				</div>
-				<div class="mt-2 space-y-1.5">
+				<div class="mt-3 space-y-2">
 					{#if isLoading && trends == null}
-						<Skeleton class="h-12 w-full" />
+						<Skeleton class="h-16 w-full" />
 					{:else}
 						<KpiSparkline data={stat.trend} label={stat.label} color={stat.color} />
 					{/if}
-					<div class="flex min-w-0 items-center justify-end text-xs">
-						<div
-							class="flex h-5 shrink-0 items-center gap-1 rounded-md border border-border px-1.5 text-[0.65rem]"
-						>
-							<span class="font-semibold tabular-nums text-foreground">
-								{trendTotal(stat.trend).toLocaleString()}
+					<div class="flex min-w-0 items-center justify-between gap-2 text-[0.68rem] leading-none">
+						<div class="min-w-0">
+							<p class="font-medium text-muted-foreground">Last 7 days</p>
+							<p class="mt-1 font-semibold text-foreground tabular-nums">
+								{trendTotal(stat.trend).toLocaleString()} total
+							</p>
+						</div>
+						<div class="flex shrink-0 items-center tabular-nums">
+							<span
+								class="text-[0.65rem] font-medium text-muted-foreground"
+								title={comparisonTitle(stat.comparison)}
+							>
+								{comparisonLabel(stat.comparison)}
 							</span>
-							<span class="text-muted-foreground">/ 7d</span>
 						</div>
 					</div>
 				</div>

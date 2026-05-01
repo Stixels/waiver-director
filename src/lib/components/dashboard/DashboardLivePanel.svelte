@@ -92,7 +92,7 @@
 		if (Number.isNaN(startAt)) return null;
 		const endAt = booking.endTime ? Date.parse(booking.endTime) : startAt + 60 * 60 * 1000;
 		const diffMs = startAt - now;
-		const diffMinutes = Math.round(diffMs / 60_000);
+		const diffMinutes = Math.max(1, Math.round(diffMs / 60_000));
 		if (now >= startAt && now <= endAt) return { label: 'Now', tone: 'now' };
 		if (now > endAt) return { label: 'Done', tone: 'past' };
 		if (diffMinutes <= 60) return { label: `In ${diffMinutes}m`, tone: 'soon' };
@@ -100,9 +100,11 @@
 	}
 
 	function timeStatusClass(tone: TimeStatus['tone']) {
-		if (tone === 'now') return 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400';
-		if (tone === 'soon') return 'bg-amber-500/15 text-amber-700 dark:text-amber-400';
-		return 'bg-muted/60 text-muted-foreground/70';
+		if (tone === 'now')
+			return 'border-emerald-500/25 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400';
+		if (tone === 'soon')
+			return 'border-amber-500/25 bg-amber-500/10 text-amber-700 dark:text-amber-400';
+		return 'border-border bg-muted/50 text-muted-foreground';
 	}
 
 	function formatTime(timestamp: string | null) {
@@ -217,7 +219,7 @@
 								{#if status}
 									<span
 										class={cn(
-											'mt-1 inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold tracking-wide uppercase',
+											'mt-1 inline-flex h-5 items-center rounded-full border px-2 text-[10px] leading-none font-semibold',
 											timeStatusClass(status.tone)
 										)}
 									>

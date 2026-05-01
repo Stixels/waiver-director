@@ -30,11 +30,11 @@
 		return { startAt: start.getTime(), endAt: end.getTime() };
 	});
 
-	// 7-day trend: today + 6 previous days
+	// 14-day window supports the visible 7-day trend plus a prior-week comparison.
 	const trendStartAt = $derived.by(() => {
 		const now = new Date();
 		const [y, m, d] = toDateInputValue(now).split('-').map(Number);
-		return new Date(y, m - 1, d - 6).getTime();
+		return new Date(y, m - 1, d - 13).getTime();
 	});
 
 	const snapshotQuery = useProtectedQuery(
@@ -70,7 +70,12 @@
 />
 
 <PageShell>
-	<DashboardKpiRow kpi={snapshot?.kpi} trends={snapshot?.kpiTrends} isLoading={isInitialLoading} />
+	<DashboardKpiRow
+		kpi={snapshot?.kpi}
+		trends={snapshot?.kpiTrends}
+		comparisons={snapshot?.kpiComparisons}
+		isLoading={isInitialLoading}
+	/>
 
 	<div class="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_24rem]">
 		{#if currentWorkspace}

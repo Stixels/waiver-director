@@ -50,42 +50,62 @@
 		{
 			label: 'Queued',
 			count: pipeline?.queued ?? 0,
-			tone: 'primary' as ChipTone
+			tone: 'primary' as ChipTone,
+			hint: 'ready'
 		},
 		{
 			label: 'Sent',
 			count: pipeline?.sent ?? 0,
-			tone: 'green' as ChipTone
+			tone: 'green' as ChipTone,
+			hint: 'delivered'
 		},
 		{
 			label: 'Failed',
 			count: pipeline?.failed ?? 0,
-			tone: ((pipeline?.failed ?? 0) > 0 ? 'destructive' : 'muted') as ChipTone
+			tone: ((pipeline?.failed ?? 0) > 0 ? 'destructive' : 'muted') as ChipTone,
+			hint: (pipeline?.failed ?? 0) > 0 ? 'needs review' : 'none'
 		},
 		{
 			label: 'Blocked',
 			count: pipeline?.blocked ?? 0,
-			tone: ((pipeline?.blocked ?? 0) > 0 ? 'amber' : 'muted') as ChipTone
+			tone: ((pipeline?.blocked ?? 0) > 0 ? 'amber' : 'muted') as ChipTone,
+			hint: (pipeline?.blocked ?? 0) > 0 ? 'sender setup' : 'none'
 		},
 		{
 			label: 'Unscheduled',
 			count: pipeline?.unscheduled ?? 0,
-			tone: 'muted' as ChipTone
+			tone: 'muted' as ChipTone,
+			hint: 'no schedule'
 		}
 	]);
 
 	function chipClasses(tone: ChipTone): string {
 		switch (tone) {
 			case 'primary':
-				return 'border-primary/20 bg-primary/10 text-primary dark:border-primary/40 dark:bg-primary/15 dark:text-[color-mix(in_oklch,var(--primary)_32%,var(--primary-foreground))]';
+				return 'border-primary/25 bg-primary/8 text-primary dark:border-primary/40 dark:bg-primary/15 dark:text-[color-mix(in_oklch,var(--primary)_32%,var(--primary-foreground))]';
 			case 'green':
-				return 'border-emerald-500/20 bg-emerald-500/8 text-emerald-700 dark:text-emerald-400';
+				return 'border-emerald-500/25 bg-emerald-500/8 text-emerald-700 dark:text-emerald-400';
 			case 'destructive':
-				return 'border-destructive/20 bg-destructive/8 text-destructive';
+				return 'border-destructive/30 bg-destructive/8 text-destructive';
 			case 'amber':
-				return 'border-amber-500/20 bg-amber-500/8 text-amber-700 dark:text-amber-400';
+				return 'border-amber-500/30 bg-amber-500/8 text-amber-700 dark:text-amber-400';
 			default:
 				return 'border-border bg-muted/40 text-muted-foreground';
+		}
+	}
+
+	function dotClasses(tone: ChipTone): string {
+		switch (tone) {
+			case 'primary':
+				return 'bg-primary';
+			case 'green':
+				return 'bg-emerald-500';
+			case 'destructive':
+				return 'bg-destructive';
+			case 'amber':
+				return 'bg-amber-500';
+			default:
+				return 'bg-muted-foreground/45';
 		}
 	}
 
@@ -131,24 +151,27 @@
 			<ExternalLinkIcon class="size-3" />
 		</a>
 	</CardHeader>
-	<CardContent class="flex min-h-0 flex-1 flex-col gap-4 p-4">
-		<!-- Status chips -->
+	<CardContent class="flex min-h-0 flex-1 flex-col gap-3 p-4">
 		{#if isLoading && pipeline == null}
-			<div class="flex flex-wrap gap-2">
+			<div class="flex flex-wrap gap-1.5">
 				{#each chipSkeletonRows as row (row)}
-					<Skeleton class="h-6 w-24" />
+					<Skeleton class="h-7 w-24" />
 				{/each}
 			</div>
 		{:else}
 			<div class="flex flex-wrap gap-1.5">
 				{#each statusChips as chip (chip.label)}
 					<div
-						class="inline-flex h-6 items-center gap-1.5 rounded-md border px-2.5 text-xs {chipClasses(chip.tone)}"
+						class="inline-flex h-7 items-center gap-1.5 rounded-md border px-2 text-xs {chipClasses(
+							chip.tone
+						)}"
+						title={`${chip.label}: ${chip.hint}`}
 					>
-						<span>{chip.label}</span>
+						<span class="size-1.5 shrink-0 rounded-full {dotClasses(chip.tone)}"></span>
 						<span class="font-semibold tabular-nums">
 							{chip.count.toLocaleString()}
 						</span>
+						<span>{chip.label}</span>
 					</div>
 				{/each}
 			</div>

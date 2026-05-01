@@ -1,9 +1,4 @@
 <script lang="ts">
-	import { ChartContainer, type ChartConfig } from '$lib/components/ui/chart';
-	import { Area, AreaChart, ChartClipPath } from 'layerchart';
-	import { curveNatural } from 'd3-shape';
-	import { cubicInOut } from 'svelte/easing';
-
 	type TrendPoint = { dayLabel: string; dayStartAt: number; count: number };
 
 	let {
@@ -16,62 +11,71 @@
 		color: string;
 	} = $props();
 
-	const uid = $props.id();
-	const gradientId = $derived(`kpi-sparkline-${uid.replace(/:/g, '')}`);
 	const points = $derived(data ?? []);
 	const hasSignal = $derived(points.some((point) => point.count > 0));
 	const maxCount = $derived(Math.max(1, ...points.map((point) => point.count)));
-	const yDomain = $derived([0, Math.ceil(maxCount * 1.25)]);
-	const chartConfig = $derived.by(
-		(): ChartConfig => ({
-			count: { label, color }
-		})
+	const emptyPoints = $derived(
+		points.length > 0
+			? points
+			: Array.from({ length: 7 }, (_, index) => ({
+					dayLabel: '',
+					dayStartAt: index,
+					count: 0
+				}))
+	);
+	const barPoints = $derived(
+		points.map((point) => ({
+			...point,
+			height:
+				point.count > 0 ? `${Math.max(10, Math.round((point.count / maxCount) * 100))}%` : '1px',
+			backgroundColor: point.count > 0 ? color : 'var(--color-muted)',
+			isToday: point.dayStartAt === points.at(-1)?.dayStartAt
+		}))
 	);
 </script>
 
-<div class="h-12 min-w-0" aria-hidden="true">
+<div class="h-16 min-w-0" aria-label={`${label} trend for the last 7 days`}>
 	{#if points.length > 1 && hasSignal}
-		<ChartContainer config={chartConfig} class="h-full w-full justify-start overflow-visible">
-			<AreaChart
-				data={points}
-				x="dayStartAt"
-				y="count"
-				{yDomain}
-				axis={false}
-				grid={false}
-				rule={false}
-				highlight={false}
-				tooltipContext={false}
-				series={[{ key: 'count', label, color }]}
-			>
-				{#snippet marks({ context })}
-					<defs>
-						<linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-							<stop offset="5%" stop-color={color} stop-opacity="0.32" />
-							<stop offset="100%" stop-color={color} stop-opacity="0.03" />
-						</linearGradient>
-					</defs>
-					<ChartClipPath
-						initialWidth={0}
-						motion={{ width: { type: 'tween', duration: 700, easing: cubicInOut } }}
+		<div class="flex h-full items-end gap-1.5">
+			{#each barPoints as point (point.dayStartAt)}
+				<div
+					class="flex h-full min-w-0 flex-1 flex-col justify-end gap-1"
+					title={`${point.dayLabel}: ${point.count.toLocaleString()}`}
+				>
+					<div class="flex min-h-0 flex-1 items-end">
+						<div
+							class="w-full rounded-t-sm transition-[height] duration-300"
+							class:opacity-100={point.isToday}
+							class:opacity-55={!point.isToday}
+							style="height: {point.height}; background-color: {point.backgroundColor};"
+						></div>
+					</div>
+					<span
+						class="truncate text-center text-[0.6rem] leading-none font-medium tabular-nums {point.isToday
+							? 'text-foreground'
+							: 'text-muted-foreground'}"
 					>
-						{#each context.series.visibleSeries as s (s.key)}
-							<Area
-								seriesKey={s.key}
-								curve={curveNatural}
-								fill={`url(#${gradientId})`}
-								line={{ class: 'stroke-1.5' }}
-								motion="tween"
-								{...s.props}
-							/>
-						{/each}
-					</ChartClipPath>
-				{/snippet}
-			</AreaChart>
-		</ChartContainer>
+						{point.dayLabel}
+					</span>
+				</div>
+			{/each}
+		</div>
 	{:else}
-		<div class="flex h-full items-center">
-			<div class="h-px w-full bg-muted"></div>
+		<div class="flex h-full flex-col justify-end gap-2">
+			<div class="flex h-10 items-end gap-1.5">
+				{#each emptyPoints as point (point.dayStartAt)}
+					<div class="flex min-w-0 flex-1 items-end">
+						<div class="h-px w-full rounded-full bg-muted"></div>
+					</div>
+				{/each}
+			</div>
+			<div
+				class="grid grid-cols-7 gap-1.5 text-center text-[0.6rem] leading-none font-medium text-muted-foreground"
+			>
+				{#each emptyPoints as point (point.dayStartAt)}
+					<span>{point.dayLabel}</span>
+				{/each}
+			</div>
 		</div>
 	{/if}
 </div>
