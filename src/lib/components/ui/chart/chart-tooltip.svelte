@@ -106,7 +106,7 @@
 	<div
 		bind:this={ref}
 		class={cn(
-			'grid min-w-[9rem] items-start gap-1.5 rounded-lg border border-border/50 bg-background px-2.5 py-1.5 text-xs shadow-xl',
+			'grid min-w-36 items-start gap-1.5 rounded-lg border border-border/50 bg-background px-2.5 py-1.5 text-xs shadow-xl',
 			className
 		)}
 		{...restProps}
@@ -154,20 +154,22 @@
 						{/if}
 						<div
 							class={cn(
-								'flex flex-1 shrink-0 justify-between leading-none',
+								'flex min-w-0 flex-1 shrink-0 justify-between gap-3 leading-none',
 								nestLabel ? 'items-end' : 'items-center'
 							)}
 						>
-							<div class="grid gap-1.5">
+							<div class="grid min-w-0 gap-1.5">
 								{#if nestLabel}
 									{@render TooltipLabel()}
 								{/if}
-								<span class="text-muted-foreground">
+								<span class="truncate text-muted-foreground">
 									{itemConfig?.label || item.label}
 								</span>
 							</div>
 							{#if item.value !== undefined}
-								<span class="font-mono font-medium text-foreground tabular-nums">
+								<span
+									class="shrink-0 text-right font-mono font-medium text-foreground tabular-nums"
+								>
 									{item.value.toLocaleString()}
 								</span>
 							{/if}

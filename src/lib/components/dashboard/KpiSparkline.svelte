@@ -1,4 +1,8 @@
 <script lang="ts">
+	import { ChartContainer, ChartTooltip, type ChartConfig } from '$lib/components/ui/chart';
+	import { BarChart } from 'layerchart';
+	import { cubicInOut } from 'svelte/easing';
+
 	type TrendPoint = { dayLabel: string; dayStartAt: number; count: number };
 
 	let {
@@ -14,6 +18,9 @@
 	const points = $derived(data ?? []);
 	const hasSignal = $derived(points.some((point) => point.count > 0));
 	const maxCount = $derived(Math.max(1, ...points.map((point) => point.count)));
+	const chartConfig = $derived({
+		count: { label, color }
+	} satisfies ChartConfig);
 	const emptyPoints = $derived(
 		points.length > 0
 			? points
@@ -23,43 +30,36 @@
 					count: 0
 				}))
 	);
-	const barPoints = $derived(
-		points.map((point) => ({
-			...point,
-			height:
-				point.count > 0 ? `${Math.max(10, Math.round((point.count / maxCount) * 100))}%` : '1px',
-			backgroundColor: point.count > 0 ? color : 'var(--color-muted)',
-			isToday: point.dayStartAt === points.at(-1)?.dayStartAt
-		}))
-	);
+	const yDomain = $derived([0, Math.ceil(maxCount * 1.15)]);
 </script>
 
 <div class="h-16 min-w-0" aria-label={`${label} trend for the last 7 days`}>
 	{#if points.length > 1 && hasSignal}
-		<div class="flex h-full items-end gap-1.5">
-			{#each barPoints as point (point.dayStartAt)}
-				<div
-					class="flex h-full min-w-0 flex-1 flex-col justify-end gap-1"
-					title={`${point.dayLabel}: ${point.count.toLocaleString()}`}
-				>
-					<div class="flex min-h-0 flex-1 items-end">
-						<div
-							class="w-full rounded-t-sm transition-[height] duration-300"
-							class:opacity-100={point.isToday}
-							class:opacity-55={!point.isToday}
-							style="height: {point.height}; background-color: {point.backgroundColor};"
-						></div>
-					</div>
-					<span
-						class="truncate text-center text-[0.6rem] leading-none font-medium tabular-nums {point.isToday
-							? 'text-foreground'
-							: 'text-muted-foreground'}"
-					>
-						{point.dayLabel}
-					</span>
-				</div>
-			{/each}
-		</div>
+		<ChartContainer config={chartConfig} class="h-full w-full overflow-visible">
+			<BarChart
+				data={points}
+				x="dayLabel"
+				axis="x"
+				{yDomain}
+				series={[{ key: 'count', label, color: 'var(--color-count)' }]}
+				bandPadding={0.28}
+				props={{
+					bars: {
+						stroke: 'none',
+						rounded: 'top',
+						radius: 3,
+						motion: { type: 'tween', duration: 350, easing: cubicInOut }
+					},
+					highlight: { area: { fill: 'none' } },
+					xAxis: { format: (day: string) => day },
+					yAxis: { format: () => '' }
+				}}
+			>
+				{#snippet tooltip()}
+					<ChartTooltip />
+				{/snippet}
+			</BarChart>
+		</ChartContainer>
 	{:else}
 		<div class="flex h-full flex-col justify-end gap-2">
 			<div class="flex h-10 items-end gap-1.5">
