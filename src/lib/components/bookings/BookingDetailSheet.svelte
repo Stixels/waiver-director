@@ -80,7 +80,7 @@
 	}
 
 	function formatStartTime(timestamp: string | number | null) {
-		if (!timestamp) return null;
+		if (timestamp == null) return null;
 		const date = new Date(timestamp);
 		if (Number.isNaN(date.getTime())) return null;
 		return new Intl.DateTimeFormat('en-US', {
@@ -90,7 +90,7 @@
 	}
 
 	function formatSignedAt(timestamp: string | number | null) {
-		if (!timestamp) return null;
+		if (timestamp == null) return null;
 		const date = new Date(timestamp);
 		if (Number.isNaN(date.getTime())) return null;
 		return new Intl.DateTimeFormat('en-US', {
@@ -107,7 +107,8 @@
 
 	function getInitials(name: string): string {
 		return name
-			.split(' ')
+			.trim()
+			.split(/\s+/)
 			.slice(0, 2)
 			.map((n) => n[0] ?? '')
 			.join('')
@@ -211,7 +212,7 @@
 							{detail.booking.activityName}
 						</SheetTitle>
 						<div class="space-y-1 text-xs text-muted-foreground">
-							{#if detail.booking.startTime && formatStartTime(detail.booking.startTime)}
+							{#if detail.booking.startTime != null && formatStartTime(detail.booking.startTime)}
 								<p class="flex min-w-0 items-center gap-1.5">
 									<ClockIcon class="size-3 shrink-0" aria-hidden="true" />
 									<span class="truncate tabular-nums"

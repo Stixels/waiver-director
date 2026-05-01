@@ -119,6 +119,10 @@
 		});
 	}
 
+	function formatCappedCount(value: number) {
+		return value >= 1000 ? '1000+' : value.toLocaleString();
+	}
+
 	function openFollowUp(followUpId: Id<'email_follow_ups'>) {
 		selectedFollowUpId = followUpId;
 		followUpPreviewOpen = true;
@@ -169,7 +173,7 @@
 					>
 						<span class="size-1.5 shrink-0 rounded-full {dotClasses(chip.tone)}"></span>
 						<span class="font-semibold tabular-nums">
-							{chip.count.toLocaleString()}
+							{formatCappedCount(chip.count)}
 						</span>
 						<span>{chip.label}</span>
 					</div>

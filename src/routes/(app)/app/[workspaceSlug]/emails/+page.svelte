@@ -675,7 +675,13 @@
 
 	$effect(() => {
 		if (isClosingPreview) return;
-		if (!followUpIdParam) return;
+		if (!followUpIdParam) {
+			if (previewOpen) {
+				previewFollowUpId = null;
+				previewOpen = false;
+			}
+			return;
+		}
 		if (previewFollowUpId === followUpIdParam && previewOpen) return;
 		previewFollowUpId = followUpIdParam;
 		previewOpen = true;

@@ -177,6 +177,7 @@ export default defineSchema({
 		submittedAt: v.number()
 	})
 		.index('by_workspaceId', ['workspaceId'])
+		.index('by_workspaceId_and_submittedAt', ['workspaceId', 'submittedAt'])
 		.index('by_versionId', ['versionId'])
 		.index('by_bookingId', ['bookingId'])
 		.index('by_customerId_and_submittedAt', ['customerId', 'submittedAt'])

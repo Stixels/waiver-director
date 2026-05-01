@@ -87,6 +87,10 @@
 		return trend?.reduce((total, point) => total + point.count, 0) ?? 0;
 	}
 
+	function formatCappedCount(value: number) {
+		return value > 1000 ? '1000+' : value.toLocaleString();
+	}
+
 	function comparisonLabel(comparison: KpiComparison | null | undefined) {
 		if (!comparison) return 'No data';
 		if (comparison.previousTotal === 0) {
@@ -116,7 +120,7 @@
 							<Skeleton class="mt-2 h-8 w-16" />
 						{:else}
 							<p class="mt-1 text-3xl font-bold tracking-tight tabular-nums">
-								{stat.value.toLocaleString()}
+								{formatCappedCount(stat.value)}
 							</p>
 						{/if}
 					</div>

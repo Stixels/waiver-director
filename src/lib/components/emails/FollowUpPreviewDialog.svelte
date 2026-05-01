@@ -219,7 +219,7 @@
 							<p class="min-w-0 truncate text-xs font-medium text-foreground tabular-nums">
 								{formatActivityDate(followUp)}
 							</p>
-							{#if followUp.status === 'queued' && followUp.scheduledAt !== undefined}
+							{#if followUp.status === 'queued' && followUp.scheduledAt != null}
 								<p class="shrink-0 text-[11px] text-muted-foreground tabular-nums">
 									Scheduled for {formatTimestamp(followUp.scheduledAt)}
 								</p>

@@ -4,6 +4,7 @@ import { requireWorkspaceMember } from './lib/waivers';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const MAX_ANALYTICS_RANGE_MS = 90 * DAY_MS;
+const DASHBOARD_COUNT_CAP = 1000;
 
 const trendDayValue = v.object({
 	dayLabel: v.string(),
@@ -18,7 +19,7 @@ const kpiComparisonValue = v.object({
 
 function floorToDay(epochMs: number): number {
 	const d = new Date(epochMs);
-	return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+	return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
 }
 
 function dayLabel(epochMs: number): string {
@@ -70,7 +71,7 @@ export const getDashboardSnapshot = query({
 		kpi: v.object({
 			bookingsToday: v.number(),
 			submissionsToday: v.number(),
-			// Capped at 1000; values at the cap are displayed as "1000+"
+			// Capped at 1000; values over the cap are displayed as "1000+"
 			followUpsQueued: v.number(),
 			totalCustomers: v.number()
 		}),
@@ -109,9 +110,9 @@ export const getDashboardSnapshot = query({
 		const [
 			workspace,
 			trendBookings,
-			recentSubmissions,
-			queuedFollowUps,
+			todaySubmissions,
 			trendSubmissions,
+			queuedFollowUps,
 			customers
 		] = await Promise.all([
 			ctx.db.get(args.workspaceId),
@@ -126,21 +127,30 @@ export const getDashboardSnapshot = query({
 				.take(5000),
 			ctx.db
 				.query('waiver_submissions')
-				.withIndex('by_workspaceId', (q) => q.eq('workspaceId', args.workspaceId))
+				.withIndex('by_workspaceId_and_submittedAt', (q) =>
+					q
+						.eq('workspaceId', args.workspaceId)
+						.gte('submittedAt', args.todayStartAt)
+						.lt('submittedAt', args.todayEndAt)
+				)
+				.take(DASHBOARD_COUNT_CAP + 1),
+			ctx.db
+				.query('waiver_submissions')
+				.withIndex('by_workspaceId_and_submittedAt', (q) =>
+					q
+						.eq('workspaceId', args.workspaceId)
+						.gte('submittedAt', args.trendStartAt)
+						.lt('submittedAt', args.todayEndAt)
+				)
 				.order('desc')
-				.take(500),
+				.take(2000),
 			ctx.db
 				.query('email_follow_ups')
 				.withIndex('by_workspaceId_and_status', (q) =>
 					q.eq('workspaceId', args.workspaceId).eq('status', 'queued')
 				)
 				.order('desc')
-				.take(1000),
-			ctx.db
-				.query('waiver_submissions')
-				.withIndex('by_workspaceId', (q) => q.eq('workspaceId', args.workspaceId))
-				.order('desc')
-				.take(2000),
+				.take(DASHBOARD_COUNT_CAP + 1),
 			ctx.db
 				.query('customers')
 				.withIndex('by_workspaceId', (q) => q.eq('workspaceId', args.workspaceId))
@@ -153,9 +163,7 @@ export const getDashboardSnapshot = query({
 		const bookingsToday = trendBookings.filter(
 			(b) => (b.startAt ?? 0) >= args.todayStartAt && (b.startAt ?? 0) < args.todayEndAt
 		);
-		const submissionsToday = recentSubmissions.filter(
-			(s) => s._creationTime >= args.todayStartAt && s._creationTime < args.todayEndAt
-		).length;
+		const submissionsToday = todaySubmissions.length;
 
 		const bookingTrendCounts = new Map<number, number>();
 		for (const booking of trendBookings) {
@@ -345,7 +353,12 @@ export const getAnalyticsSeries = query({
 		] = await Promise.all([
 			ctx.db
 				.query('waiver_submissions')
-				.withIndex('by_workspaceId', (q) => q.eq('workspaceId', args.workspaceId))
+				.withIndex('by_workspaceId_and_submittedAt', (q) =>
+					q
+						.eq('workspaceId', args.workspaceId)
+						.gte('submittedAt', args.rangeStartAt)
+						.lt('submittedAt', args.rangeEndAt)
+				)
 				.order('desc')
 				.take(10000),
 			ctx.db
@@ -376,26 +389,25 @@ export const getAnalyticsSeries = query({
 				.withIndex('by_workspaceId_and_status', (q) =>
 					q.eq('workspaceId', args.workspaceId).eq('status', 'queued')
 				)
-				.take(1001),
+				.take(1000),
 			ctx.db
 				.query('email_follow_ups')
 				.withIndex('by_workspaceId_and_status', (q) =>
 					q.eq('workspaceId', args.workspaceId).eq('status', 'failed')
 				)
-				.take(1001),
+				.take(1000),
 			ctx.db
 				.query('email_follow_ups')
 				.withIndex('by_workspaceId_and_status', (q) =>
 					q.eq('workspaceId', args.workspaceId).eq('status', 'blocked')
 				)
-				.take(1001)
+				.take(1000)
 		]);
 
 		// Submissions by day
 		const submissionCounts = new Map<number, number>();
 		for (const s of submissions) {
-			if (s._creationTime < args.rangeStartAt || s._creationTime >= args.rangeEndAt) continue;
-			const day = floorToDay(s._creationTime);
+			const day = floorToDay(s.submittedAt);
 			submissionCounts.set(day, (submissionCounts.get(day) ?? 0) + 1);
 		}
 		const submissionsByDay = buildDayBuckets(

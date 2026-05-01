@@ -12,14 +12,14 @@
 
 		const themeContents = [];
 		for (const [_theme, prefix] of Object.entries(THEMES)) {
-			let content = `${prefix} [data-chart=${id}] {\n`;
+			let content = `${prefix} [data-chart="${id}"] {\n`;
 			const color = colorConfig.map(([key, itemConfig]) => {
 				const theme = _theme as keyof typeof itemConfig.theme;
 				const color = itemConfig.theme?.[theme] || itemConfig.color;
 				return color ? `\t--color-${key}: ${color};` : null;
 			});
 
-			content += color.join('\n') + '\n}';
+			content += color.filter((line) => line != null).join('\n') + '\n}';
 
 			themeContents.push(content);
 		}

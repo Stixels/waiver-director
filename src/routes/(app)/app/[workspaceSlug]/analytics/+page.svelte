@@ -65,7 +65,12 @@
 	type AnalyticsData = FunctionReturnType<typeof api.dashboard.getAnalyticsSeries>;
 	type CustomerActivityDay = AnalyticsData['customerActivityByDay'][number];
 	const analyticsData = $derived((analyticsQuery.data ?? null) as AnalyticsData | null);
-	const isInitialLoading = $derived(analyticsQuery.isLoading && !analyticsData);
+	const analyticsError = $derived(analyticsQuery.error ?? null);
+	const missingWorkspace = $derived(!appContext.isLoading && currentWorkspace == null);
+	const analyticsUnavailable = $derived(Boolean(analyticsError) || missingWorkspace);
+	const isInitialLoading = $derived(
+		(analyticsQuery.isLoading || appContext.isLoading) && !analyticsData
+	);
 
 	function handleRangeChange(start: string, end: string) {
 		startDateStr = start;
@@ -147,6 +152,20 @@
 </PageHeader>
 
 <PageShell>
+	{#if missingWorkspace}
+		<div
+			class="rounded-lg border border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground"
+		>
+			Workspace not found.
+		</div>
+	{:else if analyticsError}
+		<div
+			class="rounded-lg border border-destructive/30 bg-destructive/8 px-4 py-3 text-sm text-destructive"
+		>
+			Unable to load analytics. Try refreshing the page.
+		</div>
+	{/if}
+
 	<!-- Submissions + Bookings over time side by side -->
 	<div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
 		<Card>
@@ -166,6 +185,10 @@
 			<CardContent>
 				{#if isInitialLoading}
 					<Skeleton class="h-52 w-full" />
+				{:else if analyticsUnavailable}
+					<div class="flex h-52 items-center justify-center text-sm text-muted-foreground">
+						Analytics unavailable
+					</div>
 				{:else if !analyticsData || analyticsData.submissionsByDay.every((d) => d.count === 0)}
 					<div class="flex h-52 items-center justify-center text-sm text-muted-foreground">
 						No submissions in this period
@@ -229,6 +252,10 @@
 			<CardContent>
 				{#if isInitialLoading}
 					<Skeleton class="h-52 w-full" />
+				{:else if analyticsUnavailable}
+					<div class="flex h-52 items-center justify-center text-sm text-muted-foreground">
+						Analytics unavailable
+					</div>
 				{:else if !analyticsData || analyticsData.bookingsByDay.every((d) => d.count === 0)}
 					<div class="flex h-52 items-center justify-center text-sm text-muted-foreground">
 						No bookings in this period
@@ -294,6 +321,12 @@
 						<Skeleton class="h-16 w-full rounded-lg" />
 						<Skeleton class="h-16 w-full rounded-lg" />
 					</div>
+				{:else if analyticsUnavailable}
+					<div
+						class="flex min-h-52 flex-1 items-center justify-center text-sm text-muted-foreground"
+					>
+						Analytics unavailable
+					</div>
 				{:else}
 					<!-- Sent in period -->
 					<div>
@@ -315,7 +348,7 @@
 									class="mb-1.5 size-3.5 text-primary dark:text-[color-mix(in_oklch,var(--primary)_30%,var(--primary-foreground))]"
 								/>
 								<p
-									class="text-base font-bold tabular-nums text-primary dark:text-[color-mix(in_oklch,var(--primary)_26%,var(--primary-foreground))]"
+									class="text-base font-bold text-primary tabular-nums dark:text-[color-mix(in_oklch,var(--primary)_26%,var(--primary-foreground))]"
 								>
 									{emailQueued.toLocaleString()}
 								</p>
@@ -388,6 +421,10 @@
 			<CardContent>
 				{#if isInitialLoading}
 					<Skeleton class="h-52 w-full" />
+				{:else if analyticsUnavailable}
+					<div class="flex h-52 items-center justify-center text-sm text-muted-foreground">
+						Analytics unavailable
+					</div>
 				{:else if !analyticsData || customerActivityTotal === 0}
 					<div class="flex h-52 items-center justify-center text-sm text-muted-foreground">
 						No customer activity in this period
