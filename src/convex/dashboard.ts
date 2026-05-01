@@ -72,19 +72,19 @@ export const getDashboardSnapshot = query({
 			bookingsToday: v.number(),
 			submissionsToday: v.number(),
 			// Capped at 1000; values over the cap are displayed as "1000+"
-			followUpsQueued: v.number(),
+			followUpsSent: v.number(),
 			newCustomersToday: v.number()
 		}),
 		kpiTrends: v.object({
 			bookingsToday: v.array(trendDayValue),
 			submissionsToday: v.array(trendDayValue),
-			followUpsQueued: v.array(trendDayValue),
+			followUpsSent: v.array(trendDayValue),
 			newCustomersToday: v.array(trendDayValue)
 		}),
 		kpiComparisons: v.object({
 			bookingsToday: kpiComparisonValue,
 			submissionsToday: kpiComparisonValue,
-			followUpsQueued: kpiComparisonValue,
+			followUpsSent: kpiComparisonValue,
 			newCustomersToday: kpiComparisonValue
 		}),
 		emailPipeline: v.object({
@@ -112,6 +112,7 @@ export const getDashboardSnapshot = query({
 			todaySubmissions,
 			trendSubmissions,
 			queuedFollowUps,
+			trendSentFollowUps,
 			todayCustomers,
 			trendCustomers
 		] = await Promise.all([
@@ -149,6 +150,16 @@ export const getDashboardSnapshot = query({
 					q.eq('workspaceId', args.workspaceId).eq('status', 'queued')
 				)
 				.order('desc')
+				.take(DASHBOARD_COUNT_CAP + 1),
+			ctx.db
+				.query('email_follow_ups')
+				.withIndex('by_workspaceId_and_status_and_sentAt', (q) =>
+					q
+						.eq('workspaceId', args.workspaceId)
+						.eq('status', 'sent')
+						.gte('sentAt', args.trendStartAt)
+						.lt('sentAt', args.todayEndAt)
+				)
 				.take(DASHBOARD_COUNT_CAP + 1),
 			ctx.db
 				.query('customers')
@@ -197,8 +208,8 @@ export const getDashboardSnapshot = query({
 
 		const trendCounts = new Map<number, number>();
 		for (const s of trendSubmissions) {
-			if (s._creationTime < args.trendStartAt) break;
-			const day = floorToDay(s._creationTime);
+			if (s.submittedAt < args.trendStartAt) break;
+			const day = floorToDay(s.submittedAt);
 			trendCounts.set(day, (trendCounts.get(day) ?? 0) + 1);
 		}
 		const submissionsTodayTrend = buildDayBuckets(
@@ -212,23 +223,31 @@ export const getDashboardSnapshot = query({
 			previousTotal: sumCountsBetween(trendCounts, args.trendStartAt, previousTrendEndAt)
 		};
 
-		const followUpTrendCounts = new Map<number, number>();
-		for (const followUp of queuedFollowUps) {
-			if (followUp.submittedAt < args.trendStartAt || followUp.submittedAt >= args.todayEndAt) {
+		const followUpSentTrendCounts = new Map<number, number>();
+		for (const followUp of trendSentFollowUps) {
+			if (
+				followUp.sentAt === undefined ||
+				followUp.sentAt < args.trendStartAt ||
+				followUp.sentAt >= args.todayEndAt
+			) {
 				continue;
 			}
-			const day = floorToDay(followUp.submittedAt);
-			followUpTrendCounts.set(day, (followUpTrendCounts.get(day) ?? 0) + 1);
+			const day = floorToDay(followUp.sentAt);
+			followUpSentTrendCounts.set(day, (followUpSentTrendCounts.get(day) ?? 0) + 1);
 		}
-		const followUpsQueuedTrend = buildDayBuckets(
+		const followUpsSentTrend = buildDayBuckets(
 			currentTrendStartAt,
 			args.todayStartAt,
-			followUpTrendCounts,
+			followUpSentTrendCounts,
 			dayLabel
 		);
 		const followUpsComparison = {
-			currentTotal: sumCountsBetween(followUpTrendCounts, currentTrendStartAt, args.todayEndAt),
-			previousTotal: sumCountsBetween(followUpTrendCounts, args.trendStartAt, previousTrendEndAt)
+			currentTotal: sumCountsBetween(followUpSentTrendCounts, currentTrendStartAt, args.todayEndAt),
+			previousTotal: sumCountsBetween(
+				followUpSentTrendCounts,
+				args.trendStartAt,
+				previousTrendEndAt
+			)
 		};
 
 		const customerTrendCounts = new Map<number, number>();
@@ -294,19 +313,23 @@ export const getDashboardSnapshot = query({
 			kpi: {
 				bookingsToday: bookingsToday.length,
 				submissionsToday,
-				followUpsQueued: queuedFollowUps.length,
+				followUpsSent: sumCountsBetween(
+					followUpSentTrendCounts,
+					args.todayStartAt,
+					args.todayEndAt
+				),
 				newCustomersToday: todayCustomers.length
 			},
 			kpiTrends: {
 				bookingsToday: bookingsTodayTrend,
 				submissionsToday: submissionsTodayTrend,
-				followUpsQueued: followUpsQueuedTrend,
+				followUpsSent: followUpsSentTrend,
 				newCustomersToday: newCustomersTodayTrend
 			},
 			kpiComparisons: {
 				bookingsToday: bookingsComparison,
 				submissionsToday: submissionsComparison,
-				followUpsQueued: followUpsComparison,
+				followUpsSent: followUpsComparison,
 				newCustomersToday: customersComparison
 			},
 			emailPipeline: {

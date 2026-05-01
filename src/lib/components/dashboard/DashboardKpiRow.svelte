@@ -10,7 +10,7 @@
 	type Kpi = {
 		bookingsToday: number;
 		submissionsToday: number;
-		followUpsQueued: number;
+		followUpsSent: number;
 		newCustomersToday: number;
 	};
 
@@ -19,7 +19,7 @@
 	type KpiTrends = {
 		bookingsToday: TrendDay[];
 		submissionsToday: TrendDay[];
-		followUpsQueued: TrendDay[];
+		followUpsSent: TrendDay[];
 		newCustomersToday: TrendDay[];
 	};
 
@@ -28,7 +28,7 @@
 	type KpiComparisons = {
 		bookingsToday: KpiComparison;
 		submissionsToday: KpiComparison;
-		followUpsQueued: KpiComparison;
+		followUpsSent: KpiComparison;
 		newCustomersToday: KpiComparison;
 	};
 
@@ -64,11 +64,11 @@
 			bgStyle: 'color-mix(in oklch, oklch(0.627 0.194 149.21) 12%, transparent)'
 		},
 		{
-			label: 'Follow-ups Queued',
-			value: kpi?.followUpsQueued ?? 0,
+			label: 'Follow-ups Sent',
+			value: kpi?.followUpsSent ?? 0,
 			icon: MailIcon,
-			trend: trends?.followUpsQueued,
-			comparison: comparisons?.followUpsQueued,
+			trend: trends?.followUpsSent,
+			comparison: comparisons?.followUpsSent,
 			color: 'oklch(0.7 0.15 60)',
 			bgStyle: 'color-mix(in oklch, oklch(0.7 0.15 60) 12%, transparent)'
 		},
