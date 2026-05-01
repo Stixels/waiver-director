@@ -3,7 +3,6 @@
 	import FollowUpPreviewDialog from '$lib/components/emails/FollowUpPreviewDialog.svelte';
 	import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
 	import { Skeleton } from '$lib/components/ui/skeleton';
-	import { Badge, type BadgeVariant } from '$lib/components/ui/badge';
 	import MailIcon from '@lucide/svelte/icons/mail';
 	import ExternalLinkIcon from '@lucide/svelte/icons/external-link';
 	import { page } from '$app/state';
@@ -45,20 +44,49 @@
 	const chipSkeletonRows = [0, 1, 2, 3, 4];
 	const queuedSkeletonRows = [0, 1, 2, 3, 4, 5];
 
+	type ChipTone = 'primary' | 'green' | 'destructive' | 'amber' | 'muted';
+
 	const statusChips = $derived([
-		{ label: 'Queued', count: pipeline?.queued ?? 0, variant: 'secondary' as const },
-		{ label: 'Sent', count: pipeline?.sent ?? 0, variant: 'secondary' as const },
+		{
+			label: 'Queued',
+			count: pipeline?.queued ?? 0,
+			tone: 'primary' as ChipTone
+		},
+		{
+			label: 'Sent',
+			count: pipeline?.sent ?? 0,
+			tone: 'green' as ChipTone
+		},
 		{
 			label: 'Failed',
 			count: pipeline?.failed ?? 0,
-			variant: (pipeline?.failed ?? 0) > 0 ? ('destructive' as const) : ('outline' as const)
+			tone: ((pipeline?.failed ?? 0) > 0 ? 'destructive' : 'muted') as ChipTone
 		},
-		{ label: 'Blocked', count: pipeline?.blocked ?? 0, variant: 'outline' as const },
-		{ label: 'Unscheduled', count: pipeline?.unscheduled ?? 0, variant: 'outline' as const }
+		{
+			label: 'Blocked',
+			count: pipeline?.blocked ?? 0,
+			tone: ((pipeline?.blocked ?? 0) > 0 ? 'amber' : 'muted') as ChipTone
+		},
+		{
+			label: 'Unscheduled',
+			count: pipeline?.unscheduled ?? 0,
+			tone: 'muted' as ChipTone
+		}
 	]);
 
-	function badgeVariant(variant: BadgeVariant) {
-		return variant;
+	function chipClasses(tone: ChipTone): string {
+		switch (tone) {
+			case 'primary':
+				return 'border-primary/20 bg-primary/10 text-primary dark:border-primary/40 dark:bg-primary/15 dark:text-[color-mix(in_oklch,var(--primary)_32%,var(--primary-foreground))]';
+			case 'green':
+				return 'border-emerald-500/20 bg-emerald-500/8 text-emerald-700 dark:text-emerald-400';
+			case 'destructive':
+				return 'border-destructive/20 bg-destructive/8 text-destructive';
+			case 'amber':
+				return 'border-amber-500/20 bg-amber-500/8 text-amber-700 dark:text-amber-400';
+			default:
+				return 'border-border bg-muted/40 text-muted-foreground';
+		}
 	}
 
 	function formatScheduledAt(scheduledAt: number | null): string {
@@ -112,14 +140,16 @@
 				{/each}
 			</div>
 		{:else}
-			<div class="flex flex-wrap gap-2">
+			<div class="flex flex-wrap gap-1.5">
 				{#each statusChips as chip (chip.label)}
-					<Badge variant={badgeVariant(chip.variant)} class="h-6 gap-1.5 rounded-md px-2.5 text-xs">
+					<div
+						class="inline-flex h-6 items-center gap-1.5 rounded-md border px-2.5 text-xs {chipClasses(chip.tone)}"
+					>
 						<span>{chip.label}</span>
 						<span class="font-semibold tabular-nums">
 							{chip.count.toLocaleString()}
 						</span>
-					</Badge>
+					</div>
 				{/each}
 			</div>
 		{/if}

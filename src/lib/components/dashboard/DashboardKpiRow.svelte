@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { Card, CardContent } from '$lib/components/ui/card';
 	import { Skeleton } from '$lib/components/ui/skeleton';
-	import { Badge } from '$lib/components/ui/badge';
 	import CalendarCheckIcon from '@lucide/svelte/icons/calendar-check';
 	import ScrollTextIcon from '@lucide/svelte/icons/scroll-text';
 	import MailIcon from '@lucide/svelte/icons/mail';
@@ -37,28 +36,32 @@
 			value: kpi?.bookingsToday ?? 0,
 			icon: CalendarCheckIcon,
 			trend: trends?.bookingsToday,
-			color: 'var(--color-primary)'
+			color: 'var(--color-primary)',
+			bgStyle: 'color-mix(in oklch, var(--color-primary) 12%, transparent)'
 		},
 		{
 			label: 'Submissions Today',
 			value: kpi?.submissionsToday ?? 0,
 			icon: ScrollTextIcon,
 			trend: trends?.submissionsToday,
-			color: 'oklch(0.627 0.194 149.21)'
+			color: 'oklch(0.627 0.194 149.21)',
+			bgStyle: 'color-mix(in oklch, oklch(0.627 0.194 149.21) 12%, transparent)'
 		},
 		{
 			label: 'Follow-ups Queued',
 			value: kpi?.followUpsQueued ?? 0,
 			icon: MailIcon,
 			trend: trends?.followUpsQueued,
-			color: 'oklch(0.7 0.15 60)'
+			color: 'oklch(0.7 0.15 60)',
+			bgStyle: 'color-mix(in oklch, oklch(0.7 0.15 60) 12%, transparent)'
 		},
 		{
 			label: 'Total Customers',
 			value: kpi?.totalCustomers ?? 0,
 			icon: UsersRoundIcon,
 			trend: trends?.totalCustomers,
-			color: 'oklch(0.58 0.18 255)'
+			color: 'oklch(0.58 0.18 255)',
+			bgStyle: 'color-mix(in oklch, oklch(0.58 0.18 255) 12%, transparent)'
 		}
 	]);
 
@@ -82,7 +85,10 @@
 							</p>
 						{/if}
 					</div>
-					<div class="ml-3 shrink-0 rounded-lg bg-primary/10 p-2.5 text-primary">
+					<div
+						class="ml-3 shrink-0 rounded-lg p-2.5"
+						style="color: {stat.color}; background: {stat.bgStyle};"
+					>
 						<stat.icon class="size-5" />
 					</div>
 				</div>
@@ -93,12 +99,14 @@
 						<KpiSparkline data={stat.trend} label={stat.label} color={stat.color} />
 					{/if}
 					<div class="flex min-w-0 items-center justify-end text-xs">
-						<Badge variant="outline" class="h-5 shrink-0 rounded-md px-1.5 text-[0.65rem]">
-							<span class="text-muted-foreground">7d</span>
-							<span class="font-semibold tabular-nums">
-								+{trendTotal(stat.trend).toLocaleString()}
+						<div
+							class="flex h-5 shrink-0 items-center gap-1 rounded-md border border-border px-1.5 text-[0.65rem]"
+						>
+							<span class="font-semibold tabular-nums text-foreground">
+								{trendTotal(stat.trend).toLocaleString()}
 							</span>
-						</Badge>
+							<span class="text-muted-foreground">/ 7d</span>
+						</div>
 					</div>
 				</div>
 			</CardContent>

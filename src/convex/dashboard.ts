@@ -264,7 +264,10 @@ export const getAnalyticsSeries = query({
 		submissionsByDay: v.array(trendDayValue),
 		bookingsByDay: v.array(trendDayValue),
 		emailTotals: v.object({
-			sent: v.number()
+			sent: v.number(),
+			queued: v.number(),
+			failed: v.number(),
+			blocked: v.number()
 		}),
 		customerActivityByDay: v.array(
 			v.object({
@@ -285,7 +288,7 @@ export const getAnalyticsSeries = query({
 			});
 		}
 
-		const [submissions, bookings, customers, sentFollowUps] = await Promise.all([
+		const [submissions, bookings, customers, sentFollowUps, queuedFollowUps, failedFollowUps, blockedFollowUps] = await Promise.all([
 			ctx.db
 				.query('waiver_submissions')
 				.withIndex('by_workspaceId', (q) => q.eq('workspaceId', args.workspaceId))
@@ -313,7 +316,25 @@ export const getAnalyticsSeries = query({
 						.gte('sentAt', args.rangeStartAt)
 						.lt('sentAt', args.rangeEndAt)
 				)
-				.take(1000)
+				.take(1000),
+			ctx.db
+				.query('email_follow_ups')
+				.withIndex('by_workspaceId_and_status', (q) =>
+					q.eq('workspaceId', args.workspaceId).eq('status', 'queued')
+				)
+				.take(1001),
+			ctx.db
+				.query('email_follow_ups')
+				.withIndex('by_workspaceId_and_status', (q) =>
+					q.eq('workspaceId', args.workspaceId).eq('status', 'failed')
+				)
+				.take(1001),
+			ctx.db
+				.query('email_follow_ups')
+				.withIndex('by_workspaceId_and_status', (q) =>
+					q.eq('workspaceId', args.workspaceId).eq('status', 'blocked')
+				)
+				.take(1001)
 		]);
 
 		// Submissions by day
@@ -386,7 +407,12 @@ export const getAnalyticsSeries = query({
 		return {
 			submissionsByDay,
 			bookingsByDay,
-			emailTotals: { sent: sentFollowUps.length },
+			emailTotals: {
+				sent: sentFollowUps.length,
+				queued: queuedFollowUps.length,
+				failed: failedFollowUps.length,
+				blocked: blockedFollowUps.length
+			},
 			customerActivityByDay
 		};
 	}

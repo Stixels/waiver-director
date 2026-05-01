@@ -17,6 +17,9 @@
 	import MailIcon from '@lucide/svelte/icons/mail';
 	import CalendarCheckIcon from '@lucide/svelte/icons/calendar-check';
 	import UsersRoundIcon from '@lucide/svelte/icons/users-round';
+	import ClockIcon from '@lucide/svelte/icons/clock';
+	import AlertCircleIcon from '@lucide/svelte/icons/alert-circle';
+	import ShieldOffIcon from '@lucide/svelte/icons/shield-off';
 
 	const appContext = useAppContext();
 	const currentWorkspace = $derived(
@@ -113,6 +116,20 @@
 			0
 		) ?? 0
 	);
+
+	// Period totals for chart headers
+	const submissionsTotal = $derived(
+		analyticsData?.submissionsByDay.reduce((sum, d) => sum + d.count, 0) ?? 0
+	);
+	const bookingsTotal = $derived(
+		analyticsData?.bookingsByDay.reduce((sum, d) => sum + d.count, 0) ?? 0
+	);
+
+	// Email pipeline stats
+	const emailSent = $derived(analyticsData?.emailTotals.sent ?? 0);
+	const emailQueued = $derived(analyticsData?.emailTotals.queued ?? 0);
+	const emailFailed = $derived(analyticsData?.emailTotals.failed ?? 0);
+	const emailBlocked = $derived(analyticsData?.emailTotals.blocked ?? 0);
 </script>
 
 <svelte:head>
@@ -133,19 +150,28 @@
 	<!-- Submissions + Bookings over time side by side -->
 	<div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
 		<Card>
-			<CardHeader class="flex flex-row items-center gap-2 pb-3">
-				<TrendingUpIcon class="size-4 text-muted-foreground" />
-				<CardTitle class="text-base font-semibold">Submissions Over Time</CardTitle>
+			<CardHeader class="flex flex-row items-start justify-between gap-2 pb-3">
+				<div class="flex items-center gap-2">
+					<TrendingUpIcon class="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+					<CardTitle class="text-base font-semibold">Submissions</CardTitle>
+				</div>
+				{#if !isInitialLoading && analyticsData}
+					<p class="text-right text-2xl font-bold tracking-tight tabular-nums">
+						{submissionsTotal.toLocaleString()}
+					</p>
+				{:else if isInitialLoading}
+					<Skeleton class="h-7 w-12" />
+				{/if}
 			</CardHeader>
 			<CardContent>
 				{#if isInitialLoading}
-					<Skeleton class="h-56 w-full" />
+					<Skeleton class="h-52 w-full" />
 				{:else if !analyticsData || analyticsData.submissionsByDay.every((d) => d.count === 0)}
-					<div class="flex h-56 items-center justify-center text-sm text-muted-foreground">
+					<div class="flex h-52 items-center justify-center text-sm text-muted-foreground">
 						No submissions in this period
 					</div>
 				{:else}
-					<ChartContainer config={submissionsConfig} class="h-56 w-full">
+					<ChartContainer config={submissionsConfig} class="h-52 w-full">
 						<AreaChart
 							data={analyticsData.submissionsByDay}
 							x="dayStartAt"
@@ -187,19 +213,28 @@
 		</Card>
 
 		<Card>
-			<CardHeader class="flex flex-row items-center gap-2 pb-3">
-				<CalendarCheckIcon class="size-4 text-muted-foreground" />
-				<CardTitle class="text-base font-semibold">Bookings Over Time</CardTitle>
+			<CardHeader class="flex flex-row items-start justify-between gap-2 pb-3">
+				<div class="flex items-center gap-2">
+					<CalendarCheckIcon class="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+					<CardTitle class="text-base font-semibold">Bookings</CardTitle>
+				</div>
+				{#if !isInitialLoading && analyticsData}
+					<p class="text-right text-2xl font-bold tracking-tight tabular-nums">
+						{bookingsTotal.toLocaleString()}
+					</p>
+				{:else if isInitialLoading}
+					<Skeleton class="h-7 w-12" />
+				{/if}
 			</CardHeader>
 			<CardContent>
 				{#if isInitialLoading}
-					<Skeleton class="h-56 w-full" />
+					<Skeleton class="h-52 w-full" />
 				{:else if !analyticsData || analyticsData.bookingsByDay.every((d) => d.count === 0)}
-					<div class="flex h-56 items-center justify-center text-sm text-muted-foreground">
+					<div class="flex h-52 items-center justify-center text-sm text-muted-foreground">
 						No bookings in this period
 					</div>
 				{:else}
-					<ChartContainer config={bookingsConfig} class="h-56 w-full">
+					<ChartContainer config={bookingsConfig} class="h-52 w-full">
 						<AreaChart
 							data={analyticsData.bookingsByDay}
 							x="dayStartAt"
@@ -242,45 +277,123 @@
 	</div>
 
 	<div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
-		<Card class="flex min-h-56 flex-col">
+		<!-- Email Pipeline card -->
+		<Card class="flex flex-col">
 			<CardHeader class="flex flex-row items-center gap-2 pb-3">
 				<MailIcon class="size-4 text-muted-foreground" />
-				<CardTitle class="text-base font-semibold">Emails Sent</CardTitle>
+				<CardTitle class="text-base font-semibold">Email Pipeline</CardTitle>
 			</CardHeader>
-			<CardContent class="flex flex-1 flex-col justify-between">
+			<CardContent class="flex flex-1 flex-col gap-5">
 				{#if isInitialLoading}
 					<div class="space-y-3">
-						<Skeleton class="h-10 w-24" />
-						<Skeleton class="h-4 w-40" />
+						<Skeleton class="h-10 w-20" />
+						<Skeleton class="h-4 w-32" />
+					</div>
+					<div class="mt-auto grid grid-cols-3 gap-2">
+						<Skeleton class="h-16 w-full rounded-lg" />
+						<Skeleton class="h-16 w-full rounded-lg" />
+						<Skeleton class="h-16 w-full rounded-lg" />
 					</div>
 				{:else}
+					<!-- Sent in period -->
 					<div>
 						<p class="text-4xl font-bold tracking-tight tabular-nums">
-							{(analyticsData?.emailTotals.sent ?? 0).toLocaleString()}
+							{emailSent.toLocaleString()}
 						</p>
-						<p class="mt-2 text-sm text-muted-foreground">Sent follow-up emails</p>
+						<p class="mt-1 text-sm text-muted-foreground">Sent in selected period</p>
 					</div>
-					<div class="rounded-md border border-border/60 px-3 py-2 text-xs text-muted-foreground">
-						Selected date range
+
+					<!-- Current pipeline health -->
+					<div class="mt-auto space-y-2">
+						<p class="text-xs font-medium text-muted-foreground">Current pipeline</p>
+						<div class="grid grid-cols-3 gap-2">
+							<!-- Queued — lighter primary in dark mode via color-mix for contrast -->
+							<div
+								class="rounded-lg border border-primary/20 bg-primary/10 px-3 py-2.5 dark:border-primary/40 dark:bg-primary/15"
+							>
+								<ClockIcon
+									class="mb-1.5 size-3.5 text-primary dark:text-[color-mix(in_oklch,var(--primary)_30%,var(--primary-foreground))]"
+								/>
+								<p
+									class="text-base font-bold tabular-nums text-primary dark:text-[color-mix(in_oklch,var(--primary)_26%,var(--primary-foreground))]"
+								>
+									{emailQueued.toLocaleString()}
+								</p>
+								<p
+									class="text-[0.65rem] font-medium text-primary/80 dark:text-[color-mix(in_oklch,var(--primary)_38%,var(--primary-foreground))]"
+								>
+									Queued
+								</p>
+							</div>
+							<!-- Failed -->
+							<div
+								class={emailFailed > 0
+									? 'rounded-lg bg-destructive/8 px-3 py-2.5'
+									: 'rounded-lg bg-muted/60 px-3 py-2.5'}
+							>
+								<AlertCircleIcon
+									class={`mb-1.5 size-3.5 ${emailFailed > 0 ? 'text-destructive' : 'text-muted-foreground'}`}
+								/>
+								<p
+									class={`text-base font-bold tabular-nums ${emailFailed > 0 ? 'text-destructive' : 'text-muted-foreground'}`}
+								>
+									{emailFailed.toLocaleString()}
+								</p>
+								<p
+									class={`text-[0.65rem] font-medium ${emailFailed > 0 ? 'text-destructive/70' : 'text-muted-foreground/70'}`}
+								>
+									Failed
+								</p>
+							</div>
+							<!-- Blocked -->
+							<div
+								class={emailBlocked > 0
+									? 'rounded-lg bg-amber-500/8 px-3 py-2.5'
+									: 'rounded-lg bg-muted/60 px-3 py-2.5'}
+							>
+								<ShieldOffIcon
+									class={`mb-1.5 size-3.5 ${emailBlocked > 0 ? 'text-amber-600 dark:text-amber-500' : 'text-muted-foreground'}`}
+								/>
+								<p
+									class={`text-base font-bold tabular-nums ${emailBlocked > 0 ? 'text-amber-700 dark:text-amber-400' : 'text-muted-foreground'}`}
+								>
+									{emailBlocked.toLocaleString()}
+								</p>
+								<p
+									class={`text-[0.65rem] font-medium ${emailBlocked > 0 ? 'text-amber-700/70 dark:text-amber-400/70' : 'text-muted-foreground/70'}`}
+								>
+									Blocked
+								</p>
+							</div>
+						</div>
 					</div>
 				{/if}
 			</CardContent>
 		</Card>
 
 		<Card class="lg:col-span-2">
-			<CardHeader class="flex flex-row items-center gap-2 pb-3">
-				<UsersRoundIcon class="size-4 text-muted-foreground" />
-				<CardTitle class="text-base font-semibold">Customers by Day</CardTitle>
+			<CardHeader class="flex flex-row items-start justify-between gap-2 pb-3">
+				<div class="flex items-center gap-2">
+					<UsersRoundIcon class="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+					<CardTitle class="text-base font-semibold">Customers by Day</CardTitle>
+				</div>
+				{#if !isInitialLoading && analyticsData && customerActivityTotal > 0}
+					<p class="text-right text-2xl font-bold tracking-tight tabular-nums">
+						{customerActivityTotal.toLocaleString()}
+					</p>
+				{:else if isInitialLoading}
+					<Skeleton class="h-7 w-12" />
+				{/if}
 			</CardHeader>
 			<CardContent>
 				{#if isInitialLoading}
-					<Skeleton class="h-56 w-full" />
+					<Skeleton class="h-52 w-full" />
 				{:else if !analyticsData || customerActivityTotal === 0}
-					<div class="flex h-56 items-center justify-center text-sm text-muted-foreground">
+					<div class="flex h-52 items-center justify-center text-sm text-muted-foreground">
 						No customer activity in this period
 					</div>
 				{:else}
-					<ChartContainer config={customersConfig} class="h-56 w-full">
+					<ChartContainer config={customersConfig} class="h-52 w-full">
 						<BarChart
 							data={analyticsData.customerActivityByDay}
 							x="dayStartAt"
