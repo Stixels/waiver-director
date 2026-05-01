@@ -4,6 +4,7 @@ import ScrollTextIcon from '@lucide/svelte/icons/scroll-text';
 import UsersRoundIcon from '@lucide/svelte/icons/users-round';
 import LayersIcon from '@lucide/svelte/icons/layers';
 import MailIcon from '@lucide/svelte/icons/mail';
+import BarChart3Icon from '@lucide/svelte/icons/bar-chart-3';
 import PlugZapIcon from '@lucide/svelte/icons/plug-zap';
 import SlidersHorizontalIcon from '@lucide/svelte/icons/sliders-horizontal';
 
@@ -46,6 +47,12 @@ export const appMainNavItems = [
 		href: '/app/[workspaceSlug]/emails',
 		icon: MailIcon,
 		description: 'Follow-up queue, templates, and email editor.'
+	},
+	{
+		label: 'Analytics',
+		href: '/app/[workspaceSlug]/analytics',
+		icon: BarChart3Icon,
+		description: 'Submission trends, booking completion, and email funnel.'
 	}
 ] as const;
 
