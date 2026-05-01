@@ -30,13 +30,6 @@
 		TableRow
 	} from '$lib/components/ui/table';
 	import {
-		Dialog,
-		DialogContent,
-		DialogDescription,
-		DialogHeader,
-		DialogTitle
-	} from '$lib/components/ui/dialog';
-	import {
 		DropdownMenu,
 		DropdownMenuCheckboxItem,
 		DropdownMenuContent,
@@ -44,18 +37,17 @@
 	} from '$lib/components/ui/dropdown-menu';
 	import { Popover, PopoverContent, PopoverTrigger } from '$lib/components/ui/popover';
 	import { RangeCalendar } from '$lib/components/ui/range-calendar';
+	import FollowUpPreviewDialog from '$lib/components/emails/FollowUpPreviewDialog.svelte';
 	import EmailLoadTemplateDialog from '$lib/components/emails/EmailLoadTemplateDialog.svelte';
 	import EmailSaveTemplateDialog from '$lib/components/emails/EmailSaveTemplateDialog.svelte';
 	import RichTextEditor from '$lib/components/emails/RichTextEditor.svelte';
 	import WaiverRichText from '$lib/components/waivers/WaiverRichText.svelte';
-	import ArrowRightIcon from '@lucide/svelte/icons/arrow-right';
-	import CalendarClockIcon from '@lucide/svelte/icons/calendar-clock';
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
 	import CloudIcon from '@lucide/svelte/icons/cloud';
 	import CloudCheckIcon from '@lucide/svelte/icons/cloud-check';
 	import CloudOffIcon from '@lucide/svelte/icons/cloud-off';
 	import EyeIcon from '@lucide/svelte/icons/eye';
-	import FileTextIcon from '@lucide/svelte/icons/file-text';
+	import CalendarClockIcon from '@lucide/svelte/icons/calendar-clock';
 	import MailIcon from '@lucide/svelte/icons/mail';
 	import MailCheckIcon from '@lucide/svelte/icons/mail-check';
 	import LoaderIcon from '@lucide/svelte/icons/loader';
@@ -63,8 +55,6 @@
 	import ShieldCheckIcon from '@lucide/svelte/icons/shield-check';
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 	import SlidersHorizontalIcon from '@lucide/svelte/icons/sliders-horizontal';
-	import TicketIcon from '@lucide/svelte/icons/ticket';
-	import UsersRoundIcon from '@lucide/svelte/icons/users-round';
 	import XIcon from '@lucide/svelte/icons/x';
 
 	const convex = useConvexClient();
@@ -80,13 +70,6 @@
 	const DEFAULT_SEND_AFTER_AMOUNT = 2;
 	const DEFAULT_SEND_AFTER_UNIT: SendAfterUnit = 'hours';
 	const AUTOSAVE_DELAY_MS = 800;
-	const previewMetaLinkClass =
-		'group/link inline-flex max-w-full items-center gap-1.5 rounded-md border border-border bg-background px-2 py-1 text-xs font-medium text-foreground shadow-xs transition-colors hover:border-foreground/30 hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none';
-	const previewMetaItemClass =
-		'min-w-0 border-t border-border pt-2 first:border-t-0 first:pt-0 sm:border-t-0 sm:border-l sm:px-3 sm:pt-0 sm:first:border-l-0 sm:first:pl-0 sm:last:pr-0';
-	const previewMetaLabelClass =
-		'mb-1 flex items-center gap-1.5 text-[10px] font-semibold tracking-wide text-muted-foreground uppercase';
-
 	const currentWorkspace = $derived(
 		appContext.workspaces.find((w) => w.slug === page.params.workspaceSlug) ?? null
 	);
@@ -216,18 +199,6 @@
 		parseConvexId<'email_follow_ups'>(page.url.searchParams.get('followUpId'))
 	);
 
-	const selectedFollowUpQuery = useProtectedQuery(
-		api.emails.getFollowUp,
-		() =>
-			currentWorkspace && followUpIdParam
-				? {
-						workspaceId: currentWorkspace.workspaceId,
-						followUpId: followUpIdParam
-					}
-				: 'skip',
-		() => ({ keepPreviousData: false })
-	);
-
 	const templatesQuery = useProtectedQuery(api.emails.listEmailTemplates, () =>
 		currentWorkspace ? { workspaceId: currentWorkspace.workspaceId } : 'skip'
 	);
@@ -253,7 +224,6 @@
 			senderSettingsQuery.error ??
 			statsQuery.error ??
 			followUpsQuery.error ??
-			selectedFollowUpQuery.error ??
 			templatesQuery.error ??
 			null
 	);
@@ -659,12 +629,10 @@
 
 	let previewOpen = $state(false);
 	let previewFollowUpId = $state<FollowUp['_id'] | null>(null);
-	let previewSnapshot = $state<FollowUp | null>(null);
 	let isClosingPreview = $state(false);
 
 	function openPreview(followUp: FollowUp) {
 		isClosingPreview = false;
-		previewSnapshot = followUp;
 		previewFollowUpId = followUp._id;
 		previewOpen = true;
 		void updateFollowUpUrl(followUp._id, false);
@@ -679,7 +647,6 @@
 
 		isClosingPreview = true;
 		previewFollowUpId = null;
-		previewSnapshot = null;
 		void updateFollowUpUrl(null, true).finally(() => {
 			isClosingPreview = false;
 		});
@@ -707,19 +674,11 @@
 	}
 
 	$effect(() => {
-		const selectedFollowUp = selectedFollowUpQuery.data as FollowUp | null | undefined;
 		if (isClosingPreview) return;
-		if (!followUpIdParam || !selectedFollowUp) return;
+		if (!followUpIdParam) return;
 		if (previewFollowUpId === followUpIdParam && previewOpen) return;
-		previewSnapshot = selectedFollowUp;
 		previewFollowUpId = followUpIdParam;
 		previewOpen = true;
-	});
-
-	const lastPreviewFollowUp = $derived.by(() => {
-		if (!previewFollowUpId) return null;
-		const visibleFollowUp = followUps.find((followUp) => followUp._id === previewFollowUpId);
-		return visibleFollowUp ?? (previewSnapshot?._id === previewFollowUpId ? previewSnapshot : null);
 	});
 
 	function isInteractiveEventTarget(event: Event) {
@@ -728,89 +687,6 @@
 			? Boolean(target.closest('a,button,input,select,textarea'))
 			: false;
 	}
-
-	const previewVars = $derived.by(() => {
-		const f = lastPreviewFollowUp;
-		if (!f) return null;
-		return {
-			signerName: f.signerName,
-			signerEmail: f.signerEmail,
-			bookingId: f.bookingNumber ? `#${f.bookingNumber}` : null,
-			customerId: f.customerId,
-			bookingRecordId: f.bookingId,
-			bookingNumber: f.bookingNumber,
-			bookingActivityName: f.bookingActivityName,
-			bookingStartTime: f.bookingStartTime,
-			businessName: currentWorkspace?.name ?? '',
-			activityDate: formatActivityDate(f),
-			scheduledAt: f.scheduledAt ?? null,
-			status: f.status,
-			followUpId: f._id
-		};
-	});
-
-	function submissionPath(submissionId: Id<'waiver_submissions'>) {
-		const query = queryString([['submissionId', submissionId]]);
-		return `/app/${page.params.workspaceSlug}/submissions?${query}` as `/app/${string}/submissions?${string}`;
-	}
-
-	function bookingDateParam(startTime: string | null | undefined) {
-		if (!startTime) return null;
-		const dateOnly = startTime.match(/^(\d{4}-\d{2}-\d{2})(?:[T\s]|$)/)?.[1];
-		if (dateOnly) return dateOnly;
-		const parsedDate = new Date(startTime);
-		if (Number.isNaN(parsedDate.getTime())) return null;
-		const year = parsedDate.getFullYear();
-		const month = String(parsedDate.getMonth() + 1).padStart(2, '0');
-		const day = String(parsedDate.getDate()).padStart(2, '0');
-		return `${year}-${month}-${day}`;
-	}
-
-	function bookingPath(bookingId: Id<'bookings'>, startTime: string | null | undefined) {
-		const query = queryString([
-			['date', bookingDateParam(startTime)],
-			['bookingId', bookingId]
-		]);
-		return `/app/${page.params.workspaceSlug}/bookings?${query}` as `/app/${string}/bookings?${string}`;
-	}
-
-	function customerPath(customerId: Id<'customers'>) {
-		const query = queryString([['customerId', customerId]]);
-		return `/app/${page.params.workspaceSlug}/customers?${query}` as `/app/${string}/customers?${string}`;
-	}
-
-	function resolveTemplate(template: string, vars: NonNullable<typeof previewVars>) {
-		return template
-			.replace(/\{\{customer_name\}\}|\{customer_name\}/g, vars.signerName)
-			.replace(/\{\{booking_id\}\}|\{booking_id\}/g, vars.bookingId ?? '')
-			.replace(/\{\{business_name\}\}|\{business_name\}/g, vars.businessName)
-			.replace(/\{\{activity_date\}\}|\{activity_date\}/g, vars.activityDate);
-	}
-
-	function resolveHtmlTemplate(template: string, vars: NonNullable<typeof previewVars>) {
-		return resolveTemplate(template, {
-			...vars,
-			signerName: escapeHtml(vars.signerName),
-			bookingId: escapeHtml(vars.bookingId ?? ''),
-			businessName: escapeHtml(vars.businessName),
-			activityDate: escapeHtml(vars.activityDate)
-		});
-	}
-
-	const previewSubjectTemplate = $derived(
-		lastPreviewFollowUp?.subjectTemplate ?? savedSubject ?? subject
-	);
-	const previewBodyTemplate = $derived(lastPreviewFollowUp?.bodyTemplate ?? savedBody ?? body);
-	const resolvedSubject = $derived.by(() => {
-		if (!previewVars) return '';
-		if (lastPreviewFollowUp?.sentSubject) return lastPreviewFollowUp.sentSubject;
-		return resolveTemplate(previewSubjectTemplate, previewVars);
-	});
-	const resolvedBodyHtml = $derived.by(() => {
-		if (!previewVars) return '';
-		if (lastPreviewFollowUp?.sentBodyHtml) return lastPreviewFollowUp.sentBodyHtml;
-		return resolveHtmlTemplate(previewBodyTemplate, previewVars);
-	});
 
 	// ─── Search/filter/pagination state ───────────────────────────────────────
 
@@ -945,50 +821,11 @@
 		}
 	}
 
-	let rowLoading = $state<Id<'email_follow_ups'> | null>(null);
-
-	async function handleRowAction(
-		action: 'send' | 'unschedule',
-		followUpId: Id<'email_follow_ups'>
-	) {
-		if (action === 'send' && !workspaceCanSendEmail) {
-			toast.error(senderUnavailableMessage);
-			return;
-		}
-		rowLoading = followUpId;
-		try {
-			if (action === 'send') {
-				await convex.mutation(api.emails.sendFollowUpNow, { followUpId });
-				toast.message('Follow-up queued for delivery.');
-			} else if (action === 'unschedule') {
-				await convex.mutation(api.emails.unscheduleFollowUp, { followUpId });
-				toast.success('Follow-up unscheduled.');
-			}
-		} catch (err) {
-			toast.error(getConvexErrorMessage(err, 'Action failed.'));
-		} finally {
-			rowLoading = null;
-		}
-	}
-
 	// ─── Formatting helpers ────────────────────────────────────────────────────
 
 	function formatTimestamp(ts: number) {
 		return new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeStyle: 'short' }).format(
 			new Date(ts)
-		);
-	}
-
-	function parseTimestamp(value: string | null | undefined) {
-		if (!value) return null;
-		const timestamp = Date.parse(value);
-		return Number.isNaN(timestamp) ? null : timestamp;
-	}
-
-	function formatActivityDate(followUp: FollowUp) {
-		const bookingStartAt = parseTimestamp(followUp.bookingStartTime);
-		return new Intl.DateTimeFormat('en-US', { dateStyle: 'long' }).format(
-			new Date(bookingStartAt ?? followUp.submittedAt)
 		);
 	}
 
@@ -1065,178 +902,16 @@
 	<title>{currentWorkspace?.name ?? 'Workspace'} Email Follow-ups | Waiver Director</title>
 </svelte:head>
 
-<!-- Follow-up preview modal -->
-<Dialog bind:open={previewOpen} onOpenChange={handlePreviewOpenChange}>
-	<DialogContent class="max-h-[92vh] gap-0 overflow-hidden p-0 sm:max-w-[860px]">
-		{#if previewVars}
-			<DialogHeader class="shrink-0 border-b border-border px-4 py-4 sm:px-6">
-				<div class="space-y-3">
-					<div class="min-w-0 pr-8 sm:pr-10">
-						<DialogTitle class="truncate text-base font-semibold">
-							{previewVars.signerName}
-						</DialogTitle>
-						<DialogDescription class="mt-0.5 truncate text-xs text-muted-foreground">
-							{previewVars.signerEmail}
-						</DialogDescription>
-					</div>
-
-					<div
-						class="grid gap-2 border-y border-border py-2 sm:grid-cols-[1fr_1.05fr_1.35fr_1.05fr] sm:gap-0"
-					>
-						<div class={previewMetaItemClass}>
-							<div class={previewMetaLabelClass}>
-								<CalendarClockIcon class="size-3" aria-hidden="true" />
-								Signed
-							</div>
-							<p class="min-w-0 truncate text-xs font-medium text-foreground tabular-nums">
-								{previewVars.activityDate}
-							</p>
-							{#if previewVars.status === 'queued' && previewVars.scheduledAt !== null}
-								<p class="shrink-0 text-[11px] text-muted-foreground tabular-nums">
-									Scheduled for {formatTimestamp(previewVars.scheduledAt)}
-								</p>
-							{/if}
-						</div>
-
-						<div class={previewMetaItemClass}>
-							<div class={previewMetaLabelClass}>
-								<UsersRoundIcon class="size-3" aria-hidden="true" />
-								Customer
-							</div>
-							{#if previewVars.customerId}
-								<a
-									href={resolve(customerPath(previewVars.customerId))}
-									class={previewMetaLinkClass}
-								>
-									<span class="truncate">{previewVars.signerName}</span>
-									<span
-										class="inline-flex size-4 shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors group-hover/link:border-foreground/30 group-hover/link:text-foreground"
-									>
-										<ArrowRightIcon class="size-2.5" aria-hidden="true" />
-									</span>
-								</a>
-							{:else}
-								<p class="min-w-0 truncate text-xs text-muted-foreground">No link</p>
-							{/if}
-						</div>
-
-						<div class={previewMetaItemClass}>
-							<div class={previewMetaLabelClass}>
-								<TicketIcon class="size-3" aria-hidden="true" />
-								Booking
-							</div>
-							{#if previewVars.bookingRecordId && previewVars.bookingNumber}
-								<a
-									href={resolve(
-										bookingPath(previewVars.bookingRecordId, previewVars.bookingStartTime)
-									)}
-									class={previewMetaLinkClass}
-								>
-									<span class="shrink-0">#{previewVars.bookingNumber}</span>
-									{#if previewVars.bookingActivityName}
-										<span class="truncate font-normal text-foreground/70">
-											{previewVars.bookingActivityName}
-										</span>
-									{/if}
-									<span
-										class="inline-flex size-4 shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors group-hover/link:border-foreground/30 group-hover/link:text-foreground"
-									>
-										<ArrowRightIcon class="size-2.5" aria-hidden="true" />
-									</span>
-								</a>
-							{:else if previewVars.bookingNumber}
-								<p class="min-w-0 truncate text-xs font-medium text-foreground">
-									#{previewVars.bookingNumber}
-									{#if previewVars.bookingActivityName}
-										<span class="font-normal text-muted-foreground">
-											{previewVars.bookingActivityName}
-										</span>
-									{/if}
-								</p>
-							{:else}
-								<p class="min-w-0 truncate text-xs text-muted-foreground">No booking</p>
-							{/if}
-						</div>
-
-						<div class={previewMetaItemClass}>
-							<div class={previewMetaLabelClass}>
-								<FileTextIcon class="size-3" aria-hidden="true" />
-								Submission
-							</div>
-							{#if lastPreviewFollowUp}
-								<a
-									href={resolve(submissionPath(lastPreviewFollowUp.submissionId))}
-									class={previewMetaLinkClass}
-								>
-									<span class="truncate">Waiver</span>
-									<span
-										class="inline-flex size-4 shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors group-hover/link:border-foreground/30 group-hover/link:text-foreground"
-									>
-										<ArrowRightIcon class="size-2.5" aria-hidden="true" />
-									</span>
-								</a>
-							{:else}
-								<p class="min-w-0 truncate text-xs text-muted-foreground">No link</p>
-							{/if}
-						</div>
-					</div>
-				</div>
-			</DialogHeader>
-
-			<div class="min-h-0 flex-1 overflow-y-auto bg-muted/20 px-4 py-5 sm:px-6">
-				<div class="space-y-5">
-					<section class="space-y-1.5">
-						<p class="text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">
-							Subject
-						</p>
-						<p class="rounded-lg border border-border bg-background px-3 py-2 text-sm font-medium">
-							{resolvedSubject}
-						</p>
-					</section>
-
-					<section class="space-y-1.5">
-						<p class="text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">
-							Body
-						</p>
-						<WaiverRichText
-							html={resolvedBodyHtml}
-							class="overflow-hidden rounded-xl border border-border bg-background px-4 py-3 text-sm leading-7 wrap-break-word text-foreground shadow-sm"
-						/>
-					</section>
-				</div>
-			</div>
-
-			<!-- Footer actions -->
-			{#if ['queued', 'unscheduled', 'failed', 'blocked'].includes(previewVars.status)}
-				<div class="flex items-center justify-between border-t border-border px-6 py-4">
-					{#if previewVars.status === 'queued'}
-						<Button
-							variant="destructive"
-							size="sm"
-							onclick={() => handleRowAction('unschedule', previewVars!.followUpId)}
-							disabled={rowLoading === previewVars.followUpId}
-						>
-							Unschedule follow-up
-						</Button>
-					{:else}
-						<span></span>
-					{/if}
-					<div class="flex gap-2">
-						<span title={!workspaceCanSendEmail ? senderUnavailableMessage : undefined}>
-							<Button
-								size="sm"
-								onclick={() => handleRowAction('send', previewVars!.followUpId)}
-								disabled={rowLoading === previewVars.followUpId || !workspaceCanSendEmail}
-							>
-								{rowLoading === previewVars.followUpId ? 'Sending…' : 'Send now'}
-							</Button>
-						</span>
-					</div>
-				</div>
-			{/if}
-		{/if}
-	</DialogContent>
-</Dialog>
+{#if currentWorkspace}
+	<FollowUpPreviewDialog
+		bind:open={previewOpen}
+		workspaceId={currentWorkspace.workspaceId}
+		workspaceSlug={currentWorkspace.slug}
+		workspaceName={currentWorkspace.name}
+		followUpId={previewFollowUpId}
+		onOpenChange={handlePreviewOpenChange}
+	/>
+{/if}
 
 <EmailSaveTemplateDialog
 	bind:open={saveTemplateOpen}
@@ -2442,12 +2117,6 @@
 		gap: 0;
 		flex: 1;
 		min-height: 0;
-	}
-
-	.compose-body-section > .compose-key {
-		display: block;
-		width: auto;
-		padding: 0.7rem 1rem 0.55rem;
 	}
 
 	/* ─── Tool rail (right column) ───────────────────────────────────────────── */

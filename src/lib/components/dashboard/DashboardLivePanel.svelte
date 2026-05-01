@@ -5,8 +5,10 @@
 	import type { Id } from '$convex/_generated/dataModel';
 	import type { FunctionReturnType } from 'convex/server';
 	import { useProtectedQuery } from '$lib/components/auth/convex-auth.svelte';
+	import BookingDetailSheet from '$lib/components/bookings/BookingDetailSheet.svelte';
 	import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
 	import { Skeleton } from '$lib/components/ui/skeleton';
+	import SubmissionDetailSheet from '$lib/components/waivers/SubmissionDetailSheet.svelte';
 	import { cn } from '$lib/utils';
 	import { onMount } from 'svelte';
 	import CalendarCheckIcon from '@lucide/svelte/icons/calendar-check';
@@ -24,7 +26,7 @@
 		todayEndAt: number;
 	} = $props();
 
-	const workspaceSlug = $derived(page.params.workspaceSlug);
+	const workspaceSlug = $derived(page.params.workspaceSlug ?? '');
 	const skeletonRows = [0, 1, 2, 3, 4, 5];
 
 	let now = $state(Date.now());
@@ -70,6 +72,17 @@
 	const submissionPage = $derived((submissionsQuery.data ?? null) as SubmissionPage | null);
 	const submissions = $derived(submissionPage?.submissions ?? []);
 	const submissionsInitialLoading = $derived(submissionsQuery.isLoading && !submissionPage);
+	const waiverQuery = useProtectedQuery(
+		api.waivers.getWorkspaceWaiver,
+		() => ({ workspaceId }),
+		() => ({ keepPreviousData: true })
+	);
+	const publicSlug = $derived(waiverQuery.data?.publicSlug ?? null);
+
+	let selectedBookingId = $state<Id<'bookings'> | null>(null);
+	let bookingDetailOpen = $state(false);
+	let selectedSubmissionId = $state<Id<'waiver_submissions'> | null>(null);
+	let submissionDetailOpen = $state(false);
 
 	type TimeStatus = { label: string; tone: 'now' | 'soon' | 'past' };
 
@@ -112,7 +125,36 @@
 			day: 'numeric'
 		}).format(new Date(submittedAt));
 	}
+
+	function openBooking(bookingId: Id<'bookings'>) {
+		selectedBookingId = bookingId;
+		bookingDetailOpen = true;
+	}
+
+	function openSubmission(submissionId: Id<'waiver_submissions'>) {
+		selectedSubmissionId = submissionId;
+		submissionDetailOpen = true;
+	}
 </script>
+
+{#if selectedBookingId}
+	<BookingDetailSheet
+		bind:open={bookingDetailOpen}
+		{workspaceId}
+		{workspaceSlug}
+		bookingId={selectedBookingId}
+		{publicSlug}
+	/>
+{/if}
+
+{#if selectedSubmissionId}
+	<SubmissionDetailSheet
+		bind:open={submissionDetailOpen}
+		{workspaceId}
+		{workspaceSlug}
+		submissionId={selectedSubmissionId}
+	/>
+{/if}
 
 <div class="grid gap-4 lg:grid-cols-2">
 	<Card class="flex h-[420px] flex-col overflow-hidden md:h-[520px]">
@@ -158,9 +200,10 @@
 						{@const status = timeStatus(booking)}
 						{@const pct = completionPercent(booking)}
 						{@const isCanceled = booking.status === 'canceled'}
-						<a
-							href={resolve(`/app/${workspaceSlug}/bookings` as `/app/${string}/bookings`)}
-							class="flex w-full items-center gap-4 px-5 py-3.5 transition-colors hover:bg-muted/30"
+						<button
+							type="button"
+							onclick={() => openBooking(booking.bookingId)}
+							class="flex w-full items-center gap-4 px-5 py-3.5 text-left transition-colors hover:bg-muted/30 focus-visible:bg-muted/30 focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
 						>
 							<div class="w-14 shrink-0">
 								<p
@@ -218,7 +261,7 @@
 									</div>
 								{/if}
 							</div>
-						</a>
+						</button>
 					{/each}
 				</div>
 			{/if}
@@ -264,9 +307,10 @@
 			{:else}
 				<div class="divide-y divide-border">
 					{#each submissions as submission (submission.submissionId)}
-						<a
-							href={resolve(`/app/${workspaceSlug}/submissions` as `/app/${string}/submissions`)}
-							class="flex w-full items-center gap-4 px-5 py-3.5 transition-colors hover:bg-muted/30"
+						<button
+							type="button"
+							onclick={() => openSubmission(submission.submissionId)}
+							class="flex w-full items-center gap-4 px-5 py-3.5 text-left transition-colors hover:bg-muted/30 focus-visible:bg-muted/30 focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
 						>
 							<div class="min-w-0 flex-1">
 								<p class="truncate text-sm font-medium">{submission.signerName}</p>
@@ -286,7 +330,7 @@
 							<p class="shrink-0 text-xs text-muted-foreground tabular-nums">
 								{formatSubmittedAt(submission.submittedAt)}
 							</p>
-						</a>
+						</button>
 					{/each}
 				</div>
 			{/if}

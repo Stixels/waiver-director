@@ -81,6 +81,8 @@
 			/>
 		{/if}
 		<EmailPipelinePanel
+			workspaceId={currentWorkspace?.workspaceId}
+			workspaceName={currentWorkspace?.name}
 			pipeline={snapshot?.emailPipeline}
 			recentQueued={snapshot?.recentQueued}
 			isLoading={isInitialLoading}

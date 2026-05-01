@@ -1,4 +1,6 @@
 <script lang="ts">
+	import type { Id } from '$convex/_generated/dataModel';
+	import FollowUpPreviewDialog from '$lib/components/emails/FollowUpPreviewDialog.svelte';
 	import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { Badge, type BadgeVariant } from '$lib/components/ui/badge';
@@ -16,7 +18,7 @@
 	};
 
 	type RecentQueued = {
-		followUpId: string;
+		followUpId: Id<'email_follow_ups'>;
 		signerName: string;
 		signerEmail: string;
 		scheduledAt: number | null;
@@ -24,16 +26,22 @@
 	};
 
 	let {
+		workspaceId,
+		workspaceName,
 		pipeline,
 		recentQueued,
 		isLoading
 	}: {
+		workspaceId: Id<'workspaces'> | null | undefined;
+		workspaceName: string | null | undefined;
 		pipeline: Pipeline | null | undefined;
 		recentQueued: RecentQueued[] | null | undefined;
 		isLoading: boolean;
 	} = $props();
 
-	const workspaceSlug = $derived(page.params.workspaceSlug);
+	const workspaceSlug = $derived(page.params.workspaceSlug ?? '');
+	let selectedFollowUpId = $state<Id<'email_follow_ups'> | null>(null);
+	let followUpPreviewOpen = $state(false);
 	const chipSkeletonRows = [0, 1, 2, 3, 4];
 	const queuedSkeletonRows = [0, 1, 2, 3, 4, 5];
 
@@ -62,7 +70,22 @@
 			minute: '2-digit'
 		});
 	}
+
+	function openFollowUp(followUpId: Id<'email_follow_ups'>) {
+		selectedFollowUpId = followUpId;
+		followUpPreviewOpen = true;
+	}
 </script>
+
+{#if workspaceId && workspaceName}
+	<FollowUpPreviewDialog
+		bind:open={followUpPreviewOpen}
+		{workspaceId}
+		{workspaceSlug}
+		{workspaceName}
+		followUpId={selectedFollowUpId}
+	/>
+{/if}
 
 <Card class="flex h-[420px] flex-col overflow-hidden md:h-[520px]">
 	<CardHeader class="flex flex-row items-center justify-between border-b py-4">
@@ -119,7 +142,11 @@
 				class="min-h-0 flex-1 divide-y divide-border/50 overflow-auto rounded-md border border-border/50"
 			>
 				{#each recentQueued as item (item.followUpId)}
-					<div class="flex items-center justify-between px-3 py-2.5">
+					<button
+						type="button"
+						onclick={() => openFollowUp(item.followUpId)}
+						class="flex w-full items-center justify-between px-3 py-2.5 text-left transition-colors hover:bg-muted/30 focus-visible:bg-muted/30 focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
+					>
 						<div class="min-w-0 flex-1">
 							<p class="truncate text-sm font-medium">{item.signerName}</p>
 							<p class="truncate text-xs text-muted-foreground">{item.signerEmail}</p>
@@ -127,7 +154,7 @@
 						<p class="ml-3 shrink-0 text-xs text-muted-foreground tabular-nums">
 							{formatScheduledAt(item.scheduledAt)}
 						</p>
-					</div>
+					</button>
 				{/each}
 			</div>
 		{:else}
