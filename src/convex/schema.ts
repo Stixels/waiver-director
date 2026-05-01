@@ -150,6 +150,7 @@ export default defineSchema({
 	})
 		.index('by_workspaceId', ['workspaceId'])
 		.index('by_workspaceId_and_normalizedEmail', ['workspaceId', 'normalizedEmail'])
+		.index('by_workspaceId_and_firstSeenAt', ['workspaceId', 'firstSeenAt'])
 		.index('by_workspaceId_and_lastSeenAt', ['workspaceId', 'lastSeenAt'])
 		.searchIndex('search_customerText', {
 			searchField: 'searchText',

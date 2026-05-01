@@ -73,19 +73,19 @@ export const getDashboardSnapshot = query({
 			submissionsToday: v.number(),
 			// Capped at 1000; values over the cap are displayed as "1000+"
 			followUpsQueued: v.number(),
-			totalCustomers: v.number()
+			newCustomersToday: v.number()
 		}),
 		kpiTrends: v.object({
 			bookingsToday: v.array(trendDayValue),
 			submissionsToday: v.array(trendDayValue),
 			followUpsQueued: v.array(trendDayValue),
-			totalCustomers: v.array(trendDayValue)
+			newCustomersToday: v.array(trendDayValue)
 		}),
 		kpiComparisons: v.object({
 			bookingsToday: kpiComparisonValue,
 			submissionsToday: kpiComparisonValue,
 			followUpsQueued: kpiComparisonValue,
-			totalCustomers: kpiComparisonValue
+			newCustomersToday: kpiComparisonValue
 		}),
 		emailPipeline: v.object({
 			queued: v.number(),
@@ -108,14 +108,13 @@ export const getDashboardSnapshot = query({
 		await requireWorkspaceMember(ctx, args.workspaceId);
 
 		const [
-			workspace,
 			trendBookings,
 			todaySubmissions,
 			trendSubmissions,
 			queuedFollowUps,
-			customers
+			todayCustomers,
+			trendCustomers
 		] = await Promise.all([
-			ctx.db.get(args.workspaceId),
 			ctx.db
 				.query('bookings')
 				.withIndex('by_workspaceId_and_startAt', (q) =>
@@ -153,7 +152,21 @@ export const getDashboardSnapshot = query({
 				.take(DASHBOARD_COUNT_CAP + 1),
 			ctx.db
 				.query('customers')
-				.withIndex('by_workspaceId', (q) => q.eq('workspaceId', args.workspaceId))
+				.withIndex('by_workspaceId_and_firstSeenAt', (q) =>
+					q
+						.eq('workspaceId', args.workspaceId)
+						.gte('firstSeenAt', args.todayStartAt)
+						.lt('firstSeenAt', args.todayEndAt)
+				)
+				.take(DASHBOARD_COUNT_CAP + 1),
+			ctx.db
+				.query('customers')
+				.withIndex('by_workspaceId_and_firstSeenAt', (q) =>
+					q
+						.eq('workspaceId', args.workspaceId)
+						.gte('firstSeenAt', args.trendStartAt)
+						.lt('firstSeenAt', args.todayEndAt)
+				)
 				.take(5000)
 		]);
 
@@ -219,14 +232,14 @@ export const getDashboardSnapshot = query({
 		};
 
 		const customerTrendCounts = new Map<number, number>();
-		for (const customer of customers) {
+		for (const customer of trendCustomers) {
 			if (customer.firstSeenAt < args.trendStartAt || customer.firstSeenAt >= args.todayEndAt) {
 				continue;
 			}
 			const day = floorToDay(customer.firstSeenAt);
 			customerTrendCounts.set(day, (customerTrendCounts.get(day) ?? 0) + 1);
 		}
-		const totalCustomersTrend = buildDayBuckets(
+		const newCustomersTodayTrend = buildDayBuckets(
 			currentTrendStartAt,
 			args.todayStartAt,
 			customerTrendCounts,
@@ -282,19 +295,19 @@ export const getDashboardSnapshot = query({
 				bookingsToday: bookingsToday.length,
 				submissionsToday,
 				followUpsQueued: queuedFollowUps.length,
-				totalCustomers: workspace?.customerCount ?? 0
+				newCustomersToday: todayCustomers.length
 			},
 			kpiTrends: {
 				bookingsToday: bookingsTodayTrend,
 				submissionsToday: submissionsTodayTrend,
 				followUpsQueued: followUpsQueuedTrend,
-				totalCustomers: totalCustomersTrend
+				newCustomersToday: newCustomersTodayTrend
 			},
 			kpiComparisons: {
 				bookingsToday: bookingsComparison,
 				submissionsToday: submissionsComparison,
 				followUpsQueued: followUpsComparison,
-				totalCustomers: customersComparison
+				newCustomersToday: customersComparison
 			},
 			emailPipeline: {
 				queued: queuedFollowUps.length,

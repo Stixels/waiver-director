@@ -11,7 +11,7 @@
 		bookingsToday: number;
 		submissionsToday: number;
 		followUpsQueued: number;
-		totalCustomers: number;
+		newCustomersToday: number;
 	};
 
 	type TrendDay = { dayLabel: string; dayStartAt: number; count: number };
@@ -20,7 +20,7 @@
 		bookingsToday: TrendDay[];
 		submissionsToday: TrendDay[];
 		followUpsQueued: TrendDay[];
-		totalCustomers: TrendDay[];
+		newCustomersToday: TrendDay[];
 	};
 
 	type KpiComparison = { currentTotal: number; previousTotal: number };
@@ -29,7 +29,7 @@
 		bookingsToday: KpiComparison;
 		submissionsToday: KpiComparison;
 		followUpsQueued: KpiComparison;
-		totalCustomers: KpiComparison;
+		newCustomersToday: KpiComparison;
 	};
 
 	let {
@@ -73,11 +73,11 @@
 			bgStyle: 'color-mix(in oklch, oklch(0.7 0.15 60) 12%, transparent)'
 		},
 		{
-			label: 'Total Customers',
-			value: kpi?.totalCustomers ?? 0,
+			label: 'New Customers',
+			value: kpi?.newCustomersToday ?? 0,
 			icon: UsersRoundIcon,
-			trend: trends?.totalCustomers,
-			comparison: comparisons?.totalCustomers,
+			trend: trends?.newCustomersToday,
+			comparison: comparisons?.newCustomersToday,
 			color: 'oklch(0.58 0.18 255)',
 			bgStyle: 'color-mix(in oklch, oklch(0.58 0.18 255) 12%, transparent)'
 		}
