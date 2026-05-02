@@ -23,6 +23,7 @@
 	import UserRoundIcon from '@lucide/svelte/icons/user-round';
 	import UsersRoundIcon from '@lucide/svelte/icons/users-round';
 	import XIcon from '@lucide/svelte/icons/x';
+	import BarChart3Icon from '@lucide/svelte/icons/bar-chart-3';
 
 	interface Props {
 		open: boolean;
@@ -58,6 +59,7 @@
 			| 'customers'
 			| 'waiver'
 			| 'emails'
+			| 'analytics'
 			| 'integrations'
 			| 'settings'
 			| 'settings/general'
@@ -172,6 +174,14 @@
 			path: 'emails',
 			aliases: ['email', 'email follow-ups', 'follow ups', 'followups', 'reminders'],
 			icon: MailIcon
+		},
+		{
+			key: 'analytics',
+			label: 'Analytics',
+			description: 'Trends, completion rates, and email performance',
+			path: 'analytics',
+			aliases: ['stats', 'statistics', 'reports', 'trends', 'completion rates', 'performance'],
+			icon: BarChart3Icon
 		},
 		{
 			key: 'integrations',

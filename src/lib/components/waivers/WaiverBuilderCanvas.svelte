@@ -789,6 +789,10 @@
 		text-underline-offset: 0.15em;
 	}
 
+	:global(.dark .waiver-canvas-editor a) {
+		color: color-mix(in oklch, var(--primary) 32%, var(--primary-foreground));
+	}
+
 	:global(.waiver-canvas-editor strong) {
 		font-weight: 700;
 	}

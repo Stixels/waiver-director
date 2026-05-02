@@ -150,6 +150,7 @@ export default defineSchema({
 	})
 		.index('by_workspaceId', ['workspaceId'])
 		.index('by_workspaceId_and_normalizedEmail', ['workspaceId', 'normalizedEmail'])
+		.index('by_workspaceId_and_firstSeenAt', ['workspaceId', 'firstSeenAt'])
 		.index('by_workspaceId_and_lastSeenAt', ['workspaceId', 'lastSeenAt'])
 		.searchIndex('search_customerText', {
 			searchField: 'searchText',
@@ -177,6 +178,7 @@ export default defineSchema({
 		submittedAt: v.number()
 	})
 		.index('by_workspaceId', ['workspaceId'])
+		.index('by_workspaceId_and_submittedAt', ['workspaceId', 'submittedAt'])
 		.index('by_versionId', ['versionId'])
 		.index('by_bookingId', ['bookingId'])
 		.index('by_customerId_and_submittedAt', ['customerId', 'submittedAt'])
