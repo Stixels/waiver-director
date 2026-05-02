@@ -47,6 +47,7 @@
 	const stats = $derived([
 		{
 			label: 'Bookings Today',
+			trendLabel: 'Bookings',
 			value: kpi?.bookingsToday ?? 0,
 			icon: CalendarCheckIcon,
 			trend: trends?.bookingsToday,
@@ -56,6 +57,7 @@
 		},
 		{
 			label: 'Submissions Today',
+			trendLabel: 'Submissions',
 			value: kpi?.submissionsToday ?? 0,
 			icon: ScrollTextIcon,
 			trend: trends?.submissionsToday,
@@ -65,6 +67,7 @@
 		},
 		{
 			label: 'Follow-ups Sent',
+			trendLabel: 'Follow-ups sent',
 			value: kpi?.followUpsSent ?? 0,
 			icon: MailIcon,
 			trend: trends?.followUpsSent,
@@ -74,6 +77,7 @@
 		},
 		{
 			label: 'New Customers',
+			trendLabel: 'New customers',
 			value: kpi?.newCustomersToday ?? 0,
 			icon: UsersRoundIcon,
 			trend: trends?.newCustomersToday,
@@ -135,7 +139,7 @@
 					{#if isLoading && trends == null}
 						<Skeleton class="h-16 w-full" />
 					{:else}
-						<KpiSparkline data={stat.trend} label={stat.label} color={stat.color} />
+						<KpiSparkline data={stat.trend} label={stat.trendLabel} color={stat.color} />
 					{/if}
 					<div class="flex min-w-0 items-center justify-between gap-2 text-[0.68rem] leading-none">
 						<div class="min-w-0">

@@ -17,9 +17,8 @@ const kpiComparisonValue = v.object({
 	previousTotal: v.number()
 });
 
-function floorToDay(epochMs: number): number {
-	const d = new Date(epochMs);
-	return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+function bucketStartForRange(epochMs: number, rangeStartAt: number): number {
+	return rangeStartAt + Math.floor((epochMs - rangeStartAt) / DAY_MS) * DAY_MS;
 }
 
 function dayLabel(epochMs: number): string {
@@ -37,8 +36,8 @@ function buildDayBuckets(
 	labelFn: (epochMs: number) => string
 ): Array<{ dayLabel: string; dayStartAt: number; count: number }> {
 	const buckets: Array<{ dayLabel: string; dayStartAt: number; count: number }> = [];
-	let cursor = floorToDay(startAt);
-	const end = floorToDay(endAt);
+	let cursor = startAt;
+	const end = endAt;
 	while (cursor <= end) {
 		buckets.push({
 			dayLabel: labelFn(cursor),
@@ -192,7 +191,7 @@ export const getDashboardSnapshot = query({
 		const bookingTrendCounts = new Map<number, number>();
 		for (const booking of trendBookings) {
 			if (typeof booking.startAt !== 'number') continue;
-			const day = floorToDay(booking.startAt);
+			const day = bucketStartForRange(booking.startAt, args.trendStartAt);
 			bookingTrendCounts.set(day, (bookingTrendCounts.get(day) ?? 0) + 1);
 		}
 		const bookingsTodayTrend = buildDayBuckets(
@@ -209,7 +208,7 @@ export const getDashboardSnapshot = query({
 		const trendCounts = new Map<number, number>();
 		for (const s of trendSubmissions) {
 			if (s.submittedAt < args.trendStartAt) break;
-			const day = floorToDay(s.submittedAt);
+			const day = bucketStartForRange(s.submittedAt, args.trendStartAt);
 			trendCounts.set(day, (trendCounts.get(day) ?? 0) + 1);
 		}
 		const submissionsTodayTrend = buildDayBuckets(
@@ -232,7 +231,7 @@ export const getDashboardSnapshot = query({
 			) {
 				continue;
 			}
-			const day = floorToDay(followUp.sentAt);
+			const day = bucketStartForRange(followUp.sentAt, args.trendStartAt);
 			followUpSentTrendCounts.set(day, (followUpSentTrendCounts.get(day) ?? 0) + 1);
 		}
 		const followUpsSentTrend = buildDayBuckets(
@@ -255,7 +254,7 @@ export const getDashboardSnapshot = query({
 			if (customer.firstSeenAt < args.trendStartAt || customer.firstSeenAt >= args.todayEndAt) {
 				continue;
 			}
-			const day = floorToDay(customer.firstSeenAt);
+			const day = bucketStartForRange(customer.firstSeenAt, args.trendStartAt);
 			customerTrendCounts.set(day, (customerTrendCounts.get(day) ?? 0) + 1);
 		}
 		const newCustomersTodayTrend = buildDayBuckets(
@@ -443,7 +442,7 @@ export const getAnalyticsSeries = query({
 		// Submissions by day
 		const submissionCounts = new Map<number, number>();
 		for (const s of submissions) {
-			const day = floorToDay(s.submittedAt);
+			const day = bucketStartForRange(s.submittedAt, args.rangeStartAt);
 			submissionCounts.set(day, (submissionCounts.get(day) ?? 0) + 1);
 		}
 		const submissionsByDay = buildDayBuckets(
@@ -457,7 +456,7 @@ export const getAnalyticsSeries = query({
 		const bookingCounts = new Map<number, number>();
 		for (const b of bookings) {
 			if (!b.startAt) continue;
-			const day = floorToDay(b.startAt);
+			const day = bucketStartForRange(b.startAt, args.rangeStartAt);
 			bookingCounts.set(day, (bookingCounts.get(day) ?? 0) + 1);
 		}
 		const bookingsByDay = buildDayBuckets(
@@ -479,8 +478,8 @@ export const getAnalyticsSeries = query({
 			const customer = customersById.get(submission.customerId);
 			if (!customer) continue;
 
-			const day = floorToDay(submission.submittedAt);
-			const firstSeenDay = floorToDay(customer.firstSeenAt);
+			const day = bucketStartForRange(submission.submittedAt, args.rangeStartAt);
+			const firstSeenDay = bucketStartForRange(customer.firstSeenAt, args.rangeStartAt);
 			const bucket =
 				firstSeenDay === day
 					? newCustomerIdsByDay
