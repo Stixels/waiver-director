@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { CheckCircle2, Clock, PenLine, X } from '@lucide/svelte';
+	import { CircleCheck, Clock, PenLine, X } from '@lucide/svelte';
 
 	import { scrollReveal } from '$lib/actions/scroll-reveal';
 
@@ -20,7 +20,7 @@
 		},
 		{
 			id: 'send',
-			icon: CheckCircle2,
+			icon: CircleCheck,
 			label: 'Email delivered from a verified sender',
 			detail:
 				'Verify your reply-to email to finish setup and send thank-yous, feedback requests, and review asks.',

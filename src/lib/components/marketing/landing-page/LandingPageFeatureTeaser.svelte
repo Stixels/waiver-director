@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import {
-		BarChart3,
+		ChartColumn,
 		FileText,
 		Link2,
 		Mail,
@@ -37,7 +37,7 @@
 		},
 		{
 			id: 'completion-analytics',
-			icon: BarChart3,
+			icon: ChartColumn,
 			title: 'Completion Analytics',
 			description: 'Signed vs. expected counts and submission trends across every session.',
 			hero: false

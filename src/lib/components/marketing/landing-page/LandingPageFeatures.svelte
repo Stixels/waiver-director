@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { BarChart3, FileText, Link2, Mail, Plug, Shield, Users } from '@lucide/svelte';
+	import { ChartColumn, FileText, Link2, Mail, Plug, Shield, Users } from '@lucide/svelte';
 
 	import MarketingSectionHeading from './MarketingSectionHeading.svelte';
 	import { chartBars } from './content';
@@ -68,7 +68,7 @@
 		},
 		{
 			id: 'completion-analytics',
-			icon: BarChart3,
+			icon: ChartColumn,
 			title: 'Completion Analytics',
 			description:
 				'See signed vs. expected counts per session, completion rates by campaign and provider, and submission trends over time.',

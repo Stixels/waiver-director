@@ -2,7 +2,7 @@
 	import { PUBLIC_APP_URL } from '$env/static/public';
 	import { resolve } from '$app/paths';
 	import {
-		BarChart3,
+		ChartColumn,
 		Clock,
 		FileText,
 		Link2,
@@ -93,7 +93,7 @@
 		},
 		{
 			id: 'completion-analytics',
-			icon: BarChart3,
+			icon: ChartColumn,
 			title: 'Completion Analytics',
 			description:
 				'See signed vs. expected counts per session, completion rates, and submission trends.',
