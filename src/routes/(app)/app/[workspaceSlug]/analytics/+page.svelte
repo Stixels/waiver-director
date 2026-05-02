@@ -9,6 +9,12 @@
 	import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { ChartContainer, ChartTooltip, type ChartConfig } from '$lib/components/ui/chart';
+	import {
+		Tooltip,
+		TooltipContent,
+		TooltipProvider,
+		TooltipTrigger
+	} from '$lib/components/ui/tooltip';
 	import { Area, AreaChart, BarChart, ChartClipPath } from 'layerchart';
 	import AnalyticsDateRangePicker from '$lib/components/dashboard/AnalyticsDateRangePicker.svelte';
 	import { curveNatural } from 'd3-shape';
@@ -18,9 +24,6 @@
 	import MailIcon from '@lucide/svelte/icons/mail';
 	import CalendarCheckIcon from '@lucide/svelte/icons/calendar-check';
 	import UsersRoundIcon from '@lucide/svelte/icons/users-round';
-	import ClockIcon from '@lucide/svelte/icons/clock';
-	import AlertCircleIcon from '@lucide/svelte/icons/alert-circle';
-	import ShieldOffIcon from '@lucide/svelte/icons/shield-off';
 
 	const appContext = useAppContext();
 	const currentWorkspace = $derived(
@@ -131,11 +134,45 @@
 		analyticsData?.bookingsByDay.reduce((sum, d) => sum + d.count, 0) ?? 0
 	);
 
-	// Email pipeline stats
 	const emailSent = $derived(analyticsData?.emailTotals.sent ?? 0);
 	const emailQueued = $derived(analyticsData?.emailTotals.queued ?? 0);
 	const emailFailed = $derived(analyticsData?.emailTotals.failed ?? 0);
 	const emailBlocked = $derived(analyticsData?.emailTotals.blocked ?? 0);
+	const emailActivityTotal = $derived(emailSent + emailQueued + emailFailed + emailBlocked);
+	const emailStatusSegments = $derived([
+		{
+			label: 'Sent',
+			value: emailSent,
+			barClass: 'bg-primary',
+			dotClass: 'bg-primary',
+			textClass: 'text-muted-foreground'
+		},
+		{
+			label: 'Queued',
+			value: emailQueued,
+			barClass: 'bg-primary/30',
+			dotClass: 'bg-primary/30',
+			textClass: 'text-muted-foreground'
+		},
+		{
+			label: 'Failed',
+			value: emailFailed,
+			barClass: 'bg-destructive',
+			dotClass: 'bg-destructive',
+			textClass: emailFailed > 0 ? 'text-destructive' : 'text-muted-foreground'
+		},
+		{
+			label: 'Blocked',
+			value: emailBlocked,
+			barClass: 'bg-amber-500',
+			dotClass: 'bg-amber-500',
+			textClass: emailBlocked > 0 ? 'text-amber-700 dark:text-amber-400' : 'text-muted-foreground'
+		}
+	]);
+
+	function shareStyle(value: number): string {
+		return `width: ${emailActivityTotal > 0 ? (value / emailActivityTotal) * 100 : 0}%`;
+	}
 </script>
 
 <svelte:head>
@@ -307,20 +344,23 @@
 	<div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
 		<!-- Email Activity card -->
 		<Card class="flex flex-col">
-			<CardHeader class="flex flex-row items-center gap-2 pb-3">
+			<CardHeader class="flex flex-row items-center gap-2 pb-2">
 				<MailIcon class="size-4 text-muted-foreground" />
 				<CardTitle class="text-base font-semibold">Email Activity</CardTitle>
 			</CardHeader>
-			<CardContent class="flex flex-1 flex-col gap-5">
+			<CardContent class="flex flex-1 flex-col">
 				{#if isInitialLoading}
 					<div class="space-y-3">
-						<Skeleton class="h-10 w-20" />
-						<Skeleton class="h-4 w-32" />
-					</div>
-					<div class="mt-auto grid grid-cols-3 gap-2">
-						<Skeleton class="h-16 w-full rounded-lg" />
-						<Skeleton class="h-16 w-full rounded-lg" />
-						<Skeleton class="h-16 w-full rounded-lg" />
+						<div class="space-y-2">
+							<Skeleton class="h-8 w-16" />
+							<Skeleton class="h-3.5 w-32" />
+						</div>
+						<Skeleton class="h-1.5 w-full rounded-full" />
+						<div class="space-y-1.5">
+							<Skeleton class="h-5 w-full" />
+							<Skeleton class="h-5 w-full" />
+							<Skeleton class="h-5 w-full" />
+						</div>
 					</div>
 				{:else if analyticsUnavailable}
 					<div
@@ -329,72 +369,55 @@
 						Analytics unavailable
 					</div>
 				{:else}
-					<!-- Sent in period -->
-					<div>
-						<p class="text-4xl font-bold tracking-tight tabular-nums">
-							{emailSent.toLocaleString()}
-						</p>
-						<p class="mt-1 text-sm text-muted-foreground">Sent in selected period</p>
-					</div>
+					<div class="flex flex-1 flex-col gap-4">
+						<div class="flex items-start justify-between gap-4">
+							<div>
+								<p class="text-3xl font-bold tracking-tight tabular-nums">
+									{emailSent.toLocaleString()}
+								</p>
+								<p class="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+									<span class="size-2 rounded-full bg-primary"></span>
+									<span>Sent</span>
+								</p>
+							</div>
+							<div class="rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground">
+								{emailActivityTotal.toLocaleString()} total
+							</div>
+						</div>
 
-					<div class="mt-auto space-y-2">
-						<p class="text-xs font-medium text-muted-foreground">Selected period</p>
-						<div class="grid grid-cols-3 gap-2">
+						<div class="space-y-1.5">
+							<p class="text-xs font-medium text-muted-foreground">Status mix</p>
 							<div
-								class="rounded-lg border border-primary/20 bg-primary/10 px-3 py-2.5 dark:border-primary/40 dark:bg-primary/15"
+								class="flex h-2 overflow-hidden rounded-full bg-muted"
+								aria-label="Email activity status mix"
 							>
-								<ClockIcon
-									class="mb-1.5 size-3.5 text-primary dark:text-[color-mix(in_oklch,var(--primary)_30%,var(--primary-foreground))]"
-								/>
-								<p
-									class="text-base font-bold text-primary tabular-nums dark:text-[color-mix(in_oklch,var(--primary)_26%,var(--primary-foreground))]"
-								>
-									{emailQueued.toLocaleString()}
-								</p>
-								<p
-									class="text-[0.65rem] font-medium text-primary/80 dark:text-[color-mix(in_oklch,var(--primary)_38%,var(--primary-foreground))]"
-								>
-									Queued
-								</p>
+								<TooltipProvider delayDuration={150}>
+									{#each emailStatusSegments.filter((segment) => segment.value > 0) as segment (segment.label)}
+										<Tooltip>
+											<TooltipTrigger
+												class={`h-full min-w-2 ${segment.barClass}`}
+												style={shareStyle(segment.value)}
+												aria-label={`${segment.label}: ${segment.value.toLocaleString()}`}
+											/>
+											<TooltipContent side="top" sideOffset={6}>
+												{segment.label}: {segment.value.toLocaleString()}
+											</TooltipContent>
+										</Tooltip>
+									{/each}
+								</TooltipProvider>
 							</div>
-							<div
-								class={emailFailed > 0
-									? 'rounded-lg bg-destructive/8 px-3 py-2.5'
-									: 'rounded-lg bg-muted/60 px-3 py-2.5'}
-							>
-								<AlertCircleIcon
-									class={`mb-1.5 size-3.5 ${emailFailed > 0 ? 'text-destructive' : 'text-muted-foreground'}`}
-								/>
-								<p
-									class={`text-base font-bold tabular-nums ${emailFailed > 0 ? 'text-destructive' : 'text-muted-foreground'}`}
-								>
-									{emailFailed.toLocaleString()}
-								</p>
-								<p
-									class={`text-[0.65rem] font-medium ${emailFailed > 0 ? 'text-destructive/70' : 'text-muted-foreground/70'}`}
-								>
-									Failed
-								</p>
-							</div>
-							<div
-								class={emailBlocked > 0
-									? 'rounded-lg bg-amber-500/8 px-3 py-2.5'
-									: 'rounded-lg bg-muted/60 px-3 py-2.5'}
-							>
-								<ShieldOffIcon
-									class={`mb-1.5 size-3.5 ${emailBlocked > 0 ? 'text-amber-600 dark:text-amber-500' : 'text-muted-foreground'}`}
-								/>
-								<p
-									class={`text-base font-bold tabular-nums ${emailBlocked > 0 ? 'text-amber-700 dark:text-amber-400' : 'text-muted-foreground'}`}
-								>
-									{emailBlocked.toLocaleString()}
-								</p>
-								<p
-									class={`text-[0.65rem] font-medium ${emailBlocked > 0 ? 'text-amber-700/70 dark:text-amber-400/70' : 'text-muted-foreground/70'}`}
-								>
-									Blocked
-								</p>
-							</div>
+						</div>
+
+						<div class="divide-y divide-border/70 border-t border-border/70 text-sm">
+							{#each emailStatusSegments.slice(1) as segment (segment.label)}
+								<div class="flex items-center justify-between py-1.5">
+									<div class={`flex items-center gap-2 ${segment.textClass}`}>
+										<span class={`size-2 rounded-full ${segment.dotClass}`}></span>
+										<span>{segment.label}</span>
+									</div>
+									<span class="font-semibold tabular-nums">{segment.value.toLocaleString()}</span>
+								</div>
+							{/each}
 						</div>
 					</div>
 				{/if}
