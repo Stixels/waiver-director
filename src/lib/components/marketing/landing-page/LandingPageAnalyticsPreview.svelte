@@ -66,7 +66,7 @@
 		{
 			session: 'Urban Axe Throwing',
 			date: 'Apr 2, 7:30 PM',
-			provider: 'Resova',
+			provider: 'Bookeo',
 			expected: 6,
 			signed: 4,
 			rate: '67%',
@@ -76,7 +76,7 @@
 		{
 			session: 'Harbor Kayak Adventure',
 			date: 'Apr 3, 9:00 AM',
-			provider: 'Xola',
+			provider: 'Bookeo',
 			expected: 10,
 			signed: 0,
 			rate: '0%',
@@ -115,8 +115,8 @@
 				Know your completion rate for every session.
 			</h2>
 			<p class="mb-10 max-w-xl text-[15px] leading-relaxed" style="color: var(--m-text-2);">
-				Signed, expected, and completion stats in one view. Numbers update as waivers come in —
-				not a stale snapshot.
+				Signed, expected, and completion stats in one view. Numbers update as waivers come in — not
+				a stale snapshot.
 			</p>
 		</div>
 
@@ -152,9 +152,7 @@
 						<div class="flex items-start justify-between gap-2">
 							<div class="min-w-0">
 								<p class="text-[11px] font-medium" style="color: var(--m-text-2);">{card.label}</p>
-								<p
-									class="mt-1 text-[26px] font-bold leading-none tracking-tight tabular-nums"
-								>
+								<p class="mt-1 text-[26px] leading-none font-bold tracking-tight tabular-nums">
 									{card.value}
 								</p>
 							</div>
@@ -175,16 +173,23 @@
 								aria-label="{card.label} 7-day trend"
 							>
 								{#each card.trend as val, di (di)}
-									<div class="flex flex-1 flex-col" aria-hidden="true">
+									<div class="flex h-full flex-1 flex-col justify-end" aria-hidden="true">
 										<div
 											class="w-full rounded-t-[2px]"
-											style="height: {barHeight(val, maxTrend)}%; background: {card.color}; opacity: {di === card.trend.length - 1 ? '1' : '0.35'};"
+											style="height: {barHeight(
+												val,
+												maxTrend
+											)}%; background: {card.color}; opacity: {di === card.trend.length - 1
+												? '1'
+												: '0.35'};"
 										></div>
 									</div>
 								{/each}
 							</div>
 							<div class="flex items-center justify-between text-[0.6rem] leading-none">
-								<span style="color: var(--m-text-2);">{card.weekTotal.toLocaleString()} this week</span>
+								<span style="color: var(--m-text-2);"
+									>{card.weekTotal.toLocaleString()} this week</span
+								>
 								<span style="color: var(--m-text-3);">{card.comparison}</span>
 							</div>
 						</div>
@@ -193,7 +198,7 @@
 			</div>
 
 			<!-- Sessions table -->
-			<div class="border-t px-4 pb-4 pt-0" style="border-color: var(--m-border-soft);">
+			<div class="border-t px-4 pt-0 pb-4" style="border-color: var(--m-border-soft);">
 				<div
 					class="overflow-hidden rounded-xl border"
 					style="border-color: var(--m-border-soft); background: var(--m-card);"
@@ -205,8 +210,7 @@
 					>
 						<span
 							class="text-[10px] font-semibold tracking-wide uppercase"
-							style="color: var(--m-text-2);"
-							>Upcoming Sessions</span
+							style="color: var(--m-text-2);">Upcoming Sessions</span
 						>
 						<span class="text-[11px] font-medium" style="color: var(--primary);" aria-hidden="true"
 							>View all →</span
@@ -232,17 +236,17 @@
 								{#each sessionRows as row (row.session)}
 									<tr class="border-t" style="border-color: var(--m-border-soft);">
 										<td class="max-w-44 truncate px-4 py-3 font-medium">{row.session}</td>
-										<td class="whitespace-nowrap px-4 py-3" style="color: var(--m-text-2);"
+										<td class="px-4 py-3 whitespace-nowrap" style="color: var(--m-text-2);"
 											>{row.date}</td
 										>
-										<td class="whitespace-nowrap px-4 py-3" style="color: var(--m-text-2);"
+										<td class="px-4 py-3 whitespace-nowrap" style="color: var(--m-text-2);"
 											>{row.provider}</td
 										>
-										<td class="whitespace-nowrap px-4 py-3 font-medium">
+										<td class="px-4 py-3 font-medium whitespace-nowrap">
 											{row.signed}
 											<span style="color: var(--m-text-2);">/ {row.expected}</span>
 										</td>
-										<td class="whitespace-nowrap px-4 py-3 font-semibold">{row.rate}</td>
+										<td class="px-4 py-3 font-semibold whitespace-nowrap">{row.rate}</td>
 										<td class="px-4 py-3">
 											<span
 												class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold"

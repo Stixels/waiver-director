@@ -21,7 +21,7 @@
 			icon: FileText,
 			title: 'Waiver Builder',
 			description:
-				'Build a structured public waiver with rich text, custom fields, and signature blocks. Versioned so signed waiver records are never altered.',
+				'Build a structured public waiver with rich text, custom fields, required questions, and signature blocks. Versioned so signed waiver records are never altered.',
 			mdClass: 'md:col-span-2',
 			lgClass: 'lg:col-span-4',
 			hero: true,
@@ -32,7 +32,7 @@
 			icon: Mail,
 			title: 'Email Automation',
 			description:
-				'Rule-based sends around booking time for every participant, not just the lead. Cancel any message before it goes out, and use follow-ups for thank-yous, feedback, and review requests.',
+				'Send follow-ups on demand or trigger them after a booking delay for every participant, not just the lead. Cancel any message before it goes out.',
 			mdClass: 'md:col-span-1',
 			lgClass: 'lg:col-span-2',
 			hero: false
@@ -42,7 +42,7 @@
 			icon: Link2,
 			title: 'Booking Sync',
 			description:
-				'Connects to Bookeo, Resova, and Xola. Upcoming sessions sync automatically with expected participant counts.',
+				'Connect Bookeo now. Resova, Xola, and other booking integrations are coming soon.',
 			mdClass: 'md:col-span-1',
 			lgClass: 'lg:col-span-2',
 			hero: false
@@ -51,8 +51,7 @@
 			id: 'marketing-sync',
 			icon: Plug,
 			title: 'Mailchimp & Constant Contact',
-			description:
-				'Sync waiver signers into the marketing lists you already use so broadcasts and automations match who actually showed up.',
+			description: 'Marketing-list integrations are coming soon for the lists you already use.',
 			mdClass: 'md:col-span-1',
 			lgClass: 'lg:col-span-2',
 			hero: false
@@ -178,7 +177,7 @@
 						</div>
 					{:else if feature.footer === 'chart'}
 						<div
-							class="mt-auto flex h-9 items-end gap-1 overflow-hidden rounded-lg bg-(--m-elevated) px-2 py-1.5 opacity-50"
+							class="mt-auto flex h-9 items-end gap-1 overflow-hidden rounded-lg bg-(--m-elevated) px-2 py-1.5 opacity-80"
 							aria-hidden="true"
 						>
 							{#each chartBars as bar (bar.day)}

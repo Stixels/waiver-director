@@ -4,13 +4,17 @@
 	const waiverFields = ['Full Name', 'Date of Birth', 'Emergency Contact'];
 	const providers = [
 		{ name: 'Bookeo', connected: true },
-		{ name: 'Resova', connected: true },
+		{ name: 'Resova', connected: false },
 		{ name: 'Xola', connected: false }
 	];
 	const shareMethods = ['Email', 'SMS', 'Booking confirmation'];
 </script>
 
-<section id="how-it-works" class="border-t py-28 md:py-36" style="border-color: var(--m-border-soft);">
+<section
+	id="how-it-works"
+	class="border-t py-28 md:py-36"
+	style="border-color: var(--m-border-soft);"
+>
 	<div class="mx-auto max-w-6xl px-4 sm:px-6">
 		<div use:scrollReveal={{ delay: 0 }}>
 			<p
@@ -27,16 +31,19 @@
 			</h2>
 		</div>
 
-		<div class="landing-how-it-works mx-auto flex max-w-6xl flex-col gap-16" use:scrollReveal={{ delay: 80 }}>
+		<div
+			class="landing-how-it-works mx-auto flex max-w-6xl flex-col gap-16"
+			use:scrollReveal={{ delay: 80 }}
+		>
 			<!-- Step 1 -->
 			<div class="grid grid-cols-1 items-center gap-10 md:grid-cols-2">
 				<div>
 					<div class="landing-how-it-works__step-number" aria-hidden="true">01</div>
 					<h3 class="landing-how-it-works__step-title">Build your waiver once.</h3>
 					<p class="text-[15px] leading-relaxed" style="color: var(--m-text-2);">
-						Create structured waivers with custom fields, signature blocks, and your branding.
-						Publish a version and it&apos;s locked — past submissions are never altered when you make
-						edits.
+						Create structured waivers with custom fields, required questions, signature blocks, and
+						your branding. Publish a version and it&apos;s locked — past submissions are never
+						altered when you make edits.
 					</p>
 				</div>
 
@@ -59,7 +66,10 @@
 							class="mb-2 rounded-lg border px-3 py-2.5"
 							style="border-color: var(--m-border-soft); background: var(--m-elevated);"
 						>
-							<p class="mb-1.5 text-[9px] tracking-widest uppercase" style="color: var(--m-text-3);">
+							<p
+								class="mb-1.5 text-[9px] tracking-widest uppercase"
+								style="color: var(--m-text-3);"
+							>
 								{field}
 							</p>
 							<div
@@ -97,8 +107,8 @@
 					<div class="landing-how-it-works__step-number" aria-hidden="true">02</div>
 					<h3 class="landing-how-it-works__step-title">Connect your booking system.</h3>
 					<p class="text-[15px] leading-relaxed" style="color: var(--m-text-2);">
-						Link Bookeo, Resova, or Xola. Sessions and expected participant counts sync automatically.
-						Waivers are matched to the right group with no manual setup per session.
+						Connect Bookeo now. Resova, Xola, and other booking integrations are coming soon. Each
+						workspace connects one booking provider at a time so sessions stay matched cleanly.
 					</p>
 				</div>
 
@@ -126,9 +136,13 @@
 								></div>
 								<p class="mb-1 text-[11px] font-semibold">{provider.name}</p>
 								{#if provider.connected}
-									<span class="text-[9px] font-semibold" style="color: var(--m-green);">Connected ✓</span>
+									<span class="text-[9px] font-semibold" style="color: var(--m-green);"
+										>Connected ✓</span
+									>
 								{:else}
-									<span class="text-[9px] font-medium" style="color: var(--m-amber);">Coming soon</span>
+									<span class="text-[9px] font-medium" style="color: var(--m-amber);"
+										>Coming soon</span
+									>
 								{/if}
 							</div>
 						{/each}

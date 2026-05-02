@@ -26,12 +26,13 @@
 		{
 			icon: Link2,
 			title: 'Booking Sync',
-			description: 'Connects to Bookeo, Resova, and Xola so sessions stay in sync automatically.'
+			description:
+				'Connect Bookeo now. Resova, Xola, and other booking integrations are coming soon.'
 		},
 		{
 			icon: Mail,
 			title: 'Email Automation',
-			description: 'Follow-up emails, thank-yous, and review requests sent to every participant.'
+			description: 'Verify your email to finish setup and send on-demand or delayed follow-ups.'
 		},
 		{
 			icon: ChartLine,

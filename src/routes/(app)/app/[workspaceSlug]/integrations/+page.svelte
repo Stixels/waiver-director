@@ -46,7 +46,7 @@
 	import UnplugIcon from '@lucide/svelte/icons/unplug';
 
 	type Integration = FunctionReturnType<typeof api.integrations.listWorkspaceIntegrations>[number];
-	type ProviderAvailability = 'available' | 'planned' | 'coming_soon';
+	type ProviderAvailability = 'available' | 'coming_soon';
 	type ProviderState = Integration['status'] | ProviderAvailability;
 	type ProviderCategory = 'booking' | 'email';
 	type ProviderDefinition = {
@@ -76,9 +76,9 @@
 			key: 'resova',
 			name: 'Resova',
 			category: 'booking',
-			availability: 'planned',
-			status: 'Planned',
-			description: 'Booking sync support planned.',
+			availability: 'coming_soon',
+			status: 'Coming soon',
+			description: 'Booking sync support coming soon.',
 			detailDescription:
 				'Resova support will use the same booking and waiver matching workflow once available.',
 			logo: resovaIcon
@@ -87,9 +87,9 @@
 			key: 'xola',
 			name: 'Xola',
 			category: 'booking',
-			availability: 'planned',
-			status: 'Planned',
-			description: 'Booking sync support planned.',
+			availability: 'coming_soon',
+			status: 'Coming soon',
+			description: 'Booking sync support coming soon.',
 			detailDescription:
 				'Xola support will connect future booking data to waiver signing once available.',
 			logo: xolaIcon
@@ -98,9 +98,9 @@
 			key: 'fareharbor',
 			name: 'FareHarbor',
 			category: 'booking',
-			availability: 'planned',
-			status: 'Planned',
-			description: 'Booking sync support planned.',
+			availability: 'coming_soon',
+			status: 'Coming soon',
+			description: 'Booking sync support coming soon.',
 			detailDescription:
 				'FareHarbor support is planned for booking imports and booking-linked waiver signing.',
 			logo: fareharborIcon
@@ -218,7 +218,6 @@
 		if (value === 'error') return 'Attention needed';
 		if (value === 'available') return 'Available';
 		if (value === 'coming_soon') return 'Coming soon';
-		if (value === 'planned') return 'Planned';
 		return 'Not connected';
 	}
 

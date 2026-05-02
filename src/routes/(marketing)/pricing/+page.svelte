@@ -17,7 +17,7 @@
 		},
 		{
 			id: 'submissions',
-			q: "What counts as a submission?",
+			q: 'What counts as a submission?',
 			a: 'A submission is one completed, signed waiver from one participant. If a group of 6 signs, that counts as 6 submissions. On the Free plan, you get 25 per month. Pro gives you unlimited.'
 		},
 		{
@@ -28,7 +28,12 @@
 		{
 			id: 'integrations',
 			q: 'How do the booking system integrations work?',
-			a: "Connect Bookeo or Resova once from your integrations settings. After that, upcoming sessions sync automatically — with expected participant counts. Waivers are matched to the right session without any per-session setup."
+			a: 'Connect Bookeo once from your integrations settings. After that, upcoming sessions sync automatically with expected participant counts. Each workspace connects one booking provider at a time. Resova, Xola, and other providers are coming soon.'
+		},
+		{
+			id: 'email-verification',
+			q: 'Do I need to verify my email to send follow-ups?',
+			a: 'Yes. Verify your reply-to email to finish email setup and send on-demand or delayed follow-up messages from your workspace.'
 		},
 		{
 			id: 'free-trial',
@@ -61,7 +66,10 @@
 </svelte:head>
 
 <!-- Page hero -->
-<section class="border-b px-4 pb-28 pt-36 text-center sm:px-6 md:pb-36 md:pt-48" style="border-color: var(--m-border-soft);">
+<section
+	class="border-b px-4 pt-36 pb-28 text-center sm:px-6 md:pt-48 md:pb-36"
+	style="border-color: var(--m-border-soft);"
+>
 	<div class="mx-auto max-w-3xl" use:scrollReveal={{ delay: 0 }}>
 		<p
 			class="mb-4 text-[11px] font-semibold tracking-widest uppercase"
@@ -89,10 +97,7 @@
 </section>
 
 <!-- FAQ section -->
-<section
-	class="border-t px-4 py-28 sm:px-6 md:py-36"
-	style="border-color: var(--m-border-soft);"
->
+<section class="border-t px-4 py-28 sm:px-6 md:py-36" style="border-color: var(--m-border-soft);">
 	<div class="mx-auto max-w-3xl" use:scrollReveal={{ delay: 0 }}>
 		<p
 			class="mb-4 text-[11px] font-semibold tracking-widest uppercase"
@@ -120,16 +125,13 @@
 						onclick={() => toggleFaq(faq.id)}
 						aria-expanded={openFaq === faq.id}
 					>
-						<span class="text-[15px] font-semibold leading-snug">{faq.q}</span>
+						<span class="text-[15px] leading-snug font-semibold">{faq.q}</span>
 						<span
 							class="faq-chevron shrink-0"
 							class:faq-chevron--open={openFaq === faq.id}
 							aria-hidden="true"
 						>
-							<ChevronDown
-								size={16}
-								style="color: var(--m-text-3);"
-							/>
+							<ChevronDown size={16} style="color: var(--m-text-3);" />
 						</span>
 					</button>
 
@@ -145,14 +147,8 @@
 </section>
 
 <!-- CTA -->
-<section
-	class="border-t px-4 py-20 sm:px-6 md:py-28"
-	style="border-color: var(--m-border-soft);"
->
-	<div
-		class="mx-auto max-w-2xl text-center"
-		use:scrollReveal={{ delay: 0 }}
-	>
+<section class="border-t px-4 py-20 sm:px-6 md:py-28" style="border-color: var(--m-border-soft);">
+	<div class="mx-auto max-w-2xl text-center" use:scrollReveal={{ delay: 0 }}>
 		<h2
 			class="mb-5 font-extrabold tracking-tight"
 			style="font-family: 'Bricolage Grotesque', sans-serif; font-size: clamp(1.9rem, 4vw, 2.75rem); letter-spacing: -0.03em; line-height: 1.1;"
@@ -160,7 +156,8 @@
 			Start capturing every guest today.
 		</h2>
 		<p class="mb-8 text-[16px] leading-relaxed" style="color: var(--m-text-2);">
-			Free to start. No credit card required. See how much of your guest list you've been leaving behind.
+			Free to start. No credit card required. See how much of your guest list you've been leaving
+			behind.
 		</p>
 		<div class="flex flex-wrap items-center justify-center gap-3">
 			<Button

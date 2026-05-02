@@ -10,7 +10,13 @@
 			name: 'Free',
 			price: '$0',
 			description: 'For getting started.',
-			features: ['1 workspace', '25 submissions / month', '1 public waiver', 'Basic dashboard', 'Email support'],
+			features: [
+				'1 workspace',
+				'25 submissions / month',
+				'1 public waiver',
+				'Basic dashboard',
+				'Email support'
+			],
 			cta: 'Get started free',
 			ctaVariant: 'outline' as const,
 			ctaClass: 'btn-mkt-outline',
@@ -22,7 +28,17 @@
 			name: 'Pro',
 			price: '$29',
 			description: 'For serious operators.',
-			features: ['Unlimited submissions', 'Version history', 'Bookeo · Resova · Xola sync', 'Follow-up email automation', 'Full analytics', 'Team access', 'PDF export', 'Audit trail'],
+			features: [
+				'Unlimited submissions',
+				'Version history',
+				'Bookeo sync',
+				'More integrations coming soon',
+				'On-demand and delayed emails',
+				'Full analytics',
+				'Team access',
+				'PDF export',
+				'Audit trail'
+			],
 			cta: 'Start free trial',
 			ctaVariant: 'default' as const,
 			ctaClass: 'btn-mkt-accent',
@@ -34,7 +50,14 @@
 			name: 'Business',
 			price: '$79',
 			description: 'For multi-location operators.',
-			features: ['Everything in Pro', 'Multiple workspaces', 'Priority support', 'Custom email sender domain', 'SLA guarantee', 'Dedicated onboarding'],
+			features: [
+				'Everything in Pro',
+				'Multiple workspaces',
+				'Priority support',
+				'Custom email sender domain',
+				'SLA guarantee',
+				'Dedicated onboarding'
+			],
 			cta: 'Contact sales',
 			ctaVariant: 'outline' as const,
 			ctaClass: '',
@@ -81,7 +104,9 @@
 						style="font-family: 'Bricolage Grotesque', sans-serif; font-size: 2.25rem; letter-spacing: -0.03em;"
 					>
 						{tier.price}
-						<span class="text-[14px] font-medium tracking-normal" style="color: var(--m-text-3);">/ mo</span>
+						<span class="text-[14px] font-medium tracking-normal" style="color: var(--m-text-3);"
+							>/ mo</span
+						>
 					</p>
 					<p class="text-[13px]" style="color: var(--m-text-2);">
 						{tier.description}

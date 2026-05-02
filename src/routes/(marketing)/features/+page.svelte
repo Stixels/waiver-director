@@ -37,9 +37,9 @@
 			icon: FileText,
 			title: 'Waiver Builder',
 			description:
-				'Build a structured public waiver with rich text, custom fields, and signature blocks.',
+				'Build a structured public waiver with rich text, custom fields, required questions, and signature blocks.',
 			detail:
-				'Version each publish: once a version is locked, every signature references that exact document. When you update your waiver, past records stay intact. Export any signed record as a PDF at any time.',
+				'Use custom fields for the details your operation actually needs, then version each publish: once a version is locked, every signature references that exact document. When you update your waiver, past records stay intact.',
 			mdClass: 'md:col-span-2',
 			lgClass: 'lg:col-span-4',
 			hero: true,
@@ -50,9 +50,9 @@
 			icon: Mail,
 			title: 'Email Automation',
 			description:
-				'Rule-based sends around booking time for every participant — not just the lead.',
+				'Send emails on demand or trigger them after a booking delay for every participant.',
 			detail:
-				'Configure delays (e.g. 2 days after signing) and templates once. Every guest who signs gets their own individually-timed message. Cancel any queued message before it fires. Use sequences for thank-yous, feedback, and review asks.',
+				'Configure booking delays and templates once, or send a message manually when the moment calls for it. Verify your reply-to email to finish setup and send thank-yous, feedback, and review asks.',
 			mdClass: 'md:col-span-1',
 			lgClass: 'lg:col-span-2',
 			hero: false
@@ -62,9 +62,9 @@
 			icon: Link2,
 			title: 'Booking Sync',
 			description:
-				'Connects to Bookeo, Resova, and Xola. Sessions and participant counts sync automatically.',
+				'Connect Bookeo now. Resova, Xola, and other booking integrations are coming soon.',
 			detail:
-				'Link your booking platform once and upcoming sessions appear in your dashboard with expected guest counts. Waivers are automatically matched to the correct session — no per-session setup required.',
+				'Link one booking provider per workspace so upcoming sessions appear in your dashboard with expected guest counts. Waivers are automatically matched to the correct session — no per-session setup required.',
 			mdClass: 'md:col-span-1',
 			lgClass: 'lg:col-span-2',
 			hero: false
@@ -73,10 +73,9 @@
 			id: 'marketing-sync',
 			icon: Plug,
 			title: 'Mailchimp & Constant Contact',
-			description:
-				'Sync waiver signers directly into the marketing lists you already use.',
+			description: 'Marketing-list integrations are coming soon for the tools you already use.',
 			detail:
-				'Keep your existing email marketing lists aligned with who actually showed up — not just who booked. New signers are added automatically so your broadcasts reflect your real audience.',
+				'Mailchimp and Constant Contact are planned so your broadcasts can reflect who actually showed up — not just who booked.',
 			mdClass: 'md:col-span-1',
 			lgClass: 'lg:col-span-2',
 			hero: false
@@ -85,8 +84,7 @@
 			id: 'team-access',
 			icon: Users,
 			title: 'Team Access',
-			description:
-				'Owner and staff roles per workspace. Manage multiple venues from one account.',
+			description: 'Owner and staff roles per workspace. Manage multiple venues from one account.',
 			detail:
 				'Invite team members with the right permission level. Staff can view sessions and submissions. Owners control waiver settings, integrations, and billing. A single account can manage multiple business locations.',
 			mdClass: 'md:col-span-1',
@@ -110,8 +108,7 @@
 			id: 'audit-trail',
 			icon: Shield,
 			title: 'Audit Trail',
-			description:
-				'Every open, draft, submit, void, and export is recorded immutably.',
+			description: 'Every open, draft, submit, void, and export is recorded immutably.',
 			detail:
 				'Every action taken on a signed record is logged with a timestamp and user reference. On-demand PDF exports always reference the exact version of the waiver that was signed — not the current draft.',
 			mdClass: 'md:col-span-1',
@@ -126,10 +123,10 @@
 
 	const integrations = [
 		{ name: 'Bookeo', status: 'live', description: 'Session sync + participant counts' },
-		{ name: 'Resova', status: 'live', description: 'Session sync + participant counts' },
+		{ name: 'Resova', status: 'soon', description: 'Coming soon' },
 		{ name: 'Xola', status: 'soon', description: 'Coming soon' },
-		{ name: 'Mailchimp', status: 'live', description: 'Signer list sync' },
-		{ name: 'Constant Contact', status: 'live', description: 'Signer list sync' }
+		{ name: 'Mailchimp', status: 'soon', description: 'Coming soon' },
+		{ name: 'Constant Contact', status: 'soon', description: 'Coming soon' }
 	];
 </script>
 
@@ -145,7 +142,10 @@
 </svelte:head>
 
 <!-- Page hero -->
-<section class="border-b px-4 pb-28 pt-36 sm:px-6 md:pb-36 md:pt-48" style="border-color: var(--m-border-soft);">
+<section
+	class="border-b px-4 pt-36 pb-28 sm:px-6 md:pt-48 md:pb-36"
+	style="border-color: var(--m-border-soft);"
+>
 	<div class="mx-auto max-w-6xl" use:scrollReveal={{ delay: 0 }}>
 		<p
 			class="mb-4 text-[11px] font-semibold tracking-widest uppercase"
@@ -160,7 +160,8 @@
 			Everything you need to run compliant, automated waivers.
 		</h1>
 		<p class="max-w-2xl text-[17px] leading-relaxed" style="color: var(--m-text-2);">
-			From building your first waiver to syncing thousands of signers into your marketing lists — Waiver Director handles the whole flow.
+			From building your first waiver to syncing Bookeo sessions and sending follow-up emails —
+			Waiver Director handles the waiver flow.
 		</p>
 	</div>
 </section>
@@ -169,10 +170,12 @@
 <section class="border-b px-4 py-28 sm:px-6 md:py-36" style="border-color: var(--m-border-soft);">
 	<div class="mx-auto max-w-6xl">
 		<div class="grid grid-cols-1 items-center gap-16 lg:grid-cols-2">
-
 			<!-- Prose -->
 			<div use:scrollReveal={{ delay: 0 }}>
-				<p class="mb-3 text-[11px] font-semibold tracking-widest uppercase" style="color: var(--primary);">
+				<p
+					class="mb-3 text-[11px] font-semibold tracking-widest uppercase"
+					style="color: var(--primary);"
+				>
 					{waiverBuilderFeature.title}
 				</p>
 				<h2
@@ -190,13 +193,13 @@
 				<div class="mt-6 flex flex-wrap items-center gap-2">
 					<span
 						class="rounded-md border px-2 py-0.5 font-mono text-[11px]"
-						style="border-color: var(--m-border-strong); color: var(--m-text-3);"
-					>v1 locked</span>
+						style="border-color: var(--m-border-strong); color: var(--m-text-3);">v1 locked</span
+					>
 					<span class="text-[11px]" style="color: var(--m-text-3);">→</span>
 					<span
 						class="rounded-md border px-2 py-0.5 font-mono text-[11px]"
-						style="border-color: var(--m-accent-border); color: var(--primary);"
-					>v2 current</span>
+						style="border-color: var(--m-accent-border); color: var(--primary);">v2 current</span
+					>
 					<span class="text-[11px]" style="color: var(--m-text-3);">· 3 changes</span>
 				</div>
 			</div>
@@ -219,13 +222,16 @@
 					<span class="ml-3 text-[13px] font-semibold">Adventure Waiver — v2</span>
 					<span
 						class="ml-auto rounded-full px-2 py-0.5 text-[10px] font-semibold"
-						style="background: var(--m-amber-dim); color: var(--m-amber);"
-					>Draft</span>
+						style="background: var(--m-amber-dim); color: var(--m-amber);">Draft</span
+					>
 				</div>
 
 				<!-- Body -->
 				<div class="p-5">
-					<p class="mb-3 text-[10px] font-semibold tracking-widest uppercase" style="color: var(--m-text-3);">
+					<p
+						class="mb-3 text-[10px] font-semibold tracking-widest uppercase"
+						style="color: var(--m-text-3);"
+					>
 						Waiver Fields
 					</p>
 
@@ -234,7 +240,12 @@
 							class="mb-2 rounded-lg border px-3 py-2.5"
 							style="border-color: var(--m-border-soft); background: var(--m-elevated);"
 						>
-							<p class="mb-1.5 text-[9px] tracking-widest uppercase" style="color: var(--m-text-3);">{field}</p>
+							<p
+								class="mb-1.5 text-[9px] tracking-widest uppercase"
+								style="color: var(--m-text-3);"
+							>
+								{field}
+							</p>
 							<div class="h-2.5 w-3/4 rounded" style="background: var(--m-border-strong);"></div>
 						</div>
 					{/each}
@@ -244,7 +255,9 @@
 						class="mb-2 rounded-lg border px-3 py-2.5"
 						style="border-color: var(--m-border-soft); background: var(--m-elevated);"
 					>
-						<p class="mb-1.5 text-[9px] tracking-widest uppercase" style="color: var(--m-text-3);">Liability Terms</p>
+						<p class="mb-1.5 text-[9px] tracking-widest uppercase" style="color: var(--m-text-3);">
+							Liability Terms
+						</p>
 						<div class="flex flex-col gap-1.5">
 							<div class="h-2 w-full rounded" style="background: var(--m-border-strong);"></div>
 							<div class="h-2 w-5/6 rounded" style="background: var(--m-border-strong);"></div>
@@ -265,17 +278,19 @@
 					<div class="flex items-center gap-2">
 						<span
 							class="rounded-lg px-3 py-1.5 text-[12px] font-semibold"
-							style="background: var(--primary); color: var(--primary-foreground);"
-						>Publish v2</span>
+							style="background: var(--primary); color: var(--primary-foreground);">Publish v2</span
+						>
 						<span
 							class="rounded-lg border px-3 py-1.5 text-[12px] font-medium"
 							style="background: var(--m-elevated); border-color: var(--m-border-strong); color: var(--m-text-2);"
-						>Save draft</span>
-						<span class="ml-auto text-[11px]" style="color: var(--m-text-3);">3 changes since v1</span>
+							>Save draft</span
+						>
+						<span class="ml-auto text-[11px]" style="color: var(--m-text-3);"
+							>3 changes since v1</span
+						>
 					</div>
 				</div>
 			</div>
-
 		</div>
 	</div>
 </section>
@@ -284,7 +299,6 @@
 <section class="border-b px-4 py-28 sm:px-6 md:py-36" style="border-color: var(--m-border-soft);">
 	<div class="mx-auto max-w-6xl">
 		<div class="grid grid-cols-1 items-center gap-16 lg:grid-cols-2">
-
 			<!-- Mockup card (left on lg) -->
 			<div
 				class="features-hero-mockup overflow-hidden rounded-2xl border lg:order-first"
@@ -304,7 +318,8 @@
 					<span
 						class="ml-auto rounded-lg border px-2.5 py-1 text-[11px]"
 						style="background: var(--m-elevated); border-color: var(--m-border-strong); color: var(--m-text-2);"
-					>Last 7 days</span>
+						>Last 7 days</span
+					>
 				</div>
 
 				<!-- Body -->
@@ -315,16 +330,25 @@
 							class="rounded-xl border p-4"
 							style="background: var(--m-elevated); border-color: var(--m-border-soft);"
 						>
-							<p class="mb-2 text-[11px] font-medium leading-snug" style="color: var(--m-text-2);">Avg. Completion Rate</p>
-							<p class="text-[30px] font-bold leading-none tracking-tight" style="color: var(--m-green);">84%</p>
+							<p class="mb-2 text-[11px] leading-snug font-medium" style="color: var(--m-text-2);">
+								Avg. Completion Rate
+							</p>
+							<p
+								class="text-[30px] leading-none font-bold tracking-tight"
+								style="color: var(--m-green);"
+							>
+								84%
+							</p>
 							<p class="mt-1.5 text-[11px]" style="color: var(--m-text-3);">sessions this week</p>
 						</div>
 						<div
 							class="rounded-xl border p-4"
 							style="background: var(--m-elevated); border-color: var(--m-border-soft);"
 						>
-							<p class="mb-2 text-[11px] font-medium leading-snug" style="color: var(--m-text-2);">Signed Before Arrival</p>
-							<p class="text-[30px] font-bold leading-none tracking-tight">71%</p>
+							<p class="mb-2 text-[11px] leading-snug font-medium" style="color: var(--m-text-2);">
+								Signed Before Arrival
+							</p>
+							<p class="text-[30px] leading-none font-bold tracking-tight">71%</p>
 							<p class="mt-1.5 text-[11px]" style="color: var(--m-text-3);">arrived pre-signed</p>
 						</div>
 					</div>
@@ -364,23 +388,26 @@
 						style="background: var(--m-elevated); border-color: var(--m-border-soft);"
 					>
 						<div class="px-4 py-2.5" style="background: var(--m-card);">
-							<p class="text-[10px] font-semibold tracking-wide uppercase" style="color: var(--m-text-2);">Recent Sessions</p>
+							<p
+								class="text-[10px] font-semibold tracking-wide uppercase"
+								style="color: var(--m-text-2);"
+							>
+								Recent Sessions
+							</p>
 						</div>
-						{#each [
-							{ name: 'Zipline Tour', count: '8/8', label: 'Complete', bg: 'var(--m-green-dim)', color: 'var(--m-green)' },
-							{ name: 'Axe Throwing', count: '4/6', label: 'In Progress', bg: 'var(--m-amber-dim)', color: 'var(--m-amber)' },
-							{ name: 'Kayak Adventure', count: '0/10', label: 'Upcoming', bg: 'var(--m-elevated)', color: 'var(--m-text-3)' }
-						] as row (row.name)}
+						{#each [{ name: 'Zipline Tour', count: '8/8', label: 'Complete', bg: 'var(--m-green-dim)', color: 'var(--m-green)' }, { name: 'Axe Throwing', count: '4/6', label: 'In Progress', bg: 'var(--m-amber-dim)', color: 'var(--m-amber)' }, { name: 'Kayak Adventure', count: '0/10', label: 'Upcoming', bg: 'var(--m-elevated)', color: 'var(--m-text-3)' }] as row (row.name)}
 							<div
 								class="flex items-center justify-between border-t px-4 py-2.5"
 								style="border-color: var(--m-border-soft);"
 							>
 								<span class="text-[12px] font-medium">{row.name}</span>
-								<span class="text-[12px] font-medium" style="color: var(--m-text-2);">{row.count}</span>
+								<span class="text-[12px] font-medium" style="color: var(--m-text-2);"
+									>{row.count}</span
+								>
 								<span
 									class="rounded-full px-2.5 py-0.5 text-[10px] font-semibold"
-									style="background: {row.bg}; color: {row.color};"
-								>{row.label}</span>
+									style="background: {row.bg}; color: {row.color};">{row.label}</span
+								>
 							</div>
 						{/each}
 					</div>
@@ -389,7 +416,10 @@
 
 			<!-- Prose (right on lg) -->
 			<div use:scrollReveal={{ delay: 0 }}>
-				<p class="mb-3 text-[11px] font-semibold tracking-widest uppercase" style="color: var(--primary);">
+				<p
+					class="mb-3 text-[11px] font-semibold tracking-widest uppercase"
+					style="color: var(--primary);"
+				>
 					{analyticsFeature.title}
 				</p>
 				<h2
@@ -407,15 +437,14 @@
 				<div class="mt-6 flex flex-wrap gap-2">
 					<span
 						class="rounded-full px-2.5 py-1 text-[11px] font-semibold"
-						style="background: var(--m-green-dim); color: var(--m-green);"
-					>84% avg. completion</span>
+						style="background: var(--m-green-dim); color: var(--m-green);">84% avg. completion</span
+					>
 					<span
 						class="rounded-full px-2.5 py-1 text-[11px] font-semibold"
-						style="background: var(--m-accent-dim); color: var(--primary);"
-					>↑ 12% this week</span>
+						style="background: var(--m-accent-dim); color: var(--primary);">↑ 12% this week</span
+					>
 				</div>
 			</div>
-
 		</div>
 	</div>
 </section>
@@ -424,7 +453,10 @@
 <section class="border-b px-4 py-28 sm:px-6 md:py-36" style="border-color: var(--m-border-soft);">
 	<div class="mx-auto max-w-6xl">
 		<div class="mb-12" use:scrollReveal={{ delay: 0 }}>
-			<p class="mb-3 text-[11px] font-semibold tracking-widest uppercase" style="color: var(--primary);">
+			<p
+				class="mb-3 text-[11px] font-semibold tracking-widest uppercase"
+				style="color: var(--primary);"
+			>
 				More Features
 			</p>
 			<h2
@@ -452,15 +484,19 @@
 					</div>
 
 					<div class="flex flex-1 flex-col gap-1.5">
-						<h3 class="text-[15px] font-semibold leading-snug">{feature.title}</h3>
-						<p class="text-[14px] leading-relaxed" style="color: var(--m-text-2);">{feature.description}</p>
-						<p class="mt-0.5 text-[13px] leading-relaxed" style="color: var(--m-text-3);">{feature.detail}</p>
+						<h3 class="text-[15px] leading-snug font-semibold">{feature.title}</h3>
+						<p class="text-[14px] leading-relaxed" style="color: var(--m-text-2);">
+							{feature.description}
+						</p>
+						<p class="mt-0.5 text-[13px] leading-relaxed" style="color: var(--m-text-3);">
+							{feature.detail}
+						</p>
 					</div>
 
 					<!-- Visual accent -->
 					{#if feature.id === 'email-automation'}
 						<div
-							class="mt-auto rounded-lg border px-3 py-2 flex items-center gap-2"
+							class="mt-auto flex items-center gap-2 rounded-lg border px-3 py-2"
 							style="background: var(--m-elevated); border-color: var(--m-border-strong);"
 							aria-hidden="true"
 						>
@@ -470,23 +506,22 @@
 							</span>
 							<span class="ml-auto shrink-0 text-[11px]" style="color: var(--m-text-3);">×</span>
 						</div>
-
 					{:else if feature.id === 'booking-sync'}
 						<div class="mt-auto flex flex-wrap gap-2" aria-hidden="true">
-							{#each [
-								{ name: 'Bookeo ✓', live: true },
-								{ name: 'Resova ✓', live: true },
-								{ name: 'Xola (soon)', live: false }
-							] as chip (chip.name)}
+							{#each [{ name: 'Bookeo ✓', live: true }, { name: 'Resova (soon)', live: false }, { name: 'Xola (soon)', live: false }] as chip (chip.name)}
 								<span
 									class="rounded-full border px-2.5 py-1 text-[11px] font-medium"
-									style="background: var(--m-elevated); border-color: var(--m-border-strong); color: {chip.live ? 'var(--m-green)' : 'var(--m-text-3)'};"
+									style="background: var(--m-elevated); border-color: var(--m-border-strong); color: {chip.live
+										? 'var(--m-green)'
+										: 'var(--m-text-3)'};"
 								>
-									{#if chip.live}<span class="mr-1 inline-block h-1.5 w-1.5 rounded-full align-middle" style="background: var(--m-green);"></span>{/if}{chip.name}
+									{#if chip.live}<span
+											class="mr-1 inline-block h-1.5 w-1.5 rounded-full align-middle"
+											style="background: var(--m-green);"
+										></span>{/if}{chip.name}
 								</span>
 							{/each}
 						</div>
-
 					{:else if feature.id === 'marketing-sync'}
 						<div class="mt-auto flex flex-col gap-1.5" aria-hidden="true">
 							{#each ['Mailchimp', 'Constant Contact'] as platform (platform)}
@@ -495,26 +530,30 @@
 									style="background: var(--m-elevated); border-color: var(--m-border-soft);"
 								>
 									<span class="text-[12px] font-medium">{platform}</span>
-									<span class="text-[10px] font-semibold" style="color: var(--m-green);">Syncing ✓</span>
+									<span class="text-[10px] font-semibold" style="color: var(--m-amber);"
+										>Coming soon</span
+									>
 								</div>
 							{/each}
 						</div>
-
 					{:else if feature.id === 'team-access'}
 						<div class="mt-auto" aria-hidden="true">
 							<div class="flex gap-2">
 								<span
 									class="rounded-lg border px-3 py-1.5 text-[11px] font-semibold"
 									style="background: var(--m-accent-dim); border-color: var(--m-accent-border); color: var(--primary);"
-								>Owner</span>
+									>Owner</span
+								>
 								<span
 									class="rounded-lg border px-3 py-1.5 text-[11px] font-medium"
 									style="background: var(--m-elevated); border-color: var(--m-border-strong); color: var(--m-text-2);"
-								>Staff</span>
+									>Staff</span
+								>
 							</div>
-							<p class="mt-2 text-[11px]" style="color: var(--m-text-3);">Multiple venues, one account.</p>
+							<p class="mt-2 text-[11px]" style="color: var(--m-text-3);">
+								Multiple venues, one account.
+							</p>
 						</div>
-
 					{:else if feature.id === 'audit-trail'}
 						<div
 							class="mt-auto flex items-center gap-2 rounded-lg border px-3 py-2"
@@ -523,7 +562,9 @@
 						>
 							<Shield size={11} style="color: var(--m-text-3); flex-shrink: 0;" />
 							<span class="text-[11px]" style="color: var(--m-text-2);">PDF export</span>
-							<span class="text-[11px]" style="color: var(--m-text-3);">by matt@venue.com · just now</span>
+							<span class="text-[11px]" style="color: var(--m-text-3);"
+								>by matt@venue.com · just now</span
+							>
 						</div>
 					{/if}
 				</div>
@@ -533,10 +574,7 @@
 </section>
 
 <!-- Integrations section -->
-<section
-	class="border-b px-4 py-28 sm:px-6 md:py-36"
-	style="border-color: var(--m-border-soft);"
->
+<section class="border-b px-4 py-28 sm:px-6 md:py-36" style="border-color: var(--m-border-soft);">
 	<div class="mx-auto max-w-6xl">
 		<div use:scrollReveal={{ delay: 0 }}>
 			<p
@@ -552,7 +590,8 @@
 				Connects to your existing stack.
 			</h2>
 			<p class="mb-12 max-w-xl text-[16px] leading-relaxed" style="color: var(--m-text-2);">
-				Link your booking platform and marketing tools. Once connected, everything syncs automatically.
+				Bookeo is available now. Other booking providers and marketing-list integrations are coming
+				soon.
 			</p>
 		</div>
 
@@ -581,7 +620,11 @@
 							class="mt-auto inline-flex w-fit items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-semibold"
 							style="background: var(--m-green-dim); color: var(--m-green);"
 						>
-							<span class="size-1.5 rounded-full" style="background: var(--m-green);" aria-hidden="true"></span>
+							<span
+								class="size-1.5 rounded-full"
+								style="background: var(--m-green);"
+								aria-hidden="true"
+							></span>
 							Connected
 						</span>
 					{:else}
@@ -599,13 +642,8 @@
 </section>
 
 <!-- CTA -->
-<section
-	class="px-4 py-20 sm:px-6 md:py-28"
->
-	<div
-		class="mx-auto max-w-3xl text-center"
-		use:scrollReveal={{ delay: 0 }}
-	>
+<section class="px-4 py-20 sm:px-6 md:py-28">
+	<div class="mx-auto max-w-3xl text-center" use:scrollReveal={{ delay: 0 }}>
 		<h2
 			class="mb-5 font-extrabold tracking-tight"
 			style="font-family: 'Bricolage Grotesque', sans-serif; font-size: clamp(1.9rem, 4vw, 3rem); letter-spacing: -0.03em; line-height: 1.1;"

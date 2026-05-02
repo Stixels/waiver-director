@@ -4,7 +4,7 @@
 	type FooterEntry =
 		| {
 				label: string;
-				href: '/#features' | '/#how-it-works' | '/#pricing' | '/privacy' | '/terms';
+				href: '/#features' | '/#how-it-works' | '/#pricing' | '/features' | '/privacy' | '/terms';
 		  }
 		| { label: string; comingSoon: true };
 
@@ -23,7 +23,7 @@
 		{
 			title: 'Integrations',
 			entries: [
-				{ label: 'Bookeo', comingSoon: true },
+				{ label: 'Bookeo', href: '/features' },
 				{ label: 'Resova', comingSoon: true },
 				{ label: 'Xola', comingSoon: true },
 				{ label: 'Mailchimp', comingSoon: true },
