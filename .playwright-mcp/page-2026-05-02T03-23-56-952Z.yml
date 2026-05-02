@@ -1,0 +1,5 @@
+- generic [ref=e3]:
+  - generic [ref=e4]:
+    - complementary [ref=e5]
+    - main [ref=e32]
+  - region "Notifications alt+T"

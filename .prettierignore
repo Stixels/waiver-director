@@ -5,5 +5,11 @@ yarn.lock
 bun.lock
 bun.lockb
 
+# Agent tooling (Convex skills, YAML) conflict with Convex command
+.agents/
+
 # Miscellaneous
 /static/
+
+# Generated (Convex API, data model, AI guidelines) conflict with Convex command
+src/convex/_generated/
