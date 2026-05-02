@@ -70,12 +70,6 @@
 			count: pipeline?.blocked ?? 0,
 			tone: ((pipeline?.blocked ?? 0) > 0 ? 'amber' : 'muted') as ChipTone,
 			hint: (pipeline?.blocked ?? 0) > 0 ? 'sender setup' : 'none'
-		},
-		{
-			label: 'Unscheduled',
-			count: pipeline?.unscheduled ?? 0,
-			tone: 'muted' as ChipTone,
-			hint: 'no schedule'
 		}
 	]);
 
