@@ -189,31 +189,106 @@
 				<Skeleton class="h-9 w-9 rounded-lg" />
 				<Skeleton class="h-4 w-32" />
 			</header>
-			<main class="min-w-0 flex-1 overflow-hidden p-6">
-				<div class="mx-auto w-full max-w-5xl space-y-5">
-					<div class="space-y-2">
-						<Skeleton class="h-3 w-24" />
-						<Skeleton class="h-7 w-72 max-w-full" />
+			<main class="min-w-0 flex-1 overflow-auto">
+				<div class="border-b border-border bg-card/30 px-6 py-5">
+					<div class="mx-auto w-full max-w-7xl space-y-1.5">
+						<Skeleton class="h-7 w-36" />
 						<Skeleton class="h-4 w-80 max-w-full" />
 					</div>
-					<div class="rounded-xl border border-border">
-						<div class="grid grid-cols-4 gap-4 border-b border-border px-4 py-3">
-							<Skeleton class="h-3 w-16" />
-							<Skeleton class="h-3 w-16" />
-							<Skeleton class="h-3 w-20" />
-							<Skeleton class="h-3 w-20" />
+				</div>
+				<div class="w-full p-6">
+					<div class="mx-auto w-full max-w-7xl space-y-6">
+						<div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
+							{#each [0, 1, 2, 3] as index (index)}
+								<div class="min-h-36 rounded-xl border border-border bg-card p-4">
+									<div class="flex items-start justify-between gap-3">
+										<div class="min-w-0">
+											<Skeleton class="h-3.5 w-28" />
+											<Skeleton class="mt-2 h-8 w-16" />
+										</div>
+										<Skeleton class="size-10 shrink-0 rounded-lg" />
+									</div>
+									<Skeleton class="mt-4 h-16 w-full" />
+									<div class="mt-3 flex items-end justify-between gap-2">
+										<div class="space-y-1.5">
+											<Skeleton class="h-2.5 w-16" />
+											<Skeleton class="h-3 w-12" />
+										</div>
+										<Skeleton class="h-2.5 w-20" />
+									</div>
+								</div>
+							{/each}
 						</div>
-						{#each [0, 1, 2, 3, 4, 5] as index (index)}
-							<div class="grid grid-cols-4 gap-4 border-b border-border px-4 py-4 last:border-b-0">
-								<div class="space-y-1.5">
-									<Skeleton class="h-4 w-28" />
+						<div class="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_24rem]">
+							<div class="grid gap-4 lg:grid-cols-2">
+								{#each [0, 1] as panel (panel)}
+									<div
+										class="flex h-[420px] flex-col overflow-hidden rounded-xl border border-border bg-card md:h-[520px]"
+									>
+										<div class="flex items-center justify-between border-b border-border px-6 py-4">
+											<div class="flex items-center gap-2">
+												<Skeleton class="size-4" />
+												<Skeleton class="h-5 w-36" />
+											</div>
+											<Skeleton class="h-3 w-12" />
+										</div>
+										<div class="min-h-0 flex-1 divide-y divide-border overflow-hidden">
+											{#each [0, 1, 2, 3, 4, 5] as row (row)}
+												<div class="flex items-center gap-4 px-5 py-3.5">
+													{#if panel === 0}
+														<div class="w-14 shrink-0 space-y-1.5">
+															<Skeleton class="h-4 w-12" />
+															<Skeleton class="h-5 w-11 rounded-full" />
+														</div>
+													{/if}
+													<div class="min-w-0 flex-1 space-y-2">
+														<Skeleton class="h-4 w-40 max-w-full" />
+														<Skeleton class="h-3 w-32 max-w-full" />
+													</div>
+													<div class="w-20 shrink-0 space-y-2">
+														<Skeleton class="ml-auto h-4 w-14" />
+														{#if panel === 0}
+															<Skeleton class="h-1.5 w-full rounded-full" />
+														{/if}
+													</div>
+												</div>
+											{/each}
+										</div>
+									</div>
+								{/each}
+							</div>
+							<div
+								class="flex h-[420px] flex-col overflow-hidden rounded-xl border border-border bg-card md:h-[520px]"
+							>
+								<div class="flex items-center justify-between border-b border-border px-6 py-4">
+									<div class="flex items-center gap-2">
+										<Skeleton class="size-4" />
+										<Skeleton class="h-5 w-32" />
+									</div>
 									<Skeleton class="h-3 w-12" />
 								</div>
-								<Skeleton class="h-4 w-40 max-w-full" />
-								<Skeleton class="h-4 w-28 max-w-full" />
-								<Skeleton class="h-4 w-32 max-w-full" />
+								<div class="flex min-h-0 flex-1 flex-col gap-3 p-4">
+									<div class="flex flex-wrap gap-1.5">
+										{#each [0, 1, 2, 3] as chip (chip)}
+											<Skeleton class="h-7 w-20 rounded-md" />
+										{/each}
+									</div>
+									<div
+										class="min-h-0 flex-1 space-y-2 overflow-hidden rounded-md border border-border/50 p-3"
+									>
+										{#each [0, 1, 2, 3, 4, 5] as row (row)}
+											<div class="flex items-center justify-between gap-3">
+												<div class="min-w-0 flex-1 space-y-2">
+													<Skeleton class="h-4 w-32 max-w-full" />
+													<Skeleton class="h-3 w-40 max-w-full" />
+												</div>
+												<Skeleton class="h-4 w-20 shrink-0" />
+											</div>
+										{/each}
+									</div>
+								</div>
 							</div>
-						{/each}
+						</div>
 					</div>
 				</div>
 			</main>

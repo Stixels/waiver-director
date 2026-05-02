@@ -32,7 +32,7 @@
 		</h1>
 
 		<p
-			class="landing-hero__animate landing-hero__delay-3 mx-auto mb-9 max-w-[500px] text-[17px] leading-relaxed"
+			class="landing-hero__animate landing-hero__delay-2 mx-auto mb-9 max-w-[500px] text-[17px] leading-relaxed"
 			style="color: var(--m-text-2);"
 		>
 			Waiver Director captures every participant&apos;s email when they sign — not just the lead

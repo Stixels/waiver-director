@@ -132,7 +132,11 @@
 						class="ml-3 shrink-0 rounded-lg p-2.5"
 						style="color: {stat.color}; background: {stat.bgStyle};"
 					>
-						<stat.icon class="size-5" />
+						{#if isLoading && kpi == null}
+							<Skeleton class="size-5 rounded-sm bg-current/15" />
+						{:else}
+							<stat.icon class="size-5" />
+						{/if}
 					</div>
 				</div>
 				<div class="mt-3 space-y-2">
@@ -143,18 +147,27 @@
 					{/if}
 					<div class="flex min-w-0 items-center justify-between gap-2 text-[0.68rem] leading-none">
 						<div class="min-w-0">
-							<p class="font-medium text-muted-foreground">Last 7 days</p>
-							<p class="mt-1 font-semibold text-foreground tabular-nums">
-								{trendTotal(stat.trend).toLocaleString()} total
-							</p>
+							{#if isLoading && trends == null}
+								<Skeleton class="h-2.5 w-16" />
+								<Skeleton class="mt-1 h-3 w-12" />
+							{:else}
+								<p class="font-medium text-muted-foreground">Last 7 days</p>
+								<p class="mt-1 font-semibold text-foreground tabular-nums">
+									{trendTotal(stat.trend).toLocaleString()} total
+								</p>
+							{/if}
 						</div>
 						<div class="flex shrink-0 items-center tabular-nums">
-							<span
-								class="text-[0.65rem] font-medium text-muted-foreground"
-								title={comparisonTitle(stat.comparison)}
-							>
-								{comparisonLabel(stat.comparison)}
-							</span>
+							{#if isLoading && comparisons == null}
+								<Skeleton class="h-2.5 w-20" />
+							{:else}
+								<span
+									class="text-[0.65rem] font-medium text-muted-foreground"
+									title={comparisonTitle(stat.comparison)}
+								>
+									{comparisonLabel(stat.comparison)}
+								</span>
+							{/if}
 						</div>
 					</div>
 				</div>
