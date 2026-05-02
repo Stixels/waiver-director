@@ -111,7 +111,7 @@
 
 <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
 	{#each stats as stat (stat.label)}
-		<Card class="min-h-36 overflow-hidden">
+		<Card class="min-h-36 overflow-visible">
 			<CardContent class="flex h-full flex-col justify-between p-4">
 				<div class="flex items-start justify-between gap-3">
 					<div class="min-w-0">
