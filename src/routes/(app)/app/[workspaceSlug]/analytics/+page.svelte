@@ -12,6 +12,7 @@
 	import { Area, AreaChart, BarChart, ChartClipPath } from 'layerchart';
 	import AnalyticsDateRangePicker from '$lib/components/dashboard/AnalyticsDateRangePicker.svelte';
 	import { curveNatural } from 'd3-shape';
+	import { scaleBand } from 'd3-scale';
 	import { cubicInOut } from 'svelte/easing';
 	import TrendingUpIcon from '@lucide/svelte/icons/trending-up';
 	import MailIcon from '@lucide/svelte/icons/mail';
@@ -40,7 +41,7 @@
 
 	function defaultStartStr(): string {
 		const now = new Date();
-		return toDateInputValue(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29));
+		return toDateInputValue(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6));
 	}
 
 	let startDateStr = $state(defaultStartStr());
@@ -433,7 +434,9 @@
 					<ChartContainer config={customersConfig} class="h-52 w-full">
 						<BarChart
 							data={analyticsData.customerActivityByDay}
+							xScale={scaleBand().padding(0.25)}
 							x="dayStartAt"
+							axis="x"
 							yDomain={customerActivityYDomain}
 							series={[
 								{
@@ -447,12 +450,22 @@
 									color: 'var(--color-returningCustomers)'
 								}
 							]}
-							seriesLayout="stack"
-							bandPadding={0.32}
-							props={{ xAxis: { ticks: 7, format: formatAxisDate } }}
+							x1Scale={scaleBand().paddingInner(0).paddingOuter(0)}
+							seriesLayout="group"
+							rule={false}
+							props={{
+								bars: {
+									stroke: 'none',
+									strokeWidth: 0,
+									rounded: 'all',
+									motion: { type: 'tween', duration: 500, easing: cubicInOut }
+								},
+								highlight: { area: { fill: 'none' } },
+								xAxis: { ticks: 7, format: formatAxisDate }
+							}}
 						>
 							{#snippet tooltip()}
-								<ChartTooltip labelFormatter={formatAxisDate} />
+								<ChartTooltip labelFormatter={formatAxisDate} indicator="dashed" />
 							{/snippet}
 						</BarChart>
 					</ChartContainer>

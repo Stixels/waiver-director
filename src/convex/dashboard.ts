@@ -3,7 +3,7 @@ import { query } from './_generated/server';
 import { requireWorkspaceMember } from './lib/waivers';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-const MAX_ANALYTICS_RANGE_MS = 90 * DAY_MS;
+const MAX_ANALYTICS_RANGE_MS = 30 * DAY_MS;
 const DASHBOARD_COUNT_CAP = 1000;
 
 const trendDayValue = v.object({
@@ -374,7 +374,7 @@ export const getAnalyticsSeries = query({
 		if (args.rangeEndAt - args.rangeStartAt > MAX_ANALYTICS_RANGE_MS) {
 			throw new ConvexError({
 				code: 'invalid_argument',
-				message: 'Analytics range cannot exceed 90 days.'
+				message: 'Analytics range cannot exceed 30 days.'
 			});
 		}
 

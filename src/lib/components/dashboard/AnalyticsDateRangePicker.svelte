@@ -1,10 +1,9 @@
 <script lang="ts">
 	import { Button } from '$lib/components/ui/button';
+	import { Calendar } from '$lib/components/ui/calendar';
 	import { Popover, PopoverContent, PopoverTrigger } from '$lib/components/ui/popover';
-	import { RangeCalendar } from '$lib/components/ui/range-calendar';
 	import { parseDate, type DateValue } from '@internationalized/date';
 	import CalendarClockIcon from '@lucide/svelte/icons/calendar-clock';
-	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
 
 	let {
 		startDate,
@@ -16,16 +15,13 @@
 		onchange: (start: string, end: string) => void;
 	} = $props();
 
-	const MAX_RANGE_DAYS = 90;
-	const DAY_MS = 24 * 60 * 60 * 1000;
+	const MAX_RANGE_DAYS = 30;
 	const presets: Array<{ label: string; days: number }> = [
 		{ label: '7d', days: 7 },
-		{ label: '30d', days: 30 },
-		{ label: '90d', days: 90 }
+		{ label: '30d', days: 30 }
 	];
-
-	let dateCalendarOpen = $state(false);
-	let dateRangeValue = $state<{ start: DateValue | undefined; end: DateValue | undefined }>();
+	let endingCalendarOpen = $state(false);
+	let endingDateValue = $state<DateValue | undefined>();
 
 	function toDateInputValue(date: Date): string {
 		const y = date.getFullYear();
@@ -37,10 +33,6 @@
 	function parseLocalDate(value: string): Date {
 		const [year, month, day] = value.split('-').map(Number);
 		return new Date(year, month - 1, day);
-	}
-
-	function dateValueKey(value: DateValue | undefined) {
-		return value?.toString() ?? '';
 	}
 
 	function dateValueFromString(value: string) {
@@ -57,70 +49,48 @@
 		}).format(new Date(year, month - 1, day));
 	}
 
-	function rangeLabel(from: string, to: string) {
-		return `${formatFilterDate(from)} - ${formatFilterDate(to)}`;
-	}
-
-	function clampRange(from: string, to: string) {
+	function daysInRange(from: string, to: string) {
 		const fromDate = parseLocalDate(from);
 		const toDate = parseLocalDate(to);
-		if (toDate.getTime() - fromDate.getTime() <= (MAX_RANGE_DAYS - 1) * DAY_MS) {
-			return { from, to };
-		}
-		return {
-			from,
-			to: toDateInputValue(
-				new Date(
-					fromDate.getFullYear(),
-					fromDate.getMonth(),
-					fromDate.getDate() + MAX_RANGE_DAYS - 1
-				)
-			)
-		};
+		const diffDays = Math.round((toDate.getTime() - fromDate.getTime()) / (24 * 60 * 60 * 1000));
+		return Math.min(MAX_RANGE_DAYS, Math.max(1, diffDays + 1));
 	}
 
-	function setRange(from: string, to: string) {
-		const next = clampRange(from, to);
-		dateRangeValue = {
-			start: dateValueFromString(next.from),
-			end: dateValueFromString(next.to)
-		};
-		if (next.from !== startDate || next.to !== endDate) {
-			onchange(next.from, next.to);
-		}
-	}
-
-	function applyPreset(days: number) {
-		const end = new Date();
-		const start = new Date(end.getFullYear(), end.getMonth(), end.getDate() - (days - 1));
-		setRange(toDateInputValue(start), toDateInputValue(end));
-		dateCalendarOpen = false;
+	function rangeStartForEndingOn(end: string, days: number) {
+		const endDate = parseLocalDate(end);
+		return toDateInputValue(
+			new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate() - (days - 1))
+		);
 	}
 
 	const today = $derived(toDateInputValue(new Date()));
-	const selectedLabel = $derived(rangeLabel(startDate, endDate));
+	const selectedDays = $derived(daysInRange(startDate, endDate));
+	const selectedLabel = $derived(
+		`${selectedDays} days ending ${formatFilterDate(endDate || today)}`
+	);
+
+	function setWindow(days: number, endingOn = endDate || today) {
+		const cappedEnd = endingOn > today ? today : endingOn;
+		const nextStart = rangeStartForEndingOn(cappedEnd, days);
+		if (nextStart !== startDate || cappedEnd !== endDate) {
+			onchange(nextStart, cappedEnd);
+		}
+	}
+
+	function handleEndingChange(value: string) {
+		if (!value) return;
+		setWindow(selectedDays, value);
+		endingCalendarOpen = false;
+	}
 
 	$effect(() => {
-		dateRangeValue = {
-			start: dateValueFromString(startDate),
-			end: dateValueFromString(endDate)
-		};
+		endingDateValue = dateValueFromString(endDate || today);
 	});
 
 	$effect(() => {
-		const nextStart = dateValueKey(dateRangeValue?.start);
-		const nextEnd = dateValueKey(dateRangeValue?.end);
-		if (!nextStart || !nextEnd) return;
-		if (nextStart === startDate && nextEnd === endDate) return;
-		const next = clampRange(nextStart, nextEnd);
-		if (next.from !== nextStart || next.to !== nextEnd) {
-			dateRangeValue = {
-				start: dateValueFromString(next.from),
-				end: dateValueFromString(next.to)
-			};
-			return;
-		}
-		onchange(next.from, next.to);
+		const nextEnd = endingDateValue?.toString();
+		if (!nextEnd || nextEnd === endDate) return;
+		handleEndingChange(nextEnd);
 	});
 </script>
 
@@ -128,9 +98,9 @@
 	<div class="flex items-center gap-1">
 		{#each presets as preset (preset.days)}
 			<Button
-				variant="outline"
+				variant={selectedDays === preset.days ? 'default' : 'outline'}
 				size="sm"
-				onclick={() => applyPreset(preset.days)}
+				onclick={() => setWindow(preset.days)}
 				class="h-8 px-3 text-xs"
 			>
 				{preset.label}
@@ -138,7 +108,7 @@
 		{/each}
 	</div>
 
-	<Popover bind:open={dateCalendarOpen}>
+	<Popover bind:open={endingCalendarOpen}>
 		<PopoverTrigger>
 			{#snippet child({ props })}
 				<Button
@@ -146,19 +116,20 @@
 					type="button"
 					variant="outline"
 					size="sm"
-					class="h-8 min-w-52 justify-between gap-2"
+					class="h-8 min-w-44 justify-between gap-2"
+					title={selectedLabel}
 				>
 					<span class="inline-flex min-w-0 items-center gap-1.5">
 						<CalendarClockIcon class="size-3.5 shrink-0" aria-hidden="true" />
-						<span class="truncate">{selectedLabel}</span>
+						<span>Ending {formatFilterDate(endDate || today)}</span>
 					</span>
-					<ChevronDownIcon class="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
 				</Button>
 			{/snippet}
 		</PopoverTrigger>
-		<PopoverContent align="end" class="w-auto p-2">
-			<RangeCalendar
-				bind:value={dateRangeValue}
+		<PopoverContent align="end" class="w-auto p-0">
+			<Calendar
+				type="single"
+				bind:value={endingDateValue}
 				maxValue={dateValueFromString(today)}
 				class="w-fit"
 			/>
