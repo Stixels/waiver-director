@@ -39,7 +39,6 @@
 	type BookingDetail = NonNullable<
 		FunctionReturnType<typeof api.bookings.getWorkspaceBookingDetail>
 	>;
-	type SignedUser = BookingDetail['signedUsers'][number];
 
 	const bookingQuery = useProtectedQuery(
 		api.bookings.getWorkspaceBookingDetail,
