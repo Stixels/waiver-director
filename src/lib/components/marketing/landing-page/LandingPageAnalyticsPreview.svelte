@@ -1,16 +1,56 @@
 <script lang="ts">
-	import { chartBars } from './content';
-	import MarketingSectionHeading from './MarketingSectionHeading.svelte';
+	import { CalendarCheck, Mail, ScrollText, UsersRound } from '@lucide/svelte';
 
-	type Tone = 'positive' | 'muted' | 'warning' | 'neutral';
-	type SessionTone = 'positive' | 'warning' | 'neutral';
+	import { scrollReveal } from '$lib/actions/scroll-reveal';
 
-	const analyticsStats = [
-		{ label: 'Total Submissions', value: '1,247', subtitle: '↑ 12% this week', tone: 'positive' },
-		{ label: 'Avg Completion Rate', value: '91%', subtitle: 'across all sessions', tone: 'muted' },
-		{ label: 'Emails Sent', value: '3,891', subtitle: '48 pending', tone: 'muted' },
-		{ label: 'Sessions Synced', value: '148', subtitle: 'from 3 providers', tone: 'muted' }
+	const kpiCards = [
+		{
+			id: 'bookings',
+			label: 'Bookings Today',
+			value: 7,
+			icon: CalendarCheck,
+			color: 'var(--primary)',
+			bg: 'color-mix(in oklch, var(--primary) 12%, transparent)',
+			comparison: '+18% this week',
+			trend: [4, 6, 3, 8, 5, 7, 7],
+			weekTotal: 40
+		},
+		{
+			id: 'submissions',
+			label: 'Submissions Today',
+			value: 37,
+			icon: ScrollText,
+			color: 'oklch(0.627 0.194 149.21)',
+			bg: 'color-mix(in oklch, oklch(0.627 0.194 149.21) 12%, transparent)',
+			comparison: '+12% this week',
+			trend: [28, 31, 24, 41, 36, 39, 37],
+			weekTotal: 236
+		},
+		{
+			id: 'followups',
+			label: 'Follow-ups Sent',
+			value: 28,
+			icon: Mail,
+			color: 'oklch(0.7 0.15 60)',
+			bg: 'color-mix(in oklch, oklch(0.7 0.15 60) 12%, transparent)',
+			comparison: '+8% this week',
+			trend: [18, 24, 21, 29, 31, 26, 28],
+			weekTotal: 177
+		},
+		{
+			id: 'customers',
+			label: 'New Customers',
+			value: 14,
+			icon: UsersRound,
+			color: 'oklch(0.58 0.18 255)',
+			bg: 'color-mix(in oklch, oklch(0.58 0.18 255) 12%, transparent)',
+			comparison: '+5% this week',
+			trend: [9, 11, 8, 15, 13, 12, 14],
+			weekTotal: 82
+		}
 	] as const;
+
+	type SessionTone = 'positive' | 'warning' | 'neutral';
 
 	const sessionRows = [
 		{
@@ -21,7 +61,7 @@
 			signed: 8,
 			rate: '100%',
 			status: 'Complete',
-			tone: 'positive'
+			tone: 'positive' as SessionTone
 		},
 		{
 			session: 'Urban Axe Throwing',
@@ -31,7 +71,7 @@
 			signed: 4,
 			rate: '67%',
 			status: 'In Progress',
-			tone: 'warning'
+			tone: 'warning' as SessionTone
 		},
 		{
 			session: 'Harbor Kayak Adventure',
@@ -41,155 +81,183 @@
 			signed: 0,
 			rate: '0%',
 			status: 'Upcoming',
-			tone: 'neutral'
+			tone: 'neutral' as SessionTone
 		}
 	] as const;
 
-	const statToneClasses: Record<Tone, string> = {
-		positive: 'text-(--m-green)',
-		muted: 'text-(--m-text-3)',
-		warning: 'text-(--m-amber)',
-		neutral: 'text-(--m-text-3)'
+	const sessionToneStyles: Record<SessionTone, string> = {
+		positive: 'background: var(--m-green-dim); color: var(--m-green);',
+		warning: 'background: var(--m-amber-dim); color: var(--m-amber);',
+		neutral: 'background: var(--m-elevated); color: var(--m-text-3);'
 	};
 
-	const sessionToneClasses: Record<SessionTone, string> = {
-		positive: 'bg-(--m-green-dim) text-(--m-green)',
-		warning: 'bg-(--m-amber-dim) text-(--m-amber)',
-		neutral: 'bg-(--m-elevated) text-(--m-text-3)'
-	};
+	function barHeight(val: number, maxVal: number): number {
+		return Math.max(8, Math.round((val / maxVal) * 100));
+	}
 </script>
 
 <section
-	class="border-t border-b py-24"
-	style="background: var(--m-surface); border-color: var(--border);"
+	class="border-t border-b py-28 md:py-36"
+	style="background: var(--m-surface); border-color: var(--m-border-soft);"
 >
 	<div class="mx-auto max-w-6xl px-4 sm:px-6">
-		<MarketingSectionHeading
-			eyebrow="Dashboard"
-			title="Know your completion rate for every session."
-			description="See signed, expected, and completion stats at a glance. Numbers update as waivers come in, so you&apos;re not looking at a stale snapshot."
-			class="mb-10"
-		/>
+		<div use:scrollReveal={{ delay: 0 }}>
+			<p
+				class="mb-3 text-[11px] font-semibold tracking-widest uppercase"
+				style="color: var(--primary);"
+			>
+				Dashboard
+			</p>
+			<h2
+				class="mb-4 max-w-xl font-extrabold tracking-tight"
+				style="font-family: 'Bricolage Grotesque', sans-serif; font-size: clamp(1.75rem, 3.5vw, 2.75rem); letter-spacing: -0.03em; line-height: 1.06;"
+			>
+				Know your completion rate for every session.
+			</h2>
+			<p class="mb-10 max-w-xl text-[15px] leading-relaxed" style="color: var(--m-text-2);">
+				Signed, expected, and completion stats in one view. Numbers update as waivers come in —
+				not a stale snapshot.
+			</p>
+		</div>
 
 		<div
-			class="mt-10 overflow-hidden rounded-xl border border-(--m-border-strong) bg-(--m-surface)"
+			class="overflow-hidden rounded-2xl border"
+			style="background: var(--m-bg); border-color: var(--m-border-strong); box-shadow: 0 24px 64px oklch(0 0 0 / 45%), inset 0 1px 0 oklch(1 0 0 / 4%);"
+			use:scrollReveal={{ delay: 80 }}
 		>
+			<!-- Title bar -->
 			<div
-				class="flex min-h-12 flex-col gap-3 border-b border-(--m-border-soft) bg-(--m-card) px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5 sm:py-0"
+				class="flex items-center justify-between border-b px-5 py-3"
+				style="background: var(--m-card); border-color: var(--m-border-soft);"
 			>
-				<span class="text-[13px] font-semibold">Analytics Dashboard</span>
-				<div class="flex flex-wrap items-center gap-2 sm:gap-3">
-					<span
-						class="rounded-md border border-(--m-border-strong) bg-(--m-elevated) px-2.5 py-1 text-[11px] text-muted-foreground"
-					>
-						Last 7 days
-					</span>
-					<span class="text-[11px] font-medium text-primary" aria-hidden="true">Export CSV</span>
-				</div>
+				<span class="text-[13px] font-semibold">Dashboard</span>
+				<span
+					class="rounded-lg border px-2.5 py-1 text-[11px]"
+					style="border-color: var(--m-border-strong); background: var(--m-elevated); color: var(--m-text-2);"
+				>
+					Today · May 2
+				</span>
 			</div>
 
-			<div class="grid grid-cols-2 md:grid-cols-4">
-				{#each analyticsStats as stat (stat.label)}
-					<div class="landing-analytics__stat-cell min-w-0 p-4 sm:p-5">
-						<p class="mb-2 text-[10px] tracking-wide text-(--m-text-3) uppercase">
-							{stat.label}
-						</p>
-						<p class="mb-1 text-[26px] leading-none font-bold">{stat.value}</p>
-						<p class={[statToneClasses[stat.tone], 'text-[11px]']}>{stat.subtitle}</p>
+			<!-- KPI cards -->
+			<div class="grid grid-cols-2 gap-3 p-4 lg:grid-cols-4">
+				{#each kpiCards as card, i (card.id)}
+					{@const Icon = card.icon}
+					{@const maxTrend = Math.max(...card.trend)}
+					<div
+						class="flex flex-col justify-between rounded-xl border p-4"
+						style="border-color: var(--m-border-soft); background: var(--m-card);"
+						use:scrollReveal={{ delay: 140 + i * 50 }}
+					>
+						<div class="flex items-start justify-between gap-2">
+							<div class="min-w-0">
+								<p class="text-[11px] font-medium" style="color: var(--m-text-2);">{card.label}</p>
+								<p
+									class="mt-1 text-[26px] font-bold leading-none tracking-tight tabular-nums"
+								>
+									{card.value}
+								</p>
+							</div>
+							<div
+								class="shrink-0 rounded-lg p-2.5"
+								style="color: {card.color}; background: {card.bg};"
+								aria-hidden="true"
+							>
+								<Icon class="size-4" />
+							</div>
+						</div>
+
+						<!-- Sparkline -->
+						<div class="mt-3 space-y-1.5">
+							<div
+								class="flex h-10 items-end gap-0.5"
+								role="img"
+								aria-label="{card.label} 7-day trend"
+							>
+								{#each card.trend as val, di (di)}
+									<div class="flex flex-1 flex-col" aria-hidden="true">
+										<div
+											class="w-full rounded-t-[2px]"
+											style="height: {barHeight(val, maxTrend)}%; background: {card.color}; opacity: {di === card.trend.length - 1 ? '1' : '0.35'};"
+										></div>
+									</div>
+								{/each}
+							</div>
+							<div class="flex items-center justify-between text-[0.6rem] leading-none">
+								<span style="color: var(--m-text-2);">{card.weekTotal.toLocaleString()} this week</span>
+								<span style="color: var(--m-text-3);">{card.comparison}</span>
+							</div>
+						</div>
 					</div>
 				{/each}
 			</div>
 
-			<div class="p-5">
-				<p class="mb-4 text-[11px] font-semibold text-muted-foreground">
-					Submissions — Last 7 Days
-				</p>
+			<!-- Sessions table -->
+			<div class="border-t px-4 pb-4 pt-0" style="border-color: var(--m-border-soft);">
 				<div
-					class="flex h-28 items-end gap-2"
-					role="img"
-					aria-label="Bar chart: daily waiver submissions over the last 7 days"
+					class="overflow-hidden rounded-xl border"
+					style="border-color: var(--m-border-soft); background: var(--m-card);"
+					use:scrollReveal={{ delay: 200 }}
 				>
-					{#each chartBars as bar (bar.day)}
-						<div class="flex flex-1 flex-col items-center gap-1.5">
-							<div
-								class="w-full rounded-t-sm"
-								style={`height: ${bar.pct}%; background: var(--primary); opacity: 0.85;`}
-								aria-hidden="true"
-							></div>
-							<span class="text-[10px] text-(--m-text-3) uppercase">{bar.day}</span>
-						</div>
-					{/each}
-				</div>
-
-				<div class="mt-5 overflow-x-auto rounded-lg border border-(--m-border-soft)">
-					<table class="w-full min-w-176 border-collapse text-left text-[12px]">
-						<caption class="sr-only">
-							Sample sessions with expected signers, signed counts, completion rate, and status
-						</caption>
-						<thead>
-							<tr class="bg-(--m-elevated) text-[10px] tracking-wide text-(--m-text-3) uppercase">
-								<th scope="col" class="px-4 py-2.5 font-semibold">Session</th>
-								<th scope="col" class="px-4 py-2.5 font-semibold">Date</th>
-								<th scope="col" class="px-4 py-2.5 font-semibold">Provider</th>
-								<th scope="col" class="px-4 py-2.5 font-semibold">Expected</th>
-								<th scope="col" class="px-4 py-2.5 font-semibold">Signed</th>
-								<th scope="col" class="px-4 py-2.5 font-semibold">Rate</th>
-								<th scope="col" class="px-4 py-2.5 font-semibold">Status</th>
-							</tr>
-						</thead>
-						<tbody>
-							{#each sessionRows as row (row.session)}
-								<tr class="border-t border-(--m-border-soft)">
-									<td class="max-w-48 truncate px-4 py-3 font-medium">{row.session}</td>
-									<td class="px-4 py-3 whitespace-nowrap text-muted-foreground">{row.date}</td>
-									<td class="px-4 py-3 whitespace-nowrap text-muted-foreground">{row.provider}</td>
-									<td class="px-4 py-3 whitespace-nowrap text-muted-foreground">{row.expected}</td>
-									<td class="px-4 py-3 whitespace-nowrap text-muted-foreground">{row.signed}</td>
-									<td class="px-4 py-3 whitespace-nowrap text-muted-foreground">{row.rate}</td>
-									<td class="px-4 py-3">
-										<span
-											class={[
-												sessionToneClasses[row.tone],
-												'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold'
-											]}
+					<div
+						class="flex items-center justify-between border-b px-4 py-2.5"
+						style="border-color: var(--m-border-soft); background: var(--m-elevated);"
+					>
+						<span
+							class="text-[10px] font-semibold tracking-wide uppercase"
+							style="color: var(--m-text-2);"
+							>Upcoming Sessions</span
+						>
+						<span class="text-[11px] font-medium" style="color: var(--primary);" aria-hidden="true"
+							>View all →</span
+						>
+					</div>
+					<div class="overflow-x-auto">
+						<table class="w-full border-collapse text-left text-[12px]">
+							<caption class="sr-only">Sessions with signed vs expected counts</caption>
+							<thead>
+								<tr style="background: var(--m-bg);">
+									{#each ['Session', 'Date', 'Provider', 'Signed / Expected', 'Rate', 'Status'] as col (col)}
+										<th
+											scope="col"
+											class="px-4 py-2.5 text-[10px] font-semibold tracking-wide uppercase"
+											style="color: var(--m-text-3);"
 										>
-											{row.status}
-										</span>
-									</td>
+											{col}
+										</th>
+									{/each}
 								</tr>
-							{/each}
-						</tbody>
-					</table>
+							</thead>
+							<tbody>
+								{#each sessionRows as row (row.session)}
+									<tr class="border-t" style="border-color: var(--m-border-soft);">
+										<td class="max-w-44 truncate px-4 py-3 font-medium">{row.session}</td>
+										<td class="whitespace-nowrap px-4 py-3" style="color: var(--m-text-2);"
+											>{row.date}</td
+										>
+										<td class="whitespace-nowrap px-4 py-3" style="color: var(--m-text-2);"
+											>{row.provider}</td
+										>
+										<td class="whitespace-nowrap px-4 py-3 font-medium">
+											{row.signed}
+											<span style="color: var(--m-text-2);">/ {row.expected}</span>
+										</td>
+										<td class="whitespace-nowrap px-4 py-3 font-semibold">{row.rate}</td>
+										<td class="px-4 py-3">
+											<span
+												class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold"
+												style={sessionToneStyles[row.tone]}
+											>
+												{row.status}
+											</span>
+										</td>
+									</tr>
+								{/each}
+							</tbody>
+						</table>
+					</div>
 				</div>
 			</div>
 		</div>
 	</div>
 </section>
-
-<style>
-	.landing-analytics__stat-cell {
-		background: var(--m-card);
-	}
-
-	.landing-analytics__stat-cell:nth-child(odd) {
-		border-right: 1px solid var(--border);
-	}
-
-	.landing-analytics__stat-cell:nth-child(-n + 2) {
-		border-bottom: 1px solid var(--border);
-	}
-
-	@media (min-width: 768px) {
-		.landing-analytics__stat-cell:nth-child(odd) {
-			border-right: none;
-		}
-
-		.landing-analytics__stat-cell:nth-child(-n + 2) {
-			border-bottom: none;
-		}
-
-		.landing-analytics__stat-cell:nth-child(-n + 3) {
-			border-right: 1px solid var(--border);
-		}
-	}
-</style>

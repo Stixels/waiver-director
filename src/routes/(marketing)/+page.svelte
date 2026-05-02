@@ -1,13 +1,14 @@
 <script lang="ts">
 	import { PUBLIC_APP_URL } from '$env/static/public';
 
-	import MarketingPricing from '$lib/components/marketing/MarketingPricing.svelte';
 	import LandingPageAnalyticsPreview from '$lib/components/marketing/landing-page/LandingPageAnalyticsPreview.svelte';
 	import LandingPageCta from '$lib/components/marketing/landing-page/LandingPageCta.svelte';
 	import LandingPageDifferentiator from '$lib/components/marketing/landing-page/LandingPageDifferentiator.svelte';
-	import LandingPageFeatures from '$lib/components/marketing/landing-page/LandingPageFeatures.svelte';
+	import LandingPageEmailPipeline from '$lib/components/marketing/landing-page/LandingPageEmailPipeline.svelte';
+	import LandingPageFeatureTeaser from '$lib/components/marketing/landing-page/LandingPageFeatureTeaser.svelte';
 	import LandingPageHero from '$lib/components/marketing/landing-page/LandingPageHero.svelte';
 	import LandingPageHowItWorks from '$lib/components/marketing/landing-page/LandingPageHowItWorks.svelte';
+	import LandingPageTestimonials from '$lib/components/marketing/landing-page/LandingPageTestimonials.svelte';
 
 	const pageTitle = 'Waiver Director — Digital Waivers for Any Booking Experience';
 	const pageDescription =
@@ -35,7 +36,8 @@
 <LandingPageHero />
 <LandingPageDifferentiator />
 <LandingPageHowItWorks />
-<LandingPageFeatures />
+<LandingPageFeatureTeaser />
+<LandingPageEmailPipeline />
 <LandingPageAnalyticsPreview />
-<MarketingPricing />
+<LandingPageTestimonials />
 <LandingPageCta />

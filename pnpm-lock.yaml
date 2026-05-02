@@ -11,6 +11,9 @@ importers:
       '@dnd-kit/svelte':
         specifier: ^0.3.2
         version: 0.3.2(svelte@5.55.1)
+      '@fontsource/geist-sans':
+        specifier: ^5.2.5
+        version: 5.2.5
       '@tiptap/core':
         specifier: ^3.22.3
         version: 3.22.4(@tiptap/pm@3.22.4)
@@ -581,6 +584,9 @@ packages:
 
   '@fontsource-variable/noto-sans@5.2.10':
     resolution: {integrity: sha512-wyFgKkFu7jki5kEL8qv7avjQ8rxHX0J/nhLWvbR9T0hOH1HRKZEvb9EW9lMjZfWHHfEzKkYf5J+NadwgCS7TXA==}
+
+  '@fontsource/geist-sans@5.2.5':
+    resolution: {integrity: sha512-anllOHyJbElRs9fV15TeDRqAeb1IKm4bSknPl6ZMoyPTx1BBy7logudcUwpNjmQLkzn4Q0JGQLRCUKJYoyST6A==}
 
   '@humanfs/core@0.19.1':
     resolution: {integrity: sha512-5DyQ4+1JEUzejeK1JGICcideyfUbGixgS9jNgex5nqkW+cY7WZhxBigmieN5Qnw9ZosSNVC9KQKyb+GUaGyKUA==}
@@ -2668,6 +2674,8 @@ snapshots:
   '@floating-ui/utils@0.2.11': {}
 
   '@fontsource-variable/noto-sans@5.2.10': {}
+
+  '@fontsource/geist-sans@5.2.5': {}
 
   '@humanfs/core@0.19.1': {}
 
