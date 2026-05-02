@@ -24,23 +24,8 @@
 	<div
 		class="relative z-10 mx-auto flex w-full max-w-[680px] min-w-0 flex-col items-center text-center"
 	>
-		<!-- Eyebrow chip -->
-		<div
-			class="landing-hero__animate landing-hero__delay-1 mb-7 inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5"
-			style="background: var(--m-accent-soft); border-color: var(--m-accent-border-soft);"
-		>
-			<span
-				class="h-1.5 w-1.5 rounded-full"
-				style="background: var(--primary);"
-				aria-hidden="true"
-			></span>
-			<span class="text-[12px] font-medium" style="color: var(--primary);">
-				Built for activity operators
-			</span>
-		</div>
-
 		<h1
-			class="landing-hero__animate landing-hero__delay-2 mb-7 max-w-full font-black tracking-tight text-balance"
+			class="landing-hero__animate landing-hero__delay-1 mb-7 max-w-full font-black tracking-tight text-balance"
 		>
 			Your waiver is your
 			<span class="landing-hero__accent">best customer list.</span>
