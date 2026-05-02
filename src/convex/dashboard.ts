@@ -421,20 +421,32 @@ export const getAnalyticsSeries = query({
 				.take(1000),
 			ctx.db
 				.query('email_follow_ups')
-				.withIndex('by_workspaceId_and_status', (q) =>
-					q.eq('workspaceId', args.workspaceId).eq('status', 'queued')
+				.withIndex('by_workspaceId_and_status_and_scheduledAt', (q) =>
+					q
+						.eq('workspaceId', args.workspaceId)
+						.eq('status', 'queued')
+						.gte('scheduledAt', args.rangeStartAt)
+						.lt('scheduledAt', args.rangeEndAt)
 				)
 				.take(1000),
 			ctx.db
 				.query('email_follow_ups')
-				.withIndex('by_workspaceId_and_status', (q) =>
-					q.eq('workspaceId', args.workspaceId).eq('status', 'failed')
+				.withIndex('by_workspaceId_and_status_and_failedAt', (q) =>
+					q
+						.eq('workspaceId', args.workspaceId)
+						.eq('status', 'failed')
+						.gte('failedAt', args.rangeStartAt)
+						.lt('failedAt', args.rangeEndAt)
 				)
 				.take(1000),
 			ctx.db
 				.query('email_follow_ups')
-				.withIndex('by_workspaceId_and_status', (q) =>
-					q.eq('workspaceId', args.workspaceId).eq('status', 'blocked')
+				.withIndex('by_workspaceId_and_status_and_scheduledAt', (q) =>
+					q
+						.eq('workspaceId', args.workspaceId)
+						.eq('status', 'blocked')
+						.gte('scheduledAt', args.rangeStartAt)
+						.lt('scheduledAt', args.rangeEndAt)
 				)
 				.take(1000)
 		]);

@@ -305,11 +305,11 @@
 	</div>
 
 	<div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
-		<!-- Email Pipeline card -->
+		<!-- Email Activity card -->
 		<Card class="flex flex-col">
 			<CardHeader class="flex flex-row items-center gap-2 pb-3">
 				<MailIcon class="size-4 text-muted-foreground" />
-				<CardTitle class="text-base font-semibold">Email Pipeline</CardTitle>
+				<CardTitle class="text-base font-semibold">Email Activity</CardTitle>
 			</CardHeader>
 			<CardContent class="flex flex-1 flex-col gap-5">
 				{#if isInitialLoading}
@@ -337,11 +337,9 @@
 						<p class="mt-1 text-sm text-muted-foreground">Sent in selected period</p>
 					</div>
 
-					<!-- Current pipeline health -->
 					<div class="mt-auto space-y-2">
-						<p class="text-xs font-medium text-muted-foreground">Current pipeline</p>
+						<p class="text-xs font-medium text-muted-foreground">Selected period</p>
 						<div class="grid grid-cols-3 gap-2">
-							<!-- Queued — lighter primary in dark mode via color-mix for contrast -->
 							<div
 								class="rounded-lg border border-primary/20 bg-primary/10 px-3 py-2.5 dark:border-primary/40 dark:bg-primary/15"
 							>
@@ -359,7 +357,6 @@
 									Queued
 								</p>
 							</div>
-							<!-- Failed -->
 							<div
 								class={emailFailed > 0
 									? 'rounded-lg bg-destructive/8 px-3 py-2.5'
@@ -379,7 +376,6 @@
 									Failed
 								</p>
 							</div>
-							<!-- Blocked -->
 							<div
 								class={emailBlocked > 0
 									? 'rounded-lg bg-amber-500/8 px-3 py-2.5'

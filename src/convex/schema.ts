@@ -249,6 +249,8 @@ export default defineSchema({
 		.index('by_workspaceId', ['workspaceId'])
 		.index('by_workspaceId_and_status', ['workspaceId', 'status'])
 		.index('by_workspaceId_and_status_and_sentAt', ['workspaceId', 'status', 'sentAt'])
+		.index('by_workspaceId_and_status_and_scheduledAt', ['workspaceId', 'status', 'scheduledAt'])
+		.index('by_workspaceId_and_status_and_failedAt', ['workspaceId', 'status', 'failedAt'])
 		.index('by_submissionId', ['submissionId'])
 		.searchIndex('search_follow_ups', {
 			searchField: 'searchText',
