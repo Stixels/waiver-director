@@ -81,6 +81,11 @@
 			? 'Verify a reply-to email before sending follow-ups.'
 			: 'Sender domain is not configured. Set RESEND_FROM_EMAIL before sending follow-ups.'
 	);
+	const followUpLoadErrorMessage = $derived(
+		followUpQuery.error
+			? getConvexErrorMessage(followUpQuery.error, 'Unable to load this follow-up.')
+			: 'This follow-up no longer exists or is unavailable.'
+	);
 
 	function formatTimestamp(ts: number) {
 		return new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeStyle: 'short' }).format(
@@ -94,11 +99,17 @@
 		return Number.isNaN(timestamp) ? null : timestamp;
 	}
 
-	function formatActivityDate(item: FollowUp) {
-		const bookingStartAt = parseTimestamp(item.bookingStartTime);
+	function formatActivityDate(item: FollowUp | number) {
+		const bookingStartAt = typeof item === 'number' ? null : parseTimestamp(item.bookingStartTime);
+		const submittedAt = typeof item === 'number' ? item : item.submittedAt;
 		return new Intl.DateTimeFormat('en-US', { dateStyle: 'long' }).format(
-			new Date(bookingStartAt ?? item.submittedAt)
+			new Date(bookingStartAt ?? submittedAt)
 		);
+	}
+
+	function closeDialog() {
+		open = false;
+		onOpenChange?.(false);
 	}
 
 	function bookingDateParam(startTime: string | null | undefined) {
@@ -217,7 +228,7 @@
 								Signed
 							</div>
 							<p class="min-w-0 truncate text-xs font-medium text-foreground tabular-nums">
-								{formatActivityDate(followUp)}
+								{formatActivityDate(followUp.submittedAt)}
 							</p>
 							{#if followUp.status === 'queued' && followUp.scheduledAt != null}
 								<p class="shrink-0 text-[11px] text-muted-foreground tabular-nums">
@@ -349,6 +360,24 @@
 					</div>
 				</div>
 			{/if}
+		{:else}
+			<DialogHeader class="shrink-0 border-b border-border px-4 py-4 sm:px-6">
+				<DialogTitle class="text-base font-semibold">Follow-up unavailable</DialogTitle>
+				<DialogDescription class="text-sm text-muted-foreground">
+					{followUpLoadErrorMessage}
+				</DialogDescription>
+			</DialogHeader>
+			<div class="min-h-0 flex-1 bg-muted/20 px-4 py-5 sm:px-6">
+				<div
+					class="rounded-lg border border-border bg-background px-4 py-3 text-sm text-muted-foreground"
+				>
+					The selected follow-up could not be opened. It may have been deleted or moved out of this
+					workspace.
+				</div>
+			</div>
+			<div class="flex justify-end border-t border-border px-6 py-4">
+				<Button size="sm" variant="outline" onclick={closeDialog}>Close</Button>
+			</div>
 		{/if}
 	</DialogContent>
 </Dialog>
