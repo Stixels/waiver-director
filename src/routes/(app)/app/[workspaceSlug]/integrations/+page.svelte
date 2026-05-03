@@ -46,7 +46,7 @@
 	import UnplugIcon from '@lucide/svelte/icons/unplug';
 
 	type Integration = FunctionReturnType<typeof api.integrations.listWorkspaceIntegrations>[number];
-	type ProviderAvailability = 'available' | 'planned' | 'coming_soon';
+	type ProviderAvailability = 'available' | 'coming_soon';
 	type ProviderState = Integration['status'] | ProviderAvailability;
 	type ProviderCategory = 'booking' | 'email';
 	type ProviderDefinition = {
@@ -76,9 +76,9 @@
 			key: 'resova',
 			name: 'Resova',
 			category: 'booking',
-			availability: 'planned',
-			status: 'Planned',
-			description: 'Booking sync support planned.',
+			availability: 'coming_soon',
+			status: 'Coming soon',
+			description: 'Booking sync support coming soon.',
 			detailDescription:
 				'Resova support will use the same booking and waiver matching workflow once available.',
 			logo: resovaIcon
@@ -87,9 +87,9 @@
 			key: 'xola',
 			name: 'Xola',
 			category: 'booking',
-			availability: 'planned',
-			status: 'Planned',
-			description: 'Booking sync support planned.',
+			availability: 'coming_soon',
+			status: 'Coming soon',
+			description: 'Booking sync support coming soon.',
 			detailDescription:
 				'Xola support will connect future booking data to waiver signing once available.',
 			logo: xolaIcon
@@ -98,9 +98,9 @@
 			key: 'fareharbor',
 			name: 'FareHarbor',
 			category: 'booking',
-			availability: 'planned',
-			status: 'Planned',
-			description: 'Booking sync support planned.',
+			availability: 'coming_soon',
+			status: 'Coming soon',
+			description: 'Booking sync support coming soon.',
 			detailDescription:
 				'FareHarbor support is planned for booking imports and booking-linked waiver signing.',
 			logo: fareharborIcon
@@ -178,7 +178,6 @@
 	);
 	const isLoading = $derived(integrationsQuery.isLoading || appContext.isLoading);
 
-	let syncHorizonMonths = $state(12);
 	let manualApiKey = $state('');
 	let selectedProviderKey = $state('bookeo');
 	let connectSheetOpen = $state(false);
@@ -218,7 +217,6 @@
 		if (value === 'error') return 'Attention needed';
 		if (value === 'available') return 'Available';
 		if (value === 'coming_soon') return 'Coming soon';
-		if (value === 'planned') return 'Planned';
 		return 'Not connected';
 	}
 
@@ -302,24 +300,12 @@
 		return 'bg-muted-foreground';
 	}
 
-	function normalizeSyncHorizon(value: number) {
-		if (!Number.isFinite(value)) return 12;
-		return Math.min(12, Math.max(1, Math.round(value)));
-	}
-
-	function handleSyncHorizonInput(event: Event) {
-		syncHorizonMonths = normalizeSyncHorizon(
-			Number((event.currentTarget as HTMLInputElement).value)
-		);
-	}
-
 	async function startBookeoConnect() {
 		if (!currentWorkspace || convex.disabled) return;
 		isStartingConnect = true;
 		try {
 			const result = await convex.action(api.integrations.startBookeoConnect, {
-				workspaceId: currentWorkspace.workspaceId,
-				syncHorizonMonths
+				workspaceId: currentWorkspace.workspaceId
 			});
 			window.location.href = result.authorizationUrl;
 		} catch (error) {
@@ -336,8 +322,7 @@
 		try {
 			await convex.action(api.integrations.connectBookeoManually, {
 				workspaceId: currentWorkspace.workspaceId,
-				apiKey: apiKeyTrimmed,
-				syncHorizonMonths
+				apiKey: apiKeyTrimmed
 			});
 			manualApiKey = '';
 			connectSheetOpen = false;
@@ -428,9 +413,7 @@
 	<SheetContent side="right" class="w-full! gap-0 overflow-hidden p-0 sm:max-w-lg!">
 		<SheetHeader class="shrink-0 border-b border-border px-6 py-5">
 			<SheetTitle>Connect {selectedProvider.name}</SheetTitle>
-			<SheetDescription>
-				Choose the import window and authorize access with the provider.
-			</SheetDescription>
+			<SheetDescription>Authorize access with the provider.</SheetDescription>
 		</SheetHeader>
 
 		<div class="min-h-0 flex-1 overflow-y-auto px-6 py-5">
@@ -455,40 +438,6 @@
 					<p class="text-xs leading-relaxed text-muted-foreground">
 						{selectedProvider.detailDescription}
 					</p>
-				</div>
-			</div>
-
-			<div class="border-b py-4">
-				<div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-					<div>
-						<p id="sync-horizon-label" class="text-sm font-semibold">Booking window</p>
-						<p class="text-xs leading-relaxed text-muted-foreground">
-							Backfill this far ahead now. New and updated bookings continue syncing automatically.
-						</p>
-					</div>
-					<div class="w-20 shrink-0 rounded-lg border bg-background px-3 py-2 text-right">
-						<p class="text-lg leading-none font-semibold">{syncHorizonMonths}</p>
-						<span class="text-xs text-muted-foreground">
-							{syncHorizonMonths === 1 ? 'month' : 'months'}
-						</span>
-					</div>
-				</div>
-
-				<div class="mt-4 space-y-2">
-					<input
-						type="range"
-						min="1"
-						max="12"
-						step="1"
-						value={syncHorizonMonths}
-						oninput={handleSyncHorizonInput}
-						class="w-full accent-primary"
-						aria-labelledby="sync-horizon-label"
-					/>
-					<div class="flex items-center justify-between text-[11px] text-muted-foreground">
-						<span>1 month</span>
-						<span>12 months</span>
-					</div>
 				</div>
 			</div>
 
@@ -717,17 +666,11 @@
 
 				{#if selectedProviderIsConnected && selectedIntegration}
 					<section class="flex min-w-0 flex-col gap-4 border-t pt-4">
-						<div class="grid gap-3 md:grid-cols-3">
+						<div class="grid gap-3 md:grid-cols-2">
 							<div class="rounded-lg border bg-card p-4">
 								<p class="text-xs font-medium text-muted-foreground">Account ID</p>
 								<p class="mt-2 text-sm font-semibold">
 									{selectedIntegration.accountId ?? 'Connected'}
-								</p>
-							</div>
-							<div class="rounded-lg border bg-card p-4">
-								<p class="text-xs font-medium text-muted-foreground">Booking window</p>
-								<p class="mt-2 text-sm font-semibold">
-									{selectedIntegration.syncHorizonMonths} months future
 								</p>
 							</div>
 							<div class="rounded-lg border bg-card p-4">
@@ -851,19 +794,6 @@
 										1
 									</span>
 									<div>
-										<p class="text-sm font-medium">Choose the import window</p>
-										<p class="text-sm leading-relaxed text-muted-foreground">
-											Set how far ahead Bookeo bookings should be imported during setup.
-										</p>
-									</div>
-								</div>
-								<div class="flex gap-3 border-b py-3">
-									<span
-										class="mt-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground"
-									>
-										2
-									</span>
-									<div>
 										<p class="text-sm font-medium">Authorize in Bookeo</p>
 										<p class="text-sm leading-relaxed text-muted-foreground">
 											Bookeo asks for the required permissions and returns you to Waiver Director.
@@ -874,7 +804,7 @@
 									<span
 										class="mt-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground"
 									>
-										3
+										2
 									</span>
 									<div>
 										<p class="text-sm font-medium">Initial sync starts</p>

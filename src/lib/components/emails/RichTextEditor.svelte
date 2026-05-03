@@ -8,10 +8,10 @@
 	import Underline from '@tiptap/extension-underline';
 	import StarterKit from '@tiptap/starter-kit';
 	import { toast } from 'svelte-sonner';
-	import AlignCenterIcon from '@lucide/svelte/icons/align-center';
-	import AlignJustifyIcon from '@lucide/svelte/icons/align-justify';
-	import AlignLeftIcon from '@lucide/svelte/icons/align-left';
-	import AlignRightIcon from '@lucide/svelte/icons/align-right';
+	import AlignCenterIcon from '@lucide/svelte/icons/text-align-center';
+	import AlignJustifyIcon from '@lucide/svelte/icons/text-align-justify';
+	import AlignLeftIcon from '@lucide/svelte/icons/text-align-start';
+	import AlignRightIcon from '@lucide/svelte/icons/text-align-end';
 	import BoldIcon from '@lucide/svelte/icons/bold';
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
 	import CodeIcon from '@lucide/svelte/icons/code';

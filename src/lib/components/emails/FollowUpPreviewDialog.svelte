@@ -49,7 +49,7 @@
 	const metaLinkClass =
 		'group/link inline-flex max-w-full items-center gap-1.5 rounded-md border border-border bg-background px-2 py-1 text-xs font-medium text-foreground shadow-xs transition-colors hover:border-foreground/30 hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none';
 	const metaItemClass =
-		'min-w-0 border-t border-border pt-2 first:border-t-0 first:pt-0 sm:border-t-0 sm:border-l sm:px-3 sm:pt-0 sm:first:border-l-0 sm:first:pl-0 sm:last:pr-0';
+		'min-w-0 border-t border-border px-4 py-3 first:border-t-0 sm:border-t-0 sm:border-l sm:first:border-l-0';
 	const metaLabelClass =
 		'mb-1 flex items-center gap-1.5 text-[10px] font-semibold tracking-wide text-muted-foreground uppercase';
 
@@ -208,104 +208,104 @@
 				<Skeleton class="h-48 w-full rounded-xl" />
 			</div>
 		{:else if followUp}
-			<DialogHeader class="shrink-0 border-b border-border px-4 py-4 sm:px-6">
-				<div class="space-y-3">
-					<div class="min-w-0 pr-8 sm:pr-10">
+			<DialogHeader class="shrink-0 border-b border-border p-0">
+				<div class="border-b border-border px-4 py-4">
+					<div
+						class="flex flex-col gap-2 pr-8 sm:flex-row sm:items-start sm:justify-between sm:pr-10"
+					>
 						<DialogTitle class="truncate text-base font-semibold">
 							{followUp.signerName}
 						</DialogTitle>
-						<DialogDescription class="mt-0.5 truncate text-xs text-muted-foreground">
+						<DialogDescription class="truncate text-xs text-muted-foreground sm:text-right">
 							{followUp.signerEmail}
 						</DialogDescription>
 					</div>
+				</div>
 
-					<div
-						class="grid gap-2 border-y border-border py-2 sm:grid-cols-[1fr_1.05fr_1.35fr_1.05fr] sm:gap-0"
-					>
-						<div class={metaItemClass}>
-							<div class={metaLabelClass}>
-								<CalendarClockIcon class="size-3" aria-hidden="true" />
-								Signed
-							</div>
-							<p class="min-w-0 truncate text-xs font-medium text-foreground tabular-nums">
-								{formatActivityDate(followUp.submittedAt)}
+				<div class="grid bg-muted/10 sm:grid-cols-[1fr_1.05fr_1.35fr_1.05fr]">
+					<div class={metaItemClass}>
+						<div class={metaLabelClass}>
+							<CalendarClockIcon class="size-3" aria-hidden="true" />
+							Signed
+						</div>
+						<p class="min-w-0 truncate text-xs font-medium text-foreground tabular-nums">
+							{formatActivityDate(followUp.submittedAt)}
+						</p>
+						{#if followUp.status === 'queued' && followUp.scheduledAt != null}
+							<p class="shrink-0 text-[11px] text-muted-foreground tabular-nums">
+								Scheduled for {formatTimestamp(followUp.scheduledAt)}
 							</p>
-							{#if followUp.status === 'queued' && followUp.scheduledAt != null}
-								<p class="shrink-0 text-[11px] text-muted-foreground tabular-nums">
-									Scheduled for {formatTimestamp(followUp.scheduledAt)}
-								</p>
-							{/if}
-						</div>
+						{/if}
+					</div>
 
-						<div class={metaItemClass}>
-							<div class={metaLabelClass}>
-								<UsersRoundIcon class="size-3" aria-hidden="true" />
-								Customer
-							</div>
-							{#if followUp.customerId}
-								<a href={resolve(customerPath(followUp.customerId))} class={metaLinkClass}>
-									<span class="truncate">{followUp.signerName}</span>
-									<span
-										class="inline-flex size-4 shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors group-hover/link:border-foreground/30 group-hover/link:text-foreground"
-									>
-										<ArrowRightIcon class="size-2.5" aria-hidden="true" />
-									</span>
-								</a>
-							{:else}
-								<p class="min-w-0 truncate text-xs text-muted-foreground">No link</p>
-							{/if}
+					<div class={metaItemClass}>
+						<div class={metaLabelClass}>
+							<UsersRoundIcon class="size-3" aria-hidden="true" />
+							Customer
 						</div>
-
-						<div class={metaItemClass}>
-							<div class={metaLabelClass}>
-								<TicketIcon class="size-3" aria-hidden="true" />
-								Booking
-							</div>
-							{#if followUp.bookingId && followUp.bookingNumber}
-								<a
-									href={resolve(bookingPath(followUp.bookingId, followUp.bookingStartTime))}
-									class={metaLinkClass}
-								>
-									<span class="shrink-0">#{followUp.bookingNumber}</span>
-									{#if followUp.bookingActivityName}
-										<span class="truncate font-normal text-foreground/70">
-											{followUp.bookingActivityName}
-										</span>
-									{/if}
-									<span
-										class="inline-flex size-4 shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors group-hover/link:border-foreground/30 group-hover/link:text-foreground"
-									>
-										<ArrowRightIcon class="size-2.5" aria-hidden="true" />
-									</span>
-								</a>
-							{:else if followUp.bookingNumber}
-								<p class="min-w-0 truncate text-xs font-medium text-foreground">
-									#{followUp.bookingNumber}
-									{#if followUp.bookingActivityName}
-										<span class="font-normal text-muted-foreground">
-											{followUp.bookingActivityName}
-										</span>
-									{/if}
-								</p>
-							{:else}
-								<p class="min-w-0 truncate text-xs text-muted-foreground">No booking</p>
-							{/if}
-						</div>
-
-						<div class={metaItemClass}>
-							<div class={metaLabelClass}>
-								<FileTextIcon class="size-3" aria-hidden="true" />
-								Submission
-							</div>
-							<a href={resolve(submissionPath(followUp.submissionId))} class={metaLinkClass}>
-								<span class="truncate">Waiver</span>
+						{#if followUp.customerId}
+							<a href={resolve(customerPath(followUp.customerId))} class={metaLinkClass}>
+								<span class="truncate">{followUp.signerName}</span>
 								<span
 									class="inline-flex size-4 shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors group-hover/link:border-foreground/30 group-hover/link:text-foreground"
 								>
 									<ArrowRightIcon class="size-2.5" aria-hidden="true" />
 								</span>
 							</a>
+						{:else}
+							<p class="min-w-0 truncate text-xs text-muted-foreground">No link</p>
+						{/if}
+					</div>
+
+					<div class={metaItemClass}>
+						<div class={metaLabelClass}>
+							<TicketIcon class="size-3" aria-hidden="true" />
+							Booking
 						</div>
+						{#if followUp.bookingId && followUp.bookingNumber}
+							<a
+								href={resolve(bookingPath(followUp.bookingId, followUp.bookingStartTime))}
+								class={metaLinkClass}
+							>
+								<span class="shrink-0">#{followUp.bookingNumber}</span>
+								{#if followUp.bookingActivityName}
+									<span class="truncate font-normal text-foreground/70">
+										{followUp.bookingActivityName}
+									</span>
+								{/if}
+								<span
+									class="inline-flex size-4 shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors group-hover/link:border-foreground/30 group-hover/link:text-foreground"
+								>
+									<ArrowRightIcon class="size-2.5" aria-hidden="true" />
+								</span>
+							</a>
+						{:else if followUp.bookingNumber}
+							<p class="min-w-0 truncate text-xs font-medium text-foreground">
+								#{followUp.bookingNumber}
+								{#if followUp.bookingActivityName}
+									<span class="font-normal text-muted-foreground">
+										{followUp.bookingActivityName}
+									</span>
+								{/if}
+							</p>
+						{:else}
+							<p class="min-w-0 truncate text-xs text-muted-foreground">No booking</p>
+						{/if}
+					</div>
+
+					<div class={metaItemClass}>
+						<div class={metaLabelClass}>
+							<FileTextIcon class="size-3" aria-hidden="true" />
+							Submission
+						</div>
+						<a href={resolve(submissionPath(followUp.submissionId))} class={metaLinkClass}>
+							<span class="truncate">Waiver</span>
+							<span
+								class="inline-flex size-4 shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors group-hover/link:border-foreground/30 group-hover/link:text-foreground"
+							>
+								<ArrowRightIcon class="size-2.5" aria-hidden="true" />
+							</span>
+						</a>
 					</div>
 				</div>
 			</DialogHeader>

@@ -68,6 +68,7 @@
 
 	type AnalyticsData = FunctionReturnType<typeof api.dashboard.getAnalyticsSeries>;
 	type CustomerActivityDay = AnalyticsData['customerActivityByDay'][number];
+	type AnalyticsComparison = AnalyticsData['comparisons']['submissions'];
 	const analyticsData = $derived((analyticsQuery.data ?? null) as AnalyticsData | null);
 	const analyticsError = $derived(analyticsQuery.error ?? null);
 	const missingWorkspace = $derived(!appContext.isLoading && currentWorkspace == null);
@@ -133,6 +134,7 @@
 	const bookingsTotal = $derived(
 		analyticsData?.bookingsByDay.reduce((sum, d) => sum + d.count, 0) ?? 0
 	);
+	const rangeDays = $derived(Math.round((rangeEndAt - rangeStartAt) / (24 * 60 * 60 * 1000)));
 
 	const emailSent = $derived(analyticsData?.emailTotals.sent ?? 0);
 	const emailQueued = $derived(analyticsData?.emailTotals.queued ?? 0);
@@ -172,6 +174,23 @@
 
 	function shareStyle(value: number): string {
 		return `width: ${emailActivityTotal > 0 ? (value / emailActivityTotal) * 100 : 0}%`;
+	}
+
+	function comparisonLabel(comparison: AnalyticsComparison | null | undefined) {
+		if (!comparison) return 'No data';
+		if (comparison.previousTotal === 0) {
+			if (comparison.currentTotal === 0) return `0% vs prior ${rangeDays}d`;
+			return `New vs prior ${rangeDays}d`;
+		}
+		const change = Math.round(
+			((comparison.currentTotal - comparison.previousTotal) / comparison.previousTotal) * 100
+		);
+		return `${change > 0 ? '+' : ''}${change.toLocaleString()}% vs prior ${rangeDays}d`;
+	}
+
+	function comparisonTitle(comparison: AnalyticsComparison | null | undefined) {
+		if (!comparison) return `No prior ${rangeDays}d comparison available`;
+		return `${comparison.currentTotal.toLocaleString()} current ${rangeDays}d, ${comparison.previousTotal.toLocaleString()} prior ${rangeDays}d`;
 	}
 </script>
 
@@ -213,11 +232,22 @@
 					<CardTitle class="text-base font-semibold">Submissions</CardTitle>
 				</div>
 				{#if !isInitialLoading && analyticsData}
-					<p class="text-right text-2xl font-bold tracking-tight tabular-nums">
-						{submissionsTotal.toLocaleString()}
-					</p>
+					<div class="text-right">
+						<p class="text-2xl font-bold tracking-tight tabular-nums">
+							{submissionsTotal.toLocaleString()}
+						</p>
+						<p
+							class="mt-0.5 text-[0.65rem] font-medium text-muted-foreground tabular-nums"
+							title={comparisonTitle(analyticsData.comparisons.submissions)}
+						>
+							{comparisonLabel(analyticsData.comparisons.submissions)}
+						</p>
+					</div>
 				{:else if isInitialLoading}
-					<Skeleton class="h-7 w-12" />
+					<div class="space-y-1">
+						<Skeleton class="h-7 w-12" />
+						<Skeleton class="h-2.5 w-20" />
+					</div>
 				{/if}
 			</CardHeader>
 			<CardContent>
@@ -280,11 +310,22 @@
 					<CardTitle class="text-base font-semibold">Bookings</CardTitle>
 				</div>
 				{#if !isInitialLoading && analyticsData}
-					<p class="text-right text-2xl font-bold tracking-tight tabular-nums">
-						{bookingsTotal.toLocaleString()}
-					</p>
+					<div class="text-right">
+						<p class="text-2xl font-bold tracking-tight tabular-nums">
+							{bookingsTotal.toLocaleString()}
+						</p>
+						<p
+							class="mt-0.5 text-[0.65rem] font-medium text-muted-foreground tabular-nums"
+							title={comparisonTitle(analyticsData.comparisons.bookings)}
+						>
+							{comparisonLabel(analyticsData.comparisons.bookings)}
+						</p>
+					</div>
 				{:else if isInitialLoading}
-					<Skeleton class="h-7 w-12" />
+					<div class="space-y-1">
+						<Skeleton class="h-7 w-12" />
+						<Skeleton class="h-2.5 w-20" />
+					</div>
 				{/if}
 			</CardHeader>
 			<CardContent>
@@ -370,19 +411,11 @@
 					</div>
 				{:else}
 					<div class="flex flex-1 flex-col gap-4">
-						<div class="flex items-start justify-between gap-4">
-							<div>
-								<p class="text-3xl font-bold tracking-tight tabular-nums">
-									{emailSent.toLocaleString()}
-								</p>
-								<p class="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
-									<span class="size-2 rounded-full bg-primary"></span>
-									<span>Sent</span>
-								</p>
-							</div>
-							<div class="rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground">
-								{emailActivityTotal.toLocaleString()} total
-							</div>
+						<div>
+							<p class="text-3xl font-bold tracking-tight tabular-nums">
+								{emailActivityTotal.toLocaleString()}
+							</p>
+							<p class="mt-0.5 text-xs text-muted-foreground">Total email activity</p>
 						</div>
 
 						<div class="space-y-1.5">
@@ -409,7 +442,7 @@
 						</div>
 
 						<div class="divide-y divide-border/70 border-t border-border/70 text-sm">
-							{#each emailStatusSegments.slice(1) as segment (segment.label)}
+							{#each emailStatusSegments as segment (segment.label)}
 								<div class="flex items-center justify-between py-1.5">
 									<div class={`flex items-center gap-2 ${segment.textClass}`}>
 										<span class={`size-2 rounded-full ${segment.dotClass}`}></span>
@@ -430,12 +463,23 @@
 					<UsersRoundIcon class="mt-0.5 size-4 shrink-0 text-muted-foreground" />
 					<CardTitle class="text-base font-semibold">Customers by Day</CardTitle>
 				</div>
-				{#if !isInitialLoading && analyticsData && customerActivityTotal > 0}
-					<p class="text-right text-2xl font-bold tracking-tight tabular-nums">
-						{customerActivityTotal.toLocaleString()}
-					</p>
+				{#if !isInitialLoading && analyticsData}
+					<div class="text-right">
+						<p class="text-2xl font-bold tracking-tight tabular-nums">
+							{customerActivityTotal.toLocaleString()}
+						</p>
+						<p
+							class="mt-0.5 text-[0.65rem] font-medium text-muted-foreground tabular-nums"
+							title={comparisonTitle(analyticsData.comparisons.customerActivity)}
+						>
+							{comparisonLabel(analyticsData.comparisons.customerActivity)}
+						</p>
+					</div>
 				{:else if isInitialLoading}
-					<Skeleton class="h-7 w-12" />
+					<div class="space-y-1">
+						<Skeleton class="h-7 w-12" />
+						<Skeleton class="h-2.5 w-20" />
+					</div>
 				{/if}
 			</CardHeader>
 			<CardContent>

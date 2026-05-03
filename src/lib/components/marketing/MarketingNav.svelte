@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import { onMount } from 'svelte';
 	import { fade, fly } from 'svelte/transition';
 	import { Button } from '$lib/components/ui/button';
@@ -12,13 +12,13 @@
 	let scrollY = $state(0);
 	let scrolled = $derived(scrollY > 24);
 
-	const navLinks: { href: string; label: string }[] = [
+	const navLinks = [
 		{ href: '/features', label: 'Features' },
 		{ href: '/pricing', label: 'Pricing' }
-	];
+	] as const;
 
 	function isActive(href: string): boolean {
-		const path = $page.url.pathname;
+		const path = page.url.pathname;
 		if (href.startsWith('/#')) return false;
 		return path === href || path.startsWith(href + '/');
 	}
@@ -91,9 +91,9 @@
 			<div class="hidden items-center gap-1 md:flex md:justify-self-center">
 				{#each navLinks as link (link.href)}
 					<a
-						href={link.href}
+						href={resolve(link.href)}
 						class="nav-link text-[13px] font-medium no-underline"
-						class:nav-link--active={isActive(link.href)}
+						class:nav-link--active={isActive(resolve(link.href))}
 					>
 						{link.label}
 					</a>
@@ -143,9 +143,9 @@
 						{#each navLinks as link (link.href)}
 							<li>
 								<a
-									href={link.href}
+									href={resolve(link.href)}
 									class="mkt-mobile-link"
-									class:mkt-mobile-link--active={isActive(link.href)}
+									class:mkt-mobile-link--active={isActive(resolve(link.href))}
 									onclick={closeMobileNav}
 								>
 									{link.label}

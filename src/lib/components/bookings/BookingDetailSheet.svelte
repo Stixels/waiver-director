@@ -55,6 +55,9 @@
 	const expectedCount = $derived(detail?.booking.participantCount ?? 0);
 	const remainingCount = $derived(Math.max(0, expectedCount - signedCount));
 	const isComplete = $derived(expectedCount > 0 && signedCount >= expectedCount);
+	const signedProgressDegrees = $derived(
+		expectedCount > 0 ? Math.min(360, Math.max(0, signedCount / expectedCount) * 360) : 0
+	);
 	const canShare = $derived(!!publicSlug && !isCanceled && !!detail);
 
 	function bookingPublicUrl() {
@@ -182,18 +185,19 @@
 					<!-- Completion ring -->
 					<div
 						class={cn(
-							'flex size-10 shrink-0 items-center justify-center rounded-full border-2',
+							'flex size-10 shrink-0 items-center justify-center rounded-full p-[2px]',
 							isComplete
-								? 'border-emerald-500'
+								? 'bg-emerald-500'
 								: isCanceled
-									? 'border-destructive'
-									: 'border-primary'
+									? 'bg-[conic-gradient(var(--destructive)_var(--signed-progress),var(--border)_0)]'
+									: 'bg-[conic-gradient(var(--primary)_var(--signed-progress),var(--border)_0)]'
 						)}
+						style={`--signed-progress: ${signedProgressDegrees}deg;`}
 						aria-hidden="true"
 					>
 						<span
 							class={cn(
-								'text-[11px] leading-none font-bold tabular-nums',
+								'flex size-full items-center justify-center rounded-full bg-background text-[11px] leading-none font-bold tabular-nums',
 								isComplete ? 'text-emerald-500' : 'text-foreground'
 							)}
 						>

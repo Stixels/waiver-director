@@ -12,7 +12,7 @@
 
 	const pageTitle = 'Waiver Director — Digital Waivers for Any Booking Experience';
 	const pageDescription =
-		"Digital waivers for tours & activities: capture every guest's email, sync Bookeo/Resova/Xola, and automate follow-ups for customer feedback, review requests & reminders. Optional Mailchimp & Constant Contact.";
+		"Digital waivers for tours & activities: capture every guest's email, sync Bookeo bookings, and automate on-demand or delayed follow-up emails. More integrations are coming soon.";
 
 	const siteBase = (PUBLIC_APP_URL ?? '').replace(/\/$/, '');
 	const canonicalUrl = siteBase ? `${siteBase}/` : '';

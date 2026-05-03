@@ -352,6 +352,11 @@ export const getAnalyticsSeries = query({
 	returns: v.object({
 		submissionsByDay: v.array(trendDayValue),
 		bookingsByDay: v.array(trendDayValue),
+		comparisons: v.object({
+			submissions: kpiComparisonValue,
+			bookings: kpiComparisonValue,
+			customerActivity: kpiComparisonValue
+		}),
 		emailTotals: v.object({
 			sent: v.number(),
 			queued: v.number(),
@@ -376,10 +381,22 @@ export const getAnalyticsSeries = query({
 				message: 'Analytics range cannot exceed 30 days.'
 			});
 		}
+		if (args.rangeEndAt <= args.rangeStartAt) {
+			throw new ConvexError({
+				code: 'invalid_argument',
+				message: 'Analytics range must include at least one day.'
+			});
+		}
+
+		const rangeDurationMs = args.rangeEndAt - args.rangeStartAt;
+		const previousRangeStartAt = args.rangeStartAt - rangeDurationMs;
+		const previousRangeEndAt = args.rangeStartAt;
 
 		const [
 			submissions,
+			previousSubmissions,
 			bookings,
+			previousBookings,
 			customers,
 			sentFollowUps,
 			queuedFollowUps,
@@ -397,12 +414,31 @@ export const getAnalyticsSeries = query({
 				.order('desc')
 				.take(10000),
 			ctx.db
+				.query('waiver_submissions')
+				.withIndex('by_workspaceId_and_submittedAt', (q) =>
+					q
+						.eq('workspaceId', args.workspaceId)
+						.gte('submittedAt', previousRangeStartAt)
+						.lt('submittedAt', previousRangeEndAt)
+				)
+				.order('desc')
+				.take(10000),
+			ctx.db
 				.query('bookings')
 				.withIndex('by_workspaceId_and_startAt', (q) =>
 					q
 						.eq('workspaceId', args.workspaceId)
 						.gte('startAt', args.rangeStartAt)
 						.lt('startAt', args.rangeEndAt)
+				)
+				.take(5000),
+			ctx.db
+				.query('bookings')
+				.withIndex('by_workspaceId_and_startAt', (q) =>
+					q
+						.eq('workspaceId', args.workspaceId)
+						.gte('startAt', previousRangeStartAt)
+						.lt('startAt', previousRangeEndAt)
 				)
 				.take(5000),
 			ctx.db
@@ -441,12 +477,18 @@ export const getAnalyticsSeries = query({
 				.take(1000),
 			ctx.db
 				.query('email_follow_ups')
-				.withIndex('by_workspaceId_and_status_and_scheduledAt', (q) =>
-					q
-						.eq('workspaceId', args.workspaceId)
-						.eq('status', 'blocked')
-						.gte('scheduledAt', args.rangeStartAt)
-						.lt('scheduledAt', args.rangeEndAt)
+				.withIndex('by_workspaceId_and_status', (q) =>
+					q.eq('workspaceId', args.workspaceId).eq('status', 'blocked')
+				)
+				.filter((q) =>
+					q.or(
+						q.and(
+							q.gte(q.field('scheduledAt'), args.rangeStartAt),
+							q.lt(q.field('scheduledAt'), args.rangeEndAt)
+						),
+						q.eq(q.field('scheduledAt'), undefined),
+						q.eq(q.field('scheduledAt'), null)
+					)
 				)
 				.take(1000)
 		]);
@@ -481,6 +523,7 @@ export const getAnalyticsSeries = query({
 		const customersById = new Map(customers.map((customer) => [customer._id, customer]));
 		const newCustomerIdsByDay = new Map<number, Set<string>>();
 		const returningCustomerIdsByDay = new Map<number, Set<string>>();
+		const previousCustomerActivityIdsByDay = new Map<number, Set<string>>();
 		for (const submission of submissions) {
 			if (submission.submittedAt < args.rangeStartAt || submission.submittedAt >= args.rangeEndAt) {
 				continue;
@@ -504,6 +547,25 @@ export const getAnalyticsSeries = query({
 			customerIds.add(submission.customerId);
 			bucket.set(day, customerIds);
 		}
+		for (const submission of previousSubmissions) {
+			if (
+				submission.submittedAt < previousRangeStartAt ||
+				submission.submittedAt >= previousRangeEndAt
+			) {
+				continue;
+			}
+			if (!submission.customerId) continue;
+			const customer = customersById.get(submission.customerId);
+			if (!customer) continue;
+
+			const day = bucketStartForRange(submission.submittedAt, previousRangeStartAt);
+			const firstSeenDay = bucketStartForRange(customer.firstSeenAt, previousRangeStartAt);
+			if (firstSeenDay > day) continue;
+
+			const customerIds = previousCustomerActivityIdsByDay.get(day) ?? new Set<string>();
+			customerIds.add(submission.customerId);
+			previousCustomerActivityIdsByDay.set(day, customerIds);
+		}
 		const customerActivityRaw = buildDayBuckets(
 			args.rangeStartAt,
 			args.rangeEndAt - 1,
@@ -520,6 +582,26 @@ export const getAnalyticsSeries = query({
 		return {
 			submissionsByDay,
 			bookingsByDay,
+			comparisons: {
+				submissions: {
+					currentTotal: submissions.length,
+					previousTotal: previousSubmissions.length
+				},
+				bookings: {
+					currentTotal: bookings.length,
+					previousTotal: previousBookings.length
+				},
+				customerActivity: {
+					currentTotal: customerActivityByDay.reduce(
+						(total, day) => total + day.newCustomers + day.returningCustomers,
+						0
+					),
+					previousTotal: Array.from(previousCustomerActivityIdsByDay.values()).reduce(
+						(total, customerIds) => total + customerIds.size,
+						0
+					)
+				}
+			},
 			emailTotals: {
 				sent: sentFollowUps.length,
 				queued: queuedFollowUps.length,

@@ -12,6 +12,7 @@ export const scrollReveal: Action<HTMLElement, ScrollRevealOptions | undefined> 
 ) => {
 	const delay = options?.delay ?? 0;
 	const threshold = options?.threshold ?? 0.1;
+	const once = options?.once ?? true;
 
 	node.style.setProperty('--sr-delay', `${delay}ms`);
 	node.classList.add('sr-hidden');
@@ -22,7 +23,10 @@ export const scrollReveal: Action<HTMLElement, ScrollRevealOptions | undefined> 
 				if (entry.isIntersecting) {
 					node.classList.remove('sr-hidden');
 					node.classList.add('sr-visible');
-					observer.disconnect();
+					if (once) observer.disconnect();
+				} else if (!once) {
+					node.classList.remove('sr-visible');
+					node.classList.add('sr-hidden');
 				}
 			});
 		},

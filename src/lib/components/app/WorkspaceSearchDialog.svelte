@@ -23,7 +23,7 @@
 	import UserRoundIcon from '@lucide/svelte/icons/user-round';
 	import UsersRoundIcon from '@lucide/svelte/icons/users-round';
 	import XIcon from '@lucide/svelte/icons/x';
-	import BarChart3Icon from '@lucide/svelte/icons/bar-chart-3';
+	import ChartColumnIcon from '@lucide/svelte/icons/chart-column';
 
 	interface Props {
 		open: boolean;
@@ -181,7 +181,7 @@
 			description: 'Trends, completion rates, and email performance',
 			path: 'analytics',
 			aliases: ['stats', 'statistics', 'reports', 'trends', 'completion rates', 'performance'],
-			icon: BarChart3Icon
+			icon: ChartColumnIcon
 		},
 		{
 			key: 'integrations',

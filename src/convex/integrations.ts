@@ -10,7 +10,6 @@ import { internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
 import type { ActionCtx } from './_generated/server';
 import {
-	assertValidSyncHorizon,
 	bookingProviderValidator,
 	bookingSearchText,
 	missingBookeoRequiredPermissions,
@@ -18,7 +17,6 @@ import {
 	normalizeNullableString,
 	parseDateTime,
 	serviceDateFromDateTime,
-	syncHorizonMonthsValidator,
 	UNKNOWN_ACTIVITY_NAME
 } from './lib/bookings';
 import { requireWorkspaceMember, requireWorkspaceOwner } from './lib/waivers';
@@ -28,6 +26,8 @@ const BOOKEO_WEBHOOK_TYPES = ['created', 'updated', 'deleted'] as const;
 const CONNECT_STATE_TTL_MS = 30 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const BOOKEO_WINDOW_MS = 31 * DAY_MS;
+const BOOKEO_BACKFILL_MONTHS = 6;
+const BOOKEO_UPCOMING_IMPORT_MONTHS = 12;
 const BOOKEO_FETCH_TIMEOUT_MS = 20_000;
 const BOOKEO_SYNC_MAX_PAGES = 200;
 const CONNECTION_SESSION_RETENTION_MS = 7 * DAY_MS;
@@ -70,7 +70,6 @@ const integrationSummaryValue = v.object({
 	accountId: v.union(v.string(), v.null()),
 	permissions: v.array(v.string()),
 	missingRequiredPermissions: v.array(v.string()),
-	syncHorizonMonths: v.number(),
 	lastSyncError: v.union(v.string(), v.null()),
 	connectedAt: v.union(v.number(), v.null()),
 	canManage: v.boolean()
@@ -533,10 +532,11 @@ async function syncBookeoWindow(
 	} while (pageNavigationToken && pageNumber <= totalPages && pageNumber <= BOOKEO_SYNC_MAX_PAGES);
 }
 
-function initialSyncRange(syncHorizonMonths: number) {
-	const start = new Date(Date.now() - 30 * DAY_MS);
+function initialSyncRange() {
+	const start = new Date();
+	start.setMonth(start.getMonth() - BOOKEO_BACKFILL_MONTHS);
 	const end = new Date();
-	end.setMonth(end.getMonth() + syncHorizonMonths);
+	end.setMonth(end.getMonth() + BOOKEO_UPCOMING_IMPORT_MONTHS);
 	return { start, end };
 }
 
@@ -574,7 +574,6 @@ export const listWorkspaceIntegrations = query({
 				integration.provider === 'bookeo'
 					? missingBookeoRequiredPermissions(integration.permissions)
 					: [],
-			syncHorizonMonths: integration.syncHorizonMonths,
 			lastSyncError: integration.lastSyncError ?? null,
 			connectedAt: integration.connectedAt ?? null,
 			canManage: membership.role === 'owner'
@@ -658,14 +657,12 @@ export const disconnectBookingIntegration = action({
 
 export const startBookeoConnect = action({
 	args: {
-		workspaceId: v.id('workspaces'),
-		syncHorizonMonths: syncHorizonMonthsValidator
+		workspaceId: v.id('workspaces')
 	},
 	returns: v.object({
 		authorizationUrl: v.string()
 	}),
 	handler: async (ctx, args) => {
-		const syncHorizonMonths = assertValidSyncHorizon(args.syncHorizonMonths);
 		const access: { userId: Id<'users'> } = await ctx.runQuery(
 			internal.integrations.getOwnerAccessForAction,
 			{
@@ -677,8 +674,7 @@ export const startBookeoConnect = action({
 			workspaceId: args.workspaceId,
 			provider: 'bookeo',
 			requestedByUserId: access.userId,
-			state,
-			syncHorizonMonths
+			state
 		});
 
 		return {
@@ -690,14 +686,12 @@ export const startBookeoConnect = action({
 export const connectBookeoManually = action({
 	args: {
 		workspaceId: v.id('workspaces'),
-		apiKey: v.string(),
-		syncHorizonMonths: syncHorizonMonthsValidator
+		apiKey: v.string()
 	},
 	returns: v.object({
 		integrationId: v.id('booking_integrations')
 	}),
 	handler: async (ctx, args): Promise<{ integrationId: Id<'booking_integrations'> }> => {
-		const syncHorizonMonths = assertValidSyncHorizon(args.syncHorizonMonths);
 		await ctx.runQuery(internal.integrations.getOwnerAccessForAction, {
 			workspaceId: args.workspaceId
 		});
@@ -727,8 +721,7 @@ export const connectBookeoManually = action({
 					workspaceId: args.workspaceId,
 					encryptedApiKey: await encryptSecret(apiKey),
 					accountId: apiKeyInfo.accountId,
-					permissions: apiKeyInfo.permissions,
-					syncHorizonMonths
+					permissions: apiKeyInfo.permissions
 				}
 			);
 			integrationId = savedIntegrationId;
@@ -844,19 +837,16 @@ export const createConnectionSession = internalMutation({
 		workspaceId: v.id('workspaces'),
 		provider: bookingProviderValidator,
 		requestedByUserId: v.id('users'),
-		state: v.string(),
-		syncHorizonMonths: syncHorizonMonthsValidator
+		state: v.string()
 	},
 	returns: v.null(),
 	handler: async (ctx, args) => {
-		const syncHorizonMonths = assertValidSyncHorizon(args.syncHorizonMonths);
 		await ctx.db.insert('booking_connection_sessions', {
 			workspaceId: args.workspaceId,
 			provider: args.provider,
 			requestedByUserId: args.requestedByUserId,
 			state: args.state,
 			status: 'pending',
-			syncHorizonMonths,
 			createdAt: Date.now(),
 			expiresAt: Date.now() + CONNECT_STATE_TTL_MS
 		});
@@ -880,7 +870,6 @@ export const getPendingConnectionSession = internalQuery({
 				v.literal('failed'),
 				v.literal('expired')
 			),
-			syncHorizonMonths: v.number(),
 			expiresAt: v.number()
 		})
 	),
@@ -896,7 +885,6 @@ export const getPendingConnectionSession = internalQuery({
 			workspaceId: session.workspaceId,
 			provider: session.provider,
 			status: session.status,
-			syncHorizonMonths: session.syncHorizonMonths,
 			expiresAt: session.expiresAt
 		};
 	}
@@ -978,12 +966,10 @@ export const saveBookeoConnection = internalMutation({
 		workspaceId: v.id('workspaces'),
 		encryptedApiKey: v.string(),
 		accountId: v.optional(v.string()),
-		permissions: v.array(v.string()),
-		syncHorizonMonths: syncHorizonMonthsValidator
+		permissions: v.array(v.string())
 	},
 	returns: v.id('booking_integrations'),
 	handler: async (ctx, args) => {
-		const syncHorizonMonths = assertValidSyncHorizon(args.syncHorizonMonths);
 		const now = Date.now();
 		const existing = await ctx.db
 			.query('booking_integrations')
@@ -1009,7 +995,6 @@ export const saveBookeoConnection = internalMutation({
 				encryptedApiKey: args.encryptedApiKey,
 				...(args.accountId ? { accountId: args.accountId } : {}),
 				permissions: args.permissions,
-				syncHorizonMonths,
 				updatedAt: now
 			});
 		}
@@ -1019,7 +1004,6 @@ export const saveBookeoConnection = internalMutation({
 			encryptedApiKey: args.encryptedApiKey,
 			accountId: args.accountId,
 			permissions: args.permissions,
-			syncHorizonMonths,
 			lastSyncError: undefined,
 			disconnectedAt: undefined,
 			updatedAt: now
@@ -1089,8 +1073,7 @@ export const getIntegrationSecret = internalQuery({
 				v.literal('error'),
 				v.literal('disconnected')
 			),
-			encryptedApiKey: v.union(v.string(), v.null()),
-			syncHorizonMonths: v.number()
+			encryptedApiKey: v.union(v.string(), v.null())
 		})
 	),
 	handler: async (ctx, args) => {
@@ -1101,8 +1084,7 @@ export const getIntegrationSecret = internalQuery({
 			workspaceId: integration.workspaceId,
 			provider: integration.provider,
 			status: integration.status,
-			encryptedApiKey: integration.encryptedApiKey ?? null,
-			syncHorizonMonths: integration.syncHorizonMonths
+			encryptedApiKey: integration.encryptedApiKey ?? null
 		};
 	}
 });
@@ -1427,7 +1409,6 @@ export const syncBookeoIntegration = internalAction({
 			provider: 'bookeo' | 'resova' | 'xola';
 			status: 'connected' | 'syncing' | 'error' | 'disconnected';
 			encryptedApiKey: string | null;
-			syncHorizonMonths: number;
 		} | null = await ctx.runQuery(internal.integrations.getIntegrationSecret, {
 			integrationId: args.integrationId
 		});
@@ -1436,8 +1417,7 @@ export const syncBookeoIntegration = internalAction({
 		}
 		if (integration.status === 'disconnected') return null;
 
-		const horizon = assertValidSyncHorizon(integration.syncHorizonMonths);
-		const range = initialSyncRange(args.syncType === 'repair' ? 1 : horizon);
+		const range = initialSyncRange();
 		const syncStarted: boolean = await ctx.runMutation(
 			internal.integrations.markBookeoSyncStarted,
 			{
@@ -1487,7 +1467,6 @@ export const completeBookeoCallback = internalAction({
 			workspaceId: Id<'workspaces'>;
 			provider: 'bookeo' | 'resova' | 'xola';
 			status: 'pending' | 'completed' | 'failed' | 'expired';
-			syncHorizonMonths: number;
 			expiresAt: number;
 		} | null = await ctx.runQuery(internal.integrations.getPendingConnectionSession, {
 			state: args.state
@@ -1539,8 +1518,7 @@ export const completeBookeoCallback = internalAction({
 					workspaceId: session.workspaceId,
 					encryptedApiKey: await encryptSecret(apiKey),
 					accountId: apiKeyInfo.accountId,
-					permissions: apiKeyInfo.permissions,
-					syncHorizonMonths: assertValidSyncHorizon(session.syncHorizonMonths)
+					permissions: apiKeyInfo.permissions
 				}
 			);
 			integrationId = savedIntegrationId;

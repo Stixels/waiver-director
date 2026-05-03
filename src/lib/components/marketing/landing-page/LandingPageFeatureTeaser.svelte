@@ -1,6 +1,15 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import { BarChart3, FileText, Link2, Mail, Plug, Shield, Users, ArrowRight } from '@lucide/svelte';
+	import {
+		ChartColumn,
+		FileText,
+		Link2,
+		Mail,
+		Plug,
+		Shield,
+		Users,
+		ArrowRight
+	} from '@lucide/svelte';
 	import { scrollReveal } from '$lib/actions/scroll-reveal';
 
 	const features = [
@@ -8,26 +17,27 @@
 			id: 'waiver-builder',
 			icon: FileText,
 			title: 'Waiver Builder',
-			description: 'Versioned waivers with locked records — past signatures are never altered.',
+			description:
+				'Build custom fields, required questions, signature blocks, and branded waiver versions that keep signed records locked.',
 			hero: true
 		},
 		{
 			id: 'email-automation',
 			icon: Mail,
 			title: 'Email Automation',
-			description: 'Individually timed follow-ups for every signer, not just the lead.',
+			description: 'Send emails on demand or trigger them after a booking delay.',
 			hero: false
 		},
 		{
 			id: 'booking-sync',
 			icon: Link2,
 			title: 'Booking Sync',
-			description: 'Bookeo, Resova, and Xola sync sessions and participant counts automatically.',
+			description: 'Bookeo sync is available now. More booking integrations are coming soon.',
 			hero: false
 		},
 		{
 			id: 'completion-analytics',
-			icon: BarChart3,
+			icon: ChartColumn,
 			title: 'Completion Analytics',
 			description: 'Signed vs. expected counts and submission trends across every session.',
 			hero: false
@@ -36,7 +46,7 @@
 			id: 'marketing-sync',
 			icon: Plug,
 			title: 'Mailchimp & Constant Contact',
-			description: 'Keep your marketing lists in sync with who actually showed up.',
+			description: 'Marketing-list integrations are coming soon.',
 			hero: false
 		},
 		{
@@ -56,13 +66,12 @@
 	];
 </script>
 
-<section
-	id="features"
-	class="border-t py-28 md:py-36"
-	style="border-color: var(--m-border-soft);"
->
+<section id="features" class="border-t py-28 md:py-36" style="border-color: var(--m-border-soft);">
 	<div class="mx-auto max-w-6xl px-4 sm:px-6">
-		<div class="mb-12 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between" use:scrollReveal={{ delay: 0 }}>
+		<div
+			class="mb-12 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"
+			use:scrollReveal={{ delay: 0 }}
+		>
 			<div>
 				<p
 					class="mb-3 text-[11px] font-semibold tracking-widest uppercase"
@@ -87,8 +96,11 @@
 			</a>
 		</div>
 
-		<div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4" use:scrollReveal={{ delay: 80 }}>
-			{#each features as feature, i (feature.id)}
+		<div
+			class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4"
+			use:scrollReveal={{ delay: 80 }}
+		>
+			{#each features as feature (feature.id)}
 				{@const Icon = feature.icon}
 				<div
 					class={[
@@ -101,14 +113,18 @@
 				>
 					<div
 						class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"
-						style={feature.hero ? 'background: var(--m-accent-medium);' : 'background: var(--m-accent-dim);'}
+						style={feature.hero
+							? 'background: var(--m-accent-medium);'
+							: 'background: var(--m-accent-dim);'}
 						aria-hidden="true"
 					>
 						<Icon size={15} style="color: var(--primary);" />
 					</div>
 					<div>
 						<p class="mb-1 text-[14px] font-semibold">{feature.title}</p>
-						<p class="text-[13px] leading-relaxed" style="color: var(--m-text-3);">{feature.description}</p>
+						<p class="text-[13px] leading-relaxed" style="color: var(--m-text-3);">
+							{feature.description}
+						</p>
 					</div>
 				</div>
 			{/each}

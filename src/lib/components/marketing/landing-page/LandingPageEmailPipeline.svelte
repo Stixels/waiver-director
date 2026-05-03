@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { CheckCircle2, Clock, PenLine, X } from '@lucide/svelte';
+	import { CircleCheck, Clock, PenLine, X } from '@lucide/svelte';
 
 	import { scrollReveal } from '$lib/actions/scroll-reveal';
 
@@ -14,15 +14,16 @@
 		{
 			id: 'queue',
 			icon: Clock,
-			label: 'Follow-up queued automatically',
-			detail: 'Your configured delay starts counting. Cancel any message before it fires.',
+			label: 'Send now or queue after a booking',
+			detail: 'Send on demand, or let your configured booking delay start counting automatically.',
 			accent: false
 		},
 		{
 			id: 'send',
-			icon: CheckCircle2,
-			label: 'Email delivered on schedule',
-			detail: 'Thank-yous, feedback requests, and review asks — sent right on time.',
+			icon: CircleCheck,
+			label: 'Email delivered from a verified sender',
+			detail:
+				'Verify your reply-to email to finish setup and send thank-yous, feedback requests, and review asks.',
 			accent: false
 		}
 	] as const;
@@ -48,8 +49,9 @@
 				Every signer gets their own follow-up.
 			</h2>
 			<p class="mb-14 max-w-xl text-[15px] leading-relaxed" style="color: var(--m-text-2);">
-				Not just the lead booker. Every guest who signs receives individually timed emails. Set your
-				delay once, and it runs itself.
+				Not just the lead booker. Every guest who signs can receive an on-demand email or an
+				individually timed follow-up after their booking. Verify your email to finish setup and
+				start sending.
 			</p>
 		</div>
 
@@ -80,7 +82,7 @@
 							{/if}
 						</div>
 						<div class="min-w-0 pb-8">
-							<p class="mb-1.5 text-[15px] font-semibold leading-snug">
+							<p class="mb-1.5 text-[15px] leading-snug font-semibold">
 								{step.label}
 							</p>
 							<p class="text-[13px] leading-relaxed" style="color: var(--m-text-3);">
@@ -96,6 +98,7 @@
 				<div
 					class="email-preview-card overflow-hidden rounded-xl border"
 					style="background: var(--m-card); border-color: var(--m-border-strong); box-shadow: 0 16px 48px oklch(0 0 0 / 40%), inset 0 1px 0 oklch(1 0 0 / 5%);"
+					aria-hidden="true"
 				>
 					<!-- Chrome bar -->
 					<div
