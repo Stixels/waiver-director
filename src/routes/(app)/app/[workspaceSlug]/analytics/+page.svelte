@@ -4,8 +4,6 @@
 	import type { FunctionReturnType } from 'convex/server';
 	import { useAppContext } from '$lib/components/app/app-context.svelte';
 	import { useProtectedQuery } from '$lib/components/auth/convex-auth.svelte';
-	import PageHeader from '$lib/components/app/PageHeader.svelte';
-	import PageShell from '$lib/components/app/PageShell.svelte';
 	import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { ChartContainer, ChartTooltip, type ChartConfig } from '$lib/components/ui/chart';
@@ -198,342 +196,360 @@
 	<title>{currentWorkspace?.name ?? 'Workspace'} Analytics | Waiver Director</title>
 </svelte:head>
 
-<PageHeader title="Analytics" subtitle="Trends, completion rates, and email performance">
-	{#snippet actions()}
-		<AnalyticsDateRangePicker
-			startDate={startDateStr}
-			endDate={endDateStr}
-			onchange={handleRangeChange}
-		/>
-	{/snippet}
-</PageHeader>
-
-<PageShell>
-	{#if missingWorkspace}
-		<div
-			class="rounded-lg border border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground"
-		>
-			Workspace not found.
+<div class="h-full min-h-0 w-full overflow-y-auto p-4 sm:p-6 xl:overflow-hidden">
+	<div
+		class="mx-auto flex min-h-full w-full max-w-7xl min-w-0 flex-col gap-4 p-px xl:h-full xl:overflow-hidden"
+	>
+		<div class="flex shrink-0 justify-end">
+			<AnalyticsDateRangePicker
+				startDate={startDateStr}
+				endDate={endDateStr}
+				onchange={handleRangeChange}
+			/>
 		</div>
-	{:else if analyticsError}
-		<div
-			class="rounded-lg border border-destructive/30 bg-destructive/8 px-4 py-3 text-sm text-destructive"
-		>
-			Unable to load analytics. Try refreshing the page.
-		</div>
-	{/if}
 
-	<!-- Submissions + Bookings over time side by side -->
-	<div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
-		<Card>
-			<CardHeader class="flex flex-row items-start justify-between gap-2 pb-3">
-				<div class="flex items-center gap-2">
-					<TrendingUpIcon class="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-					<CardTitle class="text-base font-semibold">Submissions</CardTitle>
-				</div>
-				{#if !isInitialLoading && analyticsData}
-					<div class="text-right">
-						<p class="text-2xl font-bold tracking-tight tabular-nums">
-							{submissionsTotal.toLocaleString()}
-						</p>
-						<p
-							class="mt-0.5 text-[0.65rem] font-medium text-muted-foreground tabular-nums"
-							title={comparisonTitle(analyticsData.comparisons.submissions)}
-						>
-							{comparisonLabel(analyticsData.comparisons.submissions)}
-						</p>
-					</div>
-				{:else if isInitialLoading}
-					<div class="space-y-1">
-						<Skeleton class="h-7 w-12" />
-						<Skeleton class="h-2.5 w-20" />
-					</div>
-				{/if}
-			</CardHeader>
-			<CardContent>
-				{#if isInitialLoading}
-					<Skeleton class="h-52 w-full" />
-				{:else if analyticsUnavailable}
-					<div class="flex h-52 items-center justify-center text-sm text-muted-foreground">
-						Analytics unavailable
-					</div>
-				{:else if !analyticsData || analyticsData.submissionsByDay.every((d) => d.count === 0)}
-					<div class="flex h-52 items-center justify-center text-sm text-muted-foreground">
-						No submissions in this period
-					</div>
-				{:else}
-					<ChartContainer config={submissionsConfig} class="h-52 w-full">
-						<AreaChart
-							data={analyticsData.submissionsByDay}
-							x="dayStartAt"
-							y="count"
-							yDomain={submissionsYDomain}
-							series={[{ key: 'count', label: 'Submissions', color: 'var(--color-primary)' }]}
-							props={{ xAxis: { ticks: 7, format: formatAxisDate } }}
-						>
-							{#snippet marks({ context })}
-								<defs>
-									<linearGradient id={submissionsGradientId} x1="0" y1="0" x2="0" y2="1">
-										<stop offset="5%" stop-color="var(--color-count)" stop-opacity="0.42" />
-										<stop offset="95%" stop-color="var(--color-count)" stop-opacity="0.06" />
-									</linearGradient>
-								</defs>
-								<ChartClipPath
-									initialWidth={0}
-									motion={{ width: { type: 'tween', duration: 800, easing: cubicInOut } }}
+		{#if missingWorkspace}
+			<div
+				class="shrink-0 rounded-lg border border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground"
+			>
+				Workspace not found.
+			</div>
+		{:else if analyticsError}
+			<div
+				class="shrink-0 rounded-lg border border-destructive/30 bg-destructive/8 px-4 py-3 text-sm text-destructive"
+			>
+				Unable to load analytics. Try refreshing the page.
+			</div>
+		{/if}
+
+		<div class="grid min-h-0 flex-1 grid-cols-1 gap-4 xl:grid-rows-[minmax(0,1fr)_minmax(0,1fr)]">
+			<!-- Submissions + Bookings over time side by side -->
+			<div class="grid min-h-0 grid-cols-1 gap-4 lg:grid-cols-2">
+				<Card class="flex min-h-0 flex-col overflow-hidden">
+					<CardHeader class="flex shrink-0 flex-row items-start justify-between gap-2 pb-3">
+						<div class="flex items-center gap-2">
+							<TrendingUpIcon class="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+							<CardTitle class="text-base font-semibold">Submissions</CardTitle>
+						</div>
+						{#if !isInitialLoading && analyticsData}
+							<div class="text-right">
+								<p class="text-2xl font-bold tracking-tight tabular-nums">
+									{submissionsTotal.toLocaleString()}
+								</p>
+								<p
+									class="mt-0.5 text-[0.65rem] font-medium text-muted-foreground tabular-nums"
+									title={comparisonTitle(analyticsData.comparisons.submissions)}
 								>
-									{#each context.series.visibleSeries as s (s.key)}
-										<Area
-											seriesKey={s.key}
-											curve={curveNatural}
-											fill={`url(#${submissionsGradientId})`}
-											line={{ class: 'stroke-1.5' }}
-											motion="tween"
-											{...s.props}
-										/>
-									{/each}
-								</ChartClipPath>
-							{/snippet}
-							{#snippet tooltip()}
-								<ChartTooltip labelFormatter={formatAxisDate} />
-							{/snippet}
-						</AreaChart>
-					</ChartContainer>
-				{/if}
-			</CardContent>
-		</Card>
-
-		<Card>
-			<CardHeader class="flex flex-row items-start justify-between gap-2 pb-3">
-				<div class="flex items-center gap-2">
-					<CalendarCheckIcon class="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-					<CardTitle class="text-base font-semibold">Bookings</CardTitle>
-				</div>
-				{#if !isInitialLoading && analyticsData}
-					<div class="text-right">
-						<p class="text-2xl font-bold tracking-tight tabular-nums">
-							{bookingsTotal.toLocaleString()}
-						</p>
-						<p
-							class="mt-0.5 text-[0.65rem] font-medium text-muted-foreground tabular-nums"
-							title={comparisonTitle(analyticsData.comparisons.bookings)}
-						>
-							{comparisonLabel(analyticsData.comparisons.bookings)}
-						</p>
-					</div>
-				{:else if isInitialLoading}
-					<div class="space-y-1">
-						<Skeleton class="h-7 w-12" />
-						<Skeleton class="h-2.5 w-20" />
-					</div>
-				{/if}
-			</CardHeader>
-			<CardContent>
-				{#if isInitialLoading}
-					<Skeleton class="h-52 w-full" />
-				{:else if analyticsUnavailable}
-					<div class="flex h-52 items-center justify-center text-sm text-muted-foreground">
-						Analytics unavailable
-					</div>
-				{:else if !analyticsData || analyticsData.bookingsByDay.every((d) => d.count === 0)}
-					<div class="flex h-52 items-center justify-center text-sm text-muted-foreground">
-						No bookings in this period
-					</div>
-				{:else}
-					<ChartContainer config={bookingsConfig} class="h-52 w-full">
-						<AreaChart
-							data={analyticsData.bookingsByDay}
-							x="dayStartAt"
-							y="count"
-							yDomain={bookingsYDomain}
-							series={[{ key: 'count', label: 'Bookings', color: 'var(--color-primary)' }]}
-							props={{ xAxis: { ticks: 7, format: formatAxisDate } }}
-						>
-							{#snippet marks({ context })}
-								<defs>
-									<linearGradient id={bookingsGradientId} x1="0" y1="0" x2="0" y2="1">
-										<stop offset="5%" stop-color="var(--color-count)" stop-opacity="0.42" />
-										<stop offset="95%" stop-color="var(--color-count)" stop-opacity="0.06" />
-									</linearGradient>
-								</defs>
-								<ChartClipPath
-									initialWidth={0}
-									motion={{ width: { type: 'tween', duration: 800, easing: cubicInOut } }}
-								>
-									{#each context.series.visibleSeries as s (s.key)}
-										<Area
-											seriesKey={s.key}
-											curve={curveNatural}
-											fill={`url(#${bookingsGradientId})`}
-											line={{ class: 'stroke-1.5' }}
-											motion="tween"
-											{...s.props}
-										/>
-									{/each}
-								</ChartClipPath>
-							{/snippet}
-							{#snippet tooltip()}
-								<ChartTooltip labelFormatter={formatAxisDate} />
-							{/snippet}
-						</AreaChart>
-					</ChartContainer>
-				{/if}
-			</CardContent>
-		</Card>
-	</div>
-
-	<div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
-		<!-- Email Activity card -->
-		<Card class="flex flex-col">
-			<CardHeader class="flex flex-row items-center gap-2 pb-2">
-				<MailIcon class="size-4 text-muted-foreground" />
-				<CardTitle class="text-base font-semibold">Email Activity</CardTitle>
-			</CardHeader>
-			<CardContent class="flex flex-1 flex-col">
-				{#if isInitialLoading}
-					<div class="space-y-3">
-						<div class="space-y-2">
-							<Skeleton class="h-8 w-16" />
-							<Skeleton class="h-3.5 w-32" />
-						</div>
-						<Skeleton class="h-1.5 w-full rounded-full" />
-						<div class="space-y-1.5">
-							<Skeleton class="h-5 w-full" />
-							<Skeleton class="h-5 w-full" />
-							<Skeleton class="h-5 w-full" />
-						</div>
-					</div>
-				{:else if analyticsUnavailable}
-					<div
-						class="flex min-h-52 flex-1 items-center justify-center text-sm text-muted-foreground"
-					>
-						Analytics unavailable
-					</div>
-				{:else}
-					<div class="flex flex-1 flex-col gap-4">
-						<div>
-							<p class="text-3xl font-bold tracking-tight tabular-nums">
-								{emailActivityTotal.toLocaleString()}
-							</p>
-							<p class="mt-0.5 text-xs text-muted-foreground">Total email activity</p>
-						</div>
-
-						<div class="space-y-1.5">
-							<p class="text-xs font-medium text-muted-foreground">Status mix</p>
-							<div
-								class="flex h-2 overflow-hidden rounded-full bg-muted"
-								aria-label="Email activity status mix"
-							>
-								<TooltipProvider delayDuration={150}>
-									{#each emailStatusSegments.filter((segment) => segment.value > 0) as segment (segment.label)}
-										<Tooltip>
-											<TooltipTrigger
-												class={`h-full min-w-2 ${segment.barClass}`}
-												style={shareStyle(segment.value)}
-												aria-label={`${segment.label}: ${segment.value.toLocaleString()}`}
-											/>
-											<TooltipContent side="top" sideOffset={6}>
-												{segment.label}: {segment.value.toLocaleString()}
-											</TooltipContent>
-										</Tooltip>
-									{/each}
-								</TooltipProvider>
+									{comparisonLabel(analyticsData.comparisons.submissions)}
+								</p>
 							</div>
-						</div>
+						{:else if isInitialLoading}
+							<div class="space-y-1">
+								<Skeleton class="h-7 w-12" />
+								<Skeleton class="h-2.5 w-20" />
+							</div>
+						{/if}
+					</CardHeader>
+					<CardContent class="min-h-0 flex-1">
+						{#if isInitialLoading}
+							<Skeleton class="h-52 w-full xl:h-full" />
+						{:else if analyticsUnavailable}
+							<div
+								class="flex h-52 items-center justify-center text-sm text-muted-foreground xl:h-full"
+							>
+								Analytics unavailable
+							</div>
+						{:else if !analyticsData || analyticsData.submissionsByDay.every((d) => d.count === 0)}
+							<div
+								class="flex h-52 items-center justify-center text-sm text-muted-foreground xl:h-full"
+							>
+								No submissions in this period
+							</div>
+						{:else}
+							<ChartContainer config={submissionsConfig} class="h-52 w-full xl:h-full">
+								<AreaChart
+									data={analyticsData.submissionsByDay}
+									x="dayStartAt"
+									y="count"
+									yDomain={submissionsYDomain}
+									series={[{ key: 'count', label: 'Submissions', color: 'var(--color-primary)' }]}
+									props={{ xAxis: { ticks: 7, format: formatAxisDate } }}
+								>
+									{#snippet marks({ context })}
+										<defs>
+											<linearGradient id={submissionsGradientId} x1="0" y1="0" x2="0" y2="1">
+												<stop offset="5%" stop-color="var(--color-count)" stop-opacity="0.42" />
+												<stop offset="95%" stop-color="var(--color-count)" stop-opacity="0.06" />
+											</linearGradient>
+										</defs>
+										<ChartClipPath
+											initialWidth={0}
+											motion={{ width: { type: 'tween', duration: 800, easing: cubicInOut } }}
+										>
+											{#each context.series.visibleSeries as s (s.key)}
+												<Area
+													seriesKey={s.key}
+													curve={curveNatural}
+													fill={`url(#${submissionsGradientId})`}
+													line={{ class: 'stroke-1.5' }}
+													motion="tween"
+													{...s.props}
+												/>
+											{/each}
+										</ChartClipPath>
+									{/snippet}
+									{#snippet tooltip()}
+										<ChartTooltip labelFormatter={formatAxisDate} />
+									{/snippet}
+								</AreaChart>
+							</ChartContainer>
+						{/if}
+					</CardContent>
+				</Card>
 
-						<div class="divide-y divide-border/70 border-t border-border/70 text-sm">
-							{#each emailStatusSegments as segment (segment.label)}
-								<div class="flex items-center justify-between py-1.5">
-									<div class={`flex items-center gap-2 ${segment.textClass}`}>
-										<span class={`size-2 rounded-full ${segment.dotClass}`}></span>
-										<span>{segment.label}</span>
-									</div>
-									<span class="font-semibold tabular-nums">{segment.value.toLocaleString()}</span>
+				<Card class="flex min-h-0 flex-col overflow-hidden">
+					<CardHeader class="flex shrink-0 flex-row items-start justify-between gap-2 pb-3">
+						<div class="flex items-center gap-2">
+							<CalendarCheckIcon class="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+							<CardTitle class="text-base font-semibold">Bookings</CardTitle>
+						</div>
+						{#if !isInitialLoading && analyticsData}
+							<div class="text-right">
+								<p class="text-2xl font-bold tracking-tight tabular-nums">
+									{bookingsTotal.toLocaleString()}
+								</p>
+								<p
+									class="mt-0.5 text-[0.65rem] font-medium text-muted-foreground tabular-nums"
+									title={comparisonTitle(analyticsData.comparisons.bookings)}
+								>
+									{comparisonLabel(analyticsData.comparisons.bookings)}
+								</p>
+							</div>
+						{:else if isInitialLoading}
+							<div class="space-y-1">
+								<Skeleton class="h-7 w-12" />
+								<Skeleton class="h-2.5 w-20" />
+							</div>
+						{/if}
+					</CardHeader>
+					<CardContent class="min-h-0 flex-1">
+						{#if isInitialLoading}
+							<Skeleton class="h-52 w-full xl:h-full" />
+						{:else if analyticsUnavailable}
+							<div
+								class="flex h-52 items-center justify-center text-sm text-muted-foreground xl:h-full"
+							>
+								Analytics unavailable
+							</div>
+						{:else if !analyticsData || analyticsData.bookingsByDay.every((d) => d.count === 0)}
+							<div
+								class="flex h-52 items-center justify-center text-sm text-muted-foreground xl:h-full"
+							>
+								No bookings in this period
+							</div>
+						{:else}
+							<ChartContainer config={bookingsConfig} class="h-52 w-full xl:h-full">
+								<AreaChart
+									data={analyticsData.bookingsByDay}
+									x="dayStartAt"
+									y="count"
+									yDomain={bookingsYDomain}
+									series={[{ key: 'count', label: 'Bookings', color: 'var(--color-primary)' }]}
+									props={{ xAxis: { ticks: 7, format: formatAxisDate } }}
+								>
+									{#snippet marks({ context })}
+										<defs>
+											<linearGradient id={bookingsGradientId} x1="0" y1="0" x2="0" y2="1">
+												<stop offset="5%" stop-color="var(--color-count)" stop-opacity="0.42" />
+												<stop offset="95%" stop-color="var(--color-count)" stop-opacity="0.06" />
+											</linearGradient>
+										</defs>
+										<ChartClipPath
+											initialWidth={0}
+											motion={{ width: { type: 'tween', duration: 800, easing: cubicInOut } }}
+										>
+											{#each context.series.visibleSeries as s (s.key)}
+												<Area
+													seriesKey={s.key}
+													curve={curveNatural}
+													fill={`url(#${bookingsGradientId})`}
+													line={{ class: 'stroke-1.5' }}
+													motion="tween"
+													{...s.props}
+												/>
+											{/each}
+										</ChartClipPath>
+									{/snippet}
+									{#snippet tooltip()}
+										<ChartTooltip labelFormatter={formatAxisDate} />
+									{/snippet}
+								</AreaChart>
+							</ChartContainer>
+						{/if}
+					</CardContent>
+				</Card>
+			</div>
+
+			<div class="grid min-h-0 grid-cols-1 gap-4 lg:grid-cols-3">
+				<!-- Email Activity card -->
+				<Card class="flex min-h-0 flex-col overflow-hidden">
+					<CardHeader class="flex shrink-0 flex-row items-center gap-2 pb-2">
+						<MailIcon class="size-4 text-muted-foreground" />
+						<CardTitle class="text-base font-semibold">Email Activity</CardTitle>
+					</CardHeader>
+					<CardContent class="flex min-h-0 flex-1 flex-col">
+						{#if isInitialLoading}
+							<div class="space-y-3">
+								<div class="space-y-2">
+									<Skeleton class="h-8 w-16" />
+									<Skeleton class="h-3.5 w-32" />
 								</div>
-							{/each}
-						</div>
-					</div>
-				{/if}
-			</CardContent>
-		</Card>
+								<Skeleton class="h-1.5 w-full rounded-full" />
+								<div class="space-y-1.5">
+									<Skeleton class="h-5 w-full" />
+									<Skeleton class="h-5 w-full" />
+									<Skeleton class="h-5 w-full" />
+								</div>
+							</div>
+						{:else if analyticsUnavailable}
+							<div
+								class="flex min-h-52 flex-1 items-center justify-center text-sm text-muted-foreground xl:min-h-0"
+							>
+								Analytics unavailable
+							</div>
+						{:else}
+							<div class="flex flex-1 flex-col gap-4">
+								<div>
+									<p class="text-3xl font-bold tracking-tight tabular-nums">
+										{emailActivityTotal.toLocaleString()}
+									</p>
+									<p class="mt-0.5 text-xs text-muted-foreground">Total email activity</p>
+								</div>
 
-		<Card class="lg:col-span-2">
-			<CardHeader class="flex flex-row items-start justify-between gap-2 pb-3">
-				<div class="flex items-center gap-2">
-					<UsersRoundIcon class="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-					<CardTitle class="text-base font-semibold">Customers by Day</CardTitle>
-				</div>
-				{#if !isInitialLoading && analyticsData}
-					<div class="text-right">
-						<p class="text-2xl font-bold tracking-tight tabular-nums">
-							{customerActivityTotal.toLocaleString()}
-						</p>
-						<p
-							class="mt-0.5 text-[0.65rem] font-medium text-muted-foreground tabular-nums"
-							title={comparisonTitle(analyticsData.comparisons.customerActivity)}
-						>
-							{comparisonLabel(analyticsData.comparisons.customerActivity)}
-						</p>
-					</div>
-				{:else if isInitialLoading}
-					<div class="space-y-1">
-						<Skeleton class="h-7 w-12" />
-						<Skeleton class="h-2.5 w-20" />
-					</div>
-				{/if}
-			</CardHeader>
-			<CardContent>
-				{#if isInitialLoading}
-					<Skeleton class="h-52 w-full" />
-				{:else if analyticsUnavailable}
-					<div class="flex h-52 items-center justify-center text-sm text-muted-foreground">
-						Analytics unavailable
-					</div>
-				{:else if !analyticsData || customerActivityTotal === 0}
-					<div class="flex h-52 items-center justify-center text-sm text-muted-foreground">
-						No customer activity in this period
-					</div>
-				{:else}
-					<ChartContainer config={customersConfig} class="h-52 w-full">
-						<BarChart
-							data={analyticsData.customerActivityByDay}
-							xScale={scaleBand().padding(0.25)}
-							x="dayStartAt"
-							axis="x"
-							yDomain={customerActivityYDomain}
-							series={[
-								{
-									key: 'newCustomers',
-									label: 'New',
-									color: 'var(--color-newCustomers)'
-								},
-								{
-									key: 'returningCustomers',
-									label: 'Returning',
-									color: 'var(--color-returningCustomers)'
-								}
-							]}
-							x1Scale={scaleBand().paddingInner(0).paddingOuter(0)}
-							seriesLayout="group"
-							rule={false}
-							props={{
-								bars: {
-									stroke: 'none',
-									strokeWidth: 0,
-									rounded: 'all',
-									motion: { type: 'tween', duration: 500, easing: cubicInOut }
-								},
-								highlight: { area: { fill: 'none' } },
-								xAxis: { ticks: 7, format: formatAxisDate }
-							}}
-						>
-							{#snippet tooltip()}
-								<ChartTooltip labelFormatter={formatAxisDate} indicator="dashed" />
-							{/snippet}
-						</BarChart>
-					</ChartContainer>
-				{/if}
-			</CardContent>
-		</Card>
+								<div class="space-y-1.5">
+									<p class="text-xs font-medium text-muted-foreground">Status mix</p>
+									<div
+										class="flex h-2 overflow-hidden rounded-full bg-muted"
+										aria-label="Email activity status mix"
+									>
+										<TooltipProvider delayDuration={150}>
+											{#each emailStatusSegments.filter((segment) => segment.value > 0) as segment (segment.label)}
+												<Tooltip>
+													<TooltipTrigger
+														class={`h-full min-w-2 ${segment.barClass}`}
+														style={shareStyle(segment.value)}
+														aria-label={`${segment.label}: ${segment.value.toLocaleString()}`}
+													/>
+													<TooltipContent side="top" sideOffset={6}>
+														{segment.label}: {segment.value.toLocaleString()}
+													</TooltipContent>
+												</Tooltip>
+											{/each}
+										</TooltipProvider>
+									</div>
+								</div>
+
+								<div class="divide-y divide-border/70 border-t border-border/70 text-sm">
+									{#each emailStatusSegments as segment (segment.label)}
+										<div class="flex items-center justify-between py-1.5">
+											<div class={`flex items-center gap-2 ${segment.textClass}`}>
+												<span class={`size-2 rounded-full ${segment.dotClass}`}></span>
+												<span>{segment.label}</span>
+											</div>
+											<span class="font-semibold tabular-nums"
+												>{segment.value.toLocaleString()}</span
+											>
+										</div>
+									{/each}
+								</div>
+							</div>
+						{/if}
+					</CardContent>
+				</Card>
+
+				<Card class="flex min-h-0 flex-col overflow-hidden lg:col-span-2">
+					<CardHeader class="flex shrink-0 flex-row items-start justify-between gap-2 pb-3">
+						<div class="flex items-center gap-2">
+							<UsersRoundIcon class="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+							<CardTitle class="text-base font-semibold">Customers by Day</CardTitle>
+						</div>
+						{#if !isInitialLoading && analyticsData}
+							<div class="text-right">
+								<p class="text-2xl font-bold tracking-tight tabular-nums">
+									{customerActivityTotal.toLocaleString()}
+								</p>
+								<p
+									class="mt-0.5 text-[0.65rem] font-medium text-muted-foreground tabular-nums"
+									title={comparisonTitle(analyticsData.comparisons.customerActivity)}
+								>
+									{comparisonLabel(analyticsData.comparisons.customerActivity)}
+								</p>
+							</div>
+						{:else if isInitialLoading}
+							<div class="space-y-1">
+								<Skeleton class="h-7 w-12" />
+								<Skeleton class="h-2.5 w-20" />
+							</div>
+						{/if}
+					</CardHeader>
+					<CardContent class="min-h-0 flex-1">
+						{#if isInitialLoading}
+							<Skeleton class="h-52 w-full xl:h-full" />
+						{:else if analyticsUnavailable}
+							<div
+								class="flex h-52 items-center justify-center text-sm text-muted-foreground xl:h-full"
+							>
+								Analytics unavailable
+							</div>
+						{:else if !analyticsData || customerActivityTotal === 0}
+							<div
+								class="flex h-52 items-center justify-center text-sm text-muted-foreground xl:h-full"
+							>
+								No customer activity in this period
+							</div>
+						{:else}
+							<ChartContainer config={customersConfig} class="h-52 w-full xl:h-full">
+								<BarChart
+									data={analyticsData.customerActivityByDay}
+									xScale={scaleBand().padding(0.25)}
+									x="dayStartAt"
+									axis="x"
+									yDomain={customerActivityYDomain}
+									series={[
+										{
+											key: 'newCustomers',
+											label: 'New',
+											color: 'var(--color-newCustomers)'
+										},
+										{
+											key: 'returningCustomers',
+											label: 'Returning',
+											color: 'var(--color-returningCustomers)'
+										}
+									]}
+									x1Scale={scaleBand().paddingInner(0).paddingOuter(0)}
+									seriesLayout="group"
+									rule={false}
+									props={{
+										bars: {
+											stroke: 'none',
+											strokeWidth: 0,
+											rounded: 'all',
+											motion: { type: 'tween', duration: 500, easing: cubicInOut }
+										},
+										highlight: { area: { fill: 'none' } },
+										xAxis: { ticks: 7, format: formatAxisDate }
+									}}
+								>
+									{#snippet tooltip()}
+										<ChartTooltip labelFormatter={formatAxisDate} indicator="dashed" />
+									{/snippet}
+								</BarChart>
+							</ChartContainer>
+						{/if}
+					</CardContent>
+				</Card>
+			</div>
+		</div>
 	</div>
-</PageShell>
+</div>
