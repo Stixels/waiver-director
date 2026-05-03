@@ -11,10 +11,7 @@
 	style="background: var(--m-bg); border-color: var(--m-border-soft);"
 >
 	<!-- Thin gradient line at top -->
-	<div
-		class="pointer-events-none absolute inset-x-0 top-0 flex justify-center"
-		aria-hidden="true"
-	>
+	<div class="pointer-events-none absolute inset-x-0 top-0 flex justify-center" aria-hidden="true">
 		<div
 			class="h-px w-2/3 max-w-xl"
 			style="background: linear-gradient(90deg, transparent, var(--m-accent-line), transparent);"
@@ -48,13 +45,15 @@
 				Explore features
 			</Button>
 		</div>
-		<p class="mt-5 text-[12px]" style="color: var(--m-text-3);">Free to start · No credit card required</p>
+		<p class="mt-5 text-[12px]" style="color: var(--m-text-3);">
+			Free to start · No credit card required
+		</p>
 	</div>
 </section>
 
 <style>
 	.landing-cta__title {
-		font-family: 'Bricolage Grotesque', sans-serif;
+		font-family: var(--m-font-display);
 		font-size: clamp(2rem, 5vw, 3.5rem);
 		letter-spacing: -0.035em;
 		line-height: 1.06;

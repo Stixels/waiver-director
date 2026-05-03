@@ -133,7 +133,9 @@
 	/>
 {/if}
 
-<Card class="flex h-[420px] flex-col overflow-hidden md:h-[520px]">
+<Card
+	class="flex h-[min(30rem,calc(100svh-12rem))] min-h-0 flex-col overflow-hidden sm:h-[min(32rem,calc(100svh-13rem))] xl:h-full"
+>
 	<CardHeader class="flex flex-row items-center justify-between border-b py-4">
 		<div class="flex items-center gap-2">
 			<MailIcon class="size-4 text-muted-foreground" />

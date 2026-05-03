@@ -3,8 +3,6 @@
 	import { api } from '$convex/_generated/api';
 	import { useAppContext } from '$lib/components/app/app-context.svelte';
 	import { useProtectedQuery } from '$lib/components/auth/convex-auth.svelte';
-	import PageHeader from '$lib/components/app/PageHeader.svelte';
-	import PageShell from '$lib/components/app/PageShell.svelte';
 	import DashboardKpiRow from '$lib/components/dashboard/DashboardKpiRow.svelte';
 	import DashboardLivePanel from '$lib/components/dashboard/DashboardLivePanel.svelte';
 	import EmailPipelinePanel from '$lib/components/dashboard/EmailPipelinePanel.svelte';
@@ -60,36 +58,31 @@
 	<title>{currentWorkspace?.name ?? 'Workspace'} Dashboard | Waiver Director</title>
 </svelte:head>
 
-<PageHeader
-	title="Dashboard"
-	subtitle="Today's operational overview — {new Date().toLocaleDateString('en-US', {
-		weekday: 'long',
-		month: 'long',
-		day: 'numeric'
-	})}"
-/>
-
-<PageShell>
-	<DashboardKpiRow
-		kpi={snapshot?.kpi}
-		trends={snapshot?.kpiTrends}
-		comparisons={snapshot?.kpiComparisons}
-		isLoading={isInitialLoading}
-	/>
-
-	<div class="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_24rem]">
-		<DashboardLivePanel
-			workspaceId={currentWorkspace?.workspaceId}
-			todayStartAt={today.startAt}
-			todayEndAt={today.endAt}
+<div class="h-full min-h-0 w-full overflow-y-auto p-4 sm:p-6 xl:overflow-hidden">
+	<div
+		class="mx-auto flex min-h-full w-full max-w-7xl min-w-0 flex-col gap-4 p-px xl:h-full xl:overflow-hidden"
+	>
+		<DashboardKpiRow
+			kpi={snapshot?.kpi}
+			trends={snapshot?.kpiTrends}
+			comparisons={snapshot?.kpiComparisons}
 			isLoading={isInitialLoading}
 		/>
-		<EmailPipelinePanel
-			workspaceId={currentWorkspace?.workspaceId}
-			workspaceName={currentWorkspace?.name}
-			pipeline={snapshot?.emailPipeline}
-			recentQueued={snapshot?.recentQueued}
-			isLoading={isInitialLoading}
-		/>
+
+		<div class="grid flex-1 grid-cols-1 gap-4 xl:min-h-0 xl:grid-cols-[minmax(0,1fr)_24rem]">
+			<DashboardLivePanel
+				workspaceId={currentWorkspace?.workspaceId}
+				todayStartAt={today.startAt}
+				todayEndAt={today.endAt}
+				isLoading={isInitialLoading}
+			/>
+			<EmailPipelinePanel
+				workspaceId={currentWorkspace?.workspaceId}
+				workspaceName={currentWorkspace?.name}
+				pipeline={snapshot?.emailPipeline}
+				recentQueued={snapshot?.recentQueued}
+				isLoading={isInitialLoading}
+			/>
+		</div>
 	</div>
-</PageShell>
+</div>

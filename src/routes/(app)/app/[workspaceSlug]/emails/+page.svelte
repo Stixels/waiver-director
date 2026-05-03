@@ -1031,7 +1031,7 @@
 	{#if activeTab === 'queue'}
 		<!-- Stats cards -->
 		<div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
-			<div class="rounded-xl border border-border bg-card/30 p-4">
+			<div class="rounded-xl border border-border bg-card p-4">
 				<p class="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase">
 					Emails sent today
 				</p>
@@ -1041,7 +1041,7 @@
 					<p class="mt-1 text-3xl font-semibold tabular-nums">{stats?.sentToday ?? 0}</p>
 				{/if}
 			</div>
-			<div class="rounded-xl border border-border bg-card/30 p-4">
+			<div class="rounded-xl border border-border bg-card p-4">
 				<p class="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase">
 					Pending queue
 				</p>
@@ -1051,7 +1051,7 @@
 					<p class="mt-1 text-3xl font-semibold tabular-nums">{stats?.pendingCount ?? 0}</p>
 				{/if}
 			</div>
-			<div class="rounded-xl border border-border bg-card/30 p-4">
+			<div class="rounded-xl border border-border bg-card p-4">
 				<p class="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase">
 					Total sent
 				</p>
@@ -1270,7 +1270,7 @@
 					<!-- Mobile skeleton -->
 					<div class="h-full space-y-3 overflow-hidden md:hidden">
 						{#each [0, 1, 2] as i (i)}
-							<div class="space-y-2 rounded-xl border border-border bg-card/30 p-4">
+							<div class="space-y-2 rounded-xl border border-border bg-card p-4">
 								<Skeleton class="h-4 w-32" />
 								<Skeleton class="h-3 w-48" />
 								<Skeleton class="h-4 w-20" />
@@ -1462,7 +1462,7 @@
 						<div class="min-h-0 flex-1 space-y-3 overflow-auto">
 							{#each followUps as followUp (followUp._id)}
 								<div
-									class="overflow-hidden rounded-xl border border-border bg-card/30 transition-colors {selectedIds.has(
+									class="overflow-hidden rounded-xl border border-border bg-card transition-colors {selectedIds.has(
 										followUp._id
 									)
 										? 'ring-1 ring-ring/50'

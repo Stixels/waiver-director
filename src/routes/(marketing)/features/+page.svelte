@@ -136,7 +136,7 @@
 		</p>
 		<h1
 			class="mb-5 max-w-3xl font-extrabold tracking-tight text-balance"
-			style="font-family: 'Bricolage Grotesque', sans-serif; font-size: clamp(2.2rem, 5.5vw, 4rem); letter-spacing: -0.03em; line-height: 1.06;"
+			style="font-family: var(--m-font-display); font-size: clamp(2.2rem, 5.5vw, 4rem); letter-spacing: -0.03em; line-height: 1.06;"
 		>
 			Everything you need to run compliant, automated waivers.
 		</h1>
@@ -161,7 +161,7 @@
 				</p>
 				<h2
 					class="mb-4 font-extrabold tracking-tight text-balance"
-					style="font-family: 'Bricolage Grotesque', sans-serif; font-size: clamp(1.75rem, 3.5vw, 2.5rem); letter-spacing: -0.025em; line-height: 1.1;"
+					style="font-family: var(--m-font-display); font-size: clamp(1.75rem, 3.5vw, 2.5rem); letter-spacing: -0.025em; line-height: 1.1;"
 				>
 					Build once. Version forever.
 				</h2>
@@ -405,7 +405,7 @@
 				</p>
 				<h2
 					class="mb-4 font-extrabold tracking-tight text-balance"
-					style="font-family: 'Bricolage Grotesque', sans-serif; font-size: clamp(1.75rem, 3.5vw, 2.5rem); letter-spacing: -0.025em; line-height: 1.1;"
+					style="font-family: var(--m-font-display); font-size: clamp(1.75rem, 3.5vw, 2.5rem); letter-spacing: -0.025em; line-height: 1.1;"
 				>
 					Know your numbers before they arrive.
 				</h2>
@@ -442,7 +442,7 @@
 			</p>
 			<h2
 				class="font-extrabold tracking-tight"
-				style="font-family: 'Bricolage Grotesque', sans-serif; font-size: clamp(1.75rem, 3.5vw, 2.5rem); letter-spacing: -0.025em; line-height: 1.1;"
+				style="font-family: var(--m-font-display); font-size: clamp(1.75rem, 3.5vw, 2.5rem); letter-spacing: -0.025em; line-height: 1.1;"
 			>
 				Everything else you need.
 			</h2>
@@ -566,7 +566,7 @@
 			</p>
 			<h2
 				class="mb-4 font-extrabold tracking-tight"
-				style="font-family: 'Bricolage Grotesque', sans-serif; font-size: clamp(1.75rem, 3.5vw, 2.5rem); letter-spacing: -0.025em; line-height: 1.1;"
+				style="font-family: var(--m-font-display); font-size: clamp(1.75rem, 3.5vw, 2.5rem); letter-spacing: -0.025em; line-height: 1.1;"
 			>
 				Connects to your existing stack.
 			</h2>
@@ -627,7 +627,7 @@
 	<div class="mx-auto max-w-3xl text-center" use:scrollReveal={{ delay: 0 }}>
 		<h2
 			class="mb-5 font-extrabold tracking-tight"
-			style="font-family: 'Bricolage Grotesque', sans-serif; font-size: clamp(1.9rem, 4vw, 3rem); letter-spacing: -0.03em; line-height: 1.1;"
+			style="font-family: var(--m-font-display); font-size: clamp(1.9rem, 4vw, 3rem); letter-spacing: -0.03em; line-height: 1.1;"
 		>
 			Ready to capture every guest?
 		</h2>

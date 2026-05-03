@@ -113,17 +113,17 @@
 	}
 </script>
 
-<div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
+<div class="grid shrink-0 grid-cols-2 gap-3 lg:grid-cols-4">
 	{#each stats as stat (stat.label)}
-		<Card class="min-h-36 overflow-visible">
-			<CardContent class="flex h-full flex-col justify-between p-4">
+		<Card class="overflow-visible">
+			<CardContent class="flex h-full flex-col justify-between p-3">
 				<div class="flex items-start justify-between gap-3">
 					<div class="min-w-0">
 						<p class="truncate text-xs font-medium text-muted-foreground">{stat.label}</p>
 						{#if isLoading && kpi == null}
 							<Skeleton class="mt-2 h-8 w-16" />
 						{:else}
-							<p class="mt-1 text-3xl font-bold tracking-tight tabular-nums">
+							<p class="mt-1 text-2xl font-bold tracking-tight tabular-nums">
 								{formatCappedCount(stat.value)}
 							</p>
 						{/if}
@@ -139,9 +139,9 @@
 						{/if}
 					</div>
 				</div>
-				<div class="mt-3 space-y-2">
+				<div class="mt-2 space-y-1.5">
 					{#if isLoading && trends == null}
-						<Skeleton class="h-16 w-full" />
+						<Skeleton class="h-12 w-full" />
 					{:else}
 						<KpiSparkline data={stat.trend} label={stat.trendLabel} color={stat.color} />
 					{/if}
