@@ -9,6 +9,12 @@
 	import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { ChartContainer, ChartTooltip, type ChartConfig } from '$lib/components/ui/chart';
+	import {
+		Tooltip,
+		TooltipContent,
+		TooltipProvider,
+		TooltipTrigger
+	} from '$lib/components/ui/tooltip';
 	import { Area, AreaChart, BarChart, ChartClipPath } from 'layerchart';
 	import AnalyticsDateRangePicker from '$lib/components/dashboard/AnalyticsDateRangePicker.svelte';
 	import { curveNatural } from 'd3-shape';
@@ -18,9 +24,6 @@
 	import MailIcon from '@lucide/svelte/icons/mail';
 	import CalendarCheckIcon from '@lucide/svelte/icons/calendar-check';
 	import UsersRoundIcon from '@lucide/svelte/icons/users-round';
-	import ClockIcon from '@lucide/svelte/icons/clock';
-	import AlertCircleIcon from '@lucide/svelte/icons/alert-circle';
-	import ShieldOffIcon from '@lucide/svelte/icons/shield-off';
 
 	const appContext = useAppContext();
 	const currentWorkspace = $derived(
@@ -65,6 +68,7 @@
 
 	type AnalyticsData = FunctionReturnType<typeof api.dashboard.getAnalyticsSeries>;
 	type CustomerActivityDay = AnalyticsData['customerActivityByDay'][number];
+	type AnalyticsComparison = AnalyticsData['comparisons']['submissions'];
 	const analyticsData = $derived((analyticsQuery.data ?? null) as AnalyticsData | null);
 	const analyticsError = $derived(analyticsQuery.error ?? null);
 	const missingWorkspace = $derived(!appContext.isLoading && currentWorkspace == null);
@@ -130,12 +134,64 @@
 	const bookingsTotal = $derived(
 		analyticsData?.bookingsByDay.reduce((sum, d) => sum + d.count, 0) ?? 0
 	);
+	const rangeDays = $derived(Math.round((rangeEndAt - rangeStartAt) / (24 * 60 * 60 * 1000)));
 
-	// Email pipeline stats
 	const emailSent = $derived(analyticsData?.emailTotals.sent ?? 0);
 	const emailQueued = $derived(analyticsData?.emailTotals.queued ?? 0);
 	const emailFailed = $derived(analyticsData?.emailTotals.failed ?? 0);
 	const emailBlocked = $derived(analyticsData?.emailTotals.blocked ?? 0);
+	const emailActivityTotal = $derived(emailSent + emailQueued + emailFailed + emailBlocked);
+	const emailStatusSegments = $derived([
+		{
+			label: 'Sent',
+			value: emailSent,
+			barClass: 'bg-primary',
+			dotClass: 'bg-primary',
+			textClass: 'text-muted-foreground'
+		},
+		{
+			label: 'Queued',
+			value: emailQueued,
+			barClass: 'bg-primary/30',
+			dotClass: 'bg-primary/30',
+			textClass: 'text-muted-foreground'
+		},
+		{
+			label: 'Failed',
+			value: emailFailed,
+			barClass: 'bg-destructive',
+			dotClass: 'bg-destructive',
+			textClass: emailFailed > 0 ? 'text-destructive' : 'text-muted-foreground'
+		},
+		{
+			label: 'Blocked',
+			value: emailBlocked,
+			barClass: 'bg-amber-500',
+			dotClass: 'bg-amber-500',
+			textClass: emailBlocked > 0 ? 'text-amber-700 dark:text-amber-400' : 'text-muted-foreground'
+		}
+	]);
+
+	function shareStyle(value: number): string {
+		return `width: ${emailActivityTotal > 0 ? (value / emailActivityTotal) * 100 : 0}%`;
+	}
+
+	function comparisonLabel(comparison: AnalyticsComparison | null | undefined) {
+		if (!comparison) return 'No data';
+		if (comparison.previousTotal === 0) {
+			if (comparison.currentTotal === 0) return `0% vs prior ${rangeDays}d`;
+			return `New vs prior ${rangeDays}d`;
+		}
+		const change = Math.round(
+			((comparison.currentTotal - comparison.previousTotal) / comparison.previousTotal) * 100
+		);
+		return `${change > 0 ? '+' : ''}${change.toLocaleString()}% vs prior ${rangeDays}d`;
+	}
+
+	function comparisonTitle(comparison: AnalyticsComparison | null | undefined) {
+		if (!comparison) return `No prior ${rangeDays}d comparison available`;
+		return `${comparison.currentTotal.toLocaleString()} current ${rangeDays}d, ${comparison.previousTotal.toLocaleString()} prior ${rangeDays}d`;
+	}
 </script>
 
 <svelte:head>
@@ -176,11 +232,22 @@
 					<CardTitle class="text-base font-semibold">Submissions</CardTitle>
 				</div>
 				{#if !isInitialLoading && analyticsData}
-					<p class="text-right text-2xl font-bold tracking-tight tabular-nums">
-						{submissionsTotal.toLocaleString()}
-					</p>
+					<div class="text-right">
+						<p class="text-2xl font-bold tracking-tight tabular-nums">
+							{submissionsTotal.toLocaleString()}
+						</p>
+						<p
+							class="mt-0.5 text-[0.65rem] font-medium text-muted-foreground tabular-nums"
+							title={comparisonTitle(analyticsData.comparisons.submissions)}
+						>
+							{comparisonLabel(analyticsData.comparisons.submissions)}
+						</p>
+					</div>
 				{:else if isInitialLoading}
-					<Skeleton class="h-7 w-12" />
+					<div class="space-y-1">
+						<Skeleton class="h-7 w-12" />
+						<Skeleton class="h-2.5 w-20" />
+					</div>
 				{/if}
 			</CardHeader>
 			<CardContent>
@@ -243,11 +310,22 @@
 					<CardTitle class="text-base font-semibold">Bookings</CardTitle>
 				</div>
 				{#if !isInitialLoading && analyticsData}
-					<p class="text-right text-2xl font-bold tracking-tight tabular-nums">
-						{bookingsTotal.toLocaleString()}
-					</p>
+					<div class="text-right">
+						<p class="text-2xl font-bold tracking-tight tabular-nums">
+							{bookingsTotal.toLocaleString()}
+						</p>
+						<p
+							class="mt-0.5 text-[0.65rem] font-medium text-muted-foreground tabular-nums"
+							title={comparisonTitle(analyticsData.comparisons.bookings)}
+						>
+							{comparisonLabel(analyticsData.comparisons.bookings)}
+						</p>
+					</div>
 				{:else if isInitialLoading}
-					<Skeleton class="h-7 w-12" />
+					<div class="space-y-1">
+						<Skeleton class="h-7 w-12" />
+						<Skeleton class="h-2.5 w-20" />
+					</div>
 				{/if}
 			</CardHeader>
 			<CardContent>
@@ -305,22 +383,25 @@
 	</div>
 
 	<div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
-		<!-- Email Pipeline card -->
+		<!-- Email Activity card -->
 		<Card class="flex flex-col">
-			<CardHeader class="flex flex-row items-center gap-2 pb-3">
+			<CardHeader class="flex flex-row items-center gap-2 pb-2">
 				<MailIcon class="size-4 text-muted-foreground" />
-				<CardTitle class="text-base font-semibold">Email Pipeline</CardTitle>
+				<CardTitle class="text-base font-semibold">Email Activity</CardTitle>
 			</CardHeader>
-			<CardContent class="flex flex-1 flex-col gap-5">
+			<CardContent class="flex flex-1 flex-col">
 				{#if isInitialLoading}
 					<div class="space-y-3">
-						<Skeleton class="h-10 w-20" />
-						<Skeleton class="h-4 w-32" />
-					</div>
-					<div class="mt-auto grid grid-cols-3 gap-2">
-						<Skeleton class="h-16 w-full rounded-lg" />
-						<Skeleton class="h-16 w-full rounded-lg" />
-						<Skeleton class="h-16 w-full rounded-lg" />
+						<div class="space-y-2">
+							<Skeleton class="h-8 w-16" />
+							<Skeleton class="h-3.5 w-32" />
+						</div>
+						<Skeleton class="h-1.5 w-full rounded-full" />
+						<div class="space-y-1.5">
+							<Skeleton class="h-5 w-full" />
+							<Skeleton class="h-5 w-full" />
+							<Skeleton class="h-5 w-full" />
+						</div>
 					</div>
 				{:else if analyticsUnavailable}
 					<div
@@ -329,76 +410,47 @@
 						Analytics unavailable
 					</div>
 				{:else}
-					<!-- Sent in period -->
-					<div>
-						<p class="text-4xl font-bold tracking-tight tabular-nums">
-							{emailSent.toLocaleString()}
-						</p>
-						<p class="mt-1 text-sm text-muted-foreground">Sent in selected period</p>
-					</div>
+					<div class="flex flex-1 flex-col gap-4">
+						<div>
+							<p class="text-3xl font-bold tracking-tight tabular-nums">
+								{emailActivityTotal.toLocaleString()}
+							</p>
+							<p class="mt-0.5 text-xs text-muted-foreground">Total email activity</p>
+						</div>
 
-					<!-- Current pipeline health -->
-					<div class="mt-auto space-y-2">
-						<p class="text-xs font-medium text-muted-foreground">Current pipeline</p>
-						<div class="grid grid-cols-3 gap-2">
-							<!-- Queued — lighter primary in dark mode via color-mix for contrast -->
+						<div class="space-y-1.5">
+							<p class="text-xs font-medium text-muted-foreground">Status mix</p>
 							<div
-								class="rounded-lg border border-primary/20 bg-primary/10 px-3 py-2.5 dark:border-primary/40 dark:bg-primary/15"
+								class="flex h-2 overflow-hidden rounded-full bg-muted"
+								aria-label="Email activity status mix"
 							>
-								<ClockIcon
-									class="mb-1.5 size-3.5 text-primary dark:text-[color-mix(in_oklch,var(--primary)_30%,var(--primary-foreground))]"
-								/>
-								<p
-									class="text-base font-bold text-primary tabular-nums dark:text-[color-mix(in_oklch,var(--primary)_26%,var(--primary-foreground))]"
-								>
-									{emailQueued.toLocaleString()}
-								</p>
-								<p
-									class="text-[0.65rem] font-medium text-primary/80 dark:text-[color-mix(in_oklch,var(--primary)_38%,var(--primary-foreground))]"
-								>
-									Queued
-								</p>
+								<TooltipProvider delayDuration={150}>
+									{#each emailStatusSegments.filter((segment) => segment.value > 0) as segment (segment.label)}
+										<Tooltip>
+											<TooltipTrigger
+												class={`h-full min-w-2 ${segment.barClass}`}
+												style={shareStyle(segment.value)}
+												aria-label={`${segment.label}: ${segment.value.toLocaleString()}`}
+											/>
+											<TooltipContent side="top" sideOffset={6}>
+												{segment.label}: {segment.value.toLocaleString()}
+											</TooltipContent>
+										</Tooltip>
+									{/each}
+								</TooltipProvider>
 							</div>
-							<!-- Failed -->
-							<div
-								class={emailFailed > 0
-									? 'rounded-lg bg-destructive/8 px-3 py-2.5'
-									: 'rounded-lg bg-muted/60 px-3 py-2.5'}
-							>
-								<AlertCircleIcon
-									class={`mb-1.5 size-3.5 ${emailFailed > 0 ? 'text-destructive' : 'text-muted-foreground'}`}
-								/>
-								<p
-									class={`text-base font-bold tabular-nums ${emailFailed > 0 ? 'text-destructive' : 'text-muted-foreground'}`}
-								>
-									{emailFailed.toLocaleString()}
-								</p>
-								<p
-									class={`text-[0.65rem] font-medium ${emailFailed > 0 ? 'text-destructive/70' : 'text-muted-foreground/70'}`}
-								>
-									Failed
-								</p>
-							</div>
-							<!-- Blocked -->
-							<div
-								class={emailBlocked > 0
-									? 'rounded-lg bg-amber-500/8 px-3 py-2.5'
-									: 'rounded-lg bg-muted/60 px-3 py-2.5'}
-							>
-								<ShieldOffIcon
-									class={`mb-1.5 size-3.5 ${emailBlocked > 0 ? 'text-amber-600 dark:text-amber-500' : 'text-muted-foreground'}`}
-								/>
-								<p
-									class={`text-base font-bold tabular-nums ${emailBlocked > 0 ? 'text-amber-700 dark:text-amber-400' : 'text-muted-foreground'}`}
-								>
-									{emailBlocked.toLocaleString()}
-								</p>
-								<p
-									class={`text-[0.65rem] font-medium ${emailBlocked > 0 ? 'text-amber-700/70 dark:text-amber-400/70' : 'text-muted-foreground/70'}`}
-								>
-									Blocked
-								</p>
-							</div>
+						</div>
+
+						<div class="divide-y divide-border/70 border-t border-border/70 text-sm">
+							{#each emailStatusSegments as segment (segment.label)}
+								<div class="flex items-center justify-between py-1.5">
+									<div class={`flex items-center gap-2 ${segment.textClass}`}>
+										<span class={`size-2 rounded-full ${segment.dotClass}`}></span>
+										<span>{segment.label}</span>
+									</div>
+									<span class="font-semibold tabular-nums">{segment.value.toLocaleString()}</span>
+								</div>
+							{/each}
 						</div>
 					</div>
 				{/if}
@@ -411,12 +463,23 @@
 					<UsersRoundIcon class="mt-0.5 size-4 shrink-0 text-muted-foreground" />
 					<CardTitle class="text-base font-semibold">Customers by Day</CardTitle>
 				</div>
-				{#if !isInitialLoading && analyticsData && customerActivityTotal > 0}
-					<p class="text-right text-2xl font-bold tracking-tight tabular-nums">
-						{customerActivityTotal.toLocaleString()}
-					</p>
+				{#if !isInitialLoading && analyticsData}
+					<div class="text-right">
+						<p class="text-2xl font-bold tracking-tight tabular-nums">
+							{customerActivityTotal.toLocaleString()}
+						</p>
+						<p
+							class="mt-0.5 text-[0.65rem] font-medium text-muted-foreground tabular-nums"
+							title={comparisonTitle(analyticsData.comparisons.customerActivity)}
+						>
+							{comparisonLabel(analyticsData.comparisons.customerActivity)}
+						</p>
+					</div>
 				{:else if isInitialLoading}
-					<Skeleton class="h-7 w-12" />
+					<div class="space-y-1">
+						<Skeleton class="h-7 w-12" />
+						<Skeleton class="h-2.5 w-20" />
+					</div>
 				{/if}
 			</CardHeader>
 			<CardContent>

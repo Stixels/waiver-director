@@ -41,7 +41,7 @@
 	const workspaceSlug = $derived(page.params.workspaceSlug ?? '');
 	let selectedFollowUpId = $state<Id<'email_follow_ups'> | null>(null);
 	let followUpPreviewOpen = $state(false);
-	const chipSkeletonRows = [0, 1, 2, 3, 4];
+	const chipSkeletonRows = [0, 1, 2, 3];
 	const queuedSkeletonRows = [0, 1, 2, 3, 4, 5];
 
 	type ChipTone = 'primary' | 'green' | 'destructive' | 'amber' | 'muted';
@@ -153,7 +153,7 @@
 		{#if isLoading && pipeline == null}
 			<div class="flex flex-wrap gap-1.5">
 				{#each chipSkeletonRows as row (row)}
-					<Skeleton class="h-7 w-24" />
+					<Skeleton class="h-7 w-20 rounded-md" />
 				{/each}
 			</div>
 		{:else}
@@ -180,9 +180,9 @@
 			<div class="min-h-0 flex-1 space-y-2 overflow-hidden rounded-md border p-3">
 				{#each queuedSkeletonRows as row (row)}
 					<div class="flex items-center justify-between gap-3">
-						<div class="space-y-2">
-							<Skeleton class="h-4 w-32" />
-							<Skeleton class="h-3 w-40" />
+						<div class="min-w-0 flex-1 space-y-2">
+							<Skeleton class="h-4 w-32 max-w-full" />
+							<Skeleton class="h-3 w-40 max-w-full" />
 						</div>
 						<Skeleton class="h-4 w-20 shrink-0" />
 					</div>

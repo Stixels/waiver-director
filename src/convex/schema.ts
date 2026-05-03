@@ -249,6 +249,8 @@ export default defineSchema({
 		.index('by_workspaceId', ['workspaceId'])
 		.index('by_workspaceId_and_status', ['workspaceId', 'status'])
 		.index('by_workspaceId_and_status_and_sentAt', ['workspaceId', 'status', 'sentAt'])
+		.index('by_workspaceId_and_status_and_scheduledAt', ['workspaceId', 'status', 'scheduledAt'])
+		.index('by_workspaceId_and_status_and_failedAt', ['workspaceId', 'status', 'failedAt'])
 		.index('by_submissionId', ['submissionId'])
 		.searchIndex('search_follow_ups', {
 			searchField: 'searchText',
@@ -267,7 +269,6 @@ export default defineSchema({
 		encryptedApiKey: v.optional(v.string()),
 		accountId: v.optional(v.string()),
 		permissions: v.array(v.string()),
-		syncHorizonMonths: v.number(),
 		lastSyncError: v.optional(v.string()),
 		connectedAt: v.optional(v.number()),
 		disconnectedAt: v.optional(v.number()),
@@ -287,7 +288,6 @@ export default defineSchema({
 			v.literal('failed'),
 			v.literal('expired')
 		),
-		syncHorizonMonths: v.number(),
 		createdAt: v.number(),
 		expiresAt: v.number()
 	})

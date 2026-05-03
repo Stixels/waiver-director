@@ -1,4 +1,4 @@
-import { ConvexError, v } from 'convex/values';
+import { v } from 'convex/values';
 import type { Doc } from '../_generated/dataModel';
 
 export const bookingProviderValidator = v.union(
@@ -8,8 +8,6 @@ export const bookingProviderValidator = v.union(
 );
 
 export const bookingStatusValidator = v.union(v.literal('active'), v.literal('canceled'));
-
-export const syncHorizonMonthsValidator = v.number();
 
 export const bookingSnapshotValidator = v.object({
 	provider: bookingProviderValidator,
@@ -22,7 +20,6 @@ export const bookingSnapshotValidator = v.object({
 });
 
 export type BookingProvider = 'bookeo' | 'resova' | 'xola';
-export type SyncHorizonMonths = number;
 
 export const BOOKEO_REQUIRED_PERMISSIONS = ['bookings_r_all', 'customers_r_all'] as const;
 export const UNKNOWN_ACTIVITY_NAME = 'Unknown activity';
@@ -46,14 +43,6 @@ export function serviceDateFromDateTime(value: string | undefined): string | und
 	const localDate = value?.match(/^(\d{4}-\d{2}-\d{2})(?:[T\s]|$)/)?.[1];
 	if (localDate) return localDate;
 	return undefined;
-}
-
-export function assertValidSyncHorizon(value: number): SyncHorizonMonths {
-	if (Number.isInteger(value) && value >= 1 && value <= 12) return value;
-	throw new ConvexError({
-		code: 'invalid_argument',
-		message: 'Choose a booking sync window from 1 to 12 months.'
-	});
 }
 
 export function missingBookeoRequiredPermissions(permissions: string[]): string[] {

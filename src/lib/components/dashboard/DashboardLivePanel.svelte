@@ -19,11 +19,13 @@
 	let {
 		workspaceId,
 		todayStartAt,
-		todayEndAt
+		todayEndAt,
+		isLoading = false
 	}: {
-		workspaceId: Id<'workspaces'>;
+		workspaceId: Id<'workspaces'> | null | undefined;
 		todayStartAt: number;
 		todayEndAt: number;
+		isLoading?: boolean;
 	} = $props();
 
 	const workspaceSlug = $derived(page.params.workspaceSlug ?? '');
@@ -39,25 +41,31 @@
 
 	const bookingsQuery = useProtectedQuery(
 		api.bookings.listWorkspaceBookings,
-		() => ({
-			workspaceId,
-			dayStartAt: todayStartAt,
-			dayEndAt: todayEndAt,
-			pageIndex: 0,
-			pageSize: 24,
-			searchQuery: '',
-			hideDone: true,
-			statusFilter: 'all' as const
-		}),
+		() =>
+			workspaceId
+				? {
+						workspaceId,
+						dayStartAt: todayStartAt,
+						dayEndAt: todayEndAt,
+						pageIndex: 0,
+						pageSize: 24,
+						searchQuery: '',
+						hideDone: true,
+						statusFilter: 'all' as const
+					}
+				: 'skip',
 		() => ({ keepPreviousData: true })
 	);
 
 	const submissionsQuery = useProtectedQuery(
 		api.waivers.listRecentSubmissions,
-		() => ({
-			workspaceId,
-			paginationOpts: { numItems: 24, cursor: null }
-		}),
+		() =>
+			workspaceId
+				? {
+						workspaceId,
+						paginationOpts: { numItems: 24, cursor: null }
+					}
+				: 'skip',
 		() => ({ keepPreviousData: true })
 	);
 
@@ -67,14 +75,16 @@
 
 	const bookingPage = $derived((bookingsQuery.data ?? null) as BookingPage | null);
 	const bookings = $derived(bookingPage?.bookings ?? []);
-	const bookingsInitialLoading = $derived(bookingsQuery.isLoading && !bookingPage);
+	const bookingsInitialLoading = $derived(isLoading || (bookingsQuery.isLoading && !bookingPage));
 
 	const submissionPage = $derived((submissionsQuery.data ?? null) as SubmissionPage | null);
 	const submissions = $derived(submissionPage?.submissions ?? []);
-	const submissionsInitialLoading = $derived(submissionsQuery.isLoading && !submissionPage);
+	const submissionsInitialLoading = $derived(
+		isLoading || (submissionsQuery.isLoading && !submissionPage)
+	);
 	const waiverQuery = useProtectedQuery(
 		api.waivers.getWorkspaceWaiver,
-		() => ({ workspaceId }),
+		() => (workspaceId ? { workspaceId } : 'skip'),
 		() => ({ keepPreviousData: true })
 	);
 	const publicSlug = $derived(waiverQuery.data?.publicSlug ?? null);
@@ -139,7 +149,7 @@
 	}
 </script>
 
-{#if selectedBookingId}
+{#if selectedBookingId && workspaceId}
 	<BookingDetailSheet
 		bind:open={bookingDetailOpen}
 		{workspaceId}
@@ -149,7 +159,7 @@
 	/>
 {/if}
 
-{#if selectedSubmissionId}
+{#if selectedSubmissionId && workspaceId}
 	<SubmissionDetailSheet
 		bind:open={submissionDetailOpen}
 		{workspaceId}
@@ -177,13 +187,19 @@
 			{#if bookingsInitialLoading}
 				<div class="divide-y divide-border">
 					{#each skeletonRows as row (row)}
-						<div class="flex items-center gap-4 px-5 py-4">
-							<Skeleton class="h-4 w-12 shrink-0" />
-							<div class="flex-1 space-y-2">
-								<Skeleton class="h-4 w-40" />
-								<Skeleton class="h-3 w-28" />
+						<div class="flex items-center gap-4 px-5 py-3.5">
+							<div class="w-14 shrink-0 space-y-1.5">
+								<Skeleton class="h-4 w-12" />
+								<Skeleton class="h-5 w-11 rounded-full" />
 							</div>
-							<Skeleton class="h-4 w-16 shrink-0" />
+							<div class="min-w-0 flex-1 space-y-2">
+								<Skeleton class="h-4 w-40 max-w-full" />
+								<Skeleton class="h-3 w-28 max-w-full" />
+							</div>
+							<div class="w-20 shrink-0 space-y-2">
+								<Skeleton class="ml-auto h-4 w-14" />
+								<Skeleton class="h-1.5 w-full rounded-full" />
+							</div>
 						</div>
 					{/each}
 				</div>
@@ -288,10 +304,10 @@
 			{#if submissionsInitialLoading}
 				<div class="divide-y divide-border">
 					{#each skeletonRows as row (row)}
-						<div class="flex items-center gap-4 px-5 py-4">
-							<div class="flex-1 space-y-2">
-								<Skeleton class="h-4 w-36" />
-								<Skeleton class="h-3 w-48" />
+						<div class="flex items-center gap-4 px-5 py-3.5">
+							<div class="min-w-0 flex-1 space-y-2">
+								<Skeleton class="h-4 w-36 max-w-full" />
+								<Skeleton class="h-3 w-48 max-w-full" />
 							</div>
 							<Skeleton class="h-4 w-20 shrink-0" />
 						</div>

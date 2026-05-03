@@ -78,13 +78,12 @@
 	/>
 
 	<div class="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_24rem]">
-		{#if currentWorkspace}
-			<DashboardLivePanel
-				workspaceId={currentWorkspace.workspaceId}
-				todayStartAt={today.startAt}
-				todayEndAt={today.endAt}
-			/>
-		{/if}
+		<DashboardLivePanel
+			workspaceId={currentWorkspace?.workspaceId}
+			todayStartAt={today.startAt}
+			todayEndAt={today.endAt}
+			isLoading={isInitialLoading}
+		/>
 		<EmailPipelinePanel
 			workspaceId={currentWorkspace?.workspaceId}
 			workspaceName={currentWorkspace?.name}

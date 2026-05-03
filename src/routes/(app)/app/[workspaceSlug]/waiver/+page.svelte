@@ -42,11 +42,11 @@
 	import { getConvexErrorMessage } from '$lib/utils/convex-errors';
 	import EllipsisIcon from '@lucide/svelte/icons/ellipsis';
 	import ClipboardIcon from '@lucide/svelte/icons/clipboard';
-	import Code2Icon from '@lucide/svelte/icons/code-2';
+	import Code2Icon from '@lucide/svelte/icons/code-xml';
 	import ExternalLinkIcon from '@lucide/svelte/icons/external-link';
 	import CheckIcon from '@lucide/svelte/icons/check';
 	import QrCodeIcon from '@lucide/svelte/icons/qr-code';
-	import UploadCloudIcon from '@lucide/svelte/icons/upload-cloud';
+	import UploadCloudIcon from '@lucide/svelte/icons/cloud-upload';
 	import Pencil from '@lucide/svelte/icons/pencil';
 	import XIcon from '@lucide/svelte/icons/x';
 

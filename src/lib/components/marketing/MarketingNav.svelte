@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
+	import { page } from '$app/state';
 	import { onMount } from 'svelte';
 	import { fade, fly } from 'svelte/transition';
 	import { Button } from '$lib/components/ui/button';
@@ -11,11 +12,16 @@
 	let scrollY = $state(0);
 	let scrolled = $derived(scrollY > 24);
 
-	const mobileLinks: { href: '/#features' | '/#how-it-works' | '/#pricing'; label: string }[] = [
-		{ href: '/#features', label: 'Features' },
-		{ href: '/#how-it-works', label: 'How it works' },
-		{ href: '/#pricing', label: 'Pricing' }
-	];
+	const navLinks = [
+		{ href: '/features', label: 'Features' },
+		{ href: '/pricing', label: 'Pricing' }
+	] as const;
+
+	function isActive(href: string): boolean {
+		const path = page.url.pathname;
+		if (href.startsWith('/#')) return false;
+		return path === href || path.startsWith(href + '/');
+	}
 
 	function closeMobileNav() {
 		mobileNavOpen = false;
@@ -83,15 +89,15 @@
 			</div>
 
 			<div class="hidden items-center gap-1 md:flex md:justify-self-center">
-				<a href={resolve('/#features')} class="nav-link text-[13px] font-medium no-underline"
-					>Features</a
-				>
-				<a href={resolve('/#how-it-works')} class="nav-link text-[13px] font-medium no-underline"
-					>How it works</a
-				>
-				<a href={resolve('/#pricing')} class="nav-link text-[13px] font-medium no-underline"
-					>Pricing</a
-				>
+				{#each navLinks as link (link.href)}
+					<a
+						href={resolve(link.href)}
+						class="nav-link text-[13px] font-medium no-underline"
+						class:nav-link--active={isActive(resolve(link.href))}
+					>
+						{link.label}
+					</a>
+				{/each}
 			</div>
 
 			<div class="hidden items-center gap-2 md:flex md:justify-self-end">
@@ -134,10 +140,15 @@
 			>
 				<div class="mkt-mobile-panel">
 					<ul class="mkt-mobile-nav-list">
-						{#each mobileLinks as item (item.href)}
+						{#each navLinks as link (link.href)}
 							<li>
-								<a href={resolve(item.href)} class="mkt-mobile-link" onclick={closeMobileNav}>
-									{item.label}
+								<a
+									href={resolve(link.href)}
+									class="mkt-mobile-link"
+									class:mkt-mobile-link--active={isActive(resolve(link.href))}
+									onclick={closeMobileNav}
+								>
+									{link.label}
 								</a>
 							</li>
 						{/each}
@@ -167,7 +178,7 @@
 		position: fixed;
 		inset: 0;
 		z-index: 45;
-		background: oklch(0.02 0.02 277 / 55%);
+		background: oklch(0.02 0.02 277 / 50%);
 		opacity: 1;
 		pointer-events: auto;
 	}
@@ -197,7 +208,7 @@
 		outline: none;
 		border-radius: var(--radius-lg);
 		box-shadow:
-			0 0 0 2px oklch(0.09 0.006 286),
+			0 0 0 2px oklch(0.07 0.005 286),
 			0 0 0 4px oklch(0.52 0.22 277 / 45%);
 	}
 
@@ -211,6 +222,7 @@
 		letter-spacing: -0.01em;
 		line-height: 1.2;
 		white-space: nowrap;
+		position: relative;
 		transition:
 			color 0.15s ease,
 			background 0.15s ease;
@@ -223,11 +235,26 @@
 		}
 	}
 
+	.nav-link--active {
+		color: oklch(0.97 0 0);
+	}
+
+	.nav-link--active::after {
+		content: '';
+		position: absolute;
+		bottom: -1px;
+		left: 0.8rem;
+		right: 0.8rem;
+		height: 1px;
+		background: oklch(0.52 0.22 277 / 60%);
+		border-radius: 1px;
+	}
+
 	.nav-link:focus-visible {
 		outline: none;
 		color: inherit;
 		box-shadow:
-			0 0 0 2px oklch(0.09 0.006 286),
+			0 0 0 2px oklch(0.07 0.005 286),
 			0 0 0 4px oklch(0.52 0.22 277 / 40%);
 	}
 
@@ -243,10 +270,10 @@
 		overflow: hidden;
 		border: 1px solid oklch(1 0 0 / 8%);
 		border-radius: var(--radius-2xl);
-		background: oklch(0.1 0.008 286 / 96%);
-		box-shadow: 0 12px 32px oklch(0 0 0 / 24%);
-		-webkit-backdrop-filter: blur(16px) saturate(160%);
-		backdrop-filter: blur(16px) saturate(160%);
+		background: oklch(0.09 0.006 286 / 96%);
+		box-shadow: 0 12px 32px oklch(0 0 0 / 28%);
+		-webkit-backdrop-filter: blur(20px) saturate(150%);
+		backdrop-filter: blur(20px) saturate(150%);
 	}
 
 	@media (max-width: 767px), (pointer: coarse) {
@@ -296,11 +323,16 @@
 		}
 	}
 
+	.mkt-mobile-link--active {
+		color: oklch(0.97 0 0);
+		background: oklch(0.52 0.22 277 / 8%);
+	}
+
 	.mkt-mobile-link:focus-visible {
 		outline: none;
 		background: oklch(0.52 0.22 277 / 12%);
 		box-shadow:
-			0 0 0 2px oklch(0.09 0.006 286),
+			0 0 0 2px oklch(0.07 0.005 286),
 			0 0 0 4px oklch(0.52 0.22 277 / 35%);
 	}
 

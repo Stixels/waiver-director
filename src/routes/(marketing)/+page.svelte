@@ -1,17 +1,18 @@
 <script lang="ts">
 	import { PUBLIC_APP_URL } from '$env/static/public';
 
-	import MarketingPricing from '$lib/components/marketing/MarketingPricing.svelte';
 	import LandingPageAnalyticsPreview from '$lib/components/marketing/landing-page/LandingPageAnalyticsPreview.svelte';
 	import LandingPageCta from '$lib/components/marketing/landing-page/LandingPageCta.svelte';
 	import LandingPageDifferentiator from '$lib/components/marketing/landing-page/LandingPageDifferentiator.svelte';
-	import LandingPageFeatures from '$lib/components/marketing/landing-page/LandingPageFeatures.svelte';
+	import LandingPageEmailPipeline from '$lib/components/marketing/landing-page/LandingPageEmailPipeline.svelte';
+	import LandingPageFeatureTeaser from '$lib/components/marketing/landing-page/LandingPageFeatureTeaser.svelte';
 	import LandingPageHero from '$lib/components/marketing/landing-page/LandingPageHero.svelte';
 	import LandingPageHowItWorks from '$lib/components/marketing/landing-page/LandingPageHowItWorks.svelte';
+	import LandingPageTestimonials from '$lib/components/marketing/landing-page/LandingPageTestimonials.svelte';
 
 	const pageTitle = 'Waiver Director — Digital Waivers for Any Booking Experience';
 	const pageDescription =
-		"Digital waivers for tours & activities: capture every guest's email, sync Bookeo/Resova/Xola, and automate follow-ups for customer feedback, review requests & reminders. Optional Mailchimp & Constant Contact.";
+		"Digital waivers for tours & activities: capture every guest's email, sync Bookeo bookings, and automate on-demand or delayed follow-up emails. More integrations are coming soon.";
 
 	const siteBase = (PUBLIC_APP_URL ?? '').replace(/\/$/, '');
 	const canonicalUrl = siteBase ? `${siteBase}/` : '';
@@ -35,7 +36,8 @@
 <LandingPageHero />
 <LandingPageDifferentiator />
 <LandingPageHowItWorks />
-<LandingPageFeatures />
+<LandingPageFeatureTeaser />
+<LandingPageEmailPipeline />
 <LandingPageAnalyticsPreview />
-<MarketingPricing />
+<LandingPageTestimonials />
 <LandingPageCta />
