@@ -50,6 +50,7 @@
 				<div
 					class="rounded-xl border p-5"
 					style="border-color: var(--m-border-strong); background: var(--m-card);"
+					aria-hidden="true"
 				>
 					<div class="mb-4 flex items-center justify-between">
 						<p class="text-[13px] font-semibold">Adventure Waiver — v2</p>
@@ -83,6 +84,7 @@
 					<div
 						class="mb-4 rounded-lg border-2 border-dashed px-3 py-4 text-center"
 						style="border-color: var(--m-border-strong);"
+						aria-hidden="true"
 					>
 						<p class="mb-1 text-[11px] font-semibold" style="color: var(--m-text-2);">Signature</p>
 						<p class="text-[10px]" style="color: var(--m-text-3);">Draw or type below</p>
@@ -115,6 +117,7 @@
 				<div
 					class="rounded-xl border p-5"
 					style="border-color: var(--m-border-strong); background: var(--m-card);"
+					aria-hidden="true"
 				>
 					<p
 						class="mb-4 text-[10px] font-semibold tracking-widest uppercase"
@@ -168,6 +171,7 @@
 				<div
 					class="rounded-xl border p-5"
 					style="border-color: var(--m-border-strong); background: var(--m-card);"
+					aria-hidden="true"
 				>
 					<p
 						class="mb-4 text-[10px] font-semibold tracking-widest uppercase"

@@ -411,19 +411,11 @@
 					</div>
 				{:else}
 					<div class="flex flex-1 flex-col gap-4">
-						<div class="flex items-start justify-between gap-4">
-							<div>
-								<p class="text-3xl font-bold tracking-tight tabular-nums">
-									{emailSent.toLocaleString()}
-								</p>
-								<p class="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
-									<span class="size-2 rounded-full bg-primary"></span>
-									<span>Sent</span>
-								</p>
-							</div>
-							<div class="rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground">
-								{emailActivityTotal.toLocaleString()} total
-							</div>
+						<div>
+							<p class="text-3xl font-bold tracking-tight tabular-nums">
+								{emailActivityTotal.toLocaleString()}
+							</p>
+							<p class="mt-0.5 text-xs text-muted-foreground">Total email activity</p>
 						</div>
 
 						<div class="space-y-1.5">
@@ -450,7 +442,7 @@
 						</div>
 
 						<div class="divide-y divide-border/70 border-t border-border/70 text-sm">
-							{#each emailStatusSegments.slice(1) as segment (segment.label)}
+							{#each emailStatusSegments as segment (segment.label)}
 								<div class="flex items-center justify-between py-1.5">
 									<div class={`flex items-center gap-2 ${segment.textClass}`}>
 										<span class={`size-2 rounded-full ${segment.dotClass}`}></span>
@@ -471,7 +463,7 @@
 					<UsersRoundIcon class="mt-0.5 size-4 shrink-0 text-muted-foreground" />
 					<CardTitle class="text-base font-semibold">Customers by Day</CardTitle>
 				</div>
-				{#if !isInitialLoading && analyticsData && customerActivityTotal > 0}
+				{#if !isInitialLoading && analyticsData}
 					<div class="text-right">
 						<p class="text-2xl font-bold tracking-tight tabular-nums">
 							{customerActivityTotal.toLocaleString()}

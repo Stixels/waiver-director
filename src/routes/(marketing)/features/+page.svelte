@@ -25,10 +25,7 @@
 		title: string;
 		description: string;
 		detail: string;
-		mdClass: string;
-		lgClass: string;
 		hero: boolean;
-		footer?: 'version' | 'chart';
 	};
 
 	const features: Feature[] = [
@@ -40,10 +37,7 @@
 				'Build a structured public waiver with rich text, custom fields, required questions, and signature blocks.',
 			detail:
 				'Use custom fields for the details your operation actually needs, then version each publish: once a version is locked, every signature references that exact document. When you update your waiver, past records stay intact.',
-			mdClass: 'md:col-span-2',
-			lgClass: 'lg:col-span-4',
-			hero: true,
-			footer: 'version'
+			hero: true
 		},
 		{
 			id: 'email-automation',
@@ -53,8 +47,6 @@
 				'Send emails on demand or trigger them after a booking delay for every participant.',
 			detail:
 				'Configure booking delays and templates once, or send a message manually when the moment calls for it. Verify your reply-to email to finish setup and send thank-yous, feedback, and review asks.',
-			mdClass: 'md:col-span-1',
-			lgClass: 'lg:col-span-2',
 			hero: false
 		},
 		{
@@ -65,8 +57,6 @@
 				'Connect Bookeo now. Resova, Xola, and other booking integrations are coming soon.',
 			detail:
 				'Link one booking provider per workspace so upcoming sessions appear in your dashboard with expected guest counts. Waivers are automatically matched to the correct session — no per-session setup required.',
-			mdClass: 'md:col-span-1',
-			lgClass: 'lg:col-span-2',
 			hero: false
 		},
 		{
@@ -76,8 +66,6 @@
 			description: 'Marketing-list integrations are coming soon for the tools you already use.',
 			detail:
 				'Mailchimp and Constant Contact are planned so your broadcasts can reflect who actually showed up — not just who booked.',
-			mdClass: 'md:col-span-1',
-			lgClass: 'lg:col-span-2',
 			hero: false
 		},
 		{
@@ -87,8 +75,6 @@
 			description: 'Owner and staff roles per workspace. Manage multiple venues from one account.',
 			detail:
 				'Invite team members with the right permission level. Staff can view sessions and submissions. Owners control waiver settings, integrations, and billing. A single account can manage multiple business locations.',
-			mdClass: 'md:col-span-1',
-			lgClass: 'lg:col-span-2',
 			hero: false
 		},
 		{
@@ -99,10 +85,7 @@
 				'See signed vs. expected counts per session, completion rates, and submission trends.',
 			detail:
 				'Know your real completion rate at a glance. Track how many guests signed before arrival vs. at the door. Trend charts show you how follow-up performance changes over time across all your sessions.',
-			mdClass: 'md:col-span-2',
-			lgClass: 'lg:col-span-4',
-			hero: true,
-			footer: 'chart'
+			hero: true
 		},
 		{
 			id: 'audit-trail',
@@ -111,8 +94,6 @@
 			description: 'Every open, draft, submit, void, and export is recorded immutably.',
 			detail:
 				'Every action taken on a signed record is logged with a timestamp and user reference. On-demand PDF exports always reference the exact version of the waiver that was signed — not the current draft.',
-			mdClass: 'md:col-span-1',
-			lgClass: 'lg:col-span-2',
 			hero: false
 		}
 	];

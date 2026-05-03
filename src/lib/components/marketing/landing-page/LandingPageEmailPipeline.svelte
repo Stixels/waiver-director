@@ -98,6 +98,7 @@
 				<div
 					class="email-preview-card overflow-hidden rounded-xl border"
 					style="background: var(--m-card); border-color: var(--m-border-strong); box-shadow: 0 16px 48px oklch(0 0 0 / 40%), inset 0 1px 0 oklch(1 0 0 / 5%);"
+					aria-hidden="true"
 				>
 					<!-- Chrome bar -->
 					<div
