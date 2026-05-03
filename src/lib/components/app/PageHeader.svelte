@@ -37,6 +37,6 @@
 <style>
 	.page-header {
 		border-bottom: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
-		background: color-mix(in srgb, var(--card) 30%, transparent);
+		background: var(--card);
 	}
 </style>

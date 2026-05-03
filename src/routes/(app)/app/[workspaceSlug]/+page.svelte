@@ -60,7 +60,7 @@
 
 <div class="h-full min-h-0 w-full overflow-y-auto p-4 sm:p-6 xl:overflow-hidden">
 	<div
-		class="mx-auto flex min-h-full w-full max-w-7xl min-w-0 flex-col gap-4 xl:h-full xl:overflow-hidden"
+		class="mx-auto flex min-h-full w-full max-w-7xl min-w-0 flex-col gap-4 p-px xl:h-full xl:overflow-hidden"
 	>
 		<DashboardKpiRow
 			kpi={snapshot?.kpi}
