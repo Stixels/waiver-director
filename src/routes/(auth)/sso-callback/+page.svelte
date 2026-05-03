@@ -16,9 +16,37 @@
 		);
 	}
 
-	function replaceWith(url: string): Promise<void> {
+	async function replaceWith(url: string): Promise<void> {
 		window.location.replace(url);
-		return Promise.resolve();
+	}
+
+	async function handleSsoCallback(timeoutId: number) {
+		try {
+			await clerk.clerk?.handleRedirectCallback(
+				{
+					signInUrl: resolve('/sign-in'),
+					signUpUrl: resolve('/sign-up'),
+					signInForceRedirectUrl: postAuthRedirectUrl,
+					signUpForceRedirectUrl: postAuthRedirectUrl,
+					continueSignUpUrl: resolve('/sign-up'),
+					verifyEmailAddressUrl: resolve('/sign-up'),
+					resetPasswordUrl: resolve('/forgot-password')
+				},
+				replaceWith
+			);
+
+			if (hasActiveSession()) {
+				void replaceWith(postAuthRedirectUrl);
+			}
+		} catch (error) {
+			console.error('[auth/sso-callback] Clerk redirect callback failed', error);
+			callbackError = getClerkErrorMessage(
+				error,
+				'Unable to complete Google authentication. Please try again.'
+			);
+		} finally {
+			window.clearTimeout(timeoutId);
+		}
 	}
 
 	$effect(() => {
@@ -42,33 +70,7 @@
 				'Google authentication did not finish. Check that this exact URL is allowed in Clerk and Google OAuth redirect settings, then try again.';
 		}, 8000);
 
-		void clerk.clerk
-			.handleRedirectCallback(
-				{
-					signInUrl: resolve('/sign-in'),
-					signUpUrl: resolve('/sign-up'),
-					signInForceRedirectUrl: postAuthRedirectUrl,
-					signUpForceRedirectUrl: postAuthRedirectUrl,
-					continueSignUpUrl: resolve('/sign-up'),
-					verifyEmailAddressUrl: resolve('/sign-up'),
-					resetPasswordUrl: resolve('/forgot-password')
-				},
-				replaceWith
-			)
-			.then(() => {
-				window.clearTimeout(timeoutId);
-				if (hasActiveSession()) {
-					void replaceWith(postAuthRedirectUrl);
-				}
-			})
-			.catch((error) => {
-				window.clearTimeout(timeoutId);
-				console.error('[auth/sso-callback] Clerk redirect callback failed', error);
-				callbackError = getClerkErrorMessage(
-					error,
-					'Unable to complete Google authentication. Please try again.'
-				);
-			});
+		void handleSsoCallback(timeoutId);
 	});
 </script>
 
