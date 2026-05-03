@@ -1,15 +1,46 @@
 import { ConvexError, v } from 'convex/values';
-import { mutation, query } from './_generated/server';
+import { internal } from './_generated/api';
+import { internalMutation, mutation, query } from './_generated/server';
+import type { MutationCtx } from './_generated/server';
+import type { Doc, Id, TableNames } from './_generated/dataModel';
 import { getCurrentUser } from './lib/auth';
 import {
 	createDefaultPublicWaiverSlug,
 	createDefaultWaiverDefinition,
+	requireWorkspaceMember,
 	requireWorkspaceOwner
 } from './lib/waivers';
 import { getWorkspaceMembership, listWorkspaceMembershipsForUser } from './lib/workspaces';
 
 const WORKSPACE_SLUG_REGEX = /^[a-z0-9](?:[a-z0-9-]{0,46}[a-z0-9])$/;
 const RESERVED_SLUGS = ['workspaces'];
+
+type WorkspaceScopedTableName = {
+	[TableName in TableNames]: Doc<TableName> extends { workspaceId: Id<'workspaces'> }
+		? TableName
+		: never;
+}[TableNames];
+
+const WORKSPACE_SCOPED_TABLES = {
+	workspace_memberships: true,
+	workspace_waivers: true,
+	waiver_versions: true,
+	customers: true,
+	waiver_submissions: true,
+	email_editor_content: true,
+	email_templates: true,
+	workspace_email_settings: true,
+	email_follow_ups: true,
+	booking_integrations: true,
+	booking_connection_sessions: true,
+	bookings: true,
+	booking_webhook_events: true
+} as const satisfies Record<WorkspaceScopedTableName, true>;
+type WorkspaceCleanupTableName = keyof typeof WORKSPACE_SCOPED_TABLES;
+const WORKSPACE_CLEANUP_TABLE_NAMES = Object.keys(
+	WORKSPACE_SCOPED_TABLES
+) as WorkspaceCleanupTableName[];
+const CLEANUP_BATCH_PER_TABLE = 50;
 
 export const createWorkspace = mutation({
 	args: {
@@ -134,6 +165,10 @@ export const listCurrentUserWorkspaces = query({
 				return null;
 			}
 
+			if (workspace.status === 'archived') {
+				return null;
+			}
+
 			return {
 				workspaceId: workspace._id,
 				name: workspace.name,
@@ -226,6 +261,222 @@ export const updateWorkspace = mutation({
 			name: next.name,
 			slug: next.slug,
 			slugChanged
+		};
+	}
+});
+
+export const generateLogoUploadUrl = mutation({
+	args: {
+		workspaceId: v.id('workspaces')
+	},
+	returns: v.string(),
+	handler: async (ctx, args) => {
+		await requireWorkspaceOwner(ctx, args.workspaceId, 'change workspace branding');
+		return await ctx.storage.generateUploadUrl();
+	}
+});
+
+export const setWorkspaceLogo = mutation({
+	args: {
+		workspaceId: v.id('workspaces'),
+		storageId: v.id('_storage')
+	},
+	returns: v.null(),
+	handler: async (ctx, args) => {
+		await requireWorkspaceOwner(ctx, args.workspaceId, 'change workspace branding');
+
+		const workspace = await ctx.db.get(args.workspaceId);
+		if (!workspace) {
+			throw new ConvexError({ code: 'not_found', message: 'Workspace not found.' });
+		}
+
+		const previousLogo = workspace.logoStorageId;
+		await ctx.db.patch(args.workspaceId, { logoStorageId: args.storageId });
+
+		if (previousLogo && previousLogo !== args.storageId) {
+			await ctx.storage.delete(previousLogo);
+		}
+
+		return null;
+	}
+});
+
+export const removeWorkspaceLogo = mutation({
+	args: {
+		workspaceId: v.id('workspaces')
+	},
+	returns: v.null(),
+	handler: async (ctx, args) => {
+		await requireWorkspaceOwner(ctx, args.workspaceId, 'change workspace branding');
+
+		const workspace = await ctx.db.get(args.workspaceId);
+		if (!workspace) {
+			throw new ConvexError({ code: 'not_found', message: 'Workspace not found.' });
+		}
+
+		if (!workspace.logoStorageId) {
+			return null;
+		}
+
+		const previousLogo = workspace.logoStorageId;
+		await ctx.db.patch(args.workspaceId, { logoStorageId: undefined });
+		await ctx.storage.delete(previousLogo);
+		return null;
+	}
+});
+
+export const archiveWorkspace = mutation({
+	args: {
+		workspaceId: v.id('workspaces'),
+		confirmSlug: v.string()
+	},
+	returns: v.null(),
+	handler: async (ctx, args) => {
+		await requireWorkspaceOwner(ctx, args.workspaceId, 'delete the workspace');
+
+		const workspace = await ctx.db.get(args.workspaceId);
+		if (!workspace) {
+			throw new ConvexError({ code: 'not_found', message: 'Workspace not found.' });
+		}
+
+		if (args.confirmSlug.trim() !== workspace.slug) {
+			throw new ConvexError({
+				code: 'invalid_argument',
+				message: 'Confirmation text does not match the workspace slug.'
+			});
+		}
+
+		if (workspace.status !== 'archived') {
+			await ctx.db.patch(args.workspaceId, {
+				status: 'archived',
+				archivedAt: Date.now()
+			});
+		}
+
+		await ctx.scheduler.runAfter(0, internal.workspaces.cleanupArchivedWorkspace, {
+			workspaceId: args.workspaceId
+		});
+
+		return null;
+	}
+});
+
+async function deleteWorkspaceTableBatch(
+	ctx: MutationCtx,
+	tableName: WorkspaceCleanupTableName,
+	workspaceId: Id<'workspaces'>
+): Promise<{ deleted: number; hasMore: boolean }> {
+	const rows = await ctx.db
+		.query(tableName)
+		.withIndex('by_workspaceId', (q) => q.eq('workspaceId', workspaceId))
+		.take(CLEANUP_BATCH_PER_TABLE);
+
+	for (const row of rows) {
+		if (tableName === 'email_follow_ups') {
+			const followUp = row as { scheduledFunctionId?: Id<'_scheduled_functions'> };
+			if (followUp.scheduledFunctionId) {
+				try {
+					await ctx.scheduler.cancel(followUp.scheduledFunctionId);
+				} catch (error) {
+					console.warn('[cleanupArchivedWorkspace] failed to cancel scheduled follow-up', {
+						scheduledFunctionId: followUp.scheduledFunctionId,
+						error
+					});
+				}
+			}
+		}
+		await ctx.db.delete(row._id);
+	}
+
+	return {
+		deleted: rows.length,
+		hasMore: rows.length === CLEANUP_BATCH_PER_TABLE
+	};
+}
+
+export const cleanupArchivedWorkspace = internalMutation({
+	args: {
+		workspaceId: v.id('workspaces')
+	},
+	returns: v.null(),
+	handler: async (ctx, args) => {
+		const workspace = await ctx.db.get(args.workspaceId);
+		if (!workspace) {
+			return null;
+		}
+
+		if (workspace.status !== 'archived') {
+			console.warn('[cleanupArchivedWorkspace] workspace is not archived, aborting cleanup', {
+				workspaceId: args.workspaceId,
+				status: workspace.status
+			});
+			return null;
+		}
+
+		let hasMore = false;
+		for (const tableName of WORKSPACE_CLEANUP_TABLE_NAMES) {
+			const result = await deleteWorkspaceTableBatch(ctx, tableName, args.workspaceId);
+			if (result.hasMore) {
+				hasMore = true;
+			}
+		}
+
+		if (hasMore) {
+			await ctx.scheduler.runAfter(0, internal.workspaces.cleanupArchivedWorkspace, {
+				workspaceId: args.workspaceId
+			});
+			return null;
+		}
+
+		if (workspace.logoStorageId) {
+			try {
+				await ctx.storage.delete(workspace.logoStorageId);
+			} catch (error) {
+				console.warn('[cleanupArchivedWorkspace] failed to delete logo storage', {
+					workspaceId: args.workspaceId,
+					storageId: workspace.logoStorageId,
+					error
+				});
+			}
+		}
+
+		await ctx.db.delete(args.workspaceId);
+		return null;
+	}
+});
+
+export const getWorkspaceBranding = query({
+	args: {
+		workspaceId: v.id('workspaces')
+	},
+	returns: v.union(
+		v.null(),
+		v.object({
+			workspaceId: v.id('workspaces'),
+			name: v.string(),
+			slug: v.string(),
+			logoUrl: v.union(v.string(), v.null()),
+			logoStorageId: v.union(v.id('_storage'), v.null())
+		})
+	),
+	handler: async (ctx, args) => {
+		await requireWorkspaceMember(ctx, args.workspaceId);
+
+		const workspace = await ctx.db.get(args.workspaceId);
+		if (!workspace) {
+			return null;
+		}
+
+		const logoUrl = workspace.logoStorageId
+			? await ctx.storage.getUrl(workspace.logoStorageId)
+			: null;
+
+		return {
+			workspaceId: workspace._id,
+			name: workspace.name,
+			slug: workspace.slug,
+			logoUrl: logoUrl ?? null,
+			logoStorageId: workspace.logoStorageId ?? null
 		};
 	}
 });

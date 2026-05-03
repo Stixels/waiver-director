@@ -28,7 +28,9 @@ export default defineSchema({
 		slug: v.string(),
 		status: v.union(v.literal('active'), v.literal('archived')),
 		createdByUserId: v.optional(v.id('users')),
-		customerCount: v.number()
+		customerCount: v.number(),
+		logoStorageId: v.optional(v.id('_storage')),
+		archivedAt: v.optional(v.number())
 	})
 		.index('by_slug', ['slug'])
 		.index('by_createdByUserId', ['createdByUserId']),

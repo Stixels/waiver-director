@@ -7,6 +7,8 @@
 	import { cn } from '$lib/utils';
 	import Building2Icon from '@lucide/svelte/icons/building-2';
 	import MailIcon from '@lucide/svelte/icons/mail';
+	import PaletteIcon from '@lucide/svelte/icons/palette';
+	import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
 
 	let { children } = $props();
 
@@ -21,14 +23,32 @@
 			label: 'General',
 			description: 'Name, slug, identifiers',
 			icon: Building2Icon,
-			match: 'general'
+			match: 'general',
+			tone: 'default' as const
+		},
+		{
+			href: `/app/${page.params.workspaceSlug}/settings/branding` as const,
+			label: 'Branding',
+			description: 'Logo and visual identity',
+			icon: PaletteIcon,
+			match: 'branding',
+			tone: 'default' as const
 		},
 		{
 			href: `/app/${page.params.workspaceSlug}/settings/email` as const,
 			label: 'Email identity',
 			description: 'Sender name, reply-to address',
 			icon: MailIcon,
-			match: 'email'
+			match: 'email',
+			tone: 'default' as const
+		},
+		{
+			href: `/app/${page.params.workspaceSlug}/settings/danger` as const,
+			label: 'Danger zone',
+			description: 'Delete this workspace',
+			icon: TriangleAlertIcon,
+			match: 'danger',
+			tone: 'destructive' as const
 		}
 	]);
 
@@ -56,11 +76,16 @@
 				{#each sections as section (section.href)}
 					{@const isActive = activeMatch === section.match}
 					{@const Icon = section.icon}
+					{@const isDestructive = section.tone === 'destructive'}
 					<a
 						href={resolve(section.href)}
 						class={cn(
-							'flex min-w-0 items-start gap-2 rounded-md px-2 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground focus-visible:outline-none',
-							isActive && 'bg-muted text-foreground'
+							'flex min-w-0 items-start gap-2 rounded-md px-2 py-2 text-sm transition-colors focus-visible:outline-none',
+							isDestructive
+								? 'text-destructive/85 hover:bg-destructive/10 hover:text-destructive'
+								: 'text-muted-foreground hover:bg-muted/50 hover:text-foreground',
+							isActive && !isDestructive && 'bg-muted text-foreground',
+							isActive && isDestructive && 'bg-destructive/10 text-destructive'
 						)}
 						aria-current={isActive ? 'page' : undefined}
 					>
@@ -69,7 +94,12 @@
 						</span>
 						<span class="flex min-w-0 flex-1 flex-col gap-0.5">
 							<span class="truncate font-medium">{section.label}</span>
-							<span class="truncate text-xs text-muted-foreground">{section.description}</span>
+							<span
+								class={cn(
+									'truncate text-xs',
+									isDestructive ? 'text-destructive/65' : 'text-muted-foreground'
+								)}>{section.description}</span
+							>
 						</span>
 					</a>
 				{/each}

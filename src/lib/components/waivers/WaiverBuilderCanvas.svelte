@@ -23,8 +23,12 @@
 	import CloudCheckIcon from '@lucide/svelte/icons/cloud-check';
 	import CloudOffIcon from '@lucide/svelte/icons/cloud-off';
 	import LoaderIcon from '@lucide/svelte/icons/loader';
+	import type { Id } from '$convex/_generated/dataModel';
+	import { api } from '$convex/_generated/api';
+	import { useProtectedQuery } from '$lib/components/auth/convex-auth.svelte';
 	import type { WaiverField } from '$lib/domain/waivers';
 	import WaiverDocumentShell from '$lib/components/waivers/WaiverDocumentShell.svelte';
+	import WorkspaceLogoUploader from '$lib/components/workspaces/WorkspaceLogoUploader.svelte';
 	import WaiverPublicAboutSignerCard from '$lib/components/waivers/WaiverPublicAboutSignerCard.svelte';
 	import WaiverPublicAdditionalInfoSection from '$lib/components/waivers/WaiverPublicAdditionalInfoSection.svelte';
 	import WaiverPublicMinorsBlock from '$lib/components/waivers/WaiverPublicMinorsBlock.svelte';
@@ -60,6 +64,8 @@
 		introCopy: string;
 		fields: WaiverField[];
 		workspaceName?: string;
+		workspaceId?: Id<'workspaces'> | null;
+		canEditBranding?: boolean;
 		saveState?: SaveState;
 		lastSavedAt?: number | null;
 	}
@@ -71,9 +77,16 @@
 		introCopy = $bindable('<p></p>'),
 		fields,
 		workspaceName,
+		workspaceId = null,
+		canEditBranding = false,
 		saveState = 'idle',
 		lastSavedAt = null
 	}: Props = $props();
+
+	const brandingQuery = useProtectedQuery(api.workspaces.getWorkspaceBranding, () =>
+		workspaceId ? { workspaceId } : 'skip'
+	);
+	const workspaceLogoUrl = $derived(brandingQuery.data?.logoUrl ?? null);
 
 	let editorElement = $state<HTMLDivElement | null>(null);
 	let editor = $state<Editor | null>(null);
@@ -528,7 +541,17 @@
 
 	<!-- Scrollable document canvas -->
 	<div class="flex-1 overflow-y-auto overscroll-y-contain" data-canvas-scroll>
-		<WaiverDocumentShell {workspaceName}>
+		<WaiverDocumentShell {workspaceName} {workspaceLogoUrl}>
+			{#snippet headerActions()}
+				{#if workspaceId && canEditBranding}
+					<WorkspaceLogoUploader
+						{workspaceId}
+						variant="inline"
+						canEdit={canEditBranding}
+						inlineLabel="Add logo"
+					/>
+				{/if}
+			{/snippet}
 			<!-- Editable waiver copy — just the body, no eyebrow/title/separator -->
 			<section class="{waiverSectionCardClass} canvas-document-card" class:is-focused={hasFocus}>
 				<div class="canvas-editor-wrapper" data-waiver-canvas-editor>

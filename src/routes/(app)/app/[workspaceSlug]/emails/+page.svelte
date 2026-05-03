@@ -42,6 +42,7 @@
 	import EmailSaveTemplateDialog from '$lib/components/emails/EmailSaveTemplateDialog.svelte';
 	import RichTextEditor from '$lib/components/emails/RichTextEditor.svelte';
 	import WaiverRichText from '$lib/components/waivers/WaiverRichText.svelte';
+	import WorkspaceLogoUploader from '$lib/components/workspaces/WorkspaceLogoUploader.svelte';
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
 	import CloudIcon from '@lucide/svelte/icons/cloud';
 	import CloudCheckIcon from '@lucide/svelte/icons/cloud-check';
@@ -231,6 +232,12 @@
 	// ─── Sender summary (read-only on this page) ──────────────────────────────
 
 	const businessName = $derived(currentWorkspace?.name ?? 'Your business');
+	const isOwner = $derived(currentWorkspace?.role === 'owner');
+
+	const brandingQuery = useProtectedQuery(api.workspaces.getWorkspaceBranding, () =>
+		currentWorkspace ? { workspaceId: currentWorkspace.workspaceId } : 'skip'
+	);
+	const workspaceLogoUrl = $derived(brandingQuery.data?.logoUrl ?? null);
 	const hasPlatformFromEmail = $derived(Boolean(senderSettings?.platformFromEmail));
 	const workspaceCanSendEmail = $derived(Boolean(senderSettings?.canSendEmails));
 	const replyToPendingVerification = $derived(Boolean(senderSettings?.pendingReplyToEmail));
@@ -260,7 +267,10 @@
 	let lastSavedAt = $state<number | null>(null);
 	let lastSaveError = $state<string | null>(null);
 	let autosaveTimer: ReturnType<typeof setTimeout> | null = null;
-	let editorRef = $state<{ insertText: (text: string) => void } | null>(null);
+	let editorRef = $state<{
+		insertText: (text: string) => void;
+		insertWorkspaceLogo: (logoUrl?: string | null) => void;
+	} | null>(null);
 	let subjectInputRef = $state<HTMLInputElement | null>(null);
 	let insertTarget = $state<'subject' | 'body'>('body');
 	let subjectSelectionStart = $state(0);
@@ -1677,6 +1687,17 @@
 								{/if}
 								<span class="truncate">{savedLabel}</span>
 							</span>
+							{#if currentWorkspace && (isOwner || workspaceLogoUrl)}
+								<WorkspaceLogoUploader
+									workspaceId={currentWorkspace.workspaceId}
+									variant="inline"
+									canEdit={isOwner}
+									inlineLabel="Add logo"
+									inlineLabelWithLogo="Insert logo"
+									onClickWhenSet={() => editorRef?.insertWorkspaceLogo()}
+									onUploadComplete={(logoUrl) => editorRef?.insertWorkspaceLogo(logoUrl)}
+								/>
+							{/if}
 							<button
 								type="button"
 								onclick={() => (emailPreviewMode = !emailPreviewMode)}
@@ -1743,6 +1764,8 @@
 								class="email-rich-editor"
 								bind:value={body}
 								bind:this={editorRef}
+								{workspaceLogoUrl}
+								workspaceName={businessName}
 							/>
 						</div>
 					{/if}
@@ -2381,10 +2404,15 @@
 		white-space: nowrap;
 	}
 
-	.preview-toggle:hover {
+	.preview-toggle:hover:not(:disabled) {
 		color: var(--foreground);
 		border-color: color-mix(in srgb, var(--border) 150%, transparent);
 		background: color-mix(in srgb, var(--muted) 50%, transparent);
+	}
+
+	.preview-toggle:disabled {
+		cursor: not-allowed;
+		opacity: 0.45;
 	}
 
 	.preview-toggle[data-active='true'] {
@@ -2434,6 +2462,7 @@
 		font-size: 0.8rem;
 		font-weight: 600;
 		flex-shrink: 0;
+		overflow: hidden;
 	}
 
 	.email-preview-from-info {

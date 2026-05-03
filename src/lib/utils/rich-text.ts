@@ -17,8 +17,14 @@ const ALLOWED_TAGS = [
 	'h4',
 	'h5',
 	'h6',
-	'span'
+	'span',
+	'img'
 ];
+
+const IMG_WIDTH_PATTERN = /^[1-9][0-9]{0,3}(?:px|%)?$/;
+const IMG_OBJECT_FIT_PATTERN = /^(?:contain|cover|fill|none|scale-down)$/i;
+const CONVEX_STORAGE_URL_PATTERN =
+	/^https?:\/\/(?:[a-z0-9-]+\.convex\.(?:cloud|site|dev)|127\.0\.0\.1(?::\d+)?|localhost(?::\d+)?)\/api\/storage\//i;
 
 const SAFE_FONT_TOKEN =
 	'(?:Arial|Helvetica|Georgia|["\']Times New Roman["\']|Times|Verdana|Geneva|Tahoma|["\']Courier New["\']|Courier|sans-serif|serif|monospace)';
@@ -39,7 +45,8 @@ const SANITIZE_OPTIONS: import('sanitize-html').IOptions = {
 		h4: ['style'],
 		h5: ['style'],
 		h6: ['style'],
-		span: ['style']
+		span: ['style'],
+		img: ['src', 'alt', 'width', 'height', 'style']
 	},
 	allowedStyles: {
 		p: { 'text-align': TEXT_ALIGN_PATTERNS },
@@ -52,11 +59,21 @@ const SANITIZE_OPTIONS: import('sanitize-html').IOptions = {
 		span: {
 			'font-family': [FONT_FAMILY_PATTERN],
 			'font-size': [FONT_SIZE_PATTERN]
+		},
+		img: {
+			width: [IMG_WIDTH_PATTERN],
+			'max-width': [IMG_WIDTH_PATTERN],
+			height: [/^auto$/, IMG_WIDTH_PATTERN],
+			'object-fit': [IMG_OBJECT_FIT_PATTERN],
+			display: [/^(?:block|inline|inline-block)$/i],
+			'margin-left': [/^(?:auto|0|0px)$/i],
+			'margin-right': [/^(?:auto|0|0px)$/i]
 		}
 	},
 	allowedSchemes: ['http', 'https', 'mailto', 'tel'],
-	allowedSchemesAppliedToAttributes: ['href'],
+	allowedSchemesAppliedToAttributes: ['href', 'src'],
 	allowProtocolRelative: false,
+	selfClosing: ['img', 'br'],
 	transformTags: {
 		div: (_tagName, attribs) => ({ tagName: 'p', attribs }),
 		b: sanitizeHtml.simpleTransform('strong', {}),
@@ -78,6 +95,17 @@ const SANITIZE_OPTIONS: import('sanitize-html').IOptions = {
 						tagName: 'span',
 						attribs: {}
 					};
+		},
+		img: (_tagName, attribs): import('sanitize-html').Tag => {
+			const src = (attribs.src ?? '').trim();
+			if (!src || !CONVEX_STORAGE_URL_PATTERN.test(src)) {
+				return { tagName: 'span', attribs: {} };
+			}
+			const next: Record<string, string> = { src, alt: attribs.alt ?? '' };
+			if (attribs.width) next.width = attribs.width;
+			if (attribs.height) next.height = attribs.height;
+			if (attribs.style) next.style = attribs.style;
+			return { tagName: 'img', attribs: next };
 		}
 	}
 };

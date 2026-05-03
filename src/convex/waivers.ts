@@ -47,6 +47,7 @@ const publicWaiverValue = v.object({
 	slug: v.string(),
 	versionId: v.id('waiver_versions'),
 	workspaceName: v.string(),
+	workspaceLogoUrl: v.union(v.string(), v.null()),
 	title: v.string(),
 	introCopy: v.string(),
 	fields: v.array(waiverFieldValidator)
@@ -56,6 +57,7 @@ const publicBookingWaiverValue = v.object({
 	slug: v.string(),
 	versionId: v.id('waiver_versions'),
 	workspaceName: v.string(),
+	workspaceLogoUrl: v.union(v.string(), v.null()),
 	title: v.string(),
 	introCopy: v.string(),
 	fields: v.array(waiverFieldValidator),
@@ -425,17 +427,24 @@ export const getPublicWaiverBySlug = query({
 			ctx.db.get(waiver.publishedVersionId)
 		]);
 
-		if (!workspace || !version || version.waiverId !== waiver._id) {
-			throw new ConvexError({
-				code: 'not_found',
-				message: 'This public waiver is no longer available.'
-			});
+		if (
+			!workspace ||
+			workspace.status === 'archived' ||
+			!version ||
+			version.waiverId !== waiver._id
+		) {
+			return null;
 		}
+
+		const workspaceLogoUrl = workspace.logoStorageId
+			? await ctx.storage.getUrl(workspace.logoStorageId)
+			: null;
 
 		return {
 			slug: waiver.publicSlug,
 			versionId: version._id,
 			workspaceName: workspace.name,
+			workspaceLogoUrl: workspaceLogoUrl ?? null,
 			title: version.title,
 			introCopy: version.introCopy,
 			fields: version.fields
@@ -470,16 +479,23 @@ export const getPublicWaiverForBooking = query({
 			ctx.db.get(waiver.workspaceId),
 			ctx.db.get(waiver.publishedVersionId)
 		]);
-		if (!workspace || !version || version.waiverId !== waiver._id) {
-			throw new ConvexError({
-				code: 'not_found',
-				message: 'This public waiver is no longer available.'
-			});
+		if (
+			!workspace ||
+			workspace.status === 'archived' ||
+			!version ||
+			version.waiverId !== waiver._id
+		) {
+			return null;
 		}
+		const workspaceLogoUrl = workspace.logoStorageId
+			? await ctx.storage.getUrl(workspace.logoStorageId)
+			: null;
+
 		return {
 			slug: waiver.publicSlug,
 			versionId: version._id,
 			workspaceName: workspace.name,
+			workspaceLogoUrl: workspaceLogoUrl ?? null,
 			title: version.title,
 			introCopy: version.introCopy,
 			fields: version.fields,
@@ -529,7 +545,16 @@ export const submitPublicWaiver = mutation({
 			});
 		}
 
-		const version = await ctx.db.get(waiver.publishedVersionId);
+		const [version, workspace] = await Promise.all([
+			ctx.db.get(waiver.publishedVersionId),
+			ctx.db.get(waiver.workspaceId)
+		]);
+		if (!workspace || workspace.status === 'archived') {
+			throw new ConvexError({
+				code: 'not_found',
+				message: 'This public waiver is no longer available.'
+			});
+		}
 		if (!version || version.waiverId !== waiver._id) {
 			throw new ConvexError({
 				code: 'not_found',
