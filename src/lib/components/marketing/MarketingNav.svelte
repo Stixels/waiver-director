@@ -78,7 +78,7 @@
 				>
 					<div
 						class="mkt-brand-mark flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[11px] font-black"
-						style="background: var(--primary); color: var(--primary-foreground); font-family: 'Bricolage Grotesque', sans-serif;"
+						style="background: var(--primary); color: var(--primary-foreground); font-family: var(--m-font-display);"
 						aria-hidden="true"
 					>
 						WD
@@ -194,7 +194,7 @@
 	}
 
 	.mkt-brand-wordmark {
-		font-family: 'Bricolage Grotesque', sans-serif;
+		font-family: var(--m-font-display);
 		font-size: 15px;
 	}
 
@@ -304,7 +304,7 @@
 		min-height: 2.75rem;
 		padding: 0.85rem 1rem;
 		border-radius: var(--radius-xl);
-		font-family: 'Bricolage Grotesque', sans-serif;
+		font-family: var(--m-font-display);
 		font-size: clamp(1.1rem, 4vw, 1.3rem);
 		font-weight: 700;
 		letter-spacing: -0.015em;
