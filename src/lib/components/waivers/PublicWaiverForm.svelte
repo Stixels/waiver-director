@@ -137,7 +137,7 @@
 		workspaceLogoUrl={waiver.workspaceLogoUrl}
 	>
 		{#if isSubmitted}
-			<div class="flex flex-col items-center py-24 text-center">
+			<div class="flex flex-col items-center py-20 text-center">
 				<div
 					class="mb-8 flex h-16 w-16 items-center justify-center rounded-full border-2 border-foreground/20"
 				>

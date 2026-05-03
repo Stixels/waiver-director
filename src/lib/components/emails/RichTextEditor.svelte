@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import { Editor, mergeAttributes } from '@tiptap/core';
 	import Image from '@tiptap/extension-image';
 	import Link from '@tiptap/extension-link';
@@ -40,6 +40,7 @@
 		DialogTitle
 	} from '$lib/components/ui/dialog';
 	import { Button } from '$lib/components/ui/button';
+	import { Input } from '$lib/components/ui/input';
 	import { Textarea } from '$lib/components/ui/textarea';
 	import { sanitizeRichTextHtml } from '$lib/utils/rich-text-client';
 
@@ -106,6 +107,11 @@
 	let editorElement = $state<HTMLDivElement | null>(null);
 	let editor = $state<Editor | null>(null);
 	let hasFocus = $state(false);
+	let linkDialogOpen = $state(false);
+	let linkHrefDraft = $state('');
+	let linkCanRemove = $state(false);
+	let linkError = $state<string | null>(null);
+	let linkInputEl = $state<HTMLInputElement | null>(null);
 	let htmlDialogOpen = $state(false);
 	let htmlSnippet = $state('');
 	let toolbarState = $state(DEFAULT_TOOLBAR_STATE);
@@ -211,6 +217,27 @@
 		event.preventDefault();
 	}
 
+	function handleEditorLinkClick(event: MouseEvent): boolean {
+		if (event.button !== 0) return false;
+
+		const target = event.target;
+		const targetElement =
+			target instanceof Element ? target : target instanceof Node ? target.parentElement : null;
+		if (!targetElement) return false;
+
+		const link = targetElement.closest<HTMLAnchorElement>('a[href]');
+		if (!link || !editorElement?.contains(link)) return false;
+
+		if (event.metaKey || event.ctrlKey) {
+			event.preventDefault();
+			window.open(link.href, link.target || '_blank', 'noopener,noreferrer');
+			return true;
+		}
+
+		event.preventDefault();
+		return false;
+	}
+
 	export function insertText(text: string) {
 		editor?.chain().focus().insertContent(text).run();
 	}
@@ -242,20 +269,68 @@
 		{ label: '36', value: '36px' }
 	] as const;
 
-	function setLink() {
+	function safeLinkHref(rawHref: string): string | null {
+		const trimmed = rawHref.trim();
+		if (!trimmed) return null;
+
+		const hasHierarchicalScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed);
+		const hasAllowedNonHierarchicalScheme = /^(mailto|tel):/i.test(trimmed);
+		const href =
+			hasHierarchicalScheme || hasAllowedNonHierarchicalScheme ? trimmed : `https://${trimmed}`;
+		try {
+			const url = new URL(href);
+			return ['http:', 'https:', 'mailto:', 'tel:'].includes(url.protocol) ? href : null;
+		} catch {
+			return null;
+		}
+	}
+
+	async function setLink() {
 		if (!editor || disabled) return;
 
 		const previousUrl = editor.getAttributes('link').href ?? 'https://';
-		const href = window.prompt('Enter a URL', previousUrl);
-		if (href === null) return;
+		linkCanRemove = editor.isActive('link');
+		linkHrefDraft = previousUrl;
+		linkError = null;
+		linkDialogOpen = true;
+		await tick();
+		linkInputEl?.focus();
+		linkInputEl?.select();
+	}
 
-		const trimmed = href.trim();
+	function cancelLinkDialog() {
+		linkDialogOpen = false;
+		linkCanRemove = false;
+		linkError = null;
+	}
+
+	function removeLink() {
+		if (!editor || disabled) return;
+		editor.chain().focus().extendMarkRange('link').unsetLink().run();
+		cancelLinkDialog();
+	}
+
+	async function submitLink(event: SubmitEvent) {
+		event.preventDefault();
+		if (!editor || disabled) return;
+
+		const trimmed = linkHrefDraft.trim();
 		if (!trimmed) {
 			editor.chain().focus().extendMarkRange('link').unsetLink().run();
+			cancelLinkDialog();
 			return;
 		}
 
-		editor.chain().focus().extendMarkRange('link').setLink({ href: trimmed }).run();
+		const safeHref = safeLinkHref(trimmed);
+		if (!safeHref) {
+			linkError = 'Links must start with http://, https://, mailto:, or tel:.';
+			await tick();
+			linkInputEl?.focus();
+			return;
+		}
+
+		editor.chain().focus().extendMarkRange('link').setLink({ href: safeHref }).run();
+		cancelLinkDialog();
 	}
 
 	function insertLogo(logoUrl: string | null = workspaceLogoUrl) {
@@ -494,7 +569,8 @@
 				Link.configure({
 					autolink: true,
 					defaultProtocol: 'https',
-					openOnClick: false
+					openOnClick: false,
+					enableClickSelection: true
 				}),
 				TextAlign.configure({
 					types: ['heading', 'paragraph']
@@ -515,6 +591,9 @@
 					id,
 					class:
 						'rich-text-editor-body min-h-[300px] bg-transparent text-sm leading-7 text-foreground outline-none'
+				},
+				handleDOMEvents: {
+					click: (_view, event) => handleEditorLinkClick(event)
 				}
 			},
 			onCreate: ({ editor }) => {
@@ -817,16 +896,6 @@
 			>
 				<LinkIcon class="size-3.5" />
 			</button>
-			{#if toolbarState.link}
-				<button
-					type="button"
-					class="rounded-md px-2 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
-					disabled={!canCommand((editor) => editor.can().chain().focus().unsetLink().run())}
-					onclick={() => command((editor) => editor.chain().focus().unsetLink().run())}
-				>
-					Remove
-				</button>
-			{/if}
 
 			<span class="toolbar-divider"></span>
 
@@ -905,6 +974,44 @@
 		</button>
 	</div>
 {/if}
+
+<Dialog bind:open={linkDialogOpen}>
+	<DialogContent class="sm:max-w-md">
+		<DialogHeader>
+			<DialogTitle>Set link</DialogTitle>
+			<DialogDescription>Enter a URL for the selected text.</DialogDescription>
+		</DialogHeader>
+		<form class="space-y-4" onsubmit={submitLink}>
+			<div class="space-y-1.5">
+				<label for={`${id}-link-url`} class="text-xs font-medium text-foreground">URL</label>
+				<Input
+					id={`${id}-link-url`}
+					bind:value={linkHrefDraft}
+					bind:ref={linkInputEl}
+					aria-invalid={linkError ? 'true' : undefined}
+					aria-describedby={linkError ? `${id}-link-error` : undefined}
+					{disabled}
+				/>
+				{#if linkError}
+					<p id={`${id}-link-error`} class="text-xs text-destructive">{linkError}</p>
+				{/if}
+			</div>
+			<div class="flex items-center justify-between gap-2">
+				{#if linkCanRemove}
+					<Button type="button" variant="destructive" onclick={removeLink} {disabled}
+						>Remove link</Button
+					>
+				{:else}
+					<span></span>
+				{/if}
+				<div class="flex justify-end gap-2">
+					<Button type="button" variant="outline" onclick={cancelLinkDialog}>Cancel</Button>
+					<Button type="submit" {disabled}>Apply link</Button>
+				</div>
+			</div>
+		</form>
+	</DialogContent>
+</Dialog>
 
 <Dialog bind:open={htmlDialogOpen}>
 	<DialogContent class="gap-0 overflow-hidden p-0 sm:max-w-xl">

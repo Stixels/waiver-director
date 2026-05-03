@@ -94,6 +94,7 @@
 	let hasFocus = $state(false);
 	let linkDialogOpen = $state(false);
 	let linkHrefDraft = $state('');
+	let linkCanRemove = $state(false);
 	let linkError = $state<string | null>(null);
 	let linkInputEl = $state<HTMLInputElement | null>(null);
 	let toolbarState = $state({
@@ -147,6 +148,27 @@
 		event.preventDefault();
 	}
 
+	function handleEditorLinkClick(event: MouseEvent): boolean {
+		if (event.button !== 0) return false;
+
+		const target = event.target;
+		const targetElement =
+			target instanceof Element ? target : target instanceof Node ? target.parentElement : null;
+		if (!targetElement) return false;
+
+		const link = targetElement.closest<HTMLAnchorElement>('a[href]');
+		if (!link || !editorElement?.contains(link)) return false;
+
+		if (event.metaKey || event.ctrlKey) {
+			event.preventDefault();
+			window.open(link.href, link.target || '_blank', 'noopener,noreferrer');
+			return true;
+		}
+
+		event.preventDefault();
+		return false;
+	}
+
 	function safeLinkHref(rawHref: string): string | null {
 		const trimmed = rawHref.trim();
 		if (!trimmed) return null;
@@ -167,6 +189,7 @@
 		if (!editor) return;
 
 		const previousUrl = editor.getAttributes('link').href ?? 'https://';
+		linkCanRemove = editor.isActive('link');
 		linkHrefDraft = previousUrl;
 		linkError = null;
 		linkDialogOpen = true;
@@ -177,7 +200,14 @@
 
 	function cancelLinkDialog() {
 		linkDialogOpen = false;
+		linkCanRemove = false;
 		linkError = null;
+	}
+
+	function removeLink() {
+		if (!editor) return;
+		editor.chain().focus().extendMarkRange('link').unsetLink().run();
+		cancelLinkDialog();
 	}
 
 	async function submitLink(event: SubmitEvent) {
@@ -254,7 +284,8 @@
 				Link.configure({
 					autolink: true,
 					defaultProtocol: 'https',
-					openOnClick: false
+					openOnClick: false,
+					enableClickSelection: true
 				}),
 				TextAlign.configure({
 					types: ['heading', 'paragraph']
@@ -266,6 +297,9 @@
 			editorProps: {
 				attributes: {
 					class: 'waiver-canvas-editor w-full text-base leading-7 text-foreground/85 outline-none'
+				},
+				handleDOMEvents: {
+					click: (_view, event) => handleEditorLinkClick(event)
 				}
 			},
 			onCreate: ({ editor }) => {
@@ -328,9 +362,16 @@
 					<p id="waiver-link-error" class="text-xs text-destructive">{linkError}</p>
 				{/if}
 			</div>
-			<div class="flex justify-end gap-2">
-				<Button type="button" variant="outline" onclick={cancelLinkDialog}>Cancel</Button>
-				<Button type="submit">Apply link</Button>
+			<div class="flex items-center justify-between gap-2">
+				{#if linkCanRemove}
+					<Button type="button" variant="destructive" onclick={removeLink}>Remove link</Button>
+				{:else}
+					<span></span>
+				{/if}
+				<div class="flex justify-end gap-2">
+					<Button type="button" variant="outline" onclick={cancelLinkDialog}>Cancel</Button>
+					<Button type="submit">Apply link</Button>
+				</div>
 			</div>
 		</form>
 	</DialogContent>
