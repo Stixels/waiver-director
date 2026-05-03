@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import { onMount } from 'svelte';
 	import { fade, fly } from 'svelte/transition';
 	import { Button } from '$lib/components/ui/button';
@@ -18,7 +18,7 @@
 	] as const;
 
 	function isActive(href: string): boolean {
-		const path = $page.url.pathname;
+		const path = page.url.pathname;
 		if (href.startsWith('/#')) return false;
 		return path === href || path.startsWith(href + '/');
 	}
