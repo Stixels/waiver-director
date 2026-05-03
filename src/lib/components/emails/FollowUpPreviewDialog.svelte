@@ -14,7 +14,7 @@
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import WaiverRichText from '$lib/components/waivers/WaiverRichText.svelte';
 	import { getConvexErrorMessage } from '$lib/utils/convex-errors';
-	import { escapeHtml } from '$lib/utils/rich-text';
+	import { escapeHtml } from '$lib/utils/rich-text-client';
 	import { queryString } from '$lib/utils/url';
 	import { useConvexClient } from 'convex-svelte';
 	import type { FunctionReturnType } from 'convex/server';

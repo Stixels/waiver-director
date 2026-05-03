@@ -1,4 +1,4 @@
-import { sanitizeRichTextHtml } from '$lib/utils/rich-text';
+import { sanitizeRichTextHtml } from '$lib/utils/rich-text-client';
 import {
 	MAX_SELECT_OPTION_LABEL_LENGTH,
 	MAX_SELECT_OPTIONS,

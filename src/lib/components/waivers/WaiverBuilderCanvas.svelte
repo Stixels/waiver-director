@@ -55,7 +55,7 @@
 	} from '$lib/components/ui/dialog';
 	import { Input } from '$lib/components/ui/input';
 	import { Button } from '$lib/components/ui/button';
-	import { sanitizeRichTextHtml } from '$lib/utils/rich-text';
+	import { sanitizeRichTextHtml } from '$lib/utils/rich-text-client';
 	import WaiverFieldDisplay from '$lib/components/waivers/WaiverFieldDisplay.svelte';
 
 	export type SaveState = 'idle' | 'saving' | 'saved' | 'dirty' | 'error';
@@ -246,7 +246,9 @@
 					code: false,
 					codeBlock: false,
 					hardBreak: false,
-					horizontalRule: false
+					horizontalRule: false,
+					link: false,
+					underline: false
 				}),
 				Underline,
 				Link.configure({

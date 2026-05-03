@@ -41,7 +41,7 @@
 	} from '$lib/components/ui/dialog';
 	import { Button } from '$lib/components/ui/button';
 	import { Textarea } from '$lib/components/ui/textarea';
-	import { sanitizeRichTextHtml } from '$lib/utils/rich-text';
+	import { sanitizeRichTextHtml } from '$lib/utils/rich-text-client';
 
 	interface Props {
 		value?: string;
@@ -483,7 +483,9 @@
 					code: false,
 					codeBlock: false,
 					hardBreak: false,
-					horizontalRule: false
+					horizontalRule: false,
+					link: false,
+					underline: false
 				}),
 				Underline,
 				TextStyle,

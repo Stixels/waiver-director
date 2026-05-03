@@ -15,7 +15,7 @@
 	import PageShell from '$lib/components/app/PageShell.svelte';
 	import { useProtectedQuery } from '$lib/components/auth/convex-auth.svelte';
 	import { getConvexErrorMessage } from '$lib/utils/convex-errors';
-	import { escapeHtml } from '$lib/utils/rich-text';
+	import { escapeHtml } from '$lib/utils/rich-text-client';
 	import { parseConvexId, queryString } from '$lib/utils/url';
 
 	import { Button } from '$lib/components/ui/button';

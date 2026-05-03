@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { sanitizeRichTextHtml } from '$lib/utils/rich-text';
+	import { sanitizeRichTextHtml } from '$lib/utils/rich-text-client';
 
 	interface Props {
 		html: string;
