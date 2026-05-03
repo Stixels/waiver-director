@@ -25,7 +25,7 @@
 			</p>
 			<h2
 				class="mb-16 max-w-xl font-extrabold tracking-tight"
-				style="font-family: 'Bricolage Grotesque', sans-serif; font-size: clamp(1.75rem, 3.5vw, 2.75rem); letter-spacing: -0.03em; line-height: 1.06;"
+				style="font-family: var(--m-font-display); font-size: clamp(1.75rem, 3.5vw, 2.75rem); letter-spacing: -0.03em; line-height: 1.06;"
 			>
 				Up and running in three steps.
 			</h2>
@@ -233,7 +233,7 @@
 
 	.landing-how-it-works__step-number {
 		margin-bottom: 0.75rem;
-		font-family: 'Bricolage Grotesque', sans-serif;
+		font-family: var(--m-font-display);
 		font-size: clamp(2.25rem, 10vw, 3.5rem);
 		font-weight: 900;
 		line-height: 1;
@@ -242,7 +242,7 @@
 
 	.landing-how-it-works__step-title {
 		margin-bottom: 0.75rem;
-		font-family: 'Bricolage Grotesque', sans-serif;
+		font-family: var(--m-font-display);
 		font-size: clamp(1.25rem, 3vw, 1.6rem);
 		font-weight: 700;
 		letter-spacing: -0.015em;

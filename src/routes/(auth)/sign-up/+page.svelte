@@ -270,7 +270,7 @@
 					</p>
 					<h2
 						class="signup-panel__heading mb-3 font-black tracking-tight text-balance"
-						style="font-family: 'Bricolage Grotesque', sans-serif; font-size: clamp(1.5rem, 3.5vw, 2rem); letter-spacing: -0.03em; line-height: 1.15;"
+						style="font-family: var(--m-font-display); font-size: clamp(1.5rem, 3.5vw, 2rem); letter-spacing: -0.03em; line-height: 1.15;"
 					>
 						Everything you need to run your business.
 					</h2>
@@ -318,7 +318,7 @@
 					<div class="mb-8">
 						<h1
 							class="mb-2 font-black tracking-tight"
-							style="font-family: 'Bricolage Grotesque', sans-serif; font-size: clamp(1.5rem, 4vw, 2rem); letter-spacing: -0.03em; line-height: 1.15;"
+							style="font-family: var(--m-font-display); font-size: clamp(1.5rem, 4vw, 2rem); letter-spacing: -0.03em; line-height: 1.15;"
 						>
 							Check your email
 						</h1>
@@ -406,7 +406,7 @@
 					<div class="mb-8">
 						<h1
 							class="mb-2 font-black tracking-tight"
-							style="font-family: 'Bricolage Grotesque', sans-serif; font-size: clamp(1.5rem, 4vw, 2rem); letter-spacing: -0.03em; line-height: 1.15;"
+							style="font-family: var(--m-font-display); font-size: clamp(1.5rem, 4vw, 2rem); letter-spacing: -0.03em; line-height: 1.15;"
 						>
 							Create your account
 						</h1>

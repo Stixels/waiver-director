@@ -60,14 +60,13 @@
 				<a href={resolve('/')} class="mb-3 flex items-center gap-2 no-underline">
 					<div
 						class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[11px] font-black"
-						style="background: var(--primary); color: var(--primary-foreground); font-family: 'Bricolage Grotesque', sans-serif;"
+						style="background: var(--primary); color: var(--primary-foreground); font-family: var(--m-font-display);"
 						aria-hidden="true"
 					>
 						WD
 					</div>
-					<span
-						class="text-[15px] font-bold"
-						style="font-family: 'Bricolage Grotesque', sans-serif;">Waiver Director</span
+					<span class="text-[15px] font-bold" style="font-family: var(--m-font-display);"
+						>Waiver Director</span
 					>
 				</a>
 				<p class="text-[13px]" style="color: var(--m-text-3);">

@@ -13,7 +13,7 @@
 
 	/* Background layers — near-black for Linear feel */
 	--m-bg: oklch(0.07 0.005 286);
-	--m-surface: oklch(0.10 0.006 286);
+	--m-surface: oklch(0.1 0.006 286);
 	--m-card: oklch(0.13 0.007 286);
 	--m-elevated: oklch(0.16 0.008 286);
 
