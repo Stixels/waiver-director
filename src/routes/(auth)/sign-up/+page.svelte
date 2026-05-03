@@ -60,6 +60,10 @@
 		return clerk.client?.signUp ?? null;
 	}
 
+	function absoluteUrl(path: string) {
+		return new URL(path, window.location.origin).toString();
+	}
+
 	async function activateCreatedSession(sessionId: string | null) {
 		if (!sessionId || !clerk.clerk) {
 			throw new Error('Your account was created, but no session was returned.');
@@ -96,8 +100,8 @@
 		try {
 			await signUp.authenticateWithRedirect({
 				strategy: 'oauth_google',
-				redirectUrl: resolve('/sso-callback'),
-				redirectUrlComplete: postAuthRedirectUrl
+				redirectUrl: absoluteUrl(resolve('/sso-callback')),
+				redirectUrlComplete: absoluteUrl(postAuthRedirectUrl)
 			});
 		} catch (error) {
 			submitError = getClerkErrorMessage(error, 'Unable to start Google sign-up right now.');
