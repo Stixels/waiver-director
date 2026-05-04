@@ -1675,40 +1675,44 @@
 									after booking · unlinked waivers unscheduled
 								</span>
 							</div>
-							<span class="save-indicator shrink-0" data-state={saveState}>
-								{#if saveState === 'saving'}
-									<LoaderIcon class="size-3.5 animate-spin" />
-								{:else if saveState === 'error'}
-									<CloudOffIcon class="size-3.5" />
-								{:else if saveState === 'dirty'}
-									<CloudIcon class="size-3.5" />
-								{:else}
-									<CloudCheckIcon class="size-3.5" />
+							<div class="compose-meta-end">
+								<span class="save-indicator shrink-0" data-state={saveState} title={savedLabel}>
+									{#if saveState === 'saving'}
+										<LoaderIcon class="size-3.5 animate-spin" />
+									{:else if saveState === 'error'}
+										<CloudOffIcon class="size-3.5" />
+									{:else if saveState === 'dirty'}
+										<CloudIcon class="size-3.5" />
+									{:else}
+										<CloudCheckIcon class="size-3.5" />
+									{/if}
+									<span class="save-indicator-label truncate">{savedLabel}</span>
+								</span>
+								{#if currentWorkspace && (isOwner || workspaceLogoUrl)}
+									<WorkspaceLogoUploader
+										workspaceId={currentWorkspace.workspaceId}
+										variant="inline"
+										canEdit={isOwner}
+										inlineLabel="Add logo"
+										inlineLabelWithLogo={emailPreviewMode ? 'Change logo' : 'Insert logo'}
+										onClickWhenSet={emailPreviewMode
+											? null
+											: () => editorRef?.insertWorkspaceLogo()}
+										onUploadComplete={emailPreviewMode
+											? null
+											: (logoUrl) => editorRef?.insertWorkspaceLogo(logoUrl)}
+									/>
 								{/if}
-								<span class="truncate">{savedLabel}</span>
-							</span>
-							{#if currentWorkspace && (isOwner || workspaceLogoUrl)}
-								<WorkspaceLogoUploader
-									workspaceId={currentWorkspace.workspaceId}
-									variant="inline"
-									canEdit={isOwner}
-									inlineLabel="Add logo"
-									inlineLabelWithLogo={emailPreviewMode ? 'Change logo' : 'Insert logo'}
-									onClickWhenSet={emailPreviewMode ? null : () => editorRef?.insertWorkspaceLogo()}
-									onUploadComplete={emailPreviewMode
-										? null
-										: (logoUrl) => editorRef?.insertWorkspaceLogo(logoUrl)}
-								/>
-							{/if}
-							<button
-								type="button"
-								onclick={() => (emailPreviewMode = !emailPreviewMode)}
-								class="preview-toggle"
-								data-active={emailPreviewMode}
-							>
-								<EyeIcon class="size-3" />
-								{emailPreviewMode ? 'Edit' : 'Preview'}
-							</button>
+								<button
+									type="button"
+									onclick={() => (emailPreviewMode = !emailPreviewMode)}
+									class="preview-toggle"
+									data-active={emailPreviewMode}
+								>
+									<EyeIcon class="size-3" />
+									{emailPreviewMode ? 'Edit' : 'Preview'}
+								</button>
+							</div>
 						</div>
 						{#if !isSendAfterValid}
 							<p id="send-after-error" class="compose-error">Enter a positive whole number.</p>
@@ -2052,6 +2056,7 @@
 		padding: 0.7rem 1rem;
 		background: color-mix(in srgb, var(--card) 60%, transparent);
 		border-bottom: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+		container-type: inline-size;
 	}
 
 	.compose-meta-row {
@@ -2065,9 +2070,17 @@
 		display: flex;
 		align-items: center;
 		gap: 0.4rem;
-		flex: 1;
 		flex-wrap: wrap;
 		min-width: 0;
+	}
+
+	.compose-meta-end {
+		display: flex;
+		align-items: center;
+		gap: 0.4rem;
+		flex-wrap: wrap;
+		justify-content: flex-end;
+		margin-left: auto;
 	}
 
 	.compose-select {
@@ -2099,7 +2112,19 @@
 	.compose-meta-prose {
 		font-size: 0.775rem;
 		color: color-mix(in srgb, var(--muted-foreground) 65%, transparent);
-		white-space: nowrap;
+	}
+
+	@container (max-width: 720px) {
+		.compose-meta-end {
+			width: 100%;
+			margin-left: 0;
+		}
+	}
+
+	@container (max-width: 600px) {
+		.compose-meta-prose {
+			display: none;
+		}
 	}
 
 	.compose-error {
