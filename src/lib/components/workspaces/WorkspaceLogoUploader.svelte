@@ -14,7 +14,7 @@
 	import ImageIcon from '@lucide/svelte/icons/image';
 	import ImagePlusIcon from '@lucide/svelte/icons/image-plus';
 
-	const ACCEPTED_TYPES = ['image/png', 'image/jpeg', 'image/svg+xml', 'image/webp'];
+	const ACCEPTED_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
 	const MAX_BYTES = 2 * 1024 * 1024;
 
 	interface Props {
@@ -70,7 +70,7 @@
 		if (!file || !workspaceId) return;
 
 		if (!ACCEPTED_TYPES.includes(file.type)) {
-			toast.error('Logo must be a PNG, JPEG, SVG, or WebP image.');
+			toast.error('Logo must be a PNG, JPEG, or WebP image.');
 			return;
 		}
 		if (file.size > MAX_BYTES) {
@@ -80,10 +80,10 @@
 
 		isUploading = true;
 		try {
-			const uploadUrl = await convex.mutation(api.workspaces.generateLogoUploadUrl, {
+			const upload = await convex.mutation(api.workspaces.generateLogoUploadUrl, {
 				workspaceId
 			});
-			const response = await fetch(uploadUrl, {
+			const response = await fetch(upload.uploadUrl, {
 				method: 'POST',
 				headers: { 'Content-Type': file.type },
 				body: file
@@ -94,7 +94,8 @@
 			const { storageId } = (await response.json()) as { storageId: string };
 			await convex.mutation(api.workspaces.setWorkspaceLogo, {
 				workspaceId,
-				storageId: storageId as Id<'_storage'>
+				storageId: storageId as Id<'_storage'>,
+				uploadToken: upload.uploadToken
 			});
 			const updatedBranding = await convex.query(api.workspaces.getWorkspaceBranding, {
 				workspaceId
@@ -114,6 +115,7 @@
 		try {
 			await convex.mutation(api.workspaces.removeWorkspaceLogo, { workspaceId });
 			toast.success('Logo removed.');
+			onUploadComplete?.(null);
 		} catch (err) {
 			toast.error(getConvexErrorMessage(err, 'Failed to remove logo.'));
 		} finally {
@@ -149,7 +151,7 @@
 		</div>
 
 		<div class="logo-meta">
-			<p class="logo-meta-title">PNG, JPEG, SVG, or WebP. 2MB max.</p>
+			<p class="logo-meta-title">PNG, JPEG, or WebP. 2MB max.</p>
 			<p class="logo-meta-desc">
 				Used across the public waiver page and customer emails. Square at least 256x256 works best.
 				Transparent backgrounds adapt to light and dark themes.

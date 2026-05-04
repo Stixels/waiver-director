@@ -1,135 +1,27 @@
-const ALLOWED_TAGS = new Set([
-	'p',
-	'br',
-	'strong',
-	'em',
-	'u',
-	's',
-	'ul',
-	'ol',
-	'li',
-	'a',
-	'h1',
-	'h2',
-	'h3',
-	'h4',
-	'h5',
-	'h6',
-	'span',
-	'img'
-]);
+import {
+	ALLOWED_TAG_SET,
+	CONVEX_STORAGE_URL_PATTERN,
+	DROP_CONTENT_TAG_SET,
+	IMG_WIDTH_PATTERN,
+	TAG_RENAMES,
+	finalizeSanitizedRichTextHtml,
+	hasSupportedHtmlTag,
+	plainTextToRichHtml,
+	sanitizeHref,
+	sanitizeStyle
+} from './rich-text-shared';
 
-const TAG_RENAMES: Record<string, string> = {
-	b: 'strong',
-	i: 'em',
-	strike: 's',
-	del: 's',
-	div: 'p',
-	button: 'span'
-};
-
-const BLOCK_TAGS = ['p', 'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'];
-const BLOCK_TAG_REGEX = new RegExp(`<(?:${BLOCK_TAGS.join('|')})(?:\\s|>)`, 'i');
-const URL_PROTOCOL_REGEX = /^(https?:|mailto:|tel:|\/|#)/i;
-const IMG_WIDTH_PATTERN = /^[1-9][0-9]{0,3}(?:px|%)?$/;
-const IMG_OBJECT_FIT_PATTERN = /^(?:contain|cover|fill|none|scale-down)$/i;
-const CONVEX_STORAGE_URL_PATTERN =
-	/^https?:\/\/(?:[a-z0-9-]+\.convex\.(?:cloud|site|dev)|127\.0\.0\.1(?::\d+)?|localhost(?::\d+)?)\/api\/storage\//i;
-const FONT_FAMILY_PATTERN =
-	/^(?:Arial|Helvetica|Georgia|["']Times New Roman["']|Times|Verdana|Geneva|Tahoma|["']Courier New["']|Courier|sans-serif|serif|monospace)(?:\s*,\s*(?:Arial|Helvetica|Georgia|["']Times New Roman["']|Times|Verdana|Geneva|Tahoma|["']Courier New["']|Courier|sans-serif|serif|monospace))*$/;
-const FONT_SIZE_PATTERN = /^(?:12|14|16|18|20|24|30|36)px$/;
-
-export function escapeHtml(value: string): string {
-	return value
-		.replaceAll('&', '&amp;')
-		.replaceAll('<', '&lt;')
-		.replaceAll('>', '&gt;')
-		.replaceAll('"', '&quot;')
-		.replaceAll("'", '&#39;');
-}
-
-function decodeHtml(value: string): string {
-	return value
-		.replaceAll('&nbsp;', ' ')
-		.replaceAll('&amp;', '&')
-		.replaceAll('&lt;', '<')
-		.replaceAll('&gt;', '>')
-		.replaceAll('&quot;', '"')
-		.replaceAll('&#39;', "'");
-}
-
-function hasSupportedHtmlTag(input: string): boolean {
-	return /<\/?[a-z][^>]*>/i.test(input);
-}
-
-function plainTextToRichHtml(input: string): string {
-	const normalized = decodeHtml(input).replace(/\r\n?/g, '\n').trim();
-	if (!normalized) return '';
-	return normalized
-		.split(/\n{2,}/)
-		.map((paragraph) => `<p>${escapeHtml(paragraph).replace(/\n/g, '<br>')}</p>`)
-		.join('');
-}
-
-function sanitizeHref(value: string | null): string | null {
-	const href = value?.trim() ?? '';
-	return href && URL_PROTOCOL_REGEX.test(href) ? href : null;
-}
-
-function sanitizeStyle(tagName: string, style: string | null): string | null {
-	if (!style) return null;
-
-	const next: string[] = [];
-	for (const declaration of style.split(';')) {
-		const [rawProperty, ...rawValueParts] = declaration.split(':');
-		const property = rawProperty?.trim().toLowerCase();
-		const value = rawValueParts.join(':').trim();
-		if (!property || !value) continue;
-
-		if (['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'].includes(tagName)) {
-			if (property === 'text-align' && /^(?:left|center|right|justify)$/i.test(value)) {
-				next.push(`${property}:${value}`);
-			}
-			continue;
-		}
-
-		if (tagName === 'span') {
-			if (property === 'font-family' && FONT_FAMILY_PATTERN.test(value)) {
-				next.push(`${property}:${value}`);
-			}
-			if (property === 'font-size' && FONT_SIZE_PATTERN.test(value)) {
-				next.push(`${property}:${value}`);
-			}
-			continue;
-		}
-
-		if (tagName === 'img') {
-			if (['width', 'max-width'].includes(property) && IMG_WIDTH_PATTERN.test(value)) {
-				next.push(`${property}:${value}`);
-			}
-			if (property === 'height' && (value === 'auto' || IMG_WIDTH_PATTERN.test(value))) {
-				next.push(`${property}:${value}`);
-			}
-			if (property === 'object-fit' && IMG_OBJECT_FIT_PATTERN.test(value)) {
-				next.push(`${property}:${value}`);
-			}
-			if (property === 'display' && /^(?:block|inline|inline-block)$/i.test(value)) {
-				next.push(`${property}:${value}`);
-			}
-			if (['margin-left', 'margin-right'].includes(property) && /^(?:auto|0|0px)$/i.test(value)) {
-				next.push(`${property}:${value}`);
-			}
-		}
-	}
-
-	return next.length > 0 ? next.join(';') : null;
-}
+export { escapeHtml } from './rich-text-shared';
 
 function sanitizeElement(element: Element, documentRef: Document): Node | null {
 	const sourceTag = element.tagName.toLowerCase();
 	const tagName = TAG_RENAMES[sourceTag] ?? sourceTag;
 
-	if (!ALLOWED_TAGS.has(tagName)) {
+	if (DROP_CONTENT_TAG_SET.has(sourceTag)) {
+		return documentRef.createTextNode('');
+	}
+
+	if (!ALLOWED_TAG_SET.has(tagName)) {
 		const fragment = documentRef.createDocumentFragment();
 		for (const child of Array.from(element.childNodes)) {
 			const sanitized = sanitizeNode(child, documentRef);
@@ -217,14 +109,6 @@ function browserSanitizeHtml(source: string): string | null {
 	return container.innerHTML;
 }
 
-function fallbackSanitizeHtml(source: string): string {
-	return source
-		.replace(/<script\b[\s\S]*?<\/script>/gi, '')
-		.replace(/<style\b[\s\S]*?<\/style>/gi, '')
-		.replace(/\son[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '')
-		.replace(/\s(?:href|src)\s*=\s*(["'])\s*javascript:[\s\S]*?\1/gi, '');
-}
-
 export function sanitizeRichTextHtml(input: string): string {
 	const source = input.replace(/\r\n?/g, '\n').trim();
 	if (!source) return '';
@@ -233,13 +117,10 @@ export function sanitizeRichTextHtml(input: string): string {
 		return plainTextToRichHtml(source);
 	}
 
-	let sanitized = (browserSanitizeHtml(source) ?? fallbackSanitizeHtml(source)).trim();
-	sanitized = sanitized.replace(/<p\b[^>]*>\s*<\/p>/g, '');
-
-	if (!sanitized.trim()) return '';
-	if (!BLOCK_TAG_REGEX.test(sanitized)) {
-		sanitized = `<p>${sanitized}</p>`;
+	const sanitized = browserSanitizeHtml(source);
+	if (sanitized == null) {
+		return plainTextToRichHtml(source);
 	}
 
-	return sanitized;
+	return finalizeSanitizedRichTextHtml(sanitized);
 }

@@ -49,7 +49,7 @@
 		try {
 			await convex.mutation(api.workspaces.archiveWorkspace, {
 				workspaceId: currentWorkspace.workspaceId,
-				confirmSlug: currentWorkspace.slug
+				confirmSlug: confirmTyped.trim()
 			});
 			confirmOpen = false;
 			toast.success('Workspace deleted.');

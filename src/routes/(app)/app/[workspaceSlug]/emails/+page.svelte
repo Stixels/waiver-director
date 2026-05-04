@@ -1693,9 +1693,11 @@
 									variant="inline"
 									canEdit={isOwner}
 									inlineLabel="Add logo"
-									inlineLabelWithLogo="Insert logo"
-									onClickWhenSet={() => editorRef?.insertWorkspaceLogo()}
-									onUploadComplete={(logoUrl) => editorRef?.insertWorkspaceLogo(logoUrl)}
+									inlineLabelWithLogo={emailPreviewMode ? 'Change logo' : 'Insert logo'}
+									onClickWhenSet={emailPreviewMode ? null : () => editorRef?.insertWorkspaceLogo()}
+									onUploadComplete={emailPreviewMode
+										? null
+										: (logoUrl) => editorRef?.insertWorkspaceLogo(logoUrl)}
 								/>
 							{/if}
 							<button

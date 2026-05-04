@@ -8,7 +8,9 @@ export default defineSchema({
 		primaryEmail: v.optional(v.string()),
 		imageUrl: v.optional(v.string()),
 		defaultWorkspaceId: v.optional(v.id('workspaces'))
-	}).index('by_primaryEmail', ['primaryEmail']),
+	})
+		.index('by_primaryEmail', ['primaryEmail'])
+		.index('by_defaultWorkspaceId', ['defaultWorkspaceId']),
 
 	// App-owned mapping between internal users and whichever auth provider is active.
 	auth_identities: defineTable({
@@ -34,6 +36,27 @@ export default defineSchema({
 	})
 		.index('by_slug', ['slug'])
 		.index('by_createdByUserId', ['createdByUserId']),
+
+	workspace_logo_uploads: defineTable({
+		workspaceId: v.id('workspaces'),
+		requestedByUserId: v.id('users'),
+		uploadToken: v.string(),
+		status: v.union(
+			v.literal('issued'),
+			v.literal('consumed'),
+			v.literal('expired'),
+			v.literal('removed')
+		),
+		storageId: v.optional(v.id('_storage')),
+		createdAt: v.number(),
+		expiresAt: v.number(),
+		consumedAt: v.optional(v.number()),
+		removedAt: v.optional(v.number())
+	})
+		.index('by_workspaceId', ['workspaceId'])
+		.index('by_uploadToken', ['uploadToken'])
+		.index('by_storageId', ['storageId'])
+		.index('by_workspaceId_and_storageId', ['workspaceId', 'storageId']),
 
 	workspace_memberships: defineTable({
 		workspaceId: v.id('workspaces'),

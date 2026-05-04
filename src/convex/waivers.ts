@@ -7,6 +7,7 @@ import { internal } from './_generated/api';
 import { bookingSnapshot, bookingSnapshotValidator } from './lib/bookings';
 import { upsertSignerCustomer } from './lib/customers';
 import { submissionSearchText } from './lib/submissions';
+import { getOwnedWorkspaceLogoUrl } from './lib/workspaces';
 import {
 	assertWorkspaceRecord,
 	minorInputValidator,
@@ -436,9 +437,7 @@ export const getPublicWaiverBySlug = query({
 			return null;
 		}
 
-		const workspaceLogoUrl = workspace.logoStorageId
-			? await ctx.storage.getUrl(workspace.logoStorageId)
-			: null;
+		const workspaceLogoUrl = await getOwnedWorkspaceLogoUrl(ctx, workspace);
 
 		return {
 			slug: waiver.publicSlug,
@@ -487,9 +486,7 @@ export const getPublicWaiverForBooking = query({
 		) {
 			return null;
 		}
-		const workspaceLogoUrl = workspace.logoStorageId
-			? await ctx.storage.getUrl(workspace.logoStorageId)
-			: null;
+		const workspaceLogoUrl = await getOwnedWorkspaceLogoUrl(ctx, workspace);
 
 		return {
 			slug: waiver.publicSlug,

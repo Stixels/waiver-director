@@ -626,10 +626,14 @@
 		const handleReposition = () => updateImagePopoverPosition(instance);
 		window.addEventListener('resize', handleReposition);
 		editorWrapper?.addEventListener('scroll', handleReposition);
+		window.addEventListener('scroll', handleReposition, { passive: true });
+		document.addEventListener('scroll', handleReposition, true);
 
 		return () => {
 			window.removeEventListener('resize', handleReposition);
 			editorWrapper?.removeEventListener('scroll', handleReposition);
+			window.removeEventListener('scroll', handleReposition);
+			document.removeEventListener('scroll', handleReposition, true);
 			instance.destroy();
 			editor = null;
 			syncToolbarState(null);
