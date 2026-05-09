@@ -7,7 +7,6 @@
 	import { page } from '$app/state';
 	import { useAppContext } from '$lib/components/app/app-context.svelte';
 	import PageShell from '$lib/components/app/PageShell.svelte';
-	import PageHeader from '$lib/components/app/PageHeader.svelte';
 	import { useProtectedQuery } from '$lib/components/auth/convex-auth.svelte';
 	import SubmissionDetailSheet from '$lib/components/waivers/SubmissionDetailSheet.svelte';
 	import { Button } from '$lib/components/ui/button';
@@ -246,35 +245,31 @@
 	/>
 {/if}
 
-<PageHeader title="Signed waiver records" subtitle="Click any row to view the full signed waiver.">
-	{#snippet meta()}
-		<div class="relative w-full lg:max-w-md">
-			<SearchIcon
-				class="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground"
-				aria-hidden="true"
-			/>
-			<input
-				type="search"
-				placeholder="Search by customer, activity, or booking number"
-				bind:value={searchInput}
-				class="h-9 w-full rounded-lg border border-input bg-background/60 pr-10 pl-11 text-sm shadow-xs transition-all placeholder:text-muted-foreground/70 hover:bg-background focus-visible:border-ring focus-visible:bg-background focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
-				aria-label="Search submissions"
-			/>
-			{#if searchInput}
-				<button
-					type="button"
-					onclick={clearSearch}
-					class="absolute top-1/2 right-2 inline-flex size-6 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
-					aria-label="Clear search"
-				>
-					<XIcon class="size-3.5" aria-hidden="true" />
-				</button>
-			{/if}
-		</div>
-	{/snippet}
-</PageHeader>
-
 <PageShell>
+	<div class="relative w-full lg:max-w-md">
+		<SearchIcon
+			class="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground"
+			aria-hidden="true"
+		/>
+		<input
+			type="search"
+			placeholder="Search by customer, activity, or booking number"
+			bind:value={searchInput}
+			class="h-9 w-full rounded-lg border border-input bg-background/60 pr-10 pl-11 text-sm shadow-xs transition-all placeholder:text-muted-foreground/70 hover:bg-background focus-visible:border-ring focus-visible:bg-background focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
+			aria-label="Search submissions"
+		/>
+		{#if searchInput}
+			<button
+				type="button"
+				onclick={clearSearch}
+				class="absolute top-1/2 right-2 inline-flex size-6 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
+				aria-label="Clear search"
+			>
+				<XIcon class="size-3.5" aria-hidden="true" />
+			</button>
+		{/if}
+	</div>
+
 	{#if isLoadingSubmissions}
 		<div class="space-y-2 md:hidden">
 			{#each [0, 1, 2, 3, 4, 5] as index (index)}

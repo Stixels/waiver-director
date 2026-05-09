@@ -12,8 +12,8 @@
 	import resovaIcon from '$lib/assets/providers/resova-icon.webp';
 	import xolaIcon from '$lib/assets/providers/xola-icon.webp';
 	import { useAppContext } from '$lib/components/app/app-context.svelte';
-	import PageHeader from '$lib/components/app/PageHeader.svelte';
 	import PageShell from '$lib/components/app/PageShell.svelte';
+	import UpgradeOverlay from '$lib/components/app/UpgradeOverlay.svelte';
 	import { useProtectedQuery } from '$lib/components/auth/convex-auth.svelte';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
@@ -520,11 +520,6 @@
 	</SheetContent>
 </Sheet>
 
-<PageHeader
-	title="Integrations"
-	subtitle="Connect booking and email providers for this workspace."
-/>
-
 <PageShell>
 	{#if isLoading}
 		<section class="grid min-h-128 overflow-hidden border-y md:grid-cols-[15rem_minmax(0,1fr)]">
@@ -555,7 +550,17 @@
 			Workspace not found.
 		</div>
 	{:else}
-		<article class="grid min-h-128 overflow-hidden border-y md:grid-cols-[15rem_minmax(0,1fr)]">
+		<article
+			class="relative grid min-h-128 overflow-hidden border-y md:grid-cols-[15rem_minmax(0,1fr)]"
+		>
+			{#if !canUseBookingIntegrations}
+				<UpgradeOverlay
+					title="Upgrade to connect integrations"
+					description="Booking integrations are available on Pro plans and trials. Upgrade to connect Bookeo and keep booking-linked waiver operations in sync."
+					href={`/app/${page.params.workspaceSlug}/account#/billing/plans`}
+				/>
+			{/if}
+
 			<aside
 				class="flex flex-col gap-4 border-b p-3 md:border-r md:border-b-0"
 				aria-label="Integration providers"

@@ -3,7 +3,6 @@
 	import { resolve } from '$app/paths';
 	import { useAppContext } from '$lib/components/app/app-context.svelte';
 	import PageShell from '$lib/components/app/PageShell.svelte';
-	import PageHeader from '$lib/components/app/PageHeader.svelte';
 	import { cn } from '$lib/utils';
 	import Building2Icon from '@lucide/svelte/icons/building-2';
 	import MailIcon from '@lucide/svelte/icons/mail';
@@ -42,11 +41,6 @@
 <svelte:head>
 	<title>{currentWorkspace?.name ?? 'Workspace'} Settings | Waiver Director</title>
 </svelte:head>
-
-<PageHeader
-	title="Workspace settings"
-	subtitle="Configure how this workspace looks, sounds, and connects."
-/>
 
 <PageShell>
 	<div class="grid min-h-128 overflow-hidden border-y md:grid-cols-[15rem_minmax(0,1fr)]">

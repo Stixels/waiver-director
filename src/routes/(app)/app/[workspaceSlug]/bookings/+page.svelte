@@ -9,7 +9,6 @@
 	import QrCodeDialog from '$lib/components/waivers/QrCodeDialog.svelte';
 	import { useAppContext } from '$lib/components/app/app-context.svelte';
 	import PageShell from '$lib/components/app/PageShell.svelte';
-	import PageHeader from '$lib/components/app/PageHeader.svelte';
 	import { useProtectedQuery } from '$lib/components/auth/convex-auth.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { Skeleton } from '$lib/components/ui/skeleton';
@@ -448,11 +447,33 @@
 	/>
 {/if}
 
-<PageHeader
-	title="Check-ins"
-	subtitle="{formatSelectedDate(selectedDate)} · Front desk check-in coverage."
->
-	{#snippet actions()}
+<PageShell>
+	<div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+		<div class="relative w-full lg:max-w-md">
+			<SearchIcon
+				class="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground transition-colors"
+				aria-hidden="true"
+			/>
+			<input
+				type="search"
+				placeholder="Search by customer, activity, or booking number"
+				value={searchQuery}
+				oninput={handleSearchInput}
+				class="h-9 w-full rounded-lg border border-input bg-background/60 pr-10 pl-11 text-sm shadow-xs transition-all placeholder:text-muted-foreground/70 hover:bg-background focus-visible:border-ring focus-visible:bg-background focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
+				aria-label="Search bookings"
+			/>
+			{#if searchQuery}
+				<button
+					type="button"
+					onclick={clearSearch}
+					class="absolute top-1/2 right-2 inline-flex size-6 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
+					aria-label="Clear search"
+				>
+					<XIcon class="size-3.5" aria-hidden="true" />
+				</button>
+			{/if}
+		</div>
+
 		<div
 			class="flex w-full flex-wrap items-center gap-1 rounded-xl border border-border bg-card/40 p-0.5 lg:w-auto"
 		>
@@ -490,36 +511,8 @@
 				<ChevronRightIcon class="size-4" aria-hidden="true" />
 			</Button>
 		</div>
-	{/snippet}
-	{#snippet meta()}
-		<div class="relative w-full lg:max-w-md">
-			<SearchIcon
-				class="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground transition-colors"
-				aria-hidden="true"
-			/>
-			<input
-				type="search"
-				placeholder="Search by customer, activity, or booking number"
-				value={searchQuery}
-				oninput={handleSearchInput}
-				class="h-9 w-full rounded-lg border border-input bg-background/60 pr-10 pl-11 text-sm shadow-xs transition-all placeholder:text-muted-foreground/70 hover:bg-background focus-visible:border-ring focus-visible:bg-background focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
-				aria-label="Search bookings"
-			/>
-			{#if searchQuery}
-				<button
-					type="button"
-					onclick={clearSearch}
-					class="absolute top-1/2 right-2 inline-flex size-6 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
-					aria-label="Clear search"
-				>
-					<XIcon class="size-3.5" aria-hidden="true" />
-				</button>
-			{/if}
-		</div>
-	{/snippet}
-</PageHeader>
+	</div>
 
-<PageShell>
 	<div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
 		<div class="flex w-full flex-wrap items-center gap-3 lg:w-auto">
 			{#if isToday}

@@ -7,7 +7,6 @@
 	import { page } from '$app/state';
 	import { useAppContext } from '$lib/components/app/app-context.svelte';
 	import PageShell from '$lib/components/app/PageShell.svelte';
-	import PageHeader from '$lib/components/app/PageHeader.svelte';
 	import { useProtectedQuery } from '$lib/components/auth/convex-auth.svelte';
 	import SubmissionDetailSheet from '$lib/components/waivers/SubmissionDetailSheet.svelte';
 	import { Button } from '$lib/components/ui/button';
@@ -353,21 +352,8 @@
 	/>
 {/if}
 
-<PageHeader title="Signer contacts" subtitle="Track waiver signers and their repeat-visit history.">
-	{#snippet actions()}
-		<span
-			class="inline-flex h-10 items-center gap-2 rounded-full border border-border bg-card/40 px-3 text-xs font-medium text-muted-foreground"
-		>
-			<UsersRoundIcon class="size-3.5" aria-hidden="true" />
-			{#if isLoadingCustomers && !customerPage}
-				<Skeleton class="h-3 w-10" />
-			{:else}
-				<span class="text-foreground tabular-nums">{totalCount ?? 0}</span>
-				{(totalCount ?? 0) === 1 ? 'customer' : 'customers'}
-			{/if}
-		</span>
-	{/snippet}
-	{#snippet meta()}
+<PageShell>
+	<div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
 		<div class="relative w-full lg:max-w-md">
 			<SearchIcon
 				class="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground"
@@ -391,10 +377,20 @@
 				</button>
 			{/if}
 		</div>
-	{/snippet}
-</PageHeader>
 
-<PageShell>
+		<span
+			class="inline-flex h-9 w-fit items-center gap-2 rounded-full border border-border bg-card/40 px-3 text-xs font-medium text-muted-foreground"
+		>
+			<UsersRoundIcon class="size-3.5" aria-hidden="true" />
+			{#if isLoadingCustomers && !customerPage}
+				<Skeleton class="h-3 w-10" />
+			{:else}
+				<span class="text-foreground tabular-nums">{totalCount ?? 0}</span>
+				{(totalCount ?? 0) === 1 ? 'customer' : 'customers'}
+			{/if}
+		</span>
+	</div>
+
 	<div class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_24rem]">
 		<section class="min-w-0 space-y-4">
 			{#if isLoadingCustomers}

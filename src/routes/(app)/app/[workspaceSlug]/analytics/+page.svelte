@@ -3,8 +3,8 @@
 	import { api } from '$convex/_generated/api';
 	import type { FunctionReturnType } from 'convex/server';
 	import { useAppContext } from '$lib/components/app/app-context.svelte';
+	import UpgradeOverlay from '$lib/components/app/UpgradeOverlay.svelte';
 	import { useProtectedQuery } from '$lib/components/auth/convex-auth.svelte';
-	import { Button } from '$lib/components/ui/button';
 	import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { ChartContainer, ChartTooltip, type ChartConfig } from '$lib/components/ui/chart';
@@ -204,33 +204,21 @@
 	<div
 		class="mx-auto flex min-h-full w-full max-w-7xl min-w-0 flex-col gap-4 p-px xl:h-full xl:overflow-hidden"
 	>
-		<div class="flex shrink-0 justify-end">
-			<AnalyticsDateRangePicker
-				startDate={startDateStr}
-				endDate={endDateStr}
-				onchange={handleRangeChange}
-			/>
-		</div>
+		{#if canViewAnalytics}
+			<div class="flex shrink-0 justify-end">
+				<AnalyticsDateRangePicker
+					startDate={startDateStr}
+					endDate={endDateStr}
+					onchange={handleRangeChange}
+				/>
+			</div>
+		{/if}
 
 		{#if missingWorkspace}
 			<div
 				class="shrink-0 rounded-lg border border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground"
 			>
 				Workspace not found.
-			</div>
-		{:else if !canViewAnalytics}
-			<div
-				class="flex shrink-0 flex-col gap-3 rounded-lg border border-dashed bg-card/50 px-4 py-4 sm:flex-row sm:items-center sm:justify-between"
-			>
-				<div>
-					<p class="text-sm font-medium">Upgrade to view analytics</p>
-					<p class="mt-1 text-xs text-muted-foreground">
-						Analytics are available on Pro plans and trials.
-					</p>
-				</div>
-				<Button href={`/app/${page.params.workspaceSlug}/account#/billing/plans`}
-					>View billing</Button
-				>
 			</div>
 		{:else if analyticsError}
 			<div
@@ -240,7 +228,17 @@
 			</div>
 		{/if}
 
-		<div class="grid min-h-0 flex-1 grid-cols-1 gap-4 xl:grid-rows-[minmax(0,1fr)_minmax(0,1fr)]">
+		<div
+			class="relative grid min-h-0 flex-1 grid-cols-1 gap-4 xl:grid-rows-[minmax(0,1fr)_minmax(0,1fr)]"
+		>
+			{#if !appContext.isLoading && currentWorkspace && !canViewAnalytics}
+				<UpgradeOverlay
+					title="Upgrade to view analytics"
+					description="Analytics are available on Pro plans and trials, including booking trends, submission volume, customer activity, and email performance."
+					href={`/app/${page.params.workspaceSlug}/account#/billing/plans`}
+				/>
+			{/if}
+
 			<!-- Submissions + Bookings over time side by side -->
 			<div class="grid min-h-0 grid-cols-1 gap-4 lg:grid-cols-2">
 				<Card class="flex min-h-0 flex-col overflow-hidden">
