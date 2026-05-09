@@ -42,8 +42,8 @@
 	<title>{currentWorkspace?.name ?? 'Workspace'} Settings | Waiver Director</title>
 </svelte:head>
 
-<PageShell>
-	<div class="grid min-h-128 overflow-hidden border-y md:grid-cols-[15rem_minmax(0,1fr)]">
+<PageShell flush>
+	<div class="grid min-h-full overflow-hidden border-y md:grid-cols-[15rem_minmax(0,1fr)]">
 		<aside class="flex flex-col gap-4 border-b p-3 md:border-r md:border-b-0">
 			<p class="px-2 pb-0.5 text-sm font-semibold">Settings</p>
 			<nav class="flex flex-col gap-0.5" aria-label="Settings sections">

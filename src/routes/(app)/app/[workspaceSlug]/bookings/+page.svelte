@@ -448,128 +448,130 @@
 {/if}
 
 <PageShell>
-	<div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-		<div class="relative w-full lg:max-w-md">
-			<SearchIcon
-				class="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground transition-colors"
-				aria-hidden="true"
-			/>
-			<input
-				type="search"
-				placeholder="Search by customer, activity, or booking number"
-				value={searchQuery}
-				oninput={handleSearchInput}
-				class="h-9 w-full rounded-lg border border-input bg-background/60 pr-10 pl-11 text-sm shadow-xs transition-all placeholder:text-muted-foreground/70 hover:bg-background focus-visible:border-ring focus-visible:bg-background focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
-				aria-label="Search bookings"
-			/>
-			{#if searchQuery}
-				<button
-					type="button"
-					onclick={clearSearch}
-					class="absolute top-1/2 right-2 inline-flex size-6 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
-					aria-label="Clear search"
-				>
-					<XIcon class="size-3.5" aria-hidden="true" />
-				</button>
-			{/if}
-		</div>
-
-		<div
-			class="flex w-full flex-wrap items-center gap-1 rounded-xl border border-border bg-card/40 p-0.5 lg:w-auto"
-		>
-			<Button
-				size="icon-sm"
-				variant="ghost"
-				onclick={() => changeDate(-1)}
-				aria-label="Previous day"
-			>
-				<ChevronLeftIcon class="size-4" aria-hidden="true" />
-			</Button>
-
-			<label
-				class="relative flex h-9 flex-1 items-center gap-2 rounded-md border border-input bg-background px-2.5 text-sm transition-colors focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/30 lg:flex-none"
-			>
-				<CalendarDaysIcon class="size-4 text-muted-foreground" aria-hidden="true" />
-				<span class="sr-only">Booking date</span>
-				<input
-					type="date"
-					class="h-7 w-full bg-transparent text-sm outline-none lg:w-32"
-					value={selectedDate}
-					oninput={handleDateInput}
+	<div class="space-y-2">
+		<div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+			<div class="relative w-full lg:max-w-md">
+				<SearchIcon
+					class="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground transition-colors"
+					aria-hidden="true"
 				/>
-			</label>
-
-			<Button
-				size="sm"
-				variant={isToday ? 'secondary' : 'ghost'}
-				onclick={goToday}
-				disabled={isToday}
-			>
-				Today
-			</Button>
-			<Button size="icon-sm" variant="ghost" onclick={() => changeDate(1)} aria-label="Next day">
-				<ChevronRightIcon class="size-4" aria-hidden="true" />
-			</Button>
-		</div>
-	</div>
-
-	<div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-		<div class="flex w-full flex-wrap items-center gap-3 lg:w-auto">
-			{#if isToday}
-				<label
-					class="inline-flex h-10 w-full cursor-pointer items-center rounded-lg border border-input bg-card/50 p-0.5 shadow-xs lg:w-auto"
-				>
-					<input
-						type="checkbox"
-						checked={hideDone}
-						onchange={handleHideDoneChange}
-						class="peer sr-only"
-					/>
-					<span
-						class="inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-md px-3 text-xs font-medium whitespace-nowrap text-muted-foreground transition-all peer-checked:bg-background peer-checked:text-foreground peer-checked:shadow-sm peer-focus-visible:ring-2 peer-focus-visible:ring-ring/30 peer-focus-visible:outline-none hover:text-foreground lg:h-8"
-					>
-						<EyeOffIcon class="size-3.5" aria-hidden="true" />
-						Hide done
-					</span>
-				</label>
-			{/if}
-			<div
-				class="grid h-10 w-full grid-cols-4 items-center rounded-lg border border-input bg-card/50 p-0.5 shadow-xs lg:inline-flex lg:w-auto"
-				role="tablist"
-				aria-label="Filter bookings by status"
-			>
-				{#each STATUS_FILTERS as filter (filter.value)}
-					{@const active = statusFilter === filter.value}
-					{@const filterCount = statusFilterCount(filter.value)}
+				<input
+					type="search"
+					placeholder="Search by customer, activity, or booking number"
+					value={searchQuery}
+					oninput={handleSearchInput}
+					class="h-9 w-full rounded-lg border border-input bg-background/60 pr-10 pl-11 text-sm shadow-xs transition-all placeholder:text-muted-foreground/70 hover:bg-background focus-visible:border-ring focus-visible:bg-background focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
+					aria-label="Search bookings"
+				/>
+				{#if searchQuery}
 					<button
 						type="button"
-						role="tab"
-						aria-selected={active}
-						onclick={() => setStatusFilter(filter.value)}
-						class={cn(
-							'inline-flex h-9 items-center justify-center rounded-md px-1.5 text-xs font-medium whitespace-nowrap transition-all focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none lg:h-8 lg:px-3',
-							active
-								? 'bg-background text-foreground shadow-sm'
-								: 'text-muted-foreground hover:text-foreground'
-						)}
+						onclick={clearSearch}
+						class="absolute top-1/2 right-2 inline-flex size-6 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
+						aria-label="Clear search"
 					>
-						<span>{filter.label}</span>
+						<XIcon class="size-3.5" aria-hidden="true" />
+					</button>
+				{/if}
+			</div>
+
+			<div
+				class="flex w-full flex-wrap items-center gap-1 rounded-xl border border-border bg-card/40 p-0.5 lg:w-auto"
+			>
+				<Button
+					size="icon-sm"
+					variant="ghost"
+					onclick={() => changeDate(-1)}
+					aria-label="Previous day"
+				>
+					<ChevronLeftIcon class="size-4" aria-hidden="true" />
+				</Button>
+
+				<label
+					class="relative flex h-9 flex-1 items-center gap-2 rounded-md border border-input bg-background px-2.5 text-sm transition-colors focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/30 lg:flex-none"
+				>
+					<CalendarDaysIcon class="size-4 text-muted-foreground" aria-hidden="true" />
+					<span class="sr-only">Booking date</span>
+					<input
+						type="date"
+						class="h-7 w-full bg-transparent text-sm outline-none lg:w-32"
+						value={selectedDate}
+						oninput={handleDateInput}
+					/>
+				</label>
+
+				<Button
+					size="sm"
+					variant={isToday ? 'secondary' : 'ghost'}
+					onclick={goToday}
+					disabled={isToday}
+				>
+					Today
+				</Button>
+				<Button size="icon-sm" variant="ghost" onclick={() => changeDate(1)} aria-label="Next day">
+					<ChevronRightIcon class="size-4" aria-hidden="true" />
+				</Button>
+			</div>
+		</div>
+
+		<div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+			<div class="flex w-full flex-wrap items-center gap-3 lg:w-auto">
+				{#if isToday}
+					<label
+						class="inline-flex h-10 w-full cursor-pointer items-center rounded-lg border border-input bg-card/50 p-0.5 shadow-xs lg:w-auto"
+					>
+						<input
+							type="checkbox"
+							checked={hideDone}
+							onchange={handleHideDoneChange}
+							class="peer sr-only"
+						/>
 						<span
+							class="inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-md px-3 text-xs font-medium whitespace-nowrap text-muted-foreground transition-all peer-checked:bg-background peer-checked:text-foreground peer-checked:shadow-sm peer-focus-visible:ring-2 peer-focus-visible:ring-ring/30 peer-focus-visible:outline-none hover:text-foreground lg:h-8"
+						>
+							<EyeOffIcon class="size-3.5" aria-hidden="true" />
+							Hide done
+						</span>
+					</label>
+				{/if}
+				<div
+					class="grid h-10 w-full grid-cols-4 items-center rounded-lg border border-input bg-card/50 p-0.5 shadow-xs lg:inline-flex lg:w-auto"
+					role="tablist"
+					aria-label="Filter bookings by status"
+				>
+					{#each STATUS_FILTERS as filter (filter.value)}
+						{@const active = statusFilter === filter.value}
+						{@const filterCount = statusFilterCount(filter.value)}
+						<button
+							type="button"
+							role="tab"
+							aria-selected={active}
+							onclick={() => setStatusFilter(filter.value)}
 							class={cn(
-								'ml-1 rounded-sm px-1 py-0.5 text-[10px] tabular-nums lg:ml-1.5 lg:px-1.5',
-								active ? 'bg-muted text-muted-foreground' : 'bg-muted/60 text-muted-foreground'
+								'inline-flex h-9 items-center justify-center rounded-md px-1.5 text-xs font-medium whitespace-nowrap transition-all focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none lg:h-8 lg:px-3',
+								active
+									? 'bg-background text-foreground shadow-sm'
+									: 'text-muted-foreground hover:text-foreground'
 							)}
 						>
-							{#if isInitialLoading}
-								<Skeleton class="h-2.5 w-2.5" />
-							{:else if filterCount === null}
-								&mdash;
-							{:else}
-								{filterCount}
-							{/if}
-						</span>
-					</button>
-				{/each}
+							<span>{filter.label}</span>
+							<span
+								class={cn(
+									'ml-1 rounded-sm px-1 py-0.5 text-[10px] tabular-nums lg:ml-1.5 lg:px-1.5',
+									active ? 'bg-muted text-muted-foreground' : 'bg-muted/60 text-muted-foreground'
+								)}
+							>
+								{#if isInitialLoading}
+									<Skeleton class="h-2.5 w-2.5" />
+								{:else if filterCount === null}
+									&mdash;
+								{:else}
+									{filterCount}
+								{/if}
+							</span>
+						</button>
+					{/each}
+				</div>
 			</div>
 		</div>
 	</div>

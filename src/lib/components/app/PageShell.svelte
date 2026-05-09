@@ -1,15 +1,23 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
+	import { cn } from '$lib/utils';
 
 	interface Props {
 		children: Snippet;
+		flush?: boolean;
+		class?: string;
 	}
 
-	let { children }: Props = $props();
+	let { children, flush = false, class: className = '' }: Props = $props();
 </script>
 
-<div class="w-full min-w-0 p-6">
-	<div class="mx-auto w-full max-w-7xl min-w-0 space-y-6">
+<div class={cn('w-full min-w-0', flush ? 'h-full p-0' : 'p-4 sm:p-5', className)}>
+	<div
+		class={cn(
+			'mx-auto w-full min-w-0',
+			flush ? 'h-full max-w-none space-y-0' : 'max-w-7xl space-y-4'
+		)}
+	>
 		{@render children()}
 	</div>
 </div>
