@@ -48,6 +48,7 @@
 		onNavigate?: () => void;
 		initialWorkspaces?: WorkspaceSummary[];
 		isLoadingWorkspaces?: boolean;
+		canCreateWorkspace?: boolean;
 	}
 
 	type WorkspaceSummary = FunctionReturnType<typeof api.app.current>['workspaces'][number];
@@ -62,7 +63,8 @@
 		mode = 'sidebar',
 		onNavigate,
 		initialWorkspaces = [],
-		isLoadingWorkspaces = false
+		isLoadingWorkspaces = false,
+		canCreateWorkspace = true
 	}: Props = $props();
 
 	const convexAuth = useConvexAuthState();
@@ -127,6 +129,10 @@
 
 	function workspacePathnameFor(workspaceSlug: string): `/app/${string}` {
 		return `/app/${workspaceSlug}${currentWorkspaceSubpath}` as `/app/${string}`;
+	}
+
+	function accountBillingPathnameFor(workspaceSlug: string): `/app/${string}` {
+		return `/app/${workspaceSlug}/account#/billing/plans` as `/app/${string}`;
 	}
 
 	function accountPathname(): `/app/${string}` | '/app' {
@@ -201,6 +207,20 @@
 			invalidate: ['app:bootstrap'],
 			noScroll: true
 		});
+	}
+
+	function handleCreateWorkspaceClick() {
+		if (canCreateWorkspace) {
+			createWorkspaceDialogOpen = true;
+			return;
+		}
+		const workspaceSlug = activeWorkspaceSlug ?? workspaces[0]?.slug;
+		if (!workspaceSlug) {
+			toast.message('Upgrade to Business to create multiple workspaces.');
+			return;
+		}
+		handleNavigation();
+		void goto(resolve(accountBillingPathnameFor(workspaceSlug)), { noScroll: true });
 	}
 
 	async function handleSignOut(): Promise<void> {
@@ -349,10 +369,10 @@
 					{/if}
 				</DropdownMenuGroup>
 				<DropdownMenuSeparator />
-				<DropdownMenuItem onclick={() => (createWorkspaceDialogOpen = true)}>
+				<DropdownMenuItem onclick={handleCreateWorkspaceClick}>
 					<div class="flex w-full items-center gap-2">
 						<PlusIcon class="size-3.5" aria-hidden="true" />
-						Create workspace
+						{canCreateWorkspace ? 'Create workspace' : 'Upgrade for another workspace'}
 					</div>
 				</DropdownMenuItem>
 			</DropdownMenuContent>

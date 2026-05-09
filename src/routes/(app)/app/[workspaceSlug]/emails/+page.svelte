@@ -53,6 +53,7 @@
 	import LoaderIcon from '@lucide/svelte/icons/loader';
 	import SearchIcon from '@lucide/svelte/icons/search';
 	import ShieldCheckIcon from '@lucide/svelte/icons/shield-check';
+	import CreditCardIcon from '@lucide/svelte/icons/credit-card';
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 	import SlidersHorizontalIcon from '@lucide/svelte/icons/sliders-horizontal';
 	import XIcon from '@lucide/svelte/icons/x';
@@ -73,6 +74,7 @@
 	const currentWorkspace = $derived(
 		appContext.workspaces.find((w) => w.slug === page.params.workspaceSlug) ?? null
 	);
+	const canUseEmailFollowups = $derived(Boolean(currentWorkspace?.billing.features.emailFollowups));
 
 	// ─── Queries ───────────────────────────────────────────────────────────────
 
@@ -232,12 +234,16 @@
 
 	const businessName = $derived(currentWorkspace?.name ?? 'Your business');
 	const hasPlatformFromEmail = $derived(Boolean(senderSettings?.platformFromEmail));
-	const workspaceCanSendEmail = $derived(Boolean(senderSettings?.canSendEmails));
+	const workspaceCanSendEmail = $derived(
+		canUseEmailFollowups && Boolean(senderSettings?.canSendEmails)
+	);
 	const replyToPendingVerification = $derived(Boolean(senderSettings?.pendingReplyToEmail));
 	const senderUnavailableMessage = $derived(
-		hasPlatformFromEmail
-			? 'Verify a reply-to email before sending follow-ups.'
-			: 'Sender domain is not configured. Set RESEND_FROM_EMAIL before sending follow-ups.'
+		!canUseEmailFollowups
+			? 'Upgrade to Pro to send waiver follow-up emails.'
+			: hasPlatformFromEmail
+				? 'Verify a reply-to email before sending follow-ups.'
+				: 'Sender domain is not configured. Set RESEND_FROM_EMAIL before sending follow-ups.'
 	);
 	const sendSelectionTooltip = $derived.by(() => {
 		if (canSendSelected) return undefined;
@@ -943,7 +949,16 @@
 >
 	{#snippet actions()}
 		{#if !isLoading && currentWorkspace}
-			{#if workspaceCanSendEmail}
+			{#if !canUseEmailFollowups}
+				<a
+					href={resolve(`/app/${currentWorkspace.slug}/account#/billing/plans` as const)}
+					class="sender-chip"
+					data-state="unset"
+				>
+					<CreditCardIcon class="size-3" aria-hidden="true" />
+					<span>Upgrade to send</span>
+				</a>
+			{:else if workspaceCanSendEmail}
 				<a
 					href={resolve(`/app/${currentWorkspace.slug}/settings/email` as const)}
 					class="sender-chip"
@@ -1025,6 +1040,21 @@
 			No workspace was found for <span class="font-medium text-foreground"
 				>{page.params.workspaceSlug}</span
 			>.
+		</div>
+	{/if}
+
+	{#if !isLoading && currentWorkspace && !canUseEmailFollowups}
+		<div class="rounded-xl border border-dashed bg-card/50 px-4 py-4">
+			<div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+				<div>
+					<p class="text-sm font-medium">Upgrade to send follow-ups</p>
+					<p class="mt-1 text-xs text-muted-foreground">
+						Free workspaces can draft email content, but Pro is required to queue and deliver
+						follow-up emails.
+					</p>
+				</div>
+				<Button href={`/app/${currentWorkspace.slug}/account#/billing/plans`}>View billing</Button>
+			</div>
 		</div>
 	{/if}
 
@@ -1533,7 +1563,7 @@
 		</div>
 	{:else}
 		<!-- Email tab: sender context + editor -->
-		{#if !isLoading && currentWorkspace && !workspaceCanSendEmail}
+		{#if !isLoading && currentWorkspace && canUseEmailFollowups && !workspaceCanSendEmail}
 			<div
 				class="sender-banner"
 				data-state={replyToPendingVerification && hasPlatformFromEmail ? 'pending' : 'unset'}

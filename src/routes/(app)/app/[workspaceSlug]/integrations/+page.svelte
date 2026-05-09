@@ -194,6 +194,9 @@
 	const selectedProvider = $derived(providerForKey(selectedProviderKey) ?? BOOKING_PROVIDERS[0]);
 	const selectedIntegration = $derived(integrationForProvider(selectedProvider.key));
 	const selectedProviderState = $derived(providerStateFor(selectedProvider));
+	const canUseBookingIntegrations = $derived(
+		Boolean(currentWorkspace?.billing.features.bookingIntegrations)
+	);
 	const selectedProviderIsConnected = $derived(
 		Boolean(selectedIntegration && selectedIntegration.status !== 'disconnected')
 	);
@@ -302,6 +305,10 @@
 
 	async function startBookeoConnect() {
 		if (!currentWorkspace || convex.disabled) return;
+		if (!canUseBookingIntegrations) {
+			toast.message('Upgrade to Pro to connect booking integrations.');
+			return;
+		}
 		isStartingConnect = true;
 		try {
 			const result = await convex.action(api.integrations.startBookeoConnect, {
@@ -317,6 +324,10 @@
 
 	async function connectManually() {
 		if (!currentWorkspace || convex.disabled) return;
+		if (!canUseBookingIntegrations) {
+			toast.message('Upgrade to Pro to connect booking integrations.');
+			return;
+		}
 		const apiKeyTrimmed = manualApiKey.trim();
 		isConnectingManually = true;
 		try {
@@ -777,6 +788,19 @@
 								<p class="mt-1 text-xs text-muted-foreground">
 									Only workspace owners can connect booking providers.
 								</p>
+							</div>
+						{:else if !canUseBookingIntegrations}
+							<div class="rounded-lg border border-dashed bg-card/50 p-10 text-center">
+								<p class="text-sm font-medium">Upgrade to connect Bookeo</p>
+								<p class="mt-1 text-xs text-muted-foreground">
+									Booking integrations are available on Pro plans and trials.
+								</p>
+								<Button
+									class="mt-4"
+									href={`/app/${page.params.workspaceSlug}/account#/billing/plans`}
+								>
+									View billing
+								</Button>
 							</div>
 						{:else if connectedIntegration}
 							<div class="rounded-lg border border-dashed bg-card/50 p-10 text-center">

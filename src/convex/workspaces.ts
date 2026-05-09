@@ -6,6 +6,7 @@ import {
 	createDefaultWaiverDefinition,
 	requireWorkspaceOwner
 } from './lib/waivers';
+import { requireCanCreateWorkspace } from './lib/billing';
 import { getWorkspaceMembership, listWorkspaceMembershipsForUser } from './lib/workspaces';
 
 const WORKSPACE_SLUG_REGEX = /^[a-z0-9](?:[a-z0-9-]{0,46}[a-z0-9])$/;
@@ -51,6 +52,8 @@ export const createWorkspace = mutation({
 				message: `Workspace slug "${slug}" is reserved and cannot be used.`
 			});
 		}
+
+		await requireCanCreateWorkspace(ctx, user._id);
 
 		const existing = await ctx.db
 			.query('workspaces')

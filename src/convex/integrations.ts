@@ -19,6 +19,7 @@ import {
 	serviceDateFromDateTime,
 	UNKNOWN_ACTIVITY_NAME
 } from './lib/bookings';
+import { requireWorkspaceFeature } from './lib/billing';
 import { requireWorkspaceMember, requireWorkspaceOwner } from './lib/waivers';
 
 const BOOKEO_API_BASE_URL = 'https://api.bookeo.com/v2';
@@ -764,6 +765,7 @@ export const getOwnerAccessForAction = internalQuery({
 	}),
 	handler: async (ctx, args) => {
 		const { user } = await requireWorkspaceOwner(ctx, args.workspaceId);
+		await requireWorkspaceFeature(ctx, args.workspaceId, 'booking_integrations');
 		return { userId: user._id };
 	}
 });
@@ -1416,6 +1418,11 @@ export const syncBookeoIntegration = internalAction({
 			return null;
 		}
 		if (integration.status === 'disconnected') return null;
+		const canSync: boolean = await ctx.runQuery(internal.billing.getWorkspaceFeatureAccess, {
+			workspaceId: integration.workspaceId,
+			feature: 'booking_integrations'
+		});
+		if (!canSync) return null;
 
 		const range = initialSyncRange();
 		const syncStarted: boolean = await ctx.runMutation(
@@ -1483,6 +1490,10 @@ export const completeBookeoCallback = internalAction({
 			});
 			return { redirectUrl: `${appUrl()}/app?bookeo=expired` };
 		}
+		const canConnect: boolean = await ctx.runQuery(internal.billing.getWorkspaceFeatureAccess, {
+			workspaceId: session.workspaceId,
+			feature: 'booking_integrations'
+		});
 
 		const workspace: { slug: string } = await ctx.runQuery(
 			internal.integrations.getWorkspaceRedirect,
@@ -1491,6 +1502,13 @@ export const completeBookeoCallback = internalAction({
 			}
 		);
 		const redirectBase: string = `${appUrl()}/app/${workspace.slug}/integrations`;
+		if (!canConnect) {
+			await ctx.runMutation(internal.integrations.markConnectionSession, {
+				sessionId: session.sessionId,
+				status: 'failed'
+			});
+			return { redirectUrl: `${redirectBase}?bookeo=upgrade-required` };
+		}
 
 		const apiKey = args.apiKey?.trim() ?? '';
 		if (!args.success || apiKey.length < 6) {

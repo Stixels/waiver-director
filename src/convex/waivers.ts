@@ -5,6 +5,7 @@ import type { Doc, Id } from './_generated/dataModel';
 import type { MutationCtx, QueryCtx } from './_generated/server';
 import { internal } from './_generated/api';
 import { bookingSnapshot, bookingSnapshotValidator } from './lib/bookings';
+import { requireWorkspaceFeature, workspaceHasBillingFeature } from './lib/billing';
 import { upsertSignerCustomer } from './lib/customers';
 import { submissionSearchText } from './lib/submissions';
 import {
@@ -186,6 +187,7 @@ export const publishWorkspaceWaiver = mutation({
 	}),
 	handler: async (ctx, args) => {
 		await requireWorkspaceMember(ctx, args.workspaceId);
+		await requireWorkspaceFeature(ctx, args.workspaceId, 'waiver_publishing');
 
 		const waiver = assertWorkspaceRecord(
 			await ctx.db.get(args.waiverId),
@@ -431,6 +433,9 @@ export const getPublicWaiverBySlug = query({
 				message: 'This public waiver is no longer available.'
 			});
 		}
+		if (!(await workspaceHasBillingFeature(ctx, waiver.workspaceId, 'waiver_publishing'))) {
+			return null;
+		}
 
 		return {
 			slug: waiver.publicSlug,
@@ -476,6 +481,9 @@ export const getPublicWaiverForBooking = query({
 				message: 'This public waiver is no longer available.'
 			});
 		}
+		if (!(await workspaceHasBillingFeature(ctx, waiver.workspaceId, 'waiver_publishing'))) {
+			return null;
+		}
 		return {
 			slug: waiver.publicSlug,
 			versionId: version._id,
@@ -517,6 +525,12 @@ export const submitPublicWaiver = mutation({
 			.withIndex('by_publicSlug', (q) => q.eq('publicSlug', args.slug))
 			.unique();
 		if (!waiver || !waiver.publishedVersionId) {
+			throw new ConvexError({
+				code: 'not_found',
+				message: 'This public waiver is no longer available.'
+			});
+		}
+		if (!(await workspaceHasBillingFeature(ctx, waiver.workspaceId, 'waiver_publishing'))) {
 			throw new ConvexError({
 				code: 'not_found',
 				message: 'This public waiver is no longer available.'

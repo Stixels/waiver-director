@@ -4,6 +4,7 @@
 	import type { FunctionReturnType } from 'convex/server';
 	import { useAppContext } from '$lib/components/app/app-context.svelte';
 	import { useProtectedQuery } from '$lib/components/auth/convex-auth.svelte';
+	import { Button } from '$lib/components/ui/button';
 	import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { ChartContainer, ChartTooltip, type ChartConfig } from '$lib/components/ui/chart';
@@ -27,6 +28,7 @@
 	const currentWorkspace = $derived(
 		appContext.workspaces.find((w) => w.slug === page.params.workspaceSlug) ?? null
 	);
+	const canViewAnalytics = $derived(Boolean(currentWorkspace?.billing.features.analytics));
 
 	function toDateInputValue(date: Date): string {
 		const y = date.getFullYear();
@@ -54,7 +56,7 @@
 	const analyticsQuery = useProtectedQuery(
 		api.dashboard.getAnalyticsSeries,
 		() =>
-			currentWorkspace
+			currentWorkspace && canViewAnalytics
 				? {
 						workspaceId: currentWorkspace.workspaceId,
 						rangeStartAt,
@@ -70,7 +72,9 @@
 	const analyticsData = $derived((analyticsQuery.data ?? null) as AnalyticsData | null);
 	const analyticsError = $derived(analyticsQuery.error ?? null);
 	const missingWorkspace = $derived(!appContext.isLoading && currentWorkspace == null);
-	const analyticsUnavailable = $derived(Boolean(analyticsError) || missingWorkspace);
+	const analyticsUnavailable = $derived(
+		Boolean(analyticsError) || missingWorkspace || !canViewAnalytics
+	);
 	const isInitialLoading = $derived(
 		(analyticsQuery.isLoading || appContext.isLoading) && !analyticsData
 	);
@@ -213,6 +217,20 @@
 				class="shrink-0 rounded-lg border border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground"
 			>
 				Workspace not found.
+			</div>
+		{:else if !canViewAnalytics}
+			<div
+				class="flex shrink-0 flex-col gap-3 rounded-lg border border-dashed bg-card/50 px-4 py-4 sm:flex-row sm:items-center sm:justify-between"
+			>
+				<div>
+					<p class="text-sm font-medium">Upgrade to view analytics</p>
+					<p class="mt-1 text-xs text-muted-foreground">
+						Analytics are available on Pro plans and trials.
+					</p>
+				</div>
+				<Button href={`/app/${page.params.workspaceSlug}/account#/billing/plans`}
+					>View billing</Button
+				>
 			</div>
 		{:else if analyticsError}
 			<div

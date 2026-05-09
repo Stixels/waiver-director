@@ -29,6 +29,7 @@
 
 	const appState = $state<AppContextState>({
 		currentUser: null,
+		billing: null,
 		workspaces: [],
 		isLoading: true,
 		error: null
@@ -56,6 +57,7 @@
 
 	$effect(() => {
 		appState.currentUser = appData?.currentUser ?? null;
+		appState.billing = appData?.billing ?? null;
 		appState.workspaces = appData?.workspaces ?? [];
 		appState.isLoading = isLoading;
 		appState.error = ensureError ?? appQuery.error ?? null;

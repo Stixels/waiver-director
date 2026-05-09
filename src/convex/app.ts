@@ -2,6 +2,12 @@ import { v } from 'convex/values';
 import { query } from './_generated/server';
 import type { Id } from './_generated/dataModel';
 import type { QueryCtx } from './_generated/server';
+import {
+	billingFeatureValidator,
+	canCreateWorkspace,
+	entitlementHasFeature,
+	getBillingEntitlementForUser
+} from './lib/billing';
 import { getCurrentAuthIdentity } from './lib/auth';
 import { listWorkspaceMembershipsForUser } from './lib/workspaces';
 
@@ -18,7 +24,34 @@ const workspaceSummaryValue = v.object({
 	name: v.string(),
 	slug: v.string(),
 	role: v.union(v.literal('owner'), v.literal('staff')),
-	status: v.union(v.literal('active'), v.literal('invited'), v.literal('suspended'))
+	status: v.union(v.literal('active'), v.literal('invited'), v.literal('suspended')),
+	billing: v.object({
+		ownerUserId: v.union(v.id('users'), v.null()),
+		planSlug: v.string(),
+		status: v.string(),
+		featureSlugs: v.array(billingFeatureValidator),
+		isActive: v.boolean(),
+		features: v.object({
+			waiverPublishing: v.boolean(),
+			bookingIntegrations: v.boolean(),
+			emailFollowups: v.boolean(),
+			analytics: v.boolean(),
+			pdfExport: v.boolean(),
+			teamAccess: v.boolean(),
+			multiWorkspace: v.boolean()
+		})
+	})
+});
+
+const billingSummaryValue = v.object({
+	planSlug: v.string(),
+	status: v.string(),
+	featureSlugs: v.array(billingFeatureValidator),
+	isActive: v.boolean(),
+	currentPeriodEnd: v.union(v.number(), v.null()),
+	trialEndsAt: v.union(v.number(), v.null()),
+	cancelAtPeriodEnd: v.boolean(),
+	canCreateWorkspace: v.boolean()
 });
 
 function buildCurrentUserResult(args: {
@@ -72,6 +105,7 @@ export const current = query({
 	args: {},
 	returns: v.object({
 		currentUser: v.union(v.null(), currentUserValue),
+		billing: v.union(v.null(), billingSummaryValue),
 		workspaces: v.array(workspaceSummaryValue)
 	}),
 	handler: async (ctx) => {
@@ -79,13 +113,22 @@ export const current = query({
 		if (!currentUserState) {
 			return {
 				currentUser: null,
+				billing: null,
 				workspaces: []
 			};
 		}
 
+		const currentBilling = await getBillingEntitlementForUser(ctx, currentUserState.user._id);
 		const memberships = await listWorkspaceMembershipsForUser(ctx, currentUserState.user._id);
 		const workspaceDocs = await Promise.all(
 			memberships.map((membership) => ctx.db.get(membership.workspaceId))
+		);
+		const workspaceBillingDocs = await Promise.all(
+			workspaceDocs.map((workspace) =>
+				workspace?.createdByUserId
+					? getBillingEntitlementForUser(ctx, workspace.createdByUserId)
+					: null
+			)
 		);
 
 		const workspaces = memberships.map((membership, index) => {
@@ -101,18 +144,59 @@ export const current = query({
 				});
 				return null;
 			}
+			const workspaceBilling = workspaceBillingDocs[index];
 
 			return {
 				workspaceId: workspace._id,
 				name: workspace.name,
 				slug: workspace.slug,
 				role: membership.role,
-				status: membership.status
+				status: membership.status,
+				billing: {
+					ownerUserId: workspace.createdByUserId ?? null,
+					planSlug: workspaceBilling?.planSlug ?? 'free',
+					status: workspaceBilling?.status ?? 'free',
+					featureSlugs: workspaceBilling?.featureSlugs ?? [],
+					isActive: workspaceBilling?.isActive ?? false,
+					features: {
+						waiverPublishing: workspaceBilling
+							? entitlementHasFeature(workspaceBilling, 'waiver_publishing')
+							: false,
+						bookingIntegrations: workspaceBilling
+							? entitlementHasFeature(workspaceBilling, 'booking_integrations')
+							: false,
+						emailFollowups: workspaceBilling
+							? entitlementHasFeature(workspaceBilling, 'email_followups')
+							: false,
+						analytics: workspaceBilling
+							? entitlementHasFeature(workspaceBilling, 'analytics')
+							: false,
+						pdfExport: workspaceBilling
+							? entitlementHasFeature(workspaceBilling, 'pdf_export')
+							: false,
+						teamAccess: workspaceBilling
+							? entitlementHasFeature(workspaceBilling, 'team_access')
+							: false,
+						multiWorkspace: workspaceBilling
+							? entitlementHasFeature(workspaceBilling, 'multi_workspace')
+							: false
+					}
+				}
 			};
 		});
 
 		return {
 			currentUser: currentUserState.currentUser,
+			billing: {
+				planSlug: currentBilling.planSlug,
+				status: currentBilling.status,
+				featureSlugs: currentBilling.featureSlugs,
+				isActive: currentBilling.isActive,
+				currentPeriodEnd: currentBilling.currentPeriodEnd,
+				trialEndsAt: currentBilling.trialEndsAt,
+				cancelAtPeriodEnd: currentBilling.cancelAtPeriodEnd,
+				canCreateWorkspace: await canCreateWorkspace(ctx, currentUserState.user._id)
+			},
 			workspaces: workspaces.filter((workspace) => workspace !== null)
 		};
 	}

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { beforeNavigate } from '$app/navigation';
+	import { beforeNavigate, goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { onMount, tick, untrack } from 'svelte';
@@ -94,8 +94,10 @@
 
 	let confirmKind = $state<ConfirmKind | null>(null);
 	let confirmOpen = $state(false);
+	const canPublishWaiver = $derived(Boolean(currentWorkspace?.billing.features.waiverPublishing));
 
 	const activePublicHref = $derived.by(() => {
+		if (!canPublishWaiver) return null;
 		if (!workspaceWaiver?.publishedVersionId) return null;
 		return resolve(`/w/${workspaceWaiver.publicSlug}` as `/w/${string}`);
 	});
@@ -127,7 +129,9 @@
 			isDirty ||
 			isSaving ||
 			!workspaceWaiver ||
-			(!!workspaceWaiver.publishedVersionId && !workspaceWaiver.hasUnpublishedChanges)
+			(canPublishWaiver &&
+				!!workspaceWaiver.publishedVersionId &&
+				!workspaceWaiver.hasUnpublishedChanges)
 	);
 
 	const saveState = $derived<SaveState>(
@@ -330,6 +334,7 @@
 	}
 
 	function publishButtonLabel(waiver: WorkspaceWaiverSummary | null) {
+		if (!canPublishWaiver) return 'Upgrade to publish';
 		if (!waiver) return 'Publish';
 		if (waiver.publishedVersionId && !waiver.hasUnpublishedChanges) return 'Live';
 		if (waiver.publishedVersionId && waiver.hasUnpublishedChanges) return 'Publish changes';
@@ -340,6 +345,14 @@
 	function openConfirm(kind: ConfirmKind) {
 		confirmKind = kind;
 		confirmOpen = true;
+	}
+
+	async function handlePublishClick() {
+		if (!canPublishWaiver) {
+			await goto(resolve(`/app/${page.params.workspaceSlug}/account#/billing/plans` as const));
+			return;
+		}
+		openConfirm('publish');
 	}
 
 	function confirmConfig(kind: ConfirmKind) {
@@ -597,7 +610,9 @@
 						Not live
 					</span>
 					<p class="truncate text-[13px] text-muted-foreground">
-						Publish this waiver to share a public signing link with your guests.
+						{canPublishWaiver
+							? 'Publish this waiver to share a public signing link with your guests.'
+							: 'Upgrade to Pro to publish this waiver and accept signed submissions.'}
 					</p>
 				</div>
 			{/if}
@@ -627,7 +642,7 @@
 					<Button
 						type="button"
 						size="sm"
-						onclick={() => openConfirm('publish')}
+						onclick={handlePublishClick}
 						disabled={publishDisabled}
 						class="publish-btn ml-1 h-8 gap-1.5"
 					>

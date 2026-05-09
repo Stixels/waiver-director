@@ -17,8 +17,8 @@
 		},
 		{
 			id: 'submissions',
-			q: 'What counts as a submission?',
-			a: 'A submission is one completed, signed waiver from one participant. If a group of 6 signs, that counts as 6 submissions. On the Free plan, you get 25 per month. Pro gives you unlimited.'
+			q: 'Can I collect submissions on Free?',
+			a: 'Free is for setup and preview. Upgrade to Pro or start a Pro trial to publish a live waiver and accept signed submissions.'
 		},
 		{
 			id: 'guest-accounts',
@@ -58,7 +58,7 @@
 	<title>Pricing — Waiver Director</title>
 	<meta
 		name="description"
-		content="Simple, transparent pricing for Waiver Director. Start free with 25 submissions per month. Upgrade to Pro for unlimited submissions, automation, and analytics."
+		content="Simple, transparent pricing for Waiver Director. Start free for setup and preview. Upgrade to Pro for live waiver publishing, automation, and analytics."
 	/>
 	{#if canonicalUrl}
 		<link rel="canonical" href={canonicalUrl} />
@@ -84,7 +84,7 @@
 			Simple pricing, no surprises.
 		</h1>
 		<p class="text-[17px] leading-relaxed" style="color: var(--m-text-2);">
-			Start free and upgrade as you grow. Every plan includes core waiver functionality.
+			Start free to build your waiver, then upgrade when you're ready to go live.
 		</p>
 	</div>
 </section>
