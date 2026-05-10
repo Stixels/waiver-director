@@ -11,7 +11,6 @@
 	import type { Id } from '$convex/_generated/dataModel';
 	import { api } from '$convex/_generated/api';
 	import { useAppContext } from '$lib/components/app/app-context.svelte';
-	import PageShell from '$lib/components/app/PageShell.svelte';
 	import UpgradeOverlay from '$lib/components/app/UpgradeOverlay.svelte';
 	import { useProtectedQuery } from '$lib/components/auth/convex-auth.svelte';
 	import { getConvexErrorMessage } from '$lib/utils/convex-errors';
@@ -942,372 +941,330 @@
 	onDelete={deleteTemplate}
 />
 
-<PageShell>
-	<div
-		class="flex flex-col gap-3 border-b border-border pb-3 sm:flex-row sm:items-end sm:justify-between"
-	>
-		<nav class="header-tabs" aria-label="Email follow-up sections">
-			<a
-				href={resolve(`/app/${page.params.workspaceSlug}/emails` as const)}
-				aria-current={activeTab === 'queue' ? 'page' : undefined}
-				class="header-tab-btn"
-			>
-				Queue
-				{#if !statsQuery.isLoading}
-					<span class="tab-badge">{stats?.pendingCount ?? 0}</span>
-				{/if}
-			</a>
-			<a
-				href={resolve(`/app/${page.params.workspaceSlug}/emails?tab=email` as const)}
-				aria-current={activeTab === 'email' ? 'page' : undefined}
-				class="header-tab-btn"
-			>
-				Email
-			</a>
-		</nav>
-
-		{#if !isLoading && currentWorkspace && canUseEmailFollowups}
-			{#if workspaceCanSendEmail}
-				<a
-					href={resolve(`/app/${currentWorkspace.slug}/settings/email` as const)}
-					class="sender-chip"
-					data-state="ready"
-				>
-					<ShieldCheckIcon class="size-3" aria-hidden="true" />
-					<span class="sender-chip-label">Sending as {businessName}</span>
-					{#if senderSettings?.replyToEmail}
-						<span class="sender-chip-reply">
-							<span class="sender-chip-reply-label">Reply-to</span>
-							<span class="sender-chip-reply-email">{senderSettings.replyToEmail}</span>
-						</span>
-					{/if}
-				</a>
-			{:else if replyToPendingVerification && hasPlatformFromEmail}
-				<a
-					href={resolve(`/app/${currentWorkspace.slug}/settings/email` as const)}
-					class="sender-chip"
-					data-state="pending"
-				>
-					<MailCheckIcon class="size-3" aria-hidden="true" />
-					<span>Verify reply-to</span>
-				</a>
-			{:else if hasPlatformFromEmail}
-				<a
-					href={resolve(`/app/${currentWorkspace.slug}/settings/email` as const)}
-					class="sender-chip"
-					data-state="unset"
-				>
-					<MailIcon class="size-3" aria-hidden="true" />
-					<span>Configure reply-to</span>
-				</a>
-			{:else}
-				<a
-					href={resolve(`/app/${currentWorkspace.slug}/settings/email` as const)}
-					class="sender-chip"
-					data-state="unset"
-				>
-					<MailIcon class="size-3" aria-hidden="true" />
-					<span>Sender not configured</span>
-				</a>
-			{/if}
-		{/if}
-	</div>
-
-	{#if pageError}
-		<div
-			class="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
-		>
-			{getConvexErrorMessage(pageError, 'Unable to load email follow-ups.')}
-		</div>
-	{:else if !appContext.isLoading && !currentWorkspace}
-		<div
-			class="rounded-xl border border-border bg-muted/20 px-4 py-3 text-sm text-muted-foreground"
-		>
-			No workspace was found for <span class="font-medium text-foreground"
-				>{page.params.workspaceSlug}</span
-			>.
-		</div>
+<div class="relative w-full min-w-0 p-4 sm:p-5">
+	{#if !isLoading && currentWorkspace && !canUseEmailFollowups}
+		<UpgradeOverlay
+			title="Upgrade to send follow-ups"
+			description="Free workspaces can draft email content, but Pro is required to queue, deliver, and manage waiver follow-up emails."
+			href={`/app/${currentWorkspace.slug}/account#/billing/plans`}
+		/>
 	{/if}
 
-	<div class="relative min-h-[520px]">
-		{#if !isLoading && currentWorkspace && !canUseEmailFollowups}
-			<UpgradeOverlay
-				title="Upgrade to send follow-ups"
-				description="Free workspaces can draft email content, but Pro is required to queue, deliver, and manage waiver follow-up emails."
-				href={`/app/${currentWorkspace.slug}/account#/billing/plans`}
-			/>
+	<div class="mx-auto w-full max-w-7xl min-w-0 space-y-4">
+		<div
+			class="-mx-4 flex flex-col gap-3 border-b border-border px-4 pb-3 sm:-mx-5 sm:flex-row sm:items-end sm:justify-between sm:px-5"
+		>
+			<nav class="header-tabs" aria-label="Email follow-up sections">
+				<a
+					href={resolve(`/app/${page.params.workspaceSlug}/emails` as const)}
+					aria-current={activeTab === 'queue' ? 'page' : undefined}
+					class="header-tab-btn"
+				>
+					Queue
+					{#if !statsQuery.isLoading}
+						<span class="tab-badge">{stats?.pendingCount ?? 0}</span>
+					{/if}
+				</a>
+				<a
+					href={resolve(`/app/${page.params.workspaceSlug}/emails?tab=email` as const)}
+					aria-current={activeTab === 'email' ? 'page' : undefined}
+					class="header-tab-btn"
+				>
+					Email
+				</a>
+			</nav>
+
+			{#if !isLoading && currentWorkspace && canUseEmailFollowups}
+				{#if workspaceCanSendEmail}
+					<a
+						href={resolve(`/app/${currentWorkspace.slug}/settings/email` as const)}
+						class="sender-chip"
+						data-state="ready"
+					>
+						<ShieldCheckIcon class="size-3" aria-hidden="true" />
+						<span class="sender-chip-label">Sending as {businessName}</span>
+						{#if senderSettings?.replyToEmail}
+							<span class="sender-chip-reply">
+								<span class="sender-chip-reply-label">Reply-to</span>
+								<span class="sender-chip-reply-email">{senderSettings.replyToEmail}</span>
+							</span>
+						{/if}
+					</a>
+				{:else if replyToPendingVerification && hasPlatformFromEmail}
+					<a
+						href={resolve(`/app/${currentWorkspace.slug}/settings/email` as const)}
+						class="sender-chip"
+						data-state="pending"
+					>
+						<MailCheckIcon class="size-3" aria-hidden="true" />
+						<span>Verify reply-to</span>
+					</a>
+				{:else if hasPlatformFromEmail}
+					<a
+						href={resolve(`/app/${currentWorkspace.slug}/settings/email` as const)}
+						class="sender-chip"
+						data-state="unset"
+					>
+						<MailIcon class="size-3" aria-hidden="true" />
+						<span>Configure reply-to</span>
+					</a>
+				{:else}
+					<a
+						href={resolve(`/app/${currentWorkspace.slug}/settings/email` as const)}
+						class="sender-chip"
+						data-state="unset"
+					>
+						<MailIcon class="size-3" aria-hidden="true" />
+						<span>Sender not configured</span>
+					</a>
+				{/if}
+			{/if}
+		</div>
+
+		{#if pageError}
+			<div
+				class="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+			>
+				{getConvexErrorMessage(pageError, 'Unable to load email follow-ups.')}
+			</div>
+		{:else if !appContext.isLoading && !currentWorkspace}
+			<div
+				class="rounded-xl border border-border bg-muted/20 px-4 py-3 text-sm text-muted-foreground"
+			>
+				No workspace was found for <span class="font-medium text-foreground"
+					>{page.params.workspaceSlug}</span
+				>.
+			</div>
 		{/if}
 
-		{#if activeTab === 'queue'}
-			<!-- Stats cards -->
-			<div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
-				<div class="rounded-xl border border-border bg-card p-4">
-					<p class="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase">
-						Emails sent today
-					</p>
-					{#if statsQuery.isLoading}
-						<Skeleton class="mt-2 h-8 w-16" />
-					{:else}
-						<p class="mt-1 text-3xl font-semibold tabular-nums">{stats?.sentToday ?? 0}</p>
-					{/if}
-				</div>
-				<div class="rounded-xl border border-border bg-card p-4">
-					<p class="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase">
-						Pending queue
-					</p>
-					{#if statsQuery.isLoading}
-						<Skeleton class="mt-2 h-8 w-10" />
-					{:else}
-						<p class="mt-1 text-3xl font-semibold tabular-nums">{stats?.pendingCount ?? 0}</p>
-					{/if}
-				</div>
-				<div class="rounded-xl border border-border bg-card p-4">
-					<p class="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase">
-						Total sent
-					</p>
-					{#if statsQuery.isLoading}
-						<Skeleton class="mt-2 h-8 w-14" />
-					{:else}
-						<p class="mt-1 text-3xl font-semibold tabular-nums">{stats?.totalSent ?? 0}</p>
-					{/if}
-				</div>
-			</div>
-
-			<!-- Follow-ups table -->
-			<div class="space-y-4">
-				<!-- Filters + actions -->
-				<div class="space-y-2">
-					<div class="flex flex-col gap-3 lg:flex-row lg:items-center">
-						<div class="relative w-full lg:max-w-md">
-							<SearchIcon
-								class="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground"
-								aria-hidden="true"
-							/>
-							<input
-								type="search"
-								placeholder="Search by name, email, or booking number"
-								bind:value={searchQuery}
-								class="h-9 w-full rounded-lg border border-input bg-background/60 pr-10 pl-11 text-sm shadow-xs transition-all placeholder:text-muted-foreground/70 hover:bg-background focus-visible:border-ring focus-visible:bg-background focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
-								aria-label="Search follow-ups"
-							/>
-							{#if searchQuery}
-								<button
-									type="button"
-									onclick={clearSearch}
-									class="absolute top-1/2 right-2 inline-flex size-6 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
-									aria-label="Clear search"
-								>
-									<XIcon class="size-3.5" aria-hidden="true" />
-								</button>
-							{/if}
-						</div>
-
-						<div class="flex flex-col gap-2 sm:flex-row sm:items-center lg:ml-auto">
-							<DropdownMenu>
-								<DropdownMenuTrigger>
-									{#snippet child({ props })}
-										<Button
-											{...props}
-											type="button"
-											size="lg"
-											variant={statusFilters.size > 0 ? 'secondary' : 'outline'}
-											class="h-9 w-full justify-between gap-2 sm:w-auto sm:min-w-32"
-										>
-											<span class="inline-flex min-w-0 items-center gap-1.5">
-												<SlidersHorizontalIcon class="size-3.5 shrink-0" aria-hidden="true" />
-												<span class="truncate">{statusFilterLabel}</span>
-											</span>
-											<ChevronDownIcon class="size-3.5 text-muted-foreground" aria-hidden="true" />
-										</Button>
-									{/snippet}
-								</DropdownMenuTrigger>
-								<DropdownMenuContent align="end" class="w-48">
-									{#each STATUS_OPTIONS as opt (opt.value)}
-										{@const active = statusFilters.has(opt.value)}
-										<DropdownMenuCheckboxItem
-											checked={active}
-											closeOnSelect={false}
-											onCheckedChange={(checked) => setStatusFilter(opt.value, checked)}
-										>
-											{opt.label}
-										</DropdownMenuCheckboxItem>
-									{/each}
-									{#if statusFilters.size > 0}
-										<div class="mt-1 border-t border-foreground/5 pt-1">
-											<button
-												type="button"
-												onclick={() => statusFilters.clear()}
-												class="flex min-h-7 w-full items-center rounded-md px-2 text-left text-xs text-muted-foreground outline-hidden transition-colors hover:bg-foreground/10 hover:text-foreground focus:bg-foreground/10 focus:text-foreground"
-											>
-												Clear status
-											</button>
-										</div>
-									{/if}
-								</DropdownMenuContent>
-							</DropdownMenu>
-
-							<Popover bind:open={dateCalendarOpen}>
-								<PopoverTrigger>
-									{#snippet child({ props })}
-										<Button
-											{...props}
-											type="button"
-											size="lg"
-											variant={dateFrom || dateTo ? 'secondary' : 'outline'}
-											class="h-9 w-full justify-between gap-2 sm:w-auto sm:max-w-64"
-										>
-											<span class="inline-flex min-w-0 items-center gap-1.5">
-												<CalendarClockIcon class="size-3.5 shrink-0" aria-hidden="true" />
-												<span class="truncate">{dateFilterLabel}</span>
-											</span>
-											<ChevronDownIcon class="size-3.5 text-muted-foreground" aria-hidden="true" />
-										</Button>
-									{/snippet}
-								</PopoverTrigger>
-								<PopoverContent align="end" class="w-auto p-2">
-									<RangeCalendar bind:value={dateRangeValue} class="w-fit" />
-									{#if dateFrom || dateTo}
-										<div class="flex justify-end border-t border-border px-1 pt-2">
-											<button
-												type="button"
-												onclick={clearDateRange}
-												class="rounded-md px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
-											>
-												Clear dates
-											</button>
-										</div>
-									{/if}
-								</PopoverContent>
-							</Popover>
-						</div>
-
-						<div class="flex gap-1.5">
-							<span class="inline-block flex-1 sm:flex-none" title={sendSelectionTooltip}>
-								<Button
-									size="lg"
-									onclick={handleSendSelected}
-									disabled={selectionLoading !== null || !canSendSelected}
-									class="h-9 w-full sm:h-8 sm:w-auto"
-								>
-									{selectionLoading === 'send' ? 'Sending…' : 'Send'}
-								</Button>
-							</span>
-							<span
-								class="inline-block flex-1 sm:flex-none"
-								title={!canUnscheduleSelected ? 'Select queued rows to unschedule' : undefined}
-							>
-								<Button
-									size="lg"
-									variant="outline"
-									onclick={handleUnscheduleSelected}
-									disabled={selectionLoading !== null || !canUnscheduleSelected}
-									class="h-9 w-full sm:h-8 sm:w-auto"
-								>
-									{selectionLoading === 'unschedule' ? 'Unscheduling…' : 'Unschedule'}
-								</Button>
-							</span>
-						</div>
+		<div class="min-h-[520px]">
+			{#if activeTab === 'queue'}
+				<!-- Stats cards -->
+				<div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+					<div class="rounded-xl border border-border bg-card p-4">
+						<p class="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase">
+							Emails sent today
+						</p>
+						{#if statsQuery.isLoading}
+							<Skeleton class="mt-2 h-8 w-16" />
+						{:else}
+							<p class="mt-1 text-3xl font-semibold tabular-nums">{stats?.sentToday ?? 0}</p>
+						{/if}
+					</div>
+					<div class="rounded-xl border border-border bg-card p-4">
+						<p class="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase">
+							Pending queue
+						</p>
+						{#if statsQuery.isLoading}
+							<Skeleton class="mt-2 h-8 w-10" />
+						{:else}
+							<p class="mt-1 text-3xl font-semibold tabular-nums">{stats?.pendingCount ?? 0}</p>
+						{/if}
+					</div>
+					<div class="rounded-xl border border-border bg-card p-4">
+						<p class="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase">
+							Total sent
+						</p>
+						{#if statsQuery.isLoading}
+							<Skeleton class="mt-2 h-8 w-14" />
+						{:else}
+							<p class="mt-1 text-3xl font-semibold tabular-nums">{stats?.totalSent ?? 0}</p>
+						{/if}
 					</div>
 				</div>
 
-				<!-- List -->
-				<div class="flex h-[440px] min-h-0 flex-col md:h-[520px]">
-					{#snippet paginationFooter(border: boolean)}
-						<div
-							class="flex items-center justify-between {border
-								? 'border-t border-border'
-								: ''} px-4 py-3 sm:px-5"
-						>
-							<p class="text-xs text-muted-foreground">
-								{#if followUps.length === 0}
-									No entries
-								{:else}
-									Page {currentPage + 1} · Showing {followUps.length}
-									{followUps.length === 1 ? 'entry' : 'entries'}
+				<!-- Follow-ups table -->
+				<div class="space-y-4">
+					<!-- Filters + actions -->
+					<div class="space-y-2">
+						<div class="flex flex-col gap-3 lg:flex-row lg:items-center">
+							<div class="relative w-full lg:max-w-md">
+								<SearchIcon
+									class="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground"
+									aria-hidden="true"
+								/>
+								<input
+									type="search"
+									placeholder="Search by name, email, or booking number"
+									bind:value={searchQuery}
+									class="h-9 w-full rounded-lg border border-input bg-background/60 pr-10 pl-11 text-sm shadow-xs transition-all placeholder:text-muted-foreground/70 hover:bg-background focus-visible:border-ring focus-visible:bg-background focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
+									aria-label="Search follow-ups"
+								/>
+								{#if searchQuery}
+									<button
+										type="button"
+										onclick={clearSearch}
+										class="absolute top-1/2 right-2 inline-flex size-6 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
+										aria-label="Clear search"
+									>
+										<XIcon class="size-3.5" aria-hidden="true" />
+									</button>
 								{/if}
-							</p>
-							<div class="flex items-center gap-1">
-								<button
-									class="rounded px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
-									disabled={currentPage === 0}
-									onclick={goToPreviousPage}
-								>
-									← Prev
-								</button>
-								<span class="min-w-[64px] px-2 py-1 text-center text-xs text-muted-foreground">
-									Page {currentPage + 1}
+							</div>
+
+							<div class="flex flex-col gap-2 sm:flex-row sm:items-center lg:ml-auto">
+								<DropdownMenu>
+									<DropdownMenuTrigger>
+										{#snippet child({ props })}
+											<Button
+												{...props}
+												type="button"
+												size="lg"
+												variant={statusFilters.size > 0 ? 'secondary' : 'outline'}
+												class="h-9 w-full justify-between gap-2 sm:w-auto sm:min-w-32"
+											>
+												<span class="inline-flex min-w-0 items-center gap-1.5">
+													<SlidersHorizontalIcon class="size-3.5 shrink-0" aria-hidden="true" />
+													<span class="truncate">{statusFilterLabel}</span>
+												</span>
+												<ChevronDownIcon
+													class="size-3.5 text-muted-foreground"
+													aria-hidden="true"
+												/>
+											</Button>
+										{/snippet}
+									</DropdownMenuTrigger>
+									<DropdownMenuContent align="end" class="w-48">
+										{#each STATUS_OPTIONS as opt (opt.value)}
+											{@const active = statusFilters.has(opt.value)}
+											<DropdownMenuCheckboxItem
+												checked={active}
+												closeOnSelect={false}
+												onCheckedChange={(checked) => setStatusFilter(opt.value, checked)}
+											>
+												{opt.label}
+											</DropdownMenuCheckboxItem>
+										{/each}
+										{#if statusFilters.size > 0}
+											<div class="mt-1 border-t border-foreground/5 pt-1">
+												<button
+													type="button"
+													onclick={() => statusFilters.clear()}
+													class="flex min-h-7 w-full items-center rounded-md px-2 text-left text-xs text-muted-foreground outline-hidden transition-colors hover:bg-foreground/10 hover:text-foreground focus:bg-foreground/10 focus:text-foreground"
+												>
+													Clear status
+												</button>
+											</div>
+										{/if}
+									</DropdownMenuContent>
+								</DropdownMenu>
+
+								<Popover bind:open={dateCalendarOpen}>
+									<PopoverTrigger>
+										{#snippet child({ props })}
+											<Button
+												{...props}
+												type="button"
+												size="lg"
+												variant={dateFrom || dateTo ? 'secondary' : 'outline'}
+												class="h-9 w-full justify-between gap-2 sm:w-auto sm:max-w-64"
+											>
+												<span class="inline-flex min-w-0 items-center gap-1.5">
+													<CalendarClockIcon class="size-3.5 shrink-0" aria-hidden="true" />
+													<span class="truncate">{dateFilterLabel}</span>
+												</span>
+												<ChevronDownIcon
+													class="size-3.5 text-muted-foreground"
+													aria-hidden="true"
+												/>
+											</Button>
+										{/snippet}
+									</PopoverTrigger>
+									<PopoverContent align="end" class="w-auto p-2">
+										<RangeCalendar bind:value={dateRangeValue} class="w-fit" />
+										{#if dateFrom || dateTo}
+											<div class="flex justify-end border-t border-border px-1 pt-2">
+												<button
+													type="button"
+													onclick={clearDateRange}
+													class="rounded-md px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
+												>
+													Clear dates
+												</button>
+											</div>
+										{/if}
+									</PopoverContent>
+								</Popover>
+							</div>
+
+							<div class="flex gap-1.5">
+								<span class="inline-block flex-1 sm:flex-none" title={sendSelectionTooltip}>
+									<Button
+										size="lg"
+										onclick={handleSendSelected}
+										disabled={selectionLoading !== null || !canSendSelected}
+										class="h-9 w-full sm:h-8 sm:w-auto"
+									>
+										{selectionLoading === 'send' ? 'Sending…' : 'Send'}
+									</Button>
 								</span>
-								<button
-									class="rounded px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
-									disabled={!hasNextPage}
-									onclick={goToNextPage}
+								<span
+									class="inline-block flex-1 sm:flex-none"
+									title={!canUnscheduleSelected ? 'Select queued rows to unschedule' : undefined}
 								>
-									Next →
-								</button>
+									<Button
+										size="lg"
+										variant="outline"
+										onclick={handleUnscheduleSelected}
+										disabled={selectionLoading !== null || !canUnscheduleSelected}
+										class="h-9 w-full sm:h-8 sm:w-auto"
+									>
+										{selectionLoading === 'unschedule' ? 'Unscheduling…' : 'Unschedule'}
+									</Button>
+								</span>
 							</div>
 						</div>
-					{/snippet}
+					</div>
 
-					{#if followUpsQuery.isLoading || appContext.isLoading}
-						<!-- Desktop skeleton -->
-						<div class="hidden h-full rounded-xl border border-border md:block">
-							<Table class="table-fixed">
-								<colgroup>
-									<col class="w-[4%]" /><col class="w-[24%]" /><col class="w-[20%]" />
-									<col class="w-[20%]" /><col class="w-[18%]" /><col class="w-[14%]" />
-								</colgroup>
-								<TableHeader>
-									<TableRow class="border-border hover:bg-transparent">
-										{#each ['', 'Customer', 'Booking', 'Waiver signed', 'Scheduled for', 'Status'] as col (col)}
-											<TableHead
-												class="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase"
-												>{col}</TableHead
-											>
-										{/each}
-									</TableRow>
-								</TableHeader>
-								<TableBody>
-									{#each [0, 1, 2, 3] as i (i)}
-										<TableRow class="border-border hover:bg-transparent">
-											{#each [0, 1, 2, 3, 4, 5] as j (j)}
-												<TableCell><Skeleton class="h-4 w-full max-w-28" /></TableCell>
-											{/each}
-										</TableRow>
-									{/each}
-								</TableBody>
-							</Table>
-						</div>
-						<!-- Mobile skeleton -->
-						<div class="h-full space-y-3 overflow-hidden md:hidden">
-							{#each [0, 1, 2] as i (i)}
-								<div class="space-y-2 rounded-xl border border-border bg-card p-4">
-									<Skeleton class="h-4 w-32" />
-									<Skeleton class="h-3 w-48" />
-									<Skeleton class="h-4 w-20" />
+					<!-- List -->
+					<div class="flex h-[440px] min-h-0 flex-col md:h-[520px]">
+						{#snippet paginationFooter(border: boolean)}
+							<div
+								class="flex items-center justify-between {border
+									? 'border-t border-border'
+									: ''} px-4 py-3 sm:px-5"
+							>
+								<p class="text-xs text-muted-foreground">
+									{#if followUps.length === 0}
+										No entries
+									{:else}
+										Page {currentPage + 1} · Showing {followUps.length}
+										{followUps.length === 1 ? 'entry' : 'entries'}
+									{/if}
+								</p>
+								<div class="flex items-center gap-1">
+									<button
+										class="rounded px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
+										disabled={currentPage === 0}
+										onclick={goToPreviousPage}
+									>
+										← Prev
+									</button>
+									<span class="min-w-[64px] px-2 py-1 text-center text-xs text-muted-foreground">
+										Page {currentPage + 1}
+									</span>
+									<button
+										class="rounded px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
+										disabled={!hasNextPage}
+										onclick={goToNextPage}
+									>
+										Next →
+									</button>
 								</div>
-							{/each}
-						</div>
-					{:else if followUps.length === 0}
-						<div
-							class="hidden h-full flex-col overflow-hidden rounded-xl border border-border md:flex"
-						>
-							<div class="min-h-0 flex-1 overflow-auto">
+							</div>
+						{/snippet}
+
+						{#if followUpsQuery.isLoading || appContext.isLoading}
+							<!-- Desktop skeleton -->
+							<div class="hidden h-full rounded-xl border border-border md:block">
 								<Table class="table-fixed">
 									<colgroup>
 										<col class="w-[4%]" /><col class="w-[24%]" /><col class="w-[20%]" />
-										<col class="w-[18%]" /><col class="w-[20%]" /><col class="w-[14%]" />
+										<col class="w-[20%]" /><col class="w-[18%]" /><col class="w-[14%]" />
 									</colgroup>
 									<TableHeader>
 										<TableRow class="border-border hover:bg-transparent">
-											<TableHead class="pl-4">
-												<input
-													type="checkbox"
-													class="size-4 rounded accent-primary opacity-40"
-													disabled
-													aria-label="Select all follow-ups"
-												/>
-											</TableHead>
-											{#each ['Customer', 'Booking', 'Waiver signed', 'Scheduled for', 'Status'] as col (col)}
+											{#each ['', 'Customer', 'Booking', 'Waiver signed', 'Scheduled for', 'Status'] as col (col)}
 												<TableHead
 													class="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase"
 													>{col}</TableHead
@@ -1315,498 +1272,549 @@
 											{/each}
 										</TableRow>
 									</TableHeader>
-								</Table>
-								<div
-									class="flex min-h-[320px] items-center justify-center border-t border-border px-4 text-center text-sm text-muted-foreground"
-								>
-									{searchQuery || dateFrom || dateTo || statusFilters.size > 0
-										? 'No follow-ups match your filters.'
-										: `No follow-ups yet for ${currentWorkspace?.name ?? 'this workspace'}. They appear here after guests sign a waiver.`}
-								</div>
-							</div>
-
-							{@render paginationFooter(true)}
-						</div>
-						<div
-							class="flex h-full flex-col overflow-hidden rounded-xl border border-border md:hidden"
-						>
-							<div
-								class="flex min-h-0 flex-1 items-center justify-center px-4 text-center text-sm text-muted-foreground"
-							>
-								{searchQuery || dateFrom || dateTo || statusFilters.size > 0
-									? 'No follow-ups match your filters.'
-									: `No follow-ups yet for ${currentWorkspace?.name ?? 'this workspace'}. They appear here after guests sign a waiver.`}
-							</div>
-							{@render paginationFooter(true)}
-						</div>
-					{:else}
-						<!-- Desktop table -->
-						<div
-							class="hidden h-full flex-col overflow-hidden rounded-xl border border-border md:flex"
-						>
-							<div class="min-h-0 flex-1 overflow-auto">
-								<Table class="table-fixed">
-									<colgroup>
-										<col class="w-[4%]" /><col class="w-[24%]" /><col class="w-[20%]" />
-										<col class="w-[18%]" /><col class="w-[20%]" /><col class="w-[14%]" />
-									</colgroup>
-									<TableHeader>
-										<TableRow class="border-border hover:bg-transparent">
-											<TableHead class="pl-4">
-												<input
-													bind:this={headerCheckboxEl}
-													type="checkbox"
-													class="size-4 cursor-pointer rounded accent-primary"
-													checked={allVisibleSelected}
-													onchange={toggleAll}
-													onkeydown={handleHeaderCheckboxKeydown}
-													aria-label="Select all visible emails"
-												/>
-											</TableHead>
-											<TableHead
-												class="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase"
-												>Customer</TableHead
-											>
-											<TableHead
-												class="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase"
-												>Booking</TableHead
-											>
-											<TableHead
-												class="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase"
-												>Waiver signed</TableHead
-											>
-											<TableHead
-												class="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase"
-												>Scheduled for</TableHead
-											>
-											<TableHead
-												class="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase"
-												>Status</TableHead
-											>
-										</TableRow>
-									</TableHeader>
 									<TableBody>
-										{#each followUps as followUp (followUp._id)}
-											<TableRow
-												class="cursor-pointer border-border transition-colors hover:bg-muted/40 focus-visible:bg-muted/40 focus-visible:outline-none {selectedIds.has(
-													followUp._id
-												)
-													? 'bg-muted/20'
-													: ''}"
-												role="button"
-												tabindex={0}
-												onclick={(e) => {
-													if (isInteractiveEventTarget(e)) return;
-													openPreview(followUp);
-												}}
-												onkeydown={(e) => {
-													if (isInteractiveEventTarget(e)) return;
-													if (e.key === 'Enter' || e.key === ' ') {
-														e.preventDefault();
-														openPreview(followUp);
-													}
-												}}
-											>
-												<TableCell
-													class="pl-4"
-													onclick={(e) => e.stopPropagation()}
-													onkeydown={(e) => e.stopPropagation()}
-												>
-													<input
-														type="checkbox"
-														class="size-4 cursor-pointer rounded accent-primary"
-														checked={selectedIds.has(followUp._id)}
-														onchange={(e) => toggleRow(followUp._id, e)}
-														onkeydown={(e) => handleRowCheckboxKeydown(followUp._id, e)}
-														aria-label={followUpSelectionLabel(followUp)}
-													/>
-												</TableCell>
-												<TableCell>
-													<p class="truncate text-sm font-medium">{followUp.signerName}</p>
-													<p class="truncate text-xs text-muted-foreground">
-														{followUp.signerEmail}
-													</p>
-												</TableCell>
-												<TableCell class="min-w-0 font-mono text-sm text-muted-foreground">
-													<span class="block truncate" title={displayBookingId(followUp)}>
-														{displayBookingId(followUp)}
-													</span>
-												</TableCell>
-												<TableCell class="text-xs text-muted-foreground">
-													{formatTimestamp(followUp.submittedAt)}
-												</TableCell>
-												<TableCell class="text-xs text-muted-foreground">
-													{formatFollowUpSchedule(followUp)}
-												</TableCell>
-												<TableCell>
-													<span
-														class="inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium capitalize {STATUS_STYLES[
-															followUp.status
-														] ?? ''}"
-													>
-														<span
-															class="size-1.5 rounded-full {followUp.status === 'queued'
-																? 'bg-blue-400'
-																: followUp.status === 'sent'
-																	? 'bg-green-400'
-																	: followUp.status === 'blocked'
-																		? 'bg-yellow-400'
-																		: followUp.status === 'failed'
-																			? 'bg-red-400'
-																			: 'bg-muted-foreground'}"
-														></span>
-														{statusLabel(followUp.status)}
-													</span>
-												</TableCell>
+										{#each [0, 1, 2, 3] as i (i)}
+											<TableRow class="border-border hover:bg-transparent">
+												{#each [0, 1, 2, 3, 4, 5] as j (j)}
+													<TableCell><Skeleton class="h-4 w-full max-w-28" /></TableCell>
+												{/each}
 											</TableRow>
 										{/each}
 									</TableBody>
 								</Table>
 							</div>
-
-							{@render paginationFooter(true)}
-						</div>
-
-						<!-- Mobile cards -->
-						<div class="flex h-full flex-col md:hidden">
-							<div class="min-h-0 flex-1 space-y-3 overflow-auto">
-								{#each followUps as followUp (followUp._id)}
+							<!-- Mobile skeleton -->
+							<div class="h-full space-y-3 overflow-hidden md:hidden">
+								{#each [0, 1, 2] as i (i)}
+									<div class="space-y-2 rounded-xl border border-border bg-card p-4">
+										<Skeleton class="h-4 w-32" />
+										<Skeleton class="h-3 w-48" />
+										<Skeleton class="h-4 w-20" />
+									</div>
+								{/each}
+							</div>
+						{:else if followUps.length === 0}
+							<div
+								class="hidden h-full flex-col overflow-hidden rounded-xl border border-border md:flex"
+							>
+								<div class="min-h-0 flex-1 overflow-auto">
+									<Table class="table-fixed">
+										<colgroup>
+											<col class="w-[4%]" /><col class="w-[24%]" /><col class="w-[20%]" />
+											<col class="w-[18%]" /><col class="w-[20%]" /><col class="w-[14%]" />
+										</colgroup>
+										<TableHeader>
+											<TableRow class="border-border hover:bg-transparent">
+												<TableHead class="pl-4">
+													<input
+														type="checkbox"
+														class="size-4 rounded accent-primary opacity-40"
+														disabled
+														aria-label="Select all follow-ups"
+													/>
+												</TableHead>
+												{#each ['Customer', 'Booking', 'Waiver signed', 'Scheduled for', 'Status'] as col (col)}
+													<TableHead
+														class="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase"
+														>{col}</TableHead
+													>
+												{/each}
+											</TableRow>
+										</TableHeader>
+									</Table>
 									<div
-										class="overflow-hidden rounded-xl border border-border bg-card transition-colors {selectedIds.has(
-											followUp._id
-										)
-											? 'ring-1 ring-ring/50'
-											: ''}"
+										class="flex min-h-[320px] items-center justify-center border-t border-border px-4 text-center text-sm text-muted-foreground"
 									>
-										<div class="flex items-stretch">
-											<label class="flex shrink-0 cursor-pointer items-center px-3">
-												<span class="sr-only">Select follow-up</span>
-												<input
-													type="checkbox"
-													class="size-4 cursor-pointer rounded accent-primary"
-													checked={selectedIds.has(followUp._id)}
-													onchange={() => toggleRowSelection(followUp._id)}
-													aria-label={followUpSelectionLabel(followUp)}
-												/>
-											</label>
-											<button
-												type="button"
-												class="min-w-0 flex-1 px-1 py-3 pr-4 text-left transition-colors hover:bg-muted/30 focus-visible:bg-muted/30 focus-visible:outline-none"
-												onclick={() => openPreview(followUp)}
-											>
-												<div class="flex items-start justify-between gap-2">
-													<div class="min-w-0 flex-1 space-y-0.5">
+										{searchQuery || dateFrom || dateTo || statusFilters.size > 0
+											? 'No follow-ups match your filters.'
+											: `No follow-ups yet for ${currentWorkspace?.name ?? 'this workspace'}. They appear here after guests sign a waiver.`}
+									</div>
+								</div>
+
+								{@render paginationFooter(true)}
+							</div>
+							<div
+								class="flex h-full flex-col overflow-hidden rounded-xl border border-border md:hidden"
+							>
+								<div
+									class="flex min-h-0 flex-1 items-center justify-center px-4 text-center text-sm text-muted-foreground"
+								>
+									{searchQuery || dateFrom || dateTo || statusFilters.size > 0
+										? 'No follow-ups match your filters.'
+										: `No follow-ups yet for ${currentWorkspace?.name ?? 'this workspace'}. They appear here after guests sign a waiver.`}
+								</div>
+								{@render paginationFooter(true)}
+							</div>
+						{:else}
+							<!-- Desktop table -->
+							<div
+								class="hidden h-full flex-col overflow-hidden rounded-xl border border-border md:flex"
+							>
+								<div class="min-h-0 flex-1 overflow-auto">
+									<Table class="table-fixed">
+										<colgroup>
+											<col class="w-[4%]" /><col class="w-[24%]" /><col class="w-[20%]" />
+											<col class="w-[18%]" /><col class="w-[20%]" /><col class="w-[14%]" />
+										</colgroup>
+										<TableHeader>
+											<TableRow class="border-border hover:bg-transparent">
+												<TableHead class="pl-4">
+													<input
+														bind:this={headerCheckboxEl}
+														type="checkbox"
+														class="size-4 cursor-pointer rounded accent-primary"
+														checked={allVisibleSelected}
+														onchange={toggleAll}
+														onkeydown={handleHeaderCheckboxKeydown}
+														aria-label="Select all visible emails"
+													/>
+												</TableHead>
+												<TableHead
+													class="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase"
+													>Customer</TableHead
+												>
+												<TableHead
+													class="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase"
+													>Booking</TableHead
+												>
+												<TableHead
+													class="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase"
+													>Waiver signed</TableHead
+												>
+												<TableHead
+													class="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase"
+													>Scheduled for</TableHead
+												>
+												<TableHead
+													class="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase"
+													>Status</TableHead
+												>
+											</TableRow>
+										</TableHeader>
+										<TableBody>
+											{#each followUps as followUp (followUp._id)}
+												<TableRow
+													class="cursor-pointer border-border transition-colors hover:bg-muted/40 focus-visible:bg-muted/40 focus-visible:outline-none {selectedIds.has(
+														followUp._id
+													)
+														? 'bg-muted/20'
+														: ''}"
+													role="button"
+													tabindex={0}
+													onclick={(e) => {
+														if (isInteractiveEventTarget(e)) return;
+														openPreview(followUp);
+													}}
+													onkeydown={(e) => {
+														if (isInteractiveEventTarget(e)) return;
+														if (e.key === 'Enter' || e.key === ' ') {
+															e.preventDefault();
+															openPreview(followUp);
+														}
+													}}
+												>
+													<TableCell
+														class="pl-4"
+														onclick={(e) => e.stopPropagation()}
+														onkeydown={(e) => e.stopPropagation()}
+													>
+														<input
+															type="checkbox"
+															class="size-4 cursor-pointer rounded accent-primary"
+															checked={selectedIds.has(followUp._id)}
+															onchange={(e) => toggleRow(followUp._id, e)}
+															onkeydown={(e) => handleRowCheckboxKeydown(followUp._id, e)}
+															aria-label={followUpSelectionLabel(followUp)}
+														/>
+													</TableCell>
+													<TableCell>
 														<p class="truncate text-sm font-medium">{followUp.signerName}</p>
 														<p class="truncate text-xs text-muted-foreground">
 															{followUp.signerEmail}
 														</p>
-													</div>
-													<span
-														class="inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium capitalize {STATUS_STYLES[
-															followUp.status
-														] ?? ''}"
-													>
+													</TableCell>
+													<TableCell class="min-w-0 font-mono text-sm text-muted-foreground">
+														<span class="block truncate" title={displayBookingId(followUp)}>
+															{displayBookingId(followUp)}
+														</span>
+													</TableCell>
+													<TableCell class="text-xs text-muted-foreground">
+														{formatTimestamp(followUp.submittedAt)}
+													</TableCell>
+													<TableCell class="text-xs text-muted-foreground">
+														{formatFollowUpSchedule(followUp)}
+													</TableCell>
+													<TableCell>
 														<span
-															class="size-1.5 rounded-full {followUp.status === 'queued'
-																? 'bg-blue-400'
-																: followUp.status === 'sent'
-																	? 'bg-green-400'
-																	: followUp.status === 'blocked'
-																		? 'bg-yellow-400'
-																		: followUp.status === 'failed'
-																			? 'bg-red-400'
-																			: 'bg-muted-foreground'}"
-														></span>
-														{statusLabel(followUp.status)}
-													</span>
-												</div>
-												<div
-													class="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground"
-												>
-													<span
-														class="max-w-full truncate font-mono"
-														title={displayBookingId(followUp)}>{displayBookingId(followUp)}</span
-													>
-													<span>·</span>
-													<span>{formatFollowUpSchedule(followUp)}</span>
-												</div>
-											</button>
-										</div>
-									</div>
-								{/each}
+															class="inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium capitalize {STATUS_STYLES[
+																followUp.status
+															] ?? ''}"
+														>
+															<span
+																class="size-1.5 rounded-full {followUp.status === 'queued'
+																	? 'bg-blue-400'
+																	: followUp.status === 'sent'
+																		? 'bg-green-400'
+																		: followUp.status === 'blocked'
+																			? 'bg-yellow-400'
+																			: followUp.status === 'failed'
+																				? 'bg-red-400'
+																				: 'bg-muted-foreground'}"
+															></span>
+															{statusLabel(followUp.status)}
+														</span>
+													</TableCell>
+												</TableRow>
+											{/each}
+										</TableBody>
+									</Table>
+								</div>
+
+								{@render paginationFooter(true)}
 							</div>
 
-							{@render paginationFooter(false)}
-						</div>
-					{/if}
-				</div>
-			</div>
-		{:else}
-			<!-- Email tab: sender context + editor -->
-			{#if !isLoading && currentWorkspace && canUseEmailFollowups && !workspaceCanSendEmail}
-				<div
-					class="sender-banner"
-					data-state={replyToPendingVerification && hasPlatformFromEmail ? 'pending' : 'unset'}
-				>
-					<div class="sender-banner-mark">
-						{#if replyToPendingVerification && hasPlatformFromEmail}
-							<MailCheckIcon class="size-[18px]" />
-						{:else}
-							<MailIcon class="size-[18px]" />
+							<!-- Mobile cards -->
+							<div class="flex h-full flex-col md:hidden">
+								<div class="min-h-0 flex-1 space-y-3 overflow-auto">
+									{#each followUps as followUp (followUp._id)}
+										<div
+											class="overflow-hidden rounded-xl border border-border bg-card transition-colors {selectedIds.has(
+												followUp._id
+											)
+												? 'ring-1 ring-ring/50'
+												: ''}"
+										>
+											<div class="flex items-stretch">
+												<label class="flex shrink-0 cursor-pointer items-center px-3">
+													<span class="sr-only">Select follow-up</span>
+													<input
+														type="checkbox"
+														class="size-4 cursor-pointer rounded accent-primary"
+														checked={selectedIds.has(followUp._id)}
+														onchange={() => toggleRowSelection(followUp._id)}
+														aria-label={followUpSelectionLabel(followUp)}
+													/>
+												</label>
+												<button
+													type="button"
+													class="min-w-0 flex-1 px-1 py-3 pr-4 text-left transition-colors hover:bg-muted/30 focus-visible:bg-muted/30 focus-visible:outline-none"
+													onclick={() => openPreview(followUp)}
+												>
+													<div class="flex items-start justify-between gap-2">
+														<div class="min-w-0 flex-1 space-y-0.5">
+															<p class="truncate text-sm font-medium">{followUp.signerName}</p>
+															<p class="truncate text-xs text-muted-foreground">
+																{followUp.signerEmail}
+															</p>
+														</div>
+														<span
+															class="inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium capitalize {STATUS_STYLES[
+																followUp.status
+															] ?? ''}"
+														>
+															<span
+																class="size-1.5 rounded-full {followUp.status === 'queued'
+																	? 'bg-blue-400'
+																	: followUp.status === 'sent'
+																		? 'bg-green-400'
+																		: followUp.status === 'blocked'
+																			? 'bg-yellow-400'
+																			: followUp.status === 'failed'
+																				? 'bg-red-400'
+																				: 'bg-muted-foreground'}"
+															></span>
+															{statusLabel(followUp.status)}
+														</span>
+													</div>
+													<div
+														class="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground"
+													>
+														<span
+															class="max-w-full truncate font-mono"
+															title={displayBookingId(followUp)}>{displayBookingId(followUp)}</span
+														>
+														<span>·</span>
+														<span>{formatFollowUpSchedule(followUp)}</span>
+													</div>
+												</button>
+											</div>
+										</div>
+									{/each}
+								</div>
+
+								{@render paginationFooter(false)}
+							</div>
 						{/if}
-					</div>
-					<div class="sender-banner-body">
-						<p class="sender-banner-title">
-							{#if !hasPlatformFromEmail}
-								Sender domain is not configured
-							{:else if replyToPendingVerification}
-								Almost there — verify your reply-to email
-							{:else}
-								Set up your sender to start sending follow-ups
-							{/if}
-						</p>
-						<p class="sender-banner-desc">
-							{#if !hasPlatformFromEmail}
-								Ask an admin to set
-								<code>RESEND_FROM_EMAIL</code>
-								before follow-ups can be queued for delivery.
-							{:else if replyToPendingVerification}
-								We sent a code to
-								<strong class="font-medium text-foreground"
-									>{senderSettings?.pendingReplyToEmail}</strong
-								>. Paste it on the email settings page to finish.
-							{:else}
-								Follow-ups can't go out until you verify a reply-to inbox. Takes about a minute.
-							{/if}
-						</p>
-					</div>
-					<a
-						class="sender-banner-cta"
-						href={resolve(`/app/${currentWorkspace.slug}/settings/email` as const)}
-					>
-						{replyToPendingVerification && hasPlatformFromEmail ? 'Continue' : 'Set up'}
-						<ChevronRightIcon class="size-3.5" />
-					</a>
-				</div>
-			{/if}
-			<!-- Editor content -->
-			{#if isLoading}
-				<div class="email-layout">
-					<div class="composer">
-						<div class="compose-meta">
-							<div class="compose-meta-row">
-								<Skeleton class="h-4 w-60" />
-								<Skeleton class="h-4 w-28 rounded-full" />
-							</div>
-						</div>
-						<div class="compose-subject-row">
-							<Skeleton class="h-5 w-full" />
-						</div>
-						<div class="compose-body-section">
-							<div class="border-t border-border/70 bg-background">
-								<div
-									class="flex flex-col gap-2 border-b border-border/70 bg-muted/20 px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
-								>
-									<Skeleton class="h-2.5 w-10" />
-									<div class="flex flex-wrap gap-1 sm:justify-end">
-										<Skeleton class="h-7 w-16" />
-										<Skeleton class="h-7 w-7" />
-										<Skeleton class="h-7 w-24" />
-										<Skeleton class="h-7 w-14" />
-										<Skeleton class="size-7" />
-										<Skeleton class="size-7" />
-										<Skeleton class="size-7" />
-										<Skeleton class="size-7" />
-									</div>
-								</div>
-								<div class="min-h-[300px] space-y-3 p-4">
-									<Skeleton class="h-4 w-full" />
-									<Skeleton class="h-4 w-10/12" />
-									<Skeleton class="h-4 w-3/4" />
-								</div>
-							</div>
-						</div>
-					</div>
-					<div class="email-rail">
-						<div class="rail-section">
-							<Skeleton class="mb-2 h-2 w-16" />
-							<Skeleton class="mb-3 h-3 w-32" />
-							{#each [0, 1, 2, 3] as i (i)}
-								<Skeleton class="mb-1.5 h-9 w-full rounded" />
-							{/each}
-						</div>
-						<div class="rail-section">
-							<Skeleton class="mb-3 h-2 w-20" />
-							<Skeleton class="mb-2 h-8 w-full rounded-md" />
-							<Skeleton class="h-8 w-full rounded-md" />
-						</div>
 					</div>
 				</div>
 			{:else}
-				<div class="email-layout">
-					<!-- Composer (left column) -->
-					<div class="composer">
-						<!-- Timing / metadata card -->
-						<div class="compose-meta">
-							<div class="compose-meta-row">
-								<span class="compose-key">Delay</span>
-								<div class="compose-meta-controls">
-									<Input
-										type="number"
-										min="1"
-										value={sendAfterAmount}
-										oninput={sanitizeSendAfterAmount}
-										onblur={sanitizeSendAfterAmount}
-										class="compose-num h-[26px] w-14 px-1.5 text-center text-sm tabular-nums"
-										aria-invalid={!isSendAfterValid}
-										aria-describedby="send-after-error"
-									/>
-									<select
-										value={sendAfterUnit}
-										onchange={updateSendAfterUnit}
-										class="compose-select"
-										aria-label="Send after unit"
-									>
-										{#each SEND_AFTER_UNITS as unit (unit)}
-											<option value={unit}>{unit}</option>
-										{/each}
-									</select>
-									<span class="compose-meta-prose">
-										after booking · unlinked waivers unscheduled
-									</span>
+				<!-- Email tab: sender context + editor -->
+				{#if !isLoading && currentWorkspace && canUseEmailFollowups && !workspaceCanSendEmail}
+					<div
+						class="sender-banner"
+						data-state={replyToPendingVerification && hasPlatformFromEmail ? 'pending' : 'unset'}
+					>
+						<div class="sender-banner-mark">
+							{#if replyToPendingVerification && hasPlatformFromEmail}
+								<MailCheckIcon class="size-[18px]" />
+							{:else}
+								<MailIcon class="size-[18px]" />
+							{/if}
+						</div>
+						<div class="sender-banner-body">
+							<p class="sender-banner-title">
+								{#if !hasPlatformFromEmail}
+									Sender domain is not configured
+								{:else if replyToPendingVerification}
+									Almost there — verify your reply-to email
+								{:else}
+									Set up your sender to start sending follow-ups
+								{/if}
+							</p>
+							<p class="sender-banner-desc">
+								{#if !hasPlatformFromEmail}
+									Ask an admin to set
+									<code>RESEND_FROM_EMAIL</code>
+									before follow-ups can be queued for delivery.
+								{:else if replyToPendingVerification}
+									We sent a code to
+									<strong class="font-medium text-foreground"
+										>{senderSettings?.pendingReplyToEmail}</strong
+									>. Paste it on the email settings page to finish.
+								{:else}
+									Follow-ups can't go out until you verify a reply-to inbox. Takes about a minute.
+								{/if}
+							</p>
+						</div>
+						<a
+							class="sender-banner-cta"
+							href={resolve(`/app/${currentWorkspace.slug}/settings/email` as const)}
+						>
+							{replyToPendingVerification && hasPlatformFromEmail ? 'Continue' : 'Set up'}
+							<ChevronRightIcon class="size-3.5" />
+						</a>
+					</div>
+				{/if}
+				<!-- Editor content -->
+				{#if isLoading}
+					<div class="email-layout">
+						<div class="composer">
+							<div class="compose-meta">
+								<div class="compose-meta-row">
+									<Skeleton class="h-4 w-60" />
+									<Skeleton class="h-4 w-28 rounded-full" />
 								</div>
-								<span class="save-indicator shrink-0" data-state={saveState}>
-									{#if saveState === 'saving'}
-										<LoaderIcon class="size-3.5 animate-spin" />
-									{:else if saveState === 'error'}
-										<CloudOffIcon class="size-3.5" />
-									{:else if saveState === 'dirty'}
-										<CloudIcon class="size-3.5" />
-									{:else}
-										<CloudCheckIcon class="size-3.5" />
-									{/if}
-									<span class="truncate">{savedLabel}</span>
-								</span>
-								<button
-									type="button"
-									onclick={() => (emailPreviewMode = !emailPreviewMode)}
-									class="preview-toggle"
-									data-active={emailPreviewMode}
-								>
-									<EyeIcon class="size-3" />
-									{emailPreviewMode ? 'Edit' : 'Preview'}
-								</button>
 							</div>
-							{#if !isSendAfterValid}
-								<p id="send-after-error" class="compose-error">Enter a positive whole number.</p>
+							<div class="compose-subject-row">
+								<Skeleton class="h-5 w-full" />
+							</div>
+							<div class="compose-body-section">
+								<div class="border-t border-border/70 bg-background">
+									<div
+										class="flex flex-col gap-2 border-b border-border/70 bg-muted/20 px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
+									>
+										<Skeleton class="h-2.5 w-10" />
+										<div class="flex flex-wrap gap-1 sm:justify-end">
+											<Skeleton class="h-7 w-16" />
+											<Skeleton class="h-7 w-7" />
+											<Skeleton class="h-7 w-24" />
+											<Skeleton class="h-7 w-14" />
+											<Skeleton class="size-7" />
+											<Skeleton class="size-7" />
+											<Skeleton class="size-7" />
+											<Skeleton class="size-7" />
+										</div>
+									</div>
+									<div class="min-h-[300px] space-y-3 p-4">
+										<Skeleton class="h-4 w-full" />
+										<Skeleton class="h-4 w-10/12" />
+										<Skeleton class="h-4 w-3/4" />
+									</div>
+								</div>
+							</div>
+						</div>
+						<div class="email-rail">
+							<div class="rail-section">
+								<Skeleton class="mb-2 h-2 w-16" />
+								<Skeleton class="mb-3 h-3 w-32" />
+								{#each [0, 1, 2, 3] as i (i)}
+									<Skeleton class="mb-1.5 h-9 w-full rounded" />
+								{/each}
+							</div>
+							<div class="rail-section">
+								<Skeleton class="mb-3 h-2 w-20" />
+								<Skeleton class="mb-2 h-8 w-full rounded-md" />
+								<Skeleton class="h-8 w-full rounded-md" />
+							</div>
+						</div>
+					</div>
+				{:else}
+					<div class="email-layout">
+						<!-- Composer (left column) -->
+						<div class="composer">
+							<!-- Timing / metadata card -->
+							<div class="compose-meta">
+								<div class="compose-meta-row">
+									<span class="compose-key">Delay</span>
+									<div class="compose-meta-controls">
+										<Input
+											type="number"
+											min="1"
+											value={sendAfterAmount}
+											oninput={sanitizeSendAfterAmount}
+											onblur={sanitizeSendAfterAmount}
+											class="compose-num h-[26px] w-14 px-1.5 text-center text-sm tabular-nums"
+											aria-invalid={!isSendAfterValid}
+											aria-describedby="send-after-error"
+										/>
+										<select
+											value={sendAfterUnit}
+											onchange={updateSendAfterUnit}
+											class="compose-select"
+											aria-label="Send after unit"
+										>
+											{#each SEND_AFTER_UNITS as unit (unit)}
+												<option value={unit}>{unit}</option>
+											{/each}
+										</select>
+										<span class="compose-meta-prose">
+											after booking · unlinked waivers unscheduled
+										</span>
+									</div>
+									<span class="save-indicator shrink-0" data-state={saveState}>
+										{#if saveState === 'saving'}
+											<LoaderIcon class="size-3.5 animate-spin" />
+										{:else if saveState === 'error'}
+											<CloudOffIcon class="size-3.5" />
+										{:else if saveState === 'dirty'}
+											<CloudIcon class="size-3.5" />
+										{:else}
+											<CloudCheckIcon class="size-3.5" />
+										{/if}
+										<span class="truncate">{savedLabel}</span>
+									</span>
+									<button
+										type="button"
+										onclick={() => (emailPreviewMode = !emailPreviewMode)}
+										class="preview-toggle"
+										data-active={emailPreviewMode}
+									>
+										<EyeIcon class="size-3" />
+										{emailPreviewMode ? 'Edit' : 'Preview'}
+									</button>
+								</div>
+								{#if !isSendAfterValid}
+									<p id="send-after-error" class="compose-error">Enter a positive whole number.</p>
+								{/if}
+							</div>
+
+							{#if emailPreviewMode}
+								<!-- Email preview -->
+								<div class="email-preview-shell">
+									<div class="email-preview-card">
+										<div class="email-preview-from-row">
+											<div class="email-preview-avatar">
+												{businessName[0]?.toUpperCase() ?? 'B'}
+											</div>
+											<div class="email-preview-from-info">
+												<span class="email-preview-from-name">{businessName}</span>
+												<span class="email-preview-from-to">to Jane Smith</span>
+											</div>
+										</div>
+										<div class="email-preview-subject-line">
+											{emailPreviewSubject || '(no subject)'}
+										</div>
+										<WaiverRichText html={emailPreviewBody} class="email-preview-body-wrap" />
+									</div>
+									<p class="preview-sample-notice">
+										Preview uses sample data — Jane Smith, #4821, April 27, 2026.
+									</p>
+								</div>
+							{:else}
+								<!-- Subject row -->
+								<div class="compose-subject-row">
+									<label for="email-subject" class="compose-key compose-key--subject">Subject</label
+									>
+									<input
+										id="email-subject"
+										bind:this={subjectInputRef}
+										type="text"
+										bind:value={subject}
+										placeholder="Thank you for visiting {'{{business_name}}'}!"
+										spellcheck="true"
+										autocomplete="off"
+										class="compose-subject-input"
+										onfocus={captureSubjectSelection}
+										onclick={captureSubjectSelection}
+										onkeyup={captureSubjectSelection}
+										onselect={captureSubjectSelection}
+										oninput={captureSubjectSelection}
+									/>
+								</div>
+
+								<!-- Body -->
+								<div class="compose-body-section" onfocusin={markBodyInsertTarget}>
+									<RichTextEditor
+										id="email-body"
+										label="Body"
+										class="email-rich-editor"
+										bind:value={body}
+										bind:this={editorRef}
+									/>
+								</div>
 							{/if}
 						</div>
 
-						{#if emailPreviewMode}
-							<!-- Email preview -->
-							<div class="email-preview-shell">
-								<div class="email-preview-card">
-									<div class="email-preview-from-row">
-										<div class="email-preview-avatar">
-											{businessName[0]?.toUpperCase() ?? 'B'}
-										</div>
-										<div class="email-preview-from-info">
-											<span class="email-preview-from-name">{businessName}</span>
-											<span class="email-preview-from-to">to Jane Smith</span>
-										</div>
-									</div>
-									<div class="email-preview-subject-line">
-										{emailPreviewSubject || '(no subject)'}
-									</div>
-									<WaiverRichText html={emailPreviewBody} class="email-preview-body-wrap" />
+						<!-- Tool rail (right column) -->
+						<div class="email-rail">
+							<div class="rail-section">
+								<p class="rail-label">Variables</p>
+								<p class="rail-hint">Click to insert at cursor.</p>
+								<div class="var-list">
+									{#each VARIABLES as variable (variable.value)}
+										<button
+											type="button"
+											onclick={() => insertVariable(variable.value)}
+											class="var-item"
+										>
+											<div class="var-item-text">
+												<span class="var-tag">{variable.label}</span>
+												<span class="var-desc">{variable.description}</span>
+											</div>
+										</button>
+									{/each}
 								</div>
-								<p class="preview-sample-notice">
-									Preview uses sample data — Jane Smith, #4821, April 27, 2026.
-								</p>
-							</div>
-						{:else}
-							<!-- Subject row -->
-							<div class="compose-subject-row">
-								<label for="email-subject" class="compose-key compose-key--subject">Subject</label>
-								<input
-									id="email-subject"
-									bind:this={subjectInputRef}
-									type="text"
-									bind:value={subject}
-									placeholder="Thank you for visiting {'{{business_name}}'}!"
-									spellcheck="true"
-									autocomplete="off"
-									class="compose-subject-input"
-									onfocus={captureSubjectSelection}
-									onclick={captureSubjectSelection}
-									onkeyup={captureSubjectSelection}
-									onselect={captureSubjectSelection}
-									oninput={captureSubjectSelection}
-								/>
 							</div>
 
-							<!-- Body -->
-							<div class="compose-body-section" onfocusin={markBodyInsertTarget}>
-								<RichTextEditor
-									id="email-body"
-									label="Body"
-									class="email-rich-editor"
-									bind:value={body}
-									bind:this={editorRef}
-								/>
-							</div>
-						{/if}
-					</div>
-
-					<!-- Tool rail (right column) -->
-					<div class="email-rail">
-						<div class="rail-section">
-							<p class="rail-label">Variables</p>
-							<p class="rail-hint">Click to insert at cursor.</p>
-							<div class="var-list">
-								{#each VARIABLES as variable (variable.value)}
-									<button
-										type="button"
-										onclick={() => insertVariable(variable.value)}
-										class="var-item"
+							<div class="rail-section">
+								<p class="rail-label">Templates</p>
+								<div class="rail-template-btns">
+									<Button
+										variant="outline"
+										size="sm"
+										onclick={() => (loadTemplateOpen = true)}
+										class="w-full justify-start text-xs"
 									>
-										<div class="var-item-text">
-											<span class="var-tag">{variable.label}</span>
-											<span class="var-desc">{variable.description}</span>
-										</div>
-									</button>
-								{/each}
-							</div>
-						</div>
-
-						<div class="rail-section">
-							<p class="rail-label">Templates</p>
-							<div class="rail-template-btns">
-								<Button
-									variant="outline"
-									size="sm"
-									onclick={() => (loadTemplateOpen = true)}
-									class="w-full justify-start text-xs"
-								>
-									Load template
-								</Button>
-								<Button
-									variant="outline"
-									size="sm"
-									onclick={openSaveTemplate}
-									disabled={isSavingEditorContent || !isSendAfterValid}
-									class="w-full justify-start text-xs"
-								>
-									Save as template
-								</Button>
+										Load template
+									</Button>
+									<Button
+										variant="outline"
+										size="sm"
+										onclick={openSaveTemplate}
+										disabled={isSavingEditorContent || !isSendAfterValid}
+										class="w-full justify-start text-xs"
+									>
+										Save as template
+									</Button>
+								</div>
 							</div>
 						</div>
 					</div>
-				</div>
+				{/if}
 			{/if}
-		{/if}
+		</div>
 	</div>
-</PageShell>
+</div>
 
 <style>
 	.save-indicator {

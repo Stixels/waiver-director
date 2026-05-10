@@ -200,7 +200,15 @@
 	<title>{currentWorkspace?.name ?? 'Workspace'} Analytics | Waiver Director</title>
 </svelte:head>
 
-<div class="h-full min-h-0 w-full overflow-y-auto p-4 sm:p-6 xl:overflow-hidden">
+<div class="relative h-full min-h-0 w-full overflow-y-auto p-4 sm:p-5 xl:overflow-hidden">
+	{#if !appContext.isLoading && currentWorkspace && !canViewAnalytics}
+		<UpgradeOverlay
+			title="Upgrade to view analytics"
+			description="Analytics are available on Pro plans and trials, including booking trends, submission volume, customer activity, and email performance."
+			href={`/app/${page.params.workspaceSlug}/account#/billing/plans`}
+		/>
+	{/if}
+
 	<div
 		class="mx-auto flex min-h-full w-full max-w-7xl min-w-0 flex-col gap-4 p-px xl:h-full xl:overflow-hidden"
 	>
@@ -228,17 +236,7 @@
 			</div>
 		{/if}
 
-		<div
-			class="relative grid min-h-0 flex-1 grid-cols-1 gap-4 xl:grid-rows-[minmax(0,1fr)_minmax(0,1fr)]"
-		>
-			{#if !appContext.isLoading && currentWorkspace && !canViewAnalytics}
-				<UpgradeOverlay
-					title="Upgrade to view analytics"
-					description="Analytics are available on Pro plans and trials, including booking trends, submission volume, customer activity, and email performance."
-					href={`/app/${page.params.workspaceSlug}/account#/billing/plans`}
-				/>
-			{/if}
-
+		<div class="grid min-h-0 flex-1 grid-cols-1 gap-4 xl:grid-rows-[minmax(0,1fr)_minmax(0,1fr)]">
 			<!-- Submissions + Bookings over time side by side -->
 			<div class="grid min-h-0 grid-cols-1 gap-4 lg:grid-cols-2">
 				<Card class="flex min-h-0 flex-col overflow-hidden">

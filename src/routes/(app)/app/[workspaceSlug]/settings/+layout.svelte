@@ -2,7 +2,6 @@
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
 	import { useAppContext } from '$lib/components/app/app-context.svelte';
-	import PageShell from '$lib/components/app/PageShell.svelte';
 	import { cn } from '$lib/utils';
 	import Building2Icon from '@lucide/svelte/icons/building-2';
 	import MailIcon from '@lucide/svelte/icons/mail';
@@ -42,9 +41,11 @@
 	<title>{currentWorkspace?.name ?? 'Workspace'} Settings | Waiver Director</title>
 </svelte:head>
 
-<PageShell flush>
-	<div class="grid min-h-full overflow-hidden border-y md:grid-cols-[15rem_minmax(0,1fr)]">
-		<aside class="flex flex-col gap-4 border-b p-3 md:border-r md:border-b-0">
+<div class="h-full min-h-0 w-full overflow-hidden p-4 sm:p-5">
+	<div
+		class="-mx-4 grid h-full min-h-0 overflow-hidden border-y sm:-mx-5 md:grid-cols-[calc(15rem+1.25rem)_minmax(0,1fr)]"
+	>
+		<aside class="flex flex-col gap-4 border-b px-5 py-3 md:border-r md:border-b-0">
 			<p class="px-2 pb-0.5 text-sm font-semibold">Settings</p>
 			<nav class="flex flex-col gap-0.5" aria-label="Settings sections">
 				{#each sections as section (section.href)}
@@ -70,8 +71,8 @@
 			</nav>
 		</aside>
 
-		<main class="min-w-0 p-5">
+		<main class="min-w-0 px-5 py-5">
 			{@render children?.()}
 		</main>
 	</div>
-</PageShell>
+</div>

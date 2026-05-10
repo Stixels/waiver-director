@@ -12,7 +12,6 @@
 	import resovaIcon from '$lib/assets/providers/resova-icon.webp';
 	import xolaIcon from '$lib/assets/providers/xola-icon.webp';
 	import { useAppContext } from '$lib/components/app/app-context.svelte';
-	import PageShell from '$lib/components/app/PageShell.svelte';
 	import UpgradeOverlay from '$lib/components/app/UpgradeOverlay.svelte';
 	import { useProtectedQuery } from '$lib/components/auth/convex-auth.svelte';
 	import { Badge } from '$lib/components/ui/badge';
@@ -520,10 +519,20 @@
 	</SheetContent>
 </Sheet>
 
-<PageShell flush>
+<div class="relative h-full min-h-0 w-full overflow-hidden p-4 sm:p-5">
+	{#if !isLoading && currentWorkspace && !canUseBookingIntegrations}
+		<UpgradeOverlay
+			title="Upgrade to connect integrations"
+			description="Booking integrations are available on Pro plans and trials. Upgrade to connect Bookeo and keep booking-linked waiver operations in sync."
+			href={`/app/${page.params.workspaceSlug}/account#/billing/plans`}
+		/>
+	{/if}
+
 	{#if isLoading}
-		<section class="grid min-h-full overflow-hidden border-y md:grid-cols-[15rem_minmax(0,1fr)]">
-			<div class="flex min-h-60 flex-col gap-4 border-b p-3 md:border-r md:border-b-0">
+		<section
+			class="-mx-4 grid h-full min-h-0 overflow-hidden border-y sm:-mx-5 md:grid-cols-[calc(15rem+1.25rem)_minmax(0,1fr)]"
+		>
+			<div class="flex min-h-60 flex-col gap-4 border-b px-5 py-3 md:border-r md:border-b-0">
 				<Skeleton class="h-4 w-24" />
 				<Skeleton class="h-10 w-full rounded-md" />
 				<Skeleton class="h-10 w-full rounded-md" />
@@ -531,7 +540,7 @@
 				<Skeleton class="h-10 w-full rounded-md" />
 				<Skeleton class="h-10 w-full rounded-md" />
 			</div>
-			<div class="flex min-w-0 flex-col gap-5 p-5">
+			<div class="flex min-w-0 flex-col gap-5 px-5 py-5">
 				<div class="flex min-w-0 items-start gap-4">
 					<Skeleton class="size-12 rounded-md" />
 					<div class="min-w-0 flex-1">
@@ -551,18 +560,10 @@
 		</div>
 	{:else}
 		<article
-			class="relative grid min-h-full overflow-hidden border-y md:grid-cols-[15rem_minmax(0,1fr)]"
+			class="-mx-4 grid h-full min-h-0 overflow-hidden border-y sm:-mx-5 md:grid-cols-[calc(15rem+1.25rem)_minmax(0,1fr)]"
 		>
-			{#if !canUseBookingIntegrations}
-				<UpgradeOverlay
-					title="Upgrade to connect integrations"
-					description="Booking integrations are available on Pro plans and trials. Upgrade to connect Bookeo and keep booking-linked waiver operations in sync."
-					href={`/app/${page.params.workspaceSlug}/account#/billing/plans`}
-				/>
-			{/if}
-
 			<aside
-				class="flex flex-col gap-4 border-b p-3 md:border-r md:border-b-0"
+				class="flex flex-col gap-4 border-b px-5 py-3 md:border-r md:border-b-0"
 				aria-label="Integration providers"
 			>
 				<p class="px-2 pb-0.5 text-sm font-semibold">Integrations</p>
@@ -625,7 +626,7 @@
 				{/each}
 			</aside>
 
-			<div class="flex min-w-0 flex-col gap-5 p-5">
+			<div class="flex min-w-0 flex-col gap-5 px-5 py-5">
 				<div class="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
 					<div class="flex min-w-0 items-start gap-4">
 						<span
@@ -862,4 +863,4 @@
 			</div>
 		</article>
 	{/if}
-</PageShell>
+</div>
