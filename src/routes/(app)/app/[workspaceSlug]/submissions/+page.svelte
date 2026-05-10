@@ -6,9 +6,12 @@
 	import type { Id } from '$convex/_generated/dataModel';
 	import { page } from '$app/state';
 	import { useAppContext } from '$lib/components/app/app-context.svelte';
+	import DataTableEmptyState from '$lib/components/app/DataTableEmptyState.svelte';
+	import DataTablePage from '$lib/components/app/DataTablePage.svelte';
+	import DataTablePagination from '$lib/components/app/DataTablePagination.svelte';
+	import DataTableShell from '$lib/components/app/DataTableShell.svelte';
 	import { useProtectedQuery } from '$lib/components/auth/convex-auth.svelte';
 	import SubmissionDetailSheet from '$lib/components/waivers/SubmissionDetailSheet.svelte';
-	import { Button } from '$lib/components/ui/button';
 	import {
 		Table,
 		TableBody,
@@ -20,7 +23,6 @@
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { formatBookingTimestamp } from '$lib/utils/date';
 	import { queryString } from '$lib/utils/url';
-	import ChevronLeftIcon from '@lucide/svelte/icons/chevron-left';
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 	import FileTextIcon from '@lucide/svelte/icons/file-text';
 	import SearchIcon from '@lucide/svelte/icons/search';
@@ -244,34 +246,48 @@
 	/>
 {/if}
 
-<div class="w-full min-w-0 p-4 sm:p-5">
-	<div class="mx-auto w-full max-w-7xl min-w-0 space-y-4">
-		<div class="relative w-full lg:max-w-md">
-			<SearchIcon
-				class="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground"
-				aria-hidden="true"
-			/>
-			<input
-				type="search"
-				placeholder="Search by customer, activity, or booking number"
-				bind:value={searchInput}
-				class="h-9 w-full rounded-lg border border-input bg-background/60 pr-10 pl-11 text-sm shadow-xs transition-all placeholder:text-muted-foreground/70 hover:bg-background focus-visible:border-ring focus-visible:bg-background focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
-				aria-label="Search submissions"
-			/>
-			{#if searchInput}
-				<button
-					type="button"
-					onclick={clearSearch}
-					class="absolute top-1/2 right-2 inline-flex size-6 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
-					aria-label="Clear search"
-				>
-					<XIcon class="size-3.5" aria-hidden="true" />
-				</button>
-			{/if}
-		</div>
+{#snippet submissionsPagination()}
+	{#if submissionPage}
+		<DataTablePagination
+			{currentPage}
+			hasNextPage={!submissionPage.isDone}
+			hasPreviousPage={cursorHistory.length > 0}
+			itemCount={recentSubmissions.length}
+			itemLabel="submission"
+			onNext={goNextPage}
+			onPrevious={goPreviousPage}
+		/>
+	{/if}
+{/snippet}
 
+<DataTablePage>
+	<div class="relative w-full lg:max-w-md">
+		<SearchIcon
+			class="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground"
+			aria-hidden="true"
+		/>
+		<input
+			type="search"
+			placeholder="Search by customer, activity, or booking number"
+			bind:value={searchInput}
+			class="h-9 w-full rounded-lg border border-input bg-background/60 pr-10 pl-11 text-sm shadow-xs transition-all placeholder:text-muted-foreground/70 hover:bg-background focus-visible:border-ring focus-visible:bg-background focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
+			aria-label="Search submissions"
+		/>
+		{#if searchInput}
+			<button
+				type="button"
+				onclick={clearSearch}
+				class="absolute top-1/2 right-2 inline-flex size-6 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
+				aria-label="Clear search"
+			>
+				<XIcon class="size-3.5" aria-hidden="true" />
+			</button>
+		{/if}
+	</div>
+
+	<div class="flex min-h-0 flex-1 flex-col">
 		{#if isLoadingSubmissions}
-			<div class="space-y-2 md:hidden">
+			<DataTableShell class="border-0 bg-transparent md:hidden" viewportClass="space-y-2">
 				{#each [0, 1, 2, 3, 4, 5] as index (index)}
 					<div class="rounded-xl border border-border bg-background p-4">
 						<div class="flex items-start justify-between gap-3">
@@ -287,8 +303,8 @@
 						</div>
 					</div>
 				{/each}
-			</div>
-			<div class="hidden overflow-hidden rounded-xl border border-border md:block">
+			</DataTableShell>
+			<DataTableShell class="hidden md:flex">
 				<Table class="table-fixed">
 					<colgroup>
 						<col class="w-[32%]" />
@@ -342,35 +358,31 @@
 						{/each}
 					</TableBody>
 				</Table>
-			</div>
+			</DataTableShell>
 		{:else if !currentWorkspace}
-			<div
-				class="rounded-xl border border-dashed border-border p-12 text-center text-sm text-muted-foreground"
-			>
-				Workspace not found.
-			</div>
+			<DataTableShell>
+				<DataTableEmptyState
+					icon={FileTextIcon}
+					title="Workspace not found"
+					description="Choose a workspace to review submissions."
+				/>
+			</DataTableShell>
 		{:else if recentSubmissions.length === 0}
-			<div
-				class="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border bg-card/30 px-4 py-16 text-center"
-			>
-				<div
-					class="flex size-10 items-center justify-center rounded-full bg-muted text-muted-foreground"
-				>
-					<FileTextIcon class="size-5" aria-hidden="true" />
-				</div>
-				<div class="space-y-1">
-					<p class="text-sm font-medium">
-						{searchQuery ? 'No matching submissions' : 'No submissions yet'}
-					</p>
-					<p class="text-xs text-muted-foreground">
-						{searchQuery
-							? 'Try a different name, email, or booking number.'
-							: 'Once guests sign the live waiver, records will appear here.'}
-					</p>
-				</div>
-			</div>
+			<DataTableShell>
+				<DataTableEmptyState
+					icon={FileTextIcon}
+					title={searchQuery ? 'No matching submissions' : 'No submissions yet'}
+					description={searchQuery
+						? 'Try a different name, email, or booking number.'
+						: 'Once guests sign the live waiver, records will appear here.'}
+				/>
+			</DataTableShell>
 		{:else}
-			<div class="space-y-2 md:hidden">
+			<DataTableShell
+				class="border-0 bg-transparent md:hidden"
+				viewportClass="space-y-2"
+				footer={submissionsPagination}
+			>
 				{#each recentSubmissions as submission (submission.submissionId)}
 					{@const bookingDate = formatBookingTimestamp(submission.bookingStartTime)}
 					<button
@@ -391,7 +403,9 @@
 										</span>
 									{/if}
 								</div>
-								<p class="mt-1 truncate text-xs text-muted-foreground">{submission.signerEmail}</p>
+								<p class="mt-1 truncate text-xs text-muted-foreground">
+									{submission.signerEmail}
+								</p>
 							</div>
 							<ChevronRightIcon
 								class="mt-0.5 size-4 shrink-0 text-muted-foreground/50 transition-transform group-hover:translate-x-0.5 group-hover:text-muted-foreground"
@@ -422,8 +436,8 @@
 						</div>
 					</button>
 				{/each}
-			</div>
-			<div class="hidden overflow-hidden rounded-xl border border-border md:block">
+			</DataTableShell>
+			<DataTableShell class="hidden md:flex" footer={submissionsPagination}>
 				<Table class="table-fixed">
 					<colgroup>
 						<col class="w-[32%]" />
@@ -508,28 +522,7 @@
 						{/each}
 					</TableBody>
 				</Table>
-			</div>
-		{/if}
-
-		{#if submissionPage && (cursorHistory.length > 0 || !submissionPage.isDone)}
-			<div class="flex items-center justify-between gap-3">
-				<p class="text-xs text-muted-foreground">Page {currentPage}</p>
-				<div class="flex items-center gap-2">
-					<Button
-						size="sm"
-						variant="outline"
-						disabled={cursorHistory.length === 0}
-						onclick={goPreviousPage}
-					>
-						<ChevronLeftIcon class="size-4" aria-hidden="true" />
-						Previous
-					</Button>
-					<Button size="sm" variant="outline" disabled={submissionPage.isDone} onclick={goNextPage}>
-						Next
-						<ChevronRightIcon class="size-4" aria-hidden="true" />
-					</Button>
-				</div>
-			</div>
+			</DataTableShell>
 		{/if}
 	</div>
-</div>
+</DataTablePage>

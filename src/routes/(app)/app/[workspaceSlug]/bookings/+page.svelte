@@ -8,6 +8,10 @@
 	import BookingDetailSheet from '$lib/components/bookings/BookingDetailSheet.svelte';
 	import QrCodeDialog from '$lib/components/waivers/QrCodeDialog.svelte';
 	import { useAppContext } from '$lib/components/app/app-context.svelte';
+	import DataTableEmptyState from '$lib/components/app/DataTableEmptyState.svelte';
+	import DataTablePage from '$lib/components/app/DataTablePage.svelte';
+	import DataTablePagination from '$lib/components/app/DataTablePagination.svelte';
+	import DataTableShell from '$lib/components/app/DataTableShell.svelte';
 	import { useProtectedQuery } from '$lib/components/auth/convex-auth.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { Calendar } from '$lib/components/ui/calendar';
@@ -36,7 +40,7 @@
 	import SearchIcon from '@lucide/svelte/icons/search';
 	import XIcon from '@lucide/svelte/icons/x';
 
-	const PAGE_SIZE = 50;
+	const PAGE_SIZE = 20;
 
 	const appContext = useAppContext();
 	const currentWorkspace = $derived(
@@ -113,9 +117,6 @@
 		bookingsQuery.isLoading || waiverQuery.isLoading || appContext.isLoading
 	);
 	const currentPage = $derived((bookingPage?.pageIndex ?? pageIndex) + 1);
-	const hasPagination = $derived(
-		!!bookingPage && (bookingPage.hasPreviousPage || bookingPage.hasNextPage)
-	);
 	const isInitialLoading = $derived(isLoading && !bookingPage);
 	const searchDateParam = $derived(page.url.searchParams.get('date'));
 	const searchBookingIdParam = $derived(
@@ -463,160 +464,170 @@
 	/>
 {/if}
 
-<div class="w-full min-w-0 p-4 sm:p-5">
-	<div class="mx-auto w-full max-w-7xl min-w-0 space-y-4">
-		<div class="space-y-4">
-			<div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-				<div class="relative w-full lg:max-w-md">
-					<SearchIcon
-						class="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground transition-colors"
-						aria-hidden="true"
-					/>
-					<input
-						type="search"
-						placeholder="Search by customer, activity, or booking number"
-						value={searchQuery}
-						oninput={handleSearchInput}
-						class="h-9 w-full rounded-lg border border-input bg-background/60 pr-10 pl-11 text-sm shadow-xs transition-all placeholder:text-muted-foreground/70 hover:bg-background focus-visible:border-ring focus-visible:bg-background focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
-						aria-label="Search bookings"
-					/>
-					{#if searchQuery}
-						<button
-							type="button"
-							onclick={clearSearch}
-							class="absolute top-1/2 right-2 inline-flex size-6 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
-							aria-label="Clear search"
-						>
-							<XIcon class="size-3.5" aria-hidden="true" />
-						</button>
-					{/if}
-				</div>
+{#snippet bookingsPagination()}
+	{#if bookingPage}
+		<DataTablePagination
+			{currentPage}
+			hasNextPage={bookingPage.hasNextPage}
+			hasPreviousPage={bookingPage.hasPreviousPage}
+			itemCount={bookings.length}
+			itemLabel="booking"
+			totalCount={summary?.totalCount ?? null}
+			onNext={goNextPage}
+			onPrevious={goPreviousPage}
+		/>
+	{/if}
+{/snippet}
 
-				<div
-					class="flex h-10 w-full flex-wrap items-center gap-1 rounded-lg border border-border bg-card/40 p-0.5 lg:w-auto"
-				>
-					<Button
-						size="icon-lg"
-						variant="ghost"
-						onclick={() => changeDate(-1)}
-						aria-label="Previous day"
+<DataTablePage>
+	<div class="space-y-4">
+		<div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+			<div class="relative w-full lg:max-w-md">
+				<SearchIcon
+					class="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground transition-colors"
+					aria-hidden="true"
+				/>
+				<input
+					type="search"
+					placeholder="Search by customer, activity, or booking number"
+					value={searchQuery}
+					oninput={handleSearchInput}
+					class="h-9 w-full rounded-lg border border-input bg-background/60 pr-10 pl-11 text-sm shadow-xs transition-all placeholder:text-muted-foreground/70 hover:bg-background focus-visible:border-ring focus-visible:bg-background focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
+					aria-label="Search bookings"
+				/>
+				{#if searchQuery}
+					<button
+						type="button"
+						onclick={clearSearch}
+						class="absolute top-1/2 right-2 inline-flex size-6 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
+						aria-label="Clear search"
 					>
-						<ChevronLeftIcon class="size-4" aria-hidden="true" />
-					</Button>
-
-					<Popover bind:open={dateCalendarOpen}>
-						<PopoverTrigger>
-							{#snippet child({ props })}
-								<Button
-									{...props}
-									type="button"
-									variant="outline"
-									size="lg"
-									class="flex-1 justify-start gap-2 bg-background text-sm font-normal lg:w-44 lg:flex-none"
-									title={formatSelectedDate(selectedDate)}
-								>
-									<CalendarDaysIcon
-										class="size-4 shrink-0 text-muted-foreground"
-										aria-hidden="true"
-									/>
-									<span class="truncate">{formatSelectedDate(selectedDate)}</span>
-								</Button>
-							{/snippet}
-						</PopoverTrigger>
-						<PopoverContent align="end" class="w-auto p-0">
-							<Calendar
-								type="single"
-								bind:value={selectedDateValue}
-								class="rounded-md border shadow-sm"
-								captionLayout="dropdown"
-								weekdayFormat="narrow"
-							/>
-						</PopoverContent>
-					</Popover>
-
-					<Button
-						size="lg"
-						variant={isToday ? 'secondary' : 'ghost'}
-						onclick={goToday}
-						disabled={isToday}
-					>
-						Today
-					</Button>
-					<Button
-						size="icon-lg"
-						variant="ghost"
-						onclick={() => changeDate(1)}
-						aria-label="Next day"
-					>
-						<ChevronRightIcon class="size-4" aria-hidden="true" />
-					</Button>
-				</div>
+						<XIcon class="size-3.5" aria-hidden="true" />
+					</button>
+				{/if}
 			</div>
 
-			<div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-				<div class="flex w-full flex-wrap items-center gap-3 lg:w-auto">
-					{#if isToday}
-						<label
-							class="inline-flex h-10 w-full cursor-pointer items-center rounded-lg border border-input bg-card/50 p-0.5 shadow-xs lg:w-auto"
-						>
-							<input
-								type="checkbox"
-								checked={hideDone}
-								onchange={handleHideDoneChange}
-								class="peer sr-only"
-							/>
-							<span
-								class="inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-md px-3 text-xs font-medium whitespace-nowrap text-muted-foreground transition-all peer-checked:bg-background peer-checked:text-foreground peer-checked:shadow-sm peer-focus-visible:ring-2 peer-focus-visible:ring-ring/30 peer-focus-visible:outline-none hover:text-foreground lg:h-8"
-							>
-								<EyeOffIcon class="size-3.5" aria-hidden="true" />
-								Hide done
-							</span>
-						</label>
-					{/if}
-					<div
-						class="grid h-10 w-full grid-cols-4 items-center rounded-lg border border-input bg-card/50 p-0.5 shadow-xs lg:inline-flex lg:w-auto"
-						role="tablist"
-						aria-label="Filter bookings by status"
-					>
-						{#each STATUS_FILTERS as filter (filter.value)}
-							{@const active = statusFilter === filter.value}
-							{@const filterCount = statusFilterCount(filter.value)}
-							<button
+			<div
+				class="flex h-9 w-full flex-wrap items-center gap-1 rounded-lg border border-border bg-card/40 p-px lg:w-auto"
+			>
+				<Button
+					size="icon-lg"
+					variant="ghost"
+					onclick={() => changeDate(-1)}
+					aria-label="Previous day"
+				>
+					<ChevronLeftIcon class="size-4" aria-hidden="true" />
+				</Button>
+
+				<Popover bind:open={dateCalendarOpen}>
+					<PopoverTrigger>
+						{#snippet child({ props })}
+							<Button
+								{...props}
 								type="button"
-								role="tab"
-								aria-selected={active}
-								onclick={() => setStatusFilter(filter.value)}
-								class={cn(
-									'inline-flex h-9 items-center justify-center rounded-md px-1.5 text-xs font-medium whitespace-nowrap transition-all focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none lg:h-8 lg:px-3',
-									active
-										? 'bg-background text-foreground shadow-sm'
-										: 'text-muted-foreground hover:text-foreground'
-								)}
+								variant="outline"
+								size="lg"
+								class="flex-1 justify-start gap-2 bg-background text-sm font-normal lg:w-44 lg:flex-none"
+								title={formatSelectedDate(selectedDate)}
 							>
-								<span>{filter.label}</span>
-								<span
-									class={cn(
-										'ml-1 rounded-sm px-1 py-0.5 text-[10px] tabular-nums lg:ml-1.5 lg:px-1.5',
-										active ? 'bg-muted text-muted-foreground' : 'bg-muted/60 text-muted-foreground'
-									)}
-								>
-									{#if isInitialLoading}
-										<Skeleton class="h-2.5 w-2.5" />
-									{:else if filterCount === null}
-										&mdash;
-									{:else}
-										{filterCount}
-									{/if}
-								</span>
-							</button>
-						{/each}
-					</div>
-				</div>
+								<CalendarDaysIcon
+									class="size-4 shrink-0 text-muted-foreground"
+									aria-hidden="true"
+								/>
+								<span class="truncate">{formatSelectedDate(selectedDate)}</span>
+							</Button>
+						{/snippet}
+					</PopoverTrigger>
+					<PopoverContent align="end" class="w-auto p-0">
+						<Calendar
+							type="single"
+							bind:value={selectedDateValue}
+							class="rounded-md border shadow-sm"
+							captionLayout="dropdown"
+							weekdayFormat="narrow"
+						/>
+					</PopoverContent>
+				</Popover>
+
+				<Button
+					size="lg"
+					variant={isToday ? 'secondary' : 'ghost'}
+					onclick={goToday}
+					disabled={isToday}
+				>
+					Today
+				</Button>
+				<Button size="icon-lg" variant="ghost" onclick={() => changeDate(1)} aria-label="Next day">
+					<ChevronRightIcon class="size-4" aria-hidden="true" />
+				</Button>
 			</div>
 		</div>
 
+		<div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+			<div class="flex w-full flex-wrap items-center gap-3 lg:w-auto">
+				{#if isToday}
+					<label
+						class="inline-flex h-10 w-full cursor-pointer items-center rounded-lg border border-input bg-card/50 p-0.5 shadow-xs lg:w-auto"
+					>
+						<input
+							type="checkbox"
+							checked={hideDone}
+							onchange={handleHideDoneChange}
+							class="peer sr-only"
+						/>
+						<span
+							class="inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-md px-3 text-xs font-medium whitespace-nowrap text-muted-foreground transition-all peer-checked:bg-background peer-checked:text-foreground peer-checked:shadow-sm peer-focus-visible:ring-2 peer-focus-visible:ring-ring/30 peer-focus-visible:outline-none hover:text-foreground lg:h-8"
+						>
+							<EyeOffIcon class="size-3.5" aria-hidden="true" />
+							Hide done
+						</span>
+					</label>
+				{/if}
+				<div
+					class="grid h-10 w-full grid-cols-4 items-center rounded-lg border border-input bg-card/50 p-0.5 shadow-xs lg:inline-flex lg:w-auto"
+					role="tablist"
+					aria-label="Filter bookings by status"
+				>
+					{#each STATUS_FILTERS as filter (filter.value)}
+						{@const active = statusFilter === filter.value}
+						{@const filterCount = statusFilterCount(filter.value)}
+						<button
+							type="button"
+							role="tab"
+							aria-selected={active}
+							onclick={() => setStatusFilter(filter.value)}
+							class={cn(
+								'inline-flex h-9 items-center justify-center rounded-md px-1.5 text-xs font-medium whitespace-nowrap transition-all focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none lg:h-8 lg:px-3',
+								active
+									? 'bg-background text-foreground shadow-sm'
+									: 'text-muted-foreground hover:text-foreground'
+							)}
+						>
+							<span>{filter.label}</span>
+							<span
+								class={cn(
+									'ml-1 rounded-sm px-1 py-0.5 text-[10px] tabular-nums lg:ml-1.5 lg:px-1.5',
+									active ? 'bg-muted text-muted-foreground' : 'bg-muted/60 text-muted-foreground'
+								)}
+							>
+								{#if isInitialLoading}
+									<Skeleton class="h-2.5 w-2.5" />
+								{:else if filterCount === null}
+									&mdash;
+								{:else}
+									{filterCount}
+								{/if}
+							</span>
+						</button>
+					{/each}
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<div class="flex min-h-0 flex-1 flex-col">
 		{#if isLoading}
-			<div class="space-y-3 md:hidden">
+			<DataTableShell class="border-0 bg-transparent md:hidden" viewportClass="space-y-3">
 				{#each [0, 1, 2, 3, 4, 5] as index (index)}
 					<div class="overflow-hidden rounded-xl border border-border bg-card/30">
 						<div class="p-4">
@@ -642,8 +653,8 @@
 						</div>
 					</div>
 				{/each}
-			</div>
-			<div class="hidden overflow-hidden rounded-xl border border-border md:block">
+			</DataTableShell>
+			<DataTableShell class="hidden md:flex">
 				{#each [0, 1, 2, 3, 4, 5] as index (index)}
 					<div
 						class="grid grid-cols-[10%_28%_27%_20%_15%] items-center gap-4 border-b border-border px-4 py-3.5 last:border-b-0"
@@ -663,43 +674,37 @@
 						</div>
 					</div>
 				{/each}
-			</div>
+			</DataTableShell>
 		{:else if !currentWorkspace}
-			<div
-				class="rounded-xl border border-dashed border-border p-12 text-center text-sm text-muted-foreground"
-			>
-				Workspace not found.
-			</div>
+			<DataTableShell>
+				<DataTableEmptyState
+					icon={CalendarOffIcon}
+					title="Workspace not found"
+					description="Choose a workspace to review bookings."
+				/>
+			</DataTableShell>
 		{:else if bookings.length === 0}
-			<div
-				class="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border bg-card/30 px-4 py-16 text-center"
-			>
-				<div
-					class="flex size-10 items-center justify-center rounded-full bg-muted text-muted-foreground"
-				>
-					<CalendarOffIcon class="size-5" aria-hidden="true" />
-				</div>
-				<div class="space-y-1">
-					<p class="text-sm font-medium">
-						{searchQuery || statusFilter !== 'all'
-							? 'No matching bookings'
-							: hideDone && isToday
-								? 'No unfinished bookings'
-								: 'No bookings synced for this day'}
-					</p>
-					<p class="text-xs text-muted-foreground">
-						{#if searchQuery || statusFilter !== 'all'}
-							Adjust search or filters for {formatSelectedDate(selectedDate)}.
-						{:else if hideDone && isToday}
-							Show done bookings to review rooms that have already ended.
-						{:else}
-							Try a different date or check the booking integration.
-						{/if}
-					</p>
-				</div>
-			</div>
+			<DataTableShell>
+				<DataTableEmptyState
+					icon={CalendarOffIcon}
+					title={searchQuery || statusFilter !== 'all'
+						? 'No matching bookings'
+						: hideDone && isToday
+							? 'No unfinished bookings'
+							: 'No bookings synced for this day'}
+					description={searchQuery || statusFilter !== 'all'
+						? `Adjust search or filters for ${formatSelectedDate(selectedDate)}.`
+						: hideDone && isToday
+							? 'Show done bookings to review rooms that have already ended.'
+							: 'Try a different date or check the booking integration.'}
+				/>
+			</DataTableShell>
 		{:else}
-			<div class="space-y-3 md:hidden">
+			<DataTableShell
+				class="border-0 bg-transparent md:hidden"
+				viewportClass="space-y-3"
+				footer={bookingsPagination}
+			>
 				{#each bookings as booking (booking.bookingId)}
 					{@const isCanceled = booking.status === 'canceled'}
 					{@const isNextUpcoming = booking.bookingId === bookingPage?.nextUpcomingBookingId}
@@ -813,9 +818,9 @@
 						</div>
 					</div>
 				{/each}
-			</div>
+			</DataTableShell>
 
-			<div class="hidden overflow-hidden rounded-xl border border-border md:block">
+			<DataTableShell class="hidden md:flex" footer={bookingsPagination}>
 				<Table class="table-fixed">
 					<colgroup>
 						<col class="w-[10%]" />
@@ -962,40 +967,7 @@
 						{/each}
 					</TableBody>
 				</Table>
-			</div>
+			</DataTableShell>
 		{/if}
-
-		<div class={cn('flex items-center gap-3', hasPagination ? 'justify-between' : 'justify-end')}>
-			{#if bookingPage}
-				{@const visibleCount = bookings.length}
-				<p class="text-xs text-muted-foreground tabular-nums">
-					{#if hasPagination}Page {currentPage} ·
-					{/if}{visibleCount}
-					{visibleCount === 1 ? 'booking' : 'bookings'}
-				</p>
-			{/if}
-			{#if hasPagination}
-				<div class="flex items-center gap-2">
-					<Button
-						size="sm"
-						variant="outline"
-						disabled={!bookingPage?.hasPreviousPage}
-						onclick={goPreviousPage}
-					>
-						<ChevronLeftIcon class="size-4" aria-hidden="true" />
-						Previous
-					</Button>
-					<Button
-						size="sm"
-						variant="outline"
-						disabled={!bookingPage?.hasNextPage}
-						onclick={goNextPage}
-					>
-						Next
-						<ChevronRightIcon class="size-4" aria-hidden="true" />
-					</Button>
-				</div>
-			{/if}
-		</div>
 	</div>
-</div>
+</DataTablePage>
