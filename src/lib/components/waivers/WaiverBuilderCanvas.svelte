@@ -23,8 +23,12 @@
 	import CloudCheckIcon from '@lucide/svelte/icons/cloud-check';
 	import CloudOffIcon from '@lucide/svelte/icons/cloud-off';
 	import LoaderIcon from '@lucide/svelte/icons/loader';
+	import type { Id } from '$convex/_generated/dataModel';
+	import { api } from '$convex/_generated/api';
+	import { useProtectedQuery } from '$lib/components/auth/convex-auth.svelte';
 	import type { WaiverField } from '$lib/domain/waivers';
 	import WaiverDocumentShell from '$lib/components/waivers/WaiverDocumentShell.svelte';
+	import WorkspaceLogoUploader from '$lib/components/workspaces/WorkspaceLogoUploader.svelte';
 	import WaiverPublicAboutSignerCard from '$lib/components/waivers/WaiverPublicAboutSignerCard.svelte';
 	import WaiverPublicAdditionalInfoSection from '$lib/components/waivers/WaiverPublicAdditionalInfoSection.svelte';
 	import WaiverPublicMinorsBlock from '$lib/components/waivers/WaiverPublicMinorsBlock.svelte';
@@ -51,7 +55,7 @@
 	} from '$lib/components/ui/dialog';
 	import { Input } from '$lib/components/ui/input';
 	import { Button } from '$lib/components/ui/button';
-	import { sanitizeRichTextHtml } from '$lib/utils/rich-text';
+	import { sanitizeRichTextHtml } from '$lib/utils/rich-text-client';
 	import WaiverFieldDisplay from '$lib/components/waivers/WaiverFieldDisplay.svelte';
 
 	export type SaveState = 'idle' | 'saving' | 'saved' | 'dirty' | 'error';
@@ -60,6 +64,8 @@
 		introCopy: string;
 		fields: WaiverField[];
 		workspaceName?: string;
+		workspaceId?: Id<'workspaces'> | null;
+		canEditBranding?: boolean;
 		saveState?: SaveState;
 		lastSavedAt?: number | null;
 	}
@@ -71,9 +77,16 @@
 		introCopy = $bindable('<p></p>'),
 		fields,
 		workspaceName,
+		workspaceId = null,
+		canEditBranding = false,
 		saveState = 'idle',
 		lastSavedAt = null
 	}: Props = $props();
+
+	const brandingQuery = useProtectedQuery(api.workspaces.getWorkspaceBranding, () =>
+		workspaceId ? { workspaceId } : 'skip'
+	);
+	const workspaceLogoUrl = $derived(brandingQuery.data?.logoUrl ?? null);
 
 	let editorElement = $state<HTMLDivElement | null>(null);
 	let editor = $state<Editor | null>(null);
@@ -81,6 +94,7 @@
 	let hasFocus = $state(false);
 	let linkDialogOpen = $state(false);
 	let linkHrefDraft = $state('');
+	let linkCanRemove = $state(false);
 	let linkError = $state<string | null>(null);
 	let linkInputEl = $state<HTMLInputElement | null>(null);
 	let toolbarState = $state({
@@ -134,6 +148,27 @@
 		event.preventDefault();
 	}
 
+	function handleEditorLinkClick(event: MouseEvent): boolean {
+		if (event.button !== 0) return false;
+
+		const target = event.target;
+		const targetElement =
+			target instanceof Element ? target : target instanceof Node ? target.parentElement : null;
+		if (!targetElement) return false;
+
+		const link = targetElement.closest<HTMLAnchorElement>('a[href]');
+		if (!link || !editorElement?.contains(link)) return false;
+
+		if (event.metaKey || event.ctrlKey) {
+			event.preventDefault();
+			window.open(link.href, link.target || '_blank', 'noopener,noreferrer');
+			return true;
+		}
+
+		event.preventDefault();
+		return false;
+	}
+
 	function safeLinkHref(rawHref: string): string | null {
 		const trimmed = rawHref.trim();
 		if (!trimmed) return null;
@@ -154,6 +189,7 @@
 		if (!editor) return;
 
 		const previousUrl = editor.getAttributes('link').href ?? 'https://';
+		linkCanRemove = editor.isActive('link');
 		linkHrefDraft = previousUrl;
 		linkError = null;
 		linkDialogOpen = true;
@@ -164,7 +200,14 @@
 
 	function cancelLinkDialog() {
 		linkDialogOpen = false;
+		linkCanRemove = false;
 		linkError = null;
+	}
+
+	function removeLink() {
+		if (!editor) return;
+		editor.chain().focus().extendMarkRange('link').unsetLink().run();
+		cancelLinkDialog();
 	}
 
 	async function submitLink(event: SubmitEvent) {
@@ -233,13 +276,16 @@
 					code: false,
 					codeBlock: false,
 					hardBreak: false,
-					horizontalRule: false
+					horizontalRule: false,
+					link: false,
+					underline: false
 				}),
 				Underline,
 				Link.configure({
 					autolink: true,
 					defaultProtocol: 'https',
-					openOnClick: false
+					openOnClick: false,
+					enableClickSelection: true
 				}),
 				TextAlign.configure({
 					types: ['heading', 'paragraph']
@@ -251,6 +297,9 @@
 			editorProps: {
 				attributes: {
 					class: 'waiver-canvas-editor w-full text-base leading-7 text-foreground/85 outline-none'
+				},
+				handleDOMEvents: {
+					click: (_view, event) => handleEditorLinkClick(event)
 				}
 			},
 			onCreate: ({ editor }) => {
@@ -313,9 +362,16 @@
 					<p id="waiver-link-error" class="text-xs text-destructive">{linkError}</p>
 				{/if}
 			</div>
-			<div class="flex justify-end gap-2">
-				<Button type="button" variant="outline" onclick={cancelLinkDialog}>Cancel</Button>
-				<Button type="submit">Apply link</Button>
+			<div class="flex items-center justify-between gap-2">
+				{#if linkCanRemove}
+					<Button type="button" variant="destructive" onclick={removeLink}>Remove link</Button>
+				{:else}
+					<span></span>
+				{/if}
+				<div class="flex justify-end gap-2">
+					<Button type="button" variant="outline" onclick={cancelLinkDialog}>Cancel</Button>
+					<Button type="submit">Apply link</Button>
+				</div>
 			</div>
 		</form>
 	</DialogContent>
@@ -528,7 +584,17 @@
 
 	<!-- Scrollable document canvas -->
 	<div class="flex-1 overflow-y-auto overscroll-y-contain" data-canvas-scroll>
-		<WaiverDocumentShell {workspaceName}>
+		<WaiverDocumentShell {workspaceName} {workspaceLogoUrl}>
+			{#snippet headerActions()}
+				{#if workspaceId && canEditBranding}
+					<WorkspaceLogoUploader
+						{workspaceId}
+						variant="inline"
+						canEdit={canEditBranding}
+						inlineLabel="Add logo"
+					/>
+				{/if}
+			{/snippet}
 			<!-- Editable waiver copy — just the body, no eyebrow/title/separator -->
 			<section class="{waiverSectionCardClass} canvas-document-card" class:is-focused={hasFocus}>
 				<div class="canvas-editor-wrapper" data-waiver-canvas-editor>

@@ -102,6 +102,10 @@ export const current = query({
 				return null;
 			}
 
+			if (workspace.status === 'archived') {
+				return null;
+			}
+
 			return {
 				workspaceId: workspace._id,
 				name: workspace.name,

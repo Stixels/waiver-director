@@ -1,4 +1,4 @@
-import type { Id } from '../_generated/dataModel';
+import type { Doc, Id } from '../_generated/dataModel';
 import type { MutationCtx, QueryCtx } from '../_generated/server';
 
 type FunctionCtx = QueryCtx | MutationCtx;
@@ -29,4 +29,24 @@ export async function getWorkspaceBySlug(ctx: FunctionCtx, slug: string) {
 		.query('workspaces')
 		.withIndex('by_slug', (query) => query.eq('slug', slug))
 		.unique();
+}
+
+export async function getOwnedWorkspaceLogoUrl(
+	ctx: FunctionCtx,
+	workspace: Doc<'workspaces'>
+): Promise<string | null> {
+	if (!workspace.logoStorageId) return null;
+
+	const logoUpload = await ctx.db
+		.query('workspace_logo_uploads')
+		.withIndex('by_workspaceId_and_storageId', (query) =>
+			query.eq('workspaceId', workspace._id).eq('storageId', workspace.logoStorageId)
+		)
+		.first();
+
+	if (!logoUpload || logoUpload.status !== 'consumed') {
+		return null;
+	}
+
+	return (await ctx.storage.getUrl(workspace.logoStorageId)) ?? null;
 }

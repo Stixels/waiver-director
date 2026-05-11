@@ -133,8 +133,16 @@ export async function requireWorkspaceMember(
 		});
 	}
 
-	const membership = await getWorkspaceMembership(ctx, workspaceId, user._id);
-	if (!membership || membership.status !== 'active') {
+	const [membership, workspace] = await Promise.all([
+		getWorkspaceMembership(ctx, workspaceId, user._id),
+		ctx.db.get(workspaceId)
+	]);
+	if (
+		!workspace ||
+		workspace.status === 'archived' ||
+		!membership ||
+		membership.status !== 'active'
+	) {
 		throw new ConvexError({
 			code: 'forbidden',
 			message: 'You do not have access to this workspace.'
