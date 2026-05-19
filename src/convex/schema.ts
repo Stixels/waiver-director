@@ -33,6 +33,9 @@ export default defineSchema({
 		currentPeriodEnd: v.optional(v.number()),
 		trialEndsAt: v.optional(v.number()),
 		cancelAtPeriodEnd: v.optional(v.boolean()),
+		primaryWorkspaceId: v.optional(v.id('workspaces')),
+		primaryWorkspaceSelectedAt: v.optional(v.number()),
+		primaryWorkspaceSwitchPeriod: v.optional(v.string()),
 		lastEventId: v.optional(v.string()),
 		lastEventType: v.optional(v.string()),
 		updatedAt: v.number()

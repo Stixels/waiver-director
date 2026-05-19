@@ -6,7 +6,10 @@ import {
 	billingFeatureValidator,
 	canCreateWorkspace,
 	entitlementHasFeature,
-	getBillingEntitlementForUser
+	getBillingEntitlementForUser,
+	getWorkspaceLimitStateForUser,
+	type BillingEntitlementSummary,
+	type WorkspaceLimitState
 } from './lib/billing';
 import { getCurrentAuthIdentity } from './lib/auth';
 import { listWorkspaceMembershipsForUser } from './lib/workspaces';
@@ -39,6 +42,18 @@ const workspaceSummaryValue = v.object({
 			pdfExport: v.boolean(),
 			teamAccess: v.boolean(),
 			multiWorkspace: v.boolean()
+		}),
+		workspaceLimit: v.object({
+			limit: v.union(v.number(), v.null()),
+			ownedWorkspaceCount: v.number(),
+			primaryWorkspaceId: v.union(v.id('workspaces'), v.null()),
+			primaryWorkspaceSelectedAt: v.union(v.number(), v.null()),
+			currentSwitchPeriod: v.union(v.string(), v.null()),
+			switchUsedThisPeriod: v.boolean(),
+			canSwitchPrimaryWorkspace: v.boolean(),
+			hasMultiWorkspace: v.boolean(),
+			isPrimary: v.boolean(),
+			isPaused: v.boolean()
 		})
 	})
 });
@@ -51,7 +66,17 @@ const billingSummaryValue = v.object({
 	currentPeriodEnd: v.union(v.number(), v.null()),
 	trialEndsAt: v.union(v.number(), v.null()),
 	cancelAtPeriodEnd: v.boolean(),
-	canCreateWorkspace: v.boolean()
+	canCreateWorkspace: v.boolean(),
+	workspaceLimit: v.object({
+		limit: v.union(v.number(), v.null()),
+		ownedWorkspaceCount: v.number(),
+		primaryWorkspaceId: v.union(v.id('workspaces'), v.null()),
+		primaryWorkspaceSelectedAt: v.union(v.number(), v.null()),
+		currentSwitchPeriod: v.union(v.string(), v.null()),
+		switchUsedThisPeriod: v.boolean(),
+		canSwitchPrimaryWorkspace: v.boolean(),
+		hasMultiWorkspace: v.boolean()
+	})
 });
 
 function buildCurrentUserResult(args: {
@@ -101,6 +126,80 @@ async function loadCurrentUser(ctx: QueryCtx) {
 	};
 }
 
+function workspaceBillingFeatures(args: {
+	entitlement: BillingEntitlementSummary | null;
+	limitState: WorkspaceLimitState | null;
+	workspaceId: Id<'workspaces'>;
+}) {
+	const entitlement = args.entitlement;
+	if (!entitlement) {
+		return {
+			waiverPublishing: false,
+			bookingIntegrations: false,
+			emailFollowups: false,
+			analytics: false,
+			pdfExport: false,
+			teamAccess: false,
+			multiWorkspace: false
+		};
+	}
+
+	const hasMultiWorkspace = entitlementHasFeature(entitlement, 'multi_workspace');
+	const isPlanLimited = !hasMultiWorkspace && (args.limitState?.ownedWorkspaceCount ?? 0) > 1;
+	const isPrimary = !isPlanLimited || args.limitState?.primaryWorkspaceId === args.workspaceId;
+	const canUseProFeatures = !isPlanLimited || isPrimary;
+
+	return {
+		waiverPublishing: canUseProFeatures && entitlementHasFeature(entitlement, 'waiver_publishing'),
+		bookingIntegrations:
+			canUseProFeatures && entitlementHasFeature(entitlement, 'booking_integrations'),
+		emailFollowups: canUseProFeatures && entitlementHasFeature(entitlement, 'email_followups'),
+		analytics: canUseProFeatures && entitlementHasFeature(entitlement, 'analytics'),
+		pdfExport: canUseProFeatures && entitlementHasFeature(entitlement, 'pdf_export'),
+		teamAccess: canUseProFeatures && entitlementHasFeature(entitlement, 'team_access'),
+		multiWorkspace: hasMultiWorkspace
+	};
+}
+
+function workspaceLimitForWorkspace(args: {
+	limitState: WorkspaceLimitState | null;
+	workspaceId: Id<'workspaces'>;
+}) {
+	const limitState = args.limitState;
+	if (!limitState) {
+		return {
+			limit: null,
+			ownedWorkspaceCount: 0,
+			primaryWorkspaceId: null,
+			primaryWorkspaceSelectedAt: null,
+			currentSwitchPeriod: null,
+			switchUsedThisPeriod: false,
+			canSwitchPrimaryWorkspace: false,
+			hasMultiWorkspace: false,
+			isPrimary: false,
+			isPaused: false
+		};
+	}
+
+	const isPrimary =
+		limitState.hasMultiWorkspace ||
+		limitState.ownedWorkspaceCount <= 1 ||
+		limitState.primaryWorkspaceId === args.workspaceId;
+
+	return {
+		limit: limitState.limit,
+		ownedWorkspaceCount: limitState.ownedWorkspaceCount,
+		primaryWorkspaceId: limitState.primaryWorkspaceId,
+		primaryWorkspaceSelectedAt: limitState.primaryWorkspaceSelectedAt,
+		currentSwitchPeriod: limitState.currentSwitchPeriod,
+		switchUsedThisPeriod: limitState.switchUsedThisPeriod,
+		canSwitchPrimaryWorkspace: limitState.canSwitchPrimaryWorkspace,
+		hasMultiWorkspace: limitState.hasMultiWorkspace,
+		isPrimary,
+		isPaused: !limitState.hasMultiWorkspace && limitState.ownedWorkspaceCount > 1 && !isPrimary
+	};
+}
+
 export const current = query({
 	args: {},
 	returns: v.object({
@@ -119,17 +218,31 @@ export const current = query({
 		}
 
 		const currentBilling = await getBillingEntitlementForUser(ctx, currentUserState.user._id);
+		const currentWorkspaceLimit = await getWorkspaceLimitStateForUser(
+			ctx,
+			currentUserState.user._id,
+			currentBilling
+		);
 		const memberships = await listWorkspaceMembershipsForUser(ctx, currentUserState.user._id);
 		const workspaceDocs = await Promise.all(
 			memberships.map((membership) => ctx.db.get(membership.workspaceId))
 		);
-		const workspaceBillingDocs = await Promise.all(
-			workspaceDocs.map((workspace) =>
-				workspace?.createdByUserId
-					? getBillingEntitlementForUser(ctx, workspace.createdByUserId)
-					: null
-			)
-		);
+		const ownerBilling = new Map<Id<'users'>, BillingEntitlementSummary>();
+		const ownerLimitStates = new Map<Id<'users'>, WorkspaceLimitState>();
+		for (const workspace of workspaceDocs) {
+			if (!workspace?.createdByUserId || ownerBilling.has(workspace.createdByUserId)) continue;
+			const entitlement =
+				workspace.createdByUserId === currentUserState.user._id
+					? currentBilling
+					: await getBillingEntitlementForUser(ctx, workspace.createdByUserId);
+			ownerBilling.set(workspace.createdByUserId, entitlement);
+			ownerLimitStates.set(
+				workspace.createdByUserId,
+				workspace.createdByUserId === currentUserState.user._id
+					? currentWorkspaceLimit
+					: await getWorkspaceLimitStateForUser(ctx, workspace.createdByUserId, entitlement)
+			);
+		}
 
 		const workspaces = memberships.map((membership, index) => {
 			const workspace = workspaceDocs[index];
@@ -144,7 +257,12 @@ export const current = query({
 				});
 				return null;
 			}
-			const workspaceBilling = workspaceBillingDocs[index];
+			const workspaceBilling = workspace.createdByUserId
+				? (ownerBilling.get(workspace.createdByUserId) ?? null)
+				: null;
+			const workspaceLimit = workspace.createdByUserId
+				? (ownerLimitStates.get(workspace.createdByUserId) ?? null)
+				: null;
 
 			return {
 				workspaceId: workspace._id,
@@ -158,29 +276,15 @@ export const current = query({
 					status: workspaceBilling?.status ?? 'free',
 					featureSlugs: workspaceBilling?.featureSlugs ?? [],
 					isActive: workspaceBilling?.isActive ?? false,
-					features: {
-						waiverPublishing: workspaceBilling
-							? entitlementHasFeature(workspaceBilling, 'waiver_publishing')
-							: false,
-						bookingIntegrations: workspaceBilling
-							? entitlementHasFeature(workspaceBilling, 'booking_integrations')
-							: false,
-						emailFollowups: workspaceBilling
-							? entitlementHasFeature(workspaceBilling, 'email_followups')
-							: false,
-						analytics: workspaceBilling
-							? entitlementHasFeature(workspaceBilling, 'analytics')
-							: false,
-						pdfExport: workspaceBilling
-							? entitlementHasFeature(workspaceBilling, 'pdf_export')
-							: false,
-						teamAccess: workspaceBilling
-							? entitlementHasFeature(workspaceBilling, 'team_access')
-							: false,
-						multiWorkspace: workspaceBilling
-							? entitlementHasFeature(workspaceBilling, 'multi_workspace')
-							: false
-					}
+					features: workspaceBillingFeatures({
+						entitlement: workspaceBilling,
+						limitState: workspaceLimit,
+						workspaceId: workspace._id
+					}),
+					workspaceLimit: workspaceLimitForWorkspace({
+						limitState: workspaceLimit,
+						workspaceId: workspace._id
+					})
 				}
 			};
 		});
@@ -195,7 +299,8 @@ export const current = query({
 				currentPeriodEnd: currentBilling.currentPeriodEnd,
 				trialEndsAt: currentBilling.trialEndsAt,
 				cancelAtPeriodEnd: currentBilling.cancelAtPeriodEnd,
-				canCreateWorkspace: await canCreateWorkspace(ctx, currentUserState.user._id)
+				canCreateWorkspace: await canCreateWorkspace(ctx, currentUserState.user._id),
+				workspaceLimit: currentWorkspaceLimit
 			},
 			workspaces: workspaces.filter((workspace) => workspace !== null)
 		};

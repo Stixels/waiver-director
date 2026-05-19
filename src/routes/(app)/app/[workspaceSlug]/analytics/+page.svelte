@@ -29,6 +29,12 @@
 		appContext.workspaces.find((w) => w.slug === page.params.workspaceSlug) ?? null
 	);
 	const canViewAnalytics = $derived(Boolean(currentWorkspace?.billing.features.analytics));
+	const workspacePausedOnPro = $derived(Boolean(currentWorkspace?.billing.workspaceLimit.isPaused));
+	const billingHref = $derived(
+		workspacePausedOnPro
+			? `/app/${page.params.workspaceSlug}/account/plan`
+			: `/app/${page.params.workspaceSlug}/account#/billing/plans`
+	);
 
 	function toDateInputValue(date: Date): string {
 		const y = date.getFullYear();
@@ -203,9 +209,12 @@
 <div class="relative h-full min-h-0 w-full overflow-y-auto p-4 sm:p-5 xl:overflow-hidden">
 	{#if !appContext.isLoading && currentWorkspace && !canViewAnalytics}
 		<UpgradeOverlay
-			title="Upgrade to view analytics"
-			description="Analytics are available on Pro plans and trials, including booking trends, submission volume, customer activity, and email performance."
-			href={`/app/${page.params.workspaceSlug}/account#/billing/plans`}
+			title={workspacePausedOnPro ? 'Workspace paused on Pro' : 'Upgrade to view analytics'}
+			description={workspacePausedOnPro
+				? 'This workspace is not the primary workspace on your Pro plan. Make it primary to view analytics here, or upgrade to Business for every workspace.'
+				: 'Analytics are available on Pro plans and trials, including booking trends, submission volume, customer activity, and email performance.'}
+			href={billingHref}
+			actionLabel={workspacePausedOnPro ? 'Manage primary workspace' : 'View billing'}
 		/>
 	{/if}
 

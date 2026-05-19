@@ -196,6 +196,12 @@
 	const canUseBookingIntegrations = $derived(
 		Boolean(currentWorkspace?.billing.features.bookingIntegrations)
 	);
+	const workspacePausedOnPro = $derived(Boolean(currentWorkspace?.billing.workspaceLimit.isPaused));
+	const billingHref = $derived(
+		workspacePausedOnPro
+			? `/app/${page.params.workspaceSlug}/account/plan`
+			: `/app/${page.params.workspaceSlug}/account#/billing/plans`
+	);
 	const selectedProviderIsConnected = $derived(
 		Boolean(selectedIntegration && selectedIntegration.status !== 'disconnected')
 	);
@@ -305,7 +311,11 @@
 	async function startBookeoConnect() {
 		if (!currentWorkspace || convex.disabled) return;
 		if (!canUseBookingIntegrations) {
-			toast.message('Upgrade to Pro to connect booking integrations.');
+			toast.message(
+				workspacePausedOnPro
+					? 'Make this your primary workspace to connect booking integrations.'
+					: 'Upgrade to Pro to connect booking integrations.'
+			);
 			return;
 		}
 		isStartingConnect = true;
@@ -324,7 +334,11 @@
 	async function connectManually() {
 		if (!currentWorkspace || convex.disabled) return;
 		if (!canUseBookingIntegrations) {
-			toast.message('Upgrade to Pro to connect booking integrations.');
+			toast.message(
+				workspacePausedOnPro
+					? 'Make this your primary workspace to connect booking integrations.'
+					: 'Upgrade to Pro to connect booking integrations.'
+			);
 			return;
 		}
 		const apiKeyTrimmed = manualApiKey.trim();
@@ -522,9 +536,12 @@
 <div class="relative h-full min-h-0 w-full overflow-hidden p-4 sm:p-5">
 	{#if !isLoading && currentWorkspace && !canUseBookingIntegrations}
 		<UpgradeOverlay
-			title="Upgrade to connect integrations"
-			description="Booking integrations are available on Pro plans and trials. Upgrade to connect Bookeo and keep booking-linked waiver operations in sync."
-			href={`/app/${page.params.workspaceSlug}/account#/billing/plans`}
+			title={workspacePausedOnPro ? 'Workspace paused on Pro' : 'Upgrade to connect integrations'}
+			description={workspacePausedOnPro
+				? 'This workspace is not the primary workspace on your Pro plan. Make it primary to connect Bookeo here, or upgrade to Business for every workspace.'
+				: 'Booking integrations are available on Pro plans and trials. Upgrade to connect Bookeo and keep booking-linked waiver operations in sync.'}
+			href={billingHref}
+			actionLabel={workspacePausedOnPro ? 'Manage primary workspace' : 'View billing'}
 		/>
 	{/if}
 
@@ -797,15 +814,16 @@
 							</div>
 						{:else if !canUseBookingIntegrations}
 							<div class="rounded-lg border border-dashed bg-card/50 p-10 text-center">
-								<p class="text-sm font-medium">Upgrade to connect Bookeo</p>
-								<p class="mt-1 text-xs text-muted-foreground">
-									Booking integrations are available on Pro plans and trials.
+								<p class="text-sm font-medium">
+									{workspacePausedOnPro ? 'Workspace paused on Pro' : 'Upgrade to connect Bookeo'}
 								</p>
-								<Button
-									class="mt-4"
-									href={`/app/${page.params.workspaceSlug}/account#/billing/plans`}
-								>
-									View billing
+								<p class="mt-1 text-xs text-muted-foreground">
+									{workspacePausedOnPro
+										? 'Make this workspace primary to connect Bookeo here.'
+										: 'Booking integrations are available on Pro plans and trials.'}
+								</p>
+								<Button class="mt-4" href={billingHref}>
+									{workspacePausedOnPro ? 'Manage primary workspace' : 'View billing'}
 								</Button>
 							</div>
 						{:else if connectedIntegration}

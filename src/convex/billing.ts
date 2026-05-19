@@ -1,14 +1,23 @@
 import { ConvexError, v } from 'convex/values';
-import { internalAction, internalMutation, internalQuery, query } from './_generated/server';
+import {
+	internalAction,
+	internalMutation,
+	internalQuery,
+	mutation,
+	query
+} from './_generated/server';
 import { internal } from './_generated/api';
 import {
 	billingFeatureValidator,
 	canCreateWorkspace,
 	featuresForPlan,
 	getBillingEntitlementForUser,
+	getWorkspaceLimitStateForUser,
+	isBillingStatusActive,
 	normalizeBillingFeatureSlugs,
 	workspaceHasBillingFeature
 } from './lib/billing';
+import { getCurrentUser } from './lib/auth';
 
 type JsonRecord = Record<string, unknown>;
 type ClerkWebhookResult = { status: 'accepted' | 'duplicate' | 'ignored' | 'rejected' };
@@ -301,7 +310,132 @@ export const getCurrentBilling = query({
 		const entitlement = await getBillingEntitlementForUser(ctx, authIdentity.userId);
 		return {
 			...entitlement,
+			workspaceLimit: await getWorkspaceLimitStateForUser(ctx, authIdentity.userId, entitlement),
 			canCreateWorkspace: await canCreateWorkspace(ctx, authIdentity.userId)
+		};
+	}
+});
+
+export const selectPrimaryWorkspace = mutation({
+	args: {
+		workspaceId: v.id('workspaces')
+	},
+	returns: v.object({
+		primaryWorkspaceId: v.id('workspaces'),
+		primaryWorkspaceSelectedAt: v.number(),
+		currentSwitchPeriod: v.string(),
+		switchUsedThisPeriod: v.boolean(),
+		canSwitchPrimaryWorkspace: v.boolean()
+	}),
+	handler: async (ctx, args) => {
+		const user = await getCurrentUser(ctx);
+		if (!user) {
+			throw new ConvexError({
+				code: 'unauthenticated',
+				message: 'Not authenticated'
+			});
+		}
+
+		const workspace = await ctx.db.get(args.workspaceId);
+		if (!workspace || workspace.createdByUserId !== user._id || workspace.status !== 'active') {
+			throw new ConvexError({
+				code: 'forbidden',
+				message: 'Only the workspace owner can choose this primary workspace.'
+			});
+		}
+
+		const entitlement = await getBillingEntitlementForUser(ctx, user._id);
+		const currentState = await getWorkspaceLimitStateForUser(ctx, user._id, entitlement);
+		const selectedAt = Date.now();
+		const currentSwitchPeriod = currentState.currentSwitchPeriod;
+
+		if (!currentSwitchPeriod) {
+			throw new ConvexError({
+				code: 'billing_required',
+				feature: 'multi_workspace',
+				message: 'Upgrade to Business to manage multiple live workspaces.'
+			});
+		}
+
+		if (currentState.primaryWorkspaceId === args.workspaceId) {
+			return {
+				primaryWorkspaceId: args.workspaceId,
+				primaryWorkspaceSelectedAt: entitlement.primaryWorkspaceSelectedAt ?? selectedAt,
+				currentSwitchPeriod,
+				switchUsedThisPeriod: currentState.switchUsedThisPeriod,
+				canSwitchPrimaryWorkspace: currentState.canSwitchPrimaryWorkspace
+			};
+		}
+
+		if (currentState.hasMultiWorkspace) {
+			const existing = await ctx.db
+				.query('user_billing_entitlements')
+				.withIndex('by_userId', (query) => query.eq('userId', user._id))
+				.unique();
+
+			if (existing) {
+				await ctx.db.patch(existing._id, {
+					primaryWorkspaceId: args.workspaceId,
+					primaryWorkspaceSelectedAt: selectedAt
+				});
+			}
+
+			const nextState = await getWorkspaceLimitStateForUser(ctx, user._id, {
+				...entitlement,
+				primaryWorkspaceId: args.workspaceId,
+				primaryWorkspaceSelectedAt: selectedAt
+			});
+
+			return {
+				primaryWorkspaceId: args.workspaceId,
+				primaryWorkspaceSelectedAt: selectedAt,
+				currentSwitchPeriod,
+				switchUsedThisPeriod: nextState.switchUsedThisPeriod,
+				canSwitchPrimaryWorkspace: nextState.canSwitchPrimaryWorkspace
+			};
+		}
+
+		if (!currentState.canSwitchPrimaryWorkspace) {
+			throw new ConvexError({
+				code: 'billing_limit_reached',
+				feature: 'multi_workspace',
+				message: currentState.switchUsedThisPeriod
+					? 'You can switch your Pro primary workspace once per billing period.'
+					: 'Upgrade to Business to manage multiple live workspaces.'
+			});
+		}
+
+		const existing = await ctx.db
+			.query('user_billing_entitlements')
+			.withIndex('by_userId', (query) => query.eq('userId', user._id))
+			.unique();
+		if (!existing) {
+			throw new ConvexError({
+				code: 'billing_required',
+				feature: 'multi_workspace',
+				message: 'Upgrade to Business to manage multiple live workspaces.'
+			});
+		}
+
+		await ctx.db.patch(existing._id, {
+			primaryWorkspaceId: args.workspaceId,
+			primaryWorkspaceSelectedAt: selectedAt,
+			primaryWorkspaceSwitchPeriod: currentSwitchPeriod
+		});
+
+		const nextState = await getWorkspaceLimitStateForUser(ctx, user._id, {
+			...entitlement,
+			primaryWorkspaceId: args.workspaceId,
+			primaryWorkspaceSelectedAt: selectedAt,
+			primaryWorkspaceSwitchPeriod: currentSwitchPeriod
+		});
+
+		return {
+			primaryWorkspaceId: args.workspaceId,
+			primaryWorkspaceSelectedAt: selectedAt,
+			currentSwitchPeriod,
+			switchUsedThisPeriod: nextState.switchUsedThisPeriod,
+			canSwitchPrimaryWorkspace: nextState.canSwitchPrimaryWorkspace
 		};
 	}
 });
@@ -352,6 +486,24 @@ export const applyClerkBillingEvent = internalMutation({
 				query.eq('provider', 'clerk').eq('providerUserId', args.providerUserId)
 			)
 			.unique();
+
+		if (existing && existing.planSlug !== args.planSlug) {
+			const existingActive =
+				isBillingStatusActive(existing.status) ||
+				(existing.status === 'canceled' &&
+					typeof existing.currentPeriodEnd === 'number' &&
+					existing.currentPeriodEnd > Date.now());
+
+			const incomingActive =
+				isBillingStatusActive(args.status) ||
+				(args.status === 'canceled' &&
+					typeof args.currentPeriodEnd === 'number' &&
+					args.currentPeriodEnd > Date.now());
+
+			if (existingActive && !incomingActive) {
+				return { status: 'ignored' };
+			}
+		}
 
 		const patch = {
 			userId: authIdentity.userId,
@@ -407,7 +559,7 @@ export const verifyAndApplyClerkBillingWebhook = internalAction({
 		if (eventType.startsWith('paymentAttempt')) return { status: 'ignored' };
 
 		const normalized = normalizeBillingPayload(eventType, payload.data);
-		if (!normalized.providerUserId) return { status: 'ignored' };
+		if (!normalized.providerUserId || normalized.status === 'upcoming') return { status: 'ignored' };
 
 		const result: ClerkWebhookResult = await ctx.runMutation(
 			internal.billing.applyClerkBillingEvent,

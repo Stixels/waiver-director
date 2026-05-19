@@ -95,6 +95,12 @@
 	let confirmKind = $state<ConfirmKind | null>(null);
 	let confirmOpen = $state(false);
 	const canPublishWaiver = $derived(Boolean(currentWorkspace?.billing.features.waiverPublishing));
+	const workspacePausedOnPro = $derived(Boolean(currentWorkspace?.billing.workspaceLimit.isPaused));
+	const billingHref = $derived(
+		workspacePausedOnPro
+			? `/app/${page.params.workspaceSlug}/account/plan`
+			: `/app/${page.params.workspaceSlug}/account#/billing/plans`
+	);
 
 	const activePublicHref = $derived.by(() => {
 		if (!canPublishWaiver) return null;
@@ -334,7 +340,8 @@
 	}
 
 	function publishButtonLabel(waiver: WorkspaceWaiverSummary | null) {
-		if (!canPublishWaiver) return 'Upgrade to publish';
+		if (!canPublishWaiver)
+			return workspacePausedOnPro ? 'Make primary to publish' : 'Upgrade to publish';
 		if (!waiver) return 'Publish';
 		if (waiver.publishedVersionId && !waiver.hasUnpublishedChanges) return 'Live';
 		if (waiver.publishedVersionId && waiver.hasUnpublishedChanges) return 'Publish changes';
@@ -349,7 +356,7 @@
 
 	async function handlePublishClick() {
 		if (!canPublishWaiver) {
-			await goto(resolve(`/app/${page.params.workspaceSlug}/account#/billing/plans` as const));
+			await goto(resolve(billingHref as `/app/${string}`));
 			return;
 		}
 		openConfirm('publish');
@@ -612,7 +619,9 @@
 					<p class="truncate text-[13px] text-muted-foreground">
 						{canPublishWaiver
 							? 'Publish this waiver to share a public signing link with your guests.'
-							: 'Upgrade to Pro to publish this waiver and accept signed submissions.'}
+							: workspacePausedOnPro
+								? 'Make this your primary workspace to publish and accept signed submissions here.'
+								: 'Upgrade to Pro to publish this waiver and accept signed submissions.'}
 					</p>
 				</div>
 			{/if}

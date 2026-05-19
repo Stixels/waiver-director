@@ -73,6 +73,12 @@
 		appContext.workspaces.find((w) => w.slug === page.params.workspaceSlug) ?? null
 	);
 	const canUseEmailFollowups = $derived(Boolean(currentWorkspace?.billing.features.emailFollowups));
+	const workspacePausedOnPro = $derived(Boolean(currentWorkspace?.billing.workspaceLimit.isPaused));
+	const billingHref = $derived(
+		workspacePausedOnPro
+			? `/app/${currentWorkspace?.slug ?? page.params.workspaceSlug}/account/plan`
+			: `/app/${currentWorkspace?.slug ?? page.params.workspaceSlug}/account#/billing/plans`
+	);
 
 	// ─── Queries ───────────────────────────────────────────────────────────────
 
@@ -238,7 +244,9 @@
 	const replyToPendingVerification = $derived(Boolean(senderSettings?.pendingReplyToEmail));
 	const senderUnavailableMessage = $derived(
 		!canUseEmailFollowups
-			? 'Upgrade to Pro to send waiver follow-up emails.'
+			? workspacePausedOnPro
+				? 'Make this your primary workspace to send waiver follow-up emails.'
+				: 'Upgrade to Pro to send waiver follow-up emails.'
 			: hasPlatformFromEmail
 				? 'Verify a reply-to email before sending follow-ups.'
 				: 'Sender domain is not configured. Set RESEND_FROM_EMAIL before sending follow-ups.'
@@ -944,9 +952,12 @@
 <div class="relative w-full min-w-0 p-4 sm:p-5">
 	{#if !isLoading && currentWorkspace && !canUseEmailFollowups}
 		<UpgradeOverlay
-			title="Upgrade to send follow-ups"
-			description="Free workspaces can draft email content, but Pro is required to queue, deliver, and manage waiver follow-up emails."
-			href={`/app/${currentWorkspace.slug}/account#/billing/plans`}
+			title={workspacePausedOnPro ? 'Workspace paused on Pro' : 'Upgrade to send follow-ups'}
+			description={workspacePausedOnPro
+				? 'This workspace is not the primary workspace on your Pro plan. Make it primary to send follow-up emails here, or upgrade to Business for every workspace.'
+				: 'Free workspaces can draft email content, but Pro is required to queue, deliver, and manage waiver follow-up emails.'}
+			href={billingHref}
+			actionLabel={workspacePausedOnPro ? 'Manage primary workspace' : 'View billing'}
 		/>
 	{/if}
 
@@ -1074,7 +1085,7 @@
 				</div>
 
 				<!-- Follow-ups table -->
-				<div class="space-y-4">
+				<div class="mt-4 space-y-4">
 					<!-- Filters + actions -->
 					<div class="space-y-2">
 						<div class="flex flex-col gap-3 lg:flex-row lg:items-center">

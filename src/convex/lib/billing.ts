@@ -3,6 +3,7 @@ import type { Doc, Id } from '../_generated/dataModel';
 import type { MutationCtx, QueryCtx } from '../_generated/server';
 
 type FunctionCtx = QueryCtx | MutationCtx;
+const OWNED_WORKSPACES_BILLING_LIMIT = 100;
 
 export const BILLING_FEATURES = [
 	'waiver_publishing',
@@ -59,7 +60,21 @@ export type BillingEntitlementSummary = {
 	currentPeriodEnd: number | null;
 	trialEndsAt: number | null;
 	cancelAtPeriodEnd: boolean;
+	primaryWorkspaceId: Id<'workspaces'> | null;
+	primaryWorkspaceSelectedAt: number | null;
+	primaryWorkspaceSwitchPeriod: string | null;
 	updatedAt: number | null;
+};
+
+export type WorkspaceLimitState = {
+	limit: number | null;
+	ownedWorkspaceCount: number;
+	primaryWorkspaceId: Id<'workspaces'> | null;
+	primaryWorkspaceSelectedAt: number | null;
+	currentSwitchPeriod: string | null;
+	switchUsedThisPeriod: boolean;
+	canSwitchPrimaryWorkspace: boolean;
+	hasMultiWorkspace: boolean;
 };
 
 export function billingFeatureValue(feature: BillingFeature) {
@@ -99,9 +114,9 @@ function summarizeEntitlement(
 	userId: Id<'users'>,
 	entitlement: Doc<'user_billing_entitlements'> | null
 ): BillingEntitlementSummary {
-	const planSlug = entitlement?.planSlug ?? 'free';
 	const status = entitlement?.status ?? 'free';
 	const isActive = isEntitlementCurrentlyActive(status, entitlement?.currentPeriodEnd);
+	const planSlug = isActive ? (entitlement?.planSlug ?? 'free') : 'free';
 	const storedFeatureSlugs = normalizeBillingFeatureSlugs(entitlement?.featureSlugs ?? []);
 	const featureSlugs = isActive
 		? normalizeBillingFeatureSlugs([...featuresForPlan(planSlug), ...storedFeatureSlugs])
@@ -117,6 +132,9 @@ function summarizeEntitlement(
 		currentPeriodEnd: entitlement?.currentPeriodEnd ?? null,
 		trialEndsAt: entitlement?.trialEndsAt ?? null,
 		cancelAtPeriodEnd: entitlement?.cancelAtPeriodEnd ?? false,
+		primaryWorkspaceId: entitlement?.primaryWorkspaceId ?? null,
+		primaryWorkspaceSelectedAt: entitlement?.primaryWorkspaceSelectedAt ?? null,
+		primaryWorkspaceSwitchPeriod: entitlement?.primaryWorkspaceSwitchPeriod ?? null,
 		updatedAt: entitlement?.updatedAt ?? null
 	};
 }
@@ -138,6 +156,74 @@ export function entitlementHasFeature(
 	feature: BillingFeature
 ) {
 	return entitlement.featureSlugs.includes(feature);
+}
+
+export function currentWorkspaceSwitchPeriod(entitlement: BillingEntitlementSummary) {
+	const periodEnd = entitlement.currentPeriodEnd ?? entitlement.trialEndsAt;
+	if (periodEnd !== null) return `${entitlement.planSlug}:${periodEnd}`;
+
+	const now = new Date();
+	return `${entitlement.planSlug}:${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(
+		2,
+		'0'
+	)}`;
+}
+
+async function listOwnedWorkspacesForBilling(ctx: FunctionCtx, userId: Id<'users'>) {
+	const workspaces = await ctx.db
+		.query('workspaces')
+		.withIndex('by_createdByUserId', (query) => query.eq('createdByUserId', userId))
+		.take(OWNED_WORKSPACES_BILLING_LIMIT);
+
+	return workspaces
+		.filter((workspace) => workspace.status === 'active')
+		.sort((a, b) => a._creationTime - b._creationTime);
+}
+
+function workspaceIdsEqual(a: Id<'workspaces'> | null, b: Id<'workspaces'> | null) {
+	return a !== null && b !== null && a === b;
+}
+
+export async function getWorkspaceLimitStateForUser(
+	ctx: FunctionCtx,
+	userId: Id<'users'>,
+	entitlement?: BillingEntitlementSummary
+): Promise<WorkspaceLimitState> {
+	const billing = entitlement ?? (await getBillingEntitlementForUser(ctx, userId));
+	const hasMultiWorkspace = entitlementHasFeature(billing, 'multi_workspace');
+	const ownedWorkspaces = await listOwnedWorkspacesForBilling(ctx, userId);
+	const ownedWorkspaceIds = new Set(ownedWorkspaces.map((workspace) => workspace._id));
+	const user = await ctx.db.get(userId);
+
+	const storedPrimaryId =
+		billing.primaryWorkspaceId && ownedWorkspaceIds.has(billing.primaryWorkspaceId)
+			? billing.primaryWorkspaceId
+			: null;
+	const defaultPrimaryId =
+		user?.defaultWorkspaceId && ownedWorkspaceIds.has(user.defaultWorkspaceId)
+			? user.defaultWorkspaceId
+			: null;
+	const primaryWorkspaceId = storedPrimaryId ?? defaultPrimaryId ?? ownedWorkspaces[0]?._id ?? null;
+	const currentSwitchPeriod = currentWorkspaceSwitchPeriod(billing);
+	const switchUsedThisPeriod = billing.primaryWorkspaceSwitchPeriod === currentSwitchPeriod;
+	const isLimited = !hasMultiWorkspace;
+	const canSwitchPrimaryWorkspace =
+		isLimited &&
+		billing.planSlug === 'pro' &&
+		billing.isActive &&
+		ownedWorkspaces.length > 1 &&
+		!switchUsedThisPeriod;
+
+	return {
+		limit: hasMultiWorkspace ? null : 1,
+		ownedWorkspaceCount: ownedWorkspaces.length,
+		primaryWorkspaceId,
+		primaryWorkspaceSelectedAt: billing.primaryWorkspaceSelectedAt,
+		currentSwitchPeriod,
+		switchUsedThisPeriod,
+		canSwitchPrimaryWorkspace,
+		hasMultiWorkspace
+	};
 }
 
 export async function userHasBillingFeature(
@@ -168,7 +254,17 @@ export async function workspaceHasBillingFeature(
 	feature: BillingFeature
 ) {
 	const access = await getWorkspaceBillingAccess(ctx, workspaceId);
-	return access ? entitlementHasFeature(access.entitlement, feature) : false;
+	if (!access || !entitlementHasFeature(access.entitlement, feature)) return false;
+	if (feature === 'multi_workspace') return true;
+
+	const limitState = await getWorkspaceLimitStateForUser(
+		ctx,
+		access.ownerUserId,
+		access.entitlement
+	);
+	if (limitState.hasMultiWorkspace || limitState.ownedWorkspaceCount <= 1) return true;
+
+	return workspaceIdsEqual(limitState.primaryWorkspaceId, workspaceId);
 }
 
 export async function requireWorkspaceFeature(

@@ -34,6 +34,7 @@
 	import PanelLeftOpenIcon from '@lucide/svelte/icons/panel-left-open';
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import SettingsIcon from '@lucide/svelte/icons/settings';
+	import CreditCardIcon from '@lucide/svelte/icons/credit-card';
 	import LogOutIcon from '@lucide/svelte/icons/log-out';
 	import EllipsisIcon from '@lucide/svelte/icons/ellipsis';
 	import Building2Icon from '@lucide/svelte/icons/building-2';
@@ -133,6 +134,14 @@
 
 	function accountBillingPathnameFor(workspaceSlug: string): `/app/${string}` {
 		return `/app/${workspaceSlug}/account#/billing/plans` as `/app/${string}`;
+	}
+
+	function accountPlanPathname(): `/app/${string}` | '/app' {
+		if (!activeWorkspaceSlug) {
+			return '/app';
+		}
+
+		return `/app/${activeWorkspaceSlug}/account/plan` as `/app/${string}`;
 	}
 
 	function accountPathname(): `/app/${string}` | '/app' {
@@ -355,7 +364,13 @@
 									</div>
 									<div class="min-w-0 flex-1">
 										<div class="truncate text-[12px] font-medium">{ws.name}</div>
-										<div class="text-[10px] text-muted-foreground capitalize">{ws.role}</div>
+										<div class="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+											<span class="capitalize">{ws.role}</span>
+											{#if ws.billing.workspaceLimit.isPaused}
+												<span aria-hidden="true">·</span>
+												<span>Paused</span>
+											{/if}
+										</div>
 									</div>
 									{#if ws.slug === activeWorkspaceSlug}
 										<div
@@ -578,6 +593,26 @@
 					>
 						<SettingsIcon class="size-3.5 shrink-0" aria-hidden="true" />
 						<span class="flex-1">Settings</span>
+					</DropdownMenuItem>
+					<DropdownMenuItem
+						onclick={() => {
+							handleNavigation();
+							void goto(resolve(accountPlanPathname()));
+						}}
+					>
+						<Building2Icon class="size-3.5 shrink-0" aria-hidden="true" />
+						<span class="flex-1">Plan usage</span>
+					</DropdownMenuItem>
+					<DropdownMenuItem
+						onclick={() => {
+							handleNavigation();
+							if (activeWorkspaceSlug) {
+								void goto(resolve(accountBillingPathnameFor(activeWorkspaceSlug)));
+							}
+						}}
+					>
+						<CreditCardIcon class="size-3.5 shrink-0" aria-hidden="true" />
+						<span class="flex-1">Billing plans</span>
 					</DropdownMenuItem>
 				</DropdownMenuGroup>
 				<DropdownMenuSeparator />
