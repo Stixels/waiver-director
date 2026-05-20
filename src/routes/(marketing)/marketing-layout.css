@@ -7,13 +7,18 @@
 	--mkt-nav-offset: calc(env(safe-area-inset-top, 0px) + 3.5rem);
 }
 
+html:has(body .mkt),
+body:has(.mkt) {
+	background: oklch(0.07 0.005 286);
+}
+
 .mkt {
 	--mkt-nav-inline: 1rem;
 	--mkt-hero-top: 4.75rem;
 
 	/* Background layers — near-black for Linear feel */
 	--m-bg: oklch(0.07 0.005 286);
-	--m-surface: oklch(0.10 0.006 286);
+	--m-surface: oklch(0.1 0.006 286);
 	--m-card: oklch(0.13 0.007 286);
 	--m-elevated: oklch(0.16 0.008 286);
 
@@ -23,6 +28,7 @@
 
 	/* Accent purple system */
 	--m-accent: oklch(0.63 0.22 280);
+	--m-accent-text: oklch(0.74 0.16 280);
 	--m-accent-glow: oklch(0.52 0.22 277 / 24%);
 	--m-accent-dim: oklch(0.52 0.22 277 / 10%);
 	--m-accent-soft: oklch(0.52 0.22 277 / 6%);
@@ -44,7 +50,8 @@
 	/* Text hierarchy */
 	--m-text-1: oklch(0.97 0 0);
 	--m-text-2: oklch(0.65 0.005 286);
-	--m-text-3: oklch(0.45 0.005 286);
+	--m-text-3: oklch(0.6 0.005 286);
+	--muted-foreground: var(--m-text-3);
 
 	/* Typography */
 	--m-font-sans: 'Geist Sans', ui-sans-serif, system-ui, sans-serif;
@@ -192,6 +199,12 @@
 	padding-bottom: 0;
 	padding-left: max(var(--mkt-nav-inline), env(safe-area-inset-left, 0px));
 	padding-right: max(var(--mkt-nav-inline), env(safe-area-inset-right, 0px));
+}
+
+.mkt [style^='color: var(--primary);'],
+.mkt [style*='; color: var(--primary);'],
+.mkt .text-primary {
+	color: var(--m-accent-text) !important;
 }
 
 /* ── Scroll-reveal animation ───────────────────────────────── */

@@ -79,7 +79,7 @@
 		</p>
 		<h1
 			class="mb-5 font-extrabold tracking-tight text-balance"
-			style="font-family: 'Bricolage Grotesque', sans-serif; font-size: clamp(2.2rem, 5.5vw, 3.75rem); letter-spacing: -0.035em; line-height: 1.06;"
+			style="font-family: var(--m-font-display); font-size: clamp(2.2rem, 5.5vw, 3.75rem); letter-spacing: -0.035em; line-height: 1.06;"
 		>
 			Simple pricing, no surprises.
 		</h1>
@@ -107,7 +107,7 @@
 		</p>
 		<h2
 			class="mb-12 font-extrabold tracking-tight"
-			style="font-family: 'Bricolage Grotesque', sans-serif; font-size: clamp(1.75rem, 3.5vw, 2.5rem); letter-spacing: -0.025em; line-height: 1.1;"
+			style="font-family: var(--m-font-display); font-size: clamp(1.75rem, 3.5vw, 2.5rem); letter-spacing: -0.025em; line-height: 1.1;"
 		>
 			Frequently asked questions.
 		</h2>
@@ -151,7 +151,7 @@
 	<div class="mx-auto max-w-2xl text-center" use:scrollReveal={{ delay: 0 }}>
 		<h2
 			class="mb-5 font-extrabold tracking-tight"
-			style="font-family: 'Bricolage Grotesque', sans-serif; font-size: clamp(1.9rem, 4vw, 2.75rem); letter-spacing: -0.03em; line-height: 1.1;"
+			style="font-family: var(--m-font-display); font-size: clamp(1.9rem, 4vw, 2.75rem); letter-spacing: -0.03em; line-height: 1.1;"
 		>
 			Start capturing every guest today.
 		</h2>

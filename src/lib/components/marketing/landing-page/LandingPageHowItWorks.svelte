@@ -25,7 +25,7 @@
 			</p>
 			<h2
 				class="mb-16 max-w-xl font-extrabold tracking-tight"
-				style="font-family: 'Bricolage Grotesque', sans-serif; font-size: clamp(1.75rem, 3.5vw, 2.75rem); letter-spacing: -0.03em; line-height: 1.06;"
+				style="font-family: var(--m-font-display); font-size: clamp(1.75rem, 3.5vw, 2.75rem); letter-spacing: -0.03em; line-height: 1.06;"
 			>
 				Up and running in three steps.
 			</h2>
@@ -50,6 +50,7 @@
 				<div
 					class="rounded-xl border p-5"
 					style="border-color: var(--m-border-strong); background: var(--m-card);"
+					aria-hidden="true"
 				>
 					<div class="mb-4 flex items-center justify-between">
 						<p class="text-[13px] font-semibold">Adventure Waiver — v2</p>
@@ -83,6 +84,7 @@
 					<div
 						class="mb-4 rounded-lg border-2 border-dashed px-3 py-4 text-center"
 						style="border-color: var(--m-border-strong);"
+						aria-hidden="true"
 					>
 						<p class="mb-1 text-[11px] font-semibold" style="color: var(--m-text-2);">Signature</p>
 						<p class="text-[10px]" style="color: var(--m-text-3);">Draw or type below</p>
@@ -115,6 +117,7 @@
 				<div
 					class="rounded-xl border p-5"
 					style="border-color: var(--m-border-strong); background: var(--m-card);"
+					aria-hidden="true"
 				>
 					<p
 						class="mb-4 text-[10px] font-semibold tracking-widest uppercase"
@@ -168,6 +171,7 @@
 				<div
 					class="rounded-xl border p-5"
 					style="border-color: var(--m-border-strong); background: var(--m-card);"
+					aria-hidden="true"
 				>
 					<p
 						class="mb-4 text-[10px] font-semibold tracking-widest uppercase"
@@ -229,7 +233,7 @@
 
 	.landing-how-it-works__step-number {
 		margin-bottom: 0.75rem;
-		font-family: 'Bricolage Grotesque', sans-serif;
+		font-family: var(--m-font-display);
 		font-size: clamp(2.25rem, 10vw, 3.5rem);
 		font-weight: 900;
 		line-height: 1;
@@ -238,7 +242,7 @@
 
 	.landing-how-it-works__step-title {
 		margin-bottom: 0.75rem;
-		font-family: 'Bricolage Grotesque', sans-serif;
+		font-family: var(--m-font-display);
 		font-size: clamp(1.25rem, 3vw, 1.6rem);
 		font-weight: 700;
 		letter-spacing: -0.015em;

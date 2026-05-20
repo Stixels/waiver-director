@@ -4,7 +4,7 @@ import ScrollTextIcon from '@lucide/svelte/icons/scroll-text';
 import UsersRoundIcon from '@lucide/svelte/icons/users-round';
 import LayersIcon from '@lucide/svelte/icons/layers';
 import MailIcon from '@lucide/svelte/icons/mail';
-import BarChart3Icon from '@lucide/svelte/icons/chart-column';
+import ChartColumnIcon from '@lucide/svelte/icons/chart-column';
 import PlugZapIcon from '@lucide/svelte/icons/plug-zap';
 import SlidersHorizontalIcon from '@lucide/svelte/icons/sliders-horizontal';
 
@@ -51,7 +51,7 @@ export const appMainNavItems = [
 	{
 		label: 'Analytics',
 		href: '/app/[workspaceSlug]/analytics',
-		icon: BarChart3Icon,
+		icon: ChartColumnIcon,
 		description: 'Submission trends, booking completion, and email funnel.'
 	}
 ] as const;

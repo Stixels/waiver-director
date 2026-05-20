@@ -9,6 +9,7 @@
 	import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import SubmissionDetailSheet from '$lib/components/waivers/SubmissionDetailSheet.svelte';
+	import { formatBookingTimestamp } from '$lib/utils/date';
 	import { cn } from '$lib/utils';
 	import { onMount } from 'svelte';
 	import CalendarCheckIcon from '@lucide/svelte/icons/calendar-check';
@@ -30,6 +31,11 @@
 
 	const workspaceSlug = $derived(page.params.workspaceSlug ?? '');
 	const skeletonRows = [0, 1, 2, 3, 4, 5];
+	type LivePanelTab = 'bookings' | 'submissions';
+	let activeTab = $state<LivePanelTab>('bookings');
+	const activeTitle = $derived(
+		activeTab === 'bookings' ? 'Upcoming Bookings' : 'Recent Submissions'
+	);
 
 	let now = $state(Date.now());
 	onMount(() => {
@@ -138,6 +144,11 @@
 		}).format(new Date(submittedAt));
 	}
 
+	function formatDob(dob: string) {
+		const [y, m, d] = dob.split('-').map(Number);
+		return new Intl.DateTimeFormat('en-US', { dateStyle: 'medium' }).format(new Date(y, m - 1, d));
+	}
+
 	function openBooking(bookingId: Id<'bookings'>) {
 		selectedBookingId = bookingId;
 		bookingDetailOpen = true;
@@ -168,13 +179,34 @@
 	/>
 {/if}
 
-<div class="grid gap-4 lg:grid-cols-2">
-	<Card class="flex h-[420px] flex-col overflow-hidden md:h-[520px]">
-		<CardHeader class="flex flex-row items-center justify-between border-b py-4">
-			<div class="flex items-center gap-2">
-				<CalendarCheckIcon class="size-4 text-muted-foreground" />
-				<CardTitle class="text-base font-semibold">Upcoming Bookings</CardTitle>
-			</div>
+<Card
+	class="flex h-[min(30rem,calc(100svh-12rem))] min-h-0 flex-col overflow-hidden sm:h-[min(32rem,calc(100svh-13rem))] xl:h-full"
+>
+	<CardHeader class="flex flex-row items-center justify-between border-b py-4">
+		<div class="flex min-w-0 items-center gap-4">
+			<CardTitle class="sr-only">{activeTitle}</CardTitle>
+			<nav class="flex items-end gap-0" aria-label="Dashboard activity">
+				<button
+					type="button"
+					aria-current={activeTab === 'bookings' ? 'page' : undefined}
+					class="inline-flex items-center gap-2 border-b-2 border-transparent px-0.5 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:rounded-xs focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none aria-[current=page]:border-primary aria-[current=page]:text-foreground"
+					onclick={() => (activeTab = 'bookings')}
+				>
+					<CalendarCheckIcon class="size-4" aria-hidden="true" />
+					Bookings
+				</button>
+				<button
+					type="button"
+					aria-current={activeTab === 'submissions' ? 'page' : undefined}
+					class="ml-5 inline-flex items-center gap-2 border-b-2 border-transparent px-0.5 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:rounded-xs focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none aria-[current=page]:border-primary aria-[current=page]:text-foreground"
+					onclick={() => (activeTab = 'submissions')}
+				>
+					<FileTextIcon class="size-4" aria-hidden="true" />
+					Submissions
+				</button>
+			</nav>
+		</div>
+		{#if activeTab === 'bookings'}
 			<a
 				href={resolve(`/app/${workspaceSlug}/bookings` as `/app/${string}/bookings`)}
 				class="flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
@@ -182,21 +214,37 @@
 				View all
 				<ExternalLinkIcon class="size-3" />
 			</a>
-		</CardHeader>
-		<CardContent class="min-h-0 flex-1 overflow-auto p-0">
+		{:else}
+			<a
+				href={resolve(`/app/${workspaceSlug}/submissions` as `/app/${string}/submissions`)}
+				class="flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
+			>
+				View all
+				<ExternalLinkIcon class="size-3" />
+			</a>
+		{/if}
+	</CardHeader>
+	<CardContent class="min-h-0 flex-1 overflow-auto p-0">
+		{#if activeTab === 'bookings'}
 			{#if bookingsInitialLoading}
 				<div class="divide-y divide-border">
 					{#each skeletonRows as row (row)}
-						<div class="flex items-center gap-4 px-5 py-3.5">
-							<div class="w-14 shrink-0 space-y-1.5">
+						<div
+							class="grid items-center gap-4 px-5 py-3 xl:grid-cols-[5rem_minmax(14rem,1.3fr)_minmax(14rem,1fr)_7rem]"
+						>
+							<div class="space-y-1.5">
 								<Skeleton class="h-4 w-12" />
 								<Skeleton class="h-5 w-11 rounded-full" />
 							</div>
-							<div class="min-w-0 flex-1 space-y-2">
-								<Skeleton class="h-4 w-40 max-w-full" />
+							<div class="min-w-0 space-y-2">
+								<Skeleton class="h-4 w-44 max-w-full" />
 								<Skeleton class="h-3 w-28 max-w-full" />
 							</div>
-							<div class="w-20 shrink-0 space-y-2">
+							<div class="hidden min-w-0 space-y-2 xl:block">
+								<Skeleton class="h-4 w-36 max-w-full" />
+								<Skeleton class="h-3 w-52 max-w-full" />
+							</div>
+							<div class="space-y-2 xl:text-right">
 								<Skeleton class="ml-auto h-4 w-14" />
 								<Skeleton class="h-1.5 w-full rounded-full" />
 							</div>
@@ -218,12 +266,14 @@
 						{@const status = timeStatus(booking)}
 						{@const pct = completionPercent(booking)}
 						{@const isCanceled = booking.status === 'canceled'}
+						{@const complete =
+							booking.participantCount > 0 && booking.signedCount >= booking.participantCount}
 						<button
 							type="button"
 							onclick={() => openBooking(booking.bookingId)}
-							class="flex w-full items-center gap-4 px-5 py-3.5 text-left transition-colors hover:bg-muted/30 focus-visible:bg-muted/30 focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
+							class="grid w-full items-center gap-4 px-5 py-3 text-left transition-colors hover:bg-muted/30 focus-visible:bg-muted/30 focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none xl:grid-cols-[5rem_minmax(14rem,1.3fr)_minmax(14rem,1fr)_7rem]"
 						>
-							<div class="w-14 shrink-0">
+							<div class="min-w-0">
 								<p
 									class={cn(
 										'text-sm font-medium',
@@ -253,18 +303,39 @@
 								>
 									{booking.activityName}
 								</p>
-								{#if booking.leadCustomerName}
-									<p class="mt-0.5 truncate text-xs text-muted-foreground">
-										{booking.leadCustomerName}
-									</p>
-								{/if}
+								<p class="mt-0.5 truncate text-xs text-muted-foreground tabular-nums">
+									Booking #{booking.providerBookingId}
+								</p>
+								<p class="mt-0.5 truncate text-xs text-muted-foreground xl:hidden">
+									{booking.leadCustomerName ?? 'Unknown customer'}
+									<span aria-hidden="true"> · </span>{booking.leadCustomerEmail ??
+										'No email on booking'}
+								</p>
 							</div>
 
-							<div class="w-20 shrink-0 text-right">
+							<div class="hidden min-w-0 xl:block">
+								<p class="truncate text-sm font-medium">
+									{booking.leadCustomerName ?? 'Unknown customer'}
+								</p>
+								<p class="mt-0.5 truncate text-xs text-muted-foreground">
+									{booking.leadCustomerEmail ?? 'No email on booking'}
+								</p>
+							</div>
+
+							<div class="min-w-0 text-right">
 								{#if isCanceled}
 									<span class="text-xs text-muted-foreground">Canceled</span>
 								{:else}
-									<p class="text-sm font-medium tabular-nums">
+									<p
+										class={cn(
+											'text-sm font-medium tabular-nums',
+											complete
+												? 'text-emerald-600 dark:text-emerald-400'
+												: booking.signedCount === 0 && booking.participantCount > 0
+													? 'text-muted-foreground'
+													: 'text-foreground'
+										)}
+									>
 										{booking.signedCount}
 										<span class="text-muted-foreground">/ {booking.participantCount}</span>
 									</p>
@@ -283,75 +354,95 @@
 					{/each}
 				</div>
 			{/if}
-		</CardContent>
-	</Card>
-
-	<Card class="flex h-[420px] flex-col overflow-hidden md:h-[520px]">
-		<CardHeader class="flex flex-row items-center justify-between border-b py-4">
-			<div class="flex items-center gap-2">
-				<FileTextIcon class="size-4 text-muted-foreground" />
-				<CardTitle class="text-base font-semibold">Recent Submissions</CardTitle>
-			</div>
-			<a
-				href={resolve(`/app/${workspaceSlug}/submissions` as `/app/${string}/submissions`)}
-				class="flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
-			>
-				View all
-				<ExternalLinkIcon class="size-3" />
-			</a>
-		</CardHeader>
-		<CardContent class="min-h-0 flex-1 overflow-auto p-0">
-			{#if submissionsInitialLoading}
-				<div class="divide-y divide-border">
-					{#each skeletonRows as row (row)}
-						<div class="flex items-center gap-4 px-5 py-3.5">
-							<div class="min-w-0 flex-1 space-y-2">
-								<Skeleton class="h-4 w-36 max-w-full" />
-								<Skeleton class="h-3 w-48 max-w-full" />
-							</div>
-							<Skeleton class="h-4 w-20 shrink-0" />
-						</div>
-					{/each}
-				</div>
-			{:else if submissions.length === 0}
-				<div class="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
+		{:else if submissionsInitialLoading}
+			<div class="divide-y divide-border">
+				{#each skeletonRows as row (row)}
 					<div
-						class="flex size-10 items-center justify-center rounded-full bg-muted text-muted-foreground"
+						class="grid items-center gap-4 px-5 py-3 xl:grid-cols-[minmax(12rem,1.15fr)_minmax(14rem,1.2fr)_minmax(8rem,0.75fr)_8rem]"
 					>
-						<FileTextIcon class="size-5" />
+						<div class="min-w-0 space-y-2">
+							<Skeleton class="h-4 w-36 max-w-full" />
+							<Skeleton class="h-3 w-44 max-w-full" />
+						</div>
+						<div class="hidden min-w-0 space-y-2 xl:block">
+							<Skeleton class="h-4 w-40 max-w-full" />
+							<Skeleton class="h-3 w-52 max-w-full" />
+						</div>
+						<div class="hidden min-w-0 space-y-2 xl:block">
+							<Skeleton class="h-4 w-28 max-w-full" />
+							<Skeleton class="h-3 w-24 max-w-full" />
+						</div>
+						<Skeleton class="h-4 w-20 justify-self-end" />
 					</div>
-					<p class="text-sm text-muted-foreground">No submissions yet</p>
+				{/each}
+			</div>
+		{:else if submissions.length === 0}
+			<div class="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
+				<div
+					class="flex size-10 items-center justify-center rounded-full bg-muted text-muted-foreground"
+				>
+					<FileTextIcon class="size-5" />
 				</div>
-			{:else}
-				<div class="divide-y divide-border">
-					{#each submissions as submission (submission.submissionId)}
-						<button
-							type="button"
-							onclick={() => openSubmission(submission.submissionId)}
-							class="flex w-full items-center gap-4 px-5 py-3.5 text-left transition-colors hover:bg-muted/30 focus-visible:bg-muted/30 focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
-						>
-							<div class="min-w-0 flex-1">
+				<p class="text-sm text-muted-foreground">No submissions yet</p>
+			</div>
+		{:else}
+			<div class="divide-y divide-border">
+				{#each submissions as submission (submission.submissionId)}
+					{@const bookingDate = formatBookingTimestamp(submission.bookingStartTime)}
+					<button
+						type="button"
+						onclick={() => openSubmission(submission.submissionId)}
+						class="grid w-full items-center gap-4 px-5 py-3 text-left transition-colors hover:bg-muted/30 focus-visible:bg-muted/30 focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none xl:grid-cols-[minmax(12rem,1.15fr)_minmax(14rem,1.2fr)_minmax(8rem,0.75fr)_8rem]"
+					>
+						<div class="min-w-0">
+							<div class="flex min-w-0 items-center gap-2">
 								<p class="truncate text-sm font-medium">{submission.signerName}</p>
-								<p class="mt-0.5 truncate text-xs text-muted-foreground">
-									{submission.signerEmail}
-									{#if submission.bookingActivityName}
-										<span aria-hidden="true"> · </span>{submission.bookingActivityName}
-									{/if}
-									{#if submission.minorCount > 0}
-										<span aria-hidden="true"> · </span>+{submission.minorCount} minor{submission.minorCount >
-										1
-											? 's'
-											: ''}
-									{/if}
-								</p>
+								{#if submission.minorCount > 0}
+									<span
+										class="inline-flex shrink-0 items-center rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-muted-foreground tabular-nums"
+									>
+										+{submission.minorCount}
+										{submission.minorCount === 1 ? 'minor' : 'minors'}
+									</span>
+								{/if}
 							</div>
-							<p class="shrink-0 text-xs text-muted-foreground tabular-nums">
-								{formatSubmittedAt(submission.submittedAt)}
+							<p class="mt-0.5 truncate text-xs text-muted-foreground">
+								{submission.signerEmail}
+								<span aria-hidden="true"> · </span>{formatDob(submission.signerDateOfBirth)}
 							</p>
-						</button>
-					{/each}
-				</div>
-			{/if}
-		</CardContent>
-	</Card>
-</div>
+							<div
+								class="mt-0.5 flex min-w-0 items-center gap-2 text-[11px] text-muted-foreground/80 xl:hidden"
+							>
+								<p class="truncate font-medium">
+									{submission.bookingActivityName ?? 'General waiver'}
+								</p>
+								<span aria-hidden="true"> · </span>
+								<p class="shrink-0 tabular-nums">{bookingDate ?? 'No booking attached'}</p>
+							</div>
+						</div>
+
+						<div class="hidden min-w-0 xl:block">
+							<p class="truncate text-sm font-medium">
+								{submission.bookingActivityName ?? 'General waiver'}
+							</p>
+							<p class="mt-0.5 truncate text-xs text-muted-foreground tabular-nums">
+								{bookingDate ?? 'No booking attached'}
+							</p>
+						</div>
+
+						<div class="hidden min-w-0 xl:block">
+							<p class="text-xs font-medium text-muted-foreground">Date of birth</p>
+							<p class="mt-0.5 truncate text-xs text-muted-foreground tabular-nums">
+								{formatDob(submission.signerDateOfBirth)}
+							</p>
+						</div>
+
+						<p class="shrink-0 text-right text-xs text-muted-foreground tabular-nums">
+							{formatSubmittedAt(submission.submittedAt)}
+						</p>
+					</button>
+				{/each}
+			</div>
+		{/if}
+	</CardContent>
+</Card>

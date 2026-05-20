@@ -110,7 +110,7 @@
 			</p>
 			<h2
 				class="mb-4 max-w-xl font-extrabold tracking-tight"
-				style="font-family: 'Bricolage Grotesque', sans-serif; font-size: clamp(1.75rem, 3.5vw, 2.75rem); letter-spacing: -0.03em; line-height: 1.06;"
+				style="font-family: var(--m-font-display); font-size: clamp(1.75rem, 3.5vw, 2.75rem); letter-spacing: -0.03em; line-height: 1.06;"
 			>
 				Know your completion rate for every session.
 			</h2>

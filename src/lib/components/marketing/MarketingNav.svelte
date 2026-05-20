@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import { onMount } from 'svelte';
 	import { fade, fly } from 'svelte/transition';
 	import { Button } from '$lib/components/ui/button';
@@ -13,12 +13,12 @@
 	let scrolled = $derived(scrollY > 24);
 
 	const navLinks = [
-		{ href: '/features' as const, label: 'Features' },
-		{ href: '/pricing' as const, label: 'Pricing' }
-	];
+		{ href: '/features', label: 'Features' },
+		{ href: '/pricing', label: 'Pricing' }
+	] as const;
 
 	function isActive(href: string): boolean {
-		const path = $page.url.pathname;
+		const path = page.url.pathname;
 		if (href.startsWith('/#')) return false;
 		return path === href || path.startsWith(href + '/');
 	}
@@ -78,7 +78,7 @@
 				>
 					<div
 						class="mkt-brand-mark flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[11px] font-black"
-						style="background: var(--primary); color: var(--primary-foreground); font-family: 'Bricolage Grotesque', sans-serif;"
+						style="background: var(--primary); color: var(--primary-foreground); font-family: var(--m-font-display);"
 						aria-hidden="true"
 					>
 						WD
@@ -93,7 +93,7 @@
 					<a
 						href={resolve(link.href)}
 						class="nav-link text-[13px] font-medium no-underline"
-						class:nav-link--active={isActive(link.href)}
+						class:nav-link--active={isActive(resolve(link.href))}
 					>
 						{link.label}
 					</a>
@@ -145,7 +145,7 @@
 								<a
 									href={resolve(link.href)}
 									class="mkt-mobile-link"
-									class:mkt-mobile-link--active={isActive(link.href)}
+									class:mkt-mobile-link--active={isActive(resolve(link.href))}
 									onclick={closeMobileNav}
 								>
 									{link.label}
@@ -194,7 +194,7 @@
 	}
 
 	.mkt-brand-wordmark {
-		font-family: 'Bricolage Grotesque', sans-serif;
+		font-family: var(--m-font-display);
 		font-size: 15px;
 	}
 
@@ -304,7 +304,7 @@
 		min-height: 2.75rem;
 		padding: 0.85rem 1rem;
 		border-radius: var(--radius-xl);
-		font-family: 'Bricolage Grotesque', sans-serif;
+		font-family: var(--m-font-display);
 		font-size: clamp(1.1rem, 4vw, 1.3rem);
 		font-weight: 700;
 		letter-spacing: -0.015em;

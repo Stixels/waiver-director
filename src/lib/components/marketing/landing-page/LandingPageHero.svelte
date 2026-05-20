@@ -111,9 +111,7 @@
 						<p class="mb-1 text-[10px] tracking-widest uppercase" style="color: var(--m-text-3);">
 							Active Session
 						</p>
-						<h2
-							class="landing-hero__session-title mb-0.5 text-[15px] font-bold sm:text-[17px]"
-						>
+						<h2 class="landing-hero__session-title mb-0.5 text-[15px] font-bold sm:text-[17px]">
 							Wilderness Zipline Tour
 						</h2>
 						<p class="text-[12px]" style="color: var(--m-text-3);">Today · 2:00 PM · via Bookeo</p>
@@ -122,22 +120,34 @@
 						class="flex w-full shrink-0 items-center justify-between gap-2 sm:w-auto sm:justify-start sm:gap-4 md:gap-8"
 					>
 						<div class="text-center">
-							<div class="mb-1 text-[18px] leading-none font-bold sm:text-[22px]" style="color: var(--m-green);">
+							<div
+								class="mb-1 text-[18px] leading-none font-bold sm:text-[22px]"
+								style="color: var(--m-green);"
+							>
 								{totalSigned}
 							</div>
-							<div class="text-[10px] tracking-wide uppercase" style="color: var(--m-text-3);">Signed</div>
+							<div class="text-[10px] tracking-wide uppercase" style="color: var(--m-text-3);">
+								Signed
+							</div>
 						</div>
 						<div class="text-center">
 							<div class="mb-1 text-[18px] leading-none font-bold sm:text-[22px]">
 								{totalExpected}
 							</div>
-							<div class="text-[10px] tracking-wide uppercase" style="color: var(--m-text-3);">Expected</div>
+							<div class="text-[10px] tracking-wide uppercase" style="color: var(--m-text-3);">
+								Expected
+							</div>
 						</div>
 						<div class="text-center">
-							<div class="mb-1 text-[18px] leading-none font-bold sm:text-[22px]" style="color: var(--m-amber);">
+							<div
+								class="mb-1 text-[18px] leading-none font-bold sm:text-[22px]"
+								style="color: var(--m-amber);"
+							>
 								{totalPending}
 							</div>
-							<div class="text-[10px] tracking-wide uppercase" style="color: var(--m-text-3);">Pending</div>
+							<div class="text-[10px] tracking-wide uppercase" style="color: var(--m-text-3);">
+								Pending
+							</div>
 						</div>
 					</div>
 				</div>
@@ -210,7 +220,12 @@
 					class="mt-4 flex items-start gap-2.5 rounded-lg border px-4 py-3"
 					style="border-color: var(--m-border-strong); background: var(--m-elevated);"
 				>
-					<Mail size={14} class="mt-0.5 shrink-0" style="color: var(--primary);" aria-hidden="true" />
+					<Mail
+						size={14}
+						class="mt-0.5 shrink-0"
+						style="color: var(--primary);"
+						aria-hidden="true"
+					/>
 					<p class="text-[12px] leading-relaxed" style="color: var(--m-text-2);">
 						<strong>{totalSigned ?? 0} follow-up emails scheduled</strong> — one per guest who signed,
 						not just the lead. Use them for thank-yous, feedback, and review requests.
@@ -234,7 +249,8 @@
 	}
 
 	@keyframes landing-hero-pulse {
-		0%, 100% {
+		0%,
+		100% {
 			opacity: 1;
 			transform: scale(1);
 		}
@@ -245,13 +261,24 @@
 	}
 
 	@keyframes landing-hero-progress {
-		from { width: 0%; }
-		to { width: var(--landing-hero-completion); }
+		from {
+			width: 0%;
+		}
+		to {
+			width: var(--landing-hero-completion);
+		}
 	}
 
 	@keyframes landing-hero-glint {
-		0%, 82%, 90%, 100% { background-position: 0% 50%; }
-		86% { background-position: 100% 50%; }
+		0%,
+		82%,
+		90%,
+		100% {
+			background-position: 0% 50%;
+		}
+		86% {
+			background-position: 100% 50%;
+		}
 	}
 
 	.landing-hero__grid {
@@ -264,20 +291,28 @@
 		animation: landing-hero-entrance 0.55s cubic-bezier(0.16, 1, 0.3, 1) both;
 	}
 
-	.landing-hero__delay-1 { animation-delay: 0.05s; }
-	.landing-hero__delay-2 { animation-delay: 0.15s; }
-	.landing-hero__delay-3 { animation-delay: 0.25s; }
-	.landing-hero__delay-4 { animation-delay: 0.35s; }
+	.landing-hero__delay-1 {
+		animation-delay: 0.05s;
+	}
+	.landing-hero__delay-2 {
+		animation-delay: 0.15s;
+	}
+	.landing-hero__delay-3 {
+		animation-delay: 0.25s;
+	}
+	.landing-hero__delay-4 {
+		animation-delay: 0.35s;
+	}
 
 	h1 {
-		font-family: 'Bricolage Grotesque', sans-serif;
+		font-family: var(--m-font-display);
 		font-size: clamp(44px, 7vw, 82px);
 		letter-spacing: -0.035em;
 		line-height: 1.05;
 	}
 
 	.landing-hero__session-title {
-		font-family: 'Bricolage Grotesque', sans-serif;
+		font-family: var(--m-font-display);
 	}
 
 	.landing-hero__accent {

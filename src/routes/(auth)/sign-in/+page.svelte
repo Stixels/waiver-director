@@ -62,6 +62,10 @@
 		return clerk.client?.signIn ?? null;
 	}
 
+	function absoluteUrl(path: string) {
+		return new URL(path, window.location.origin).toString();
+	}
+
 	function getSupportedSecondFactors(
 		signInAttempt: NonNullable<ReturnType<typeof getSignInResource>>
 	) {
@@ -183,8 +187,8 @@
 		try {
 			await signIn.authenticateWithRedirect({
 				strategy: 'oauth_google',
-				redirectUrl: resolve('/sso-callback'),
-				redirectUrlComplete: postAuthRedirectUrl
+				redirectUrl: absoluteUrl(resolve('/sso-callback')),
+				redirectUrlComplete: absoluteUrl(postAuthRedirectUrl)
 			});
 		} catch (error) {
 			submitError = getClerkErrorMessage(error, 'Unable to start Google sign-in right now.');

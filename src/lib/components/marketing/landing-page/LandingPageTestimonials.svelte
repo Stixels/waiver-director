@@ -49,7 +49,7 @@
 			</p>
 			<h2
 				class="mb-14 max-w-xl font-extrabold tracking-tight"
-				style="font-family: 'Bricolage Grotesque', sans-serif; font-size: clamp(1.75rem, 3.5vw, 2.75rem); letter-spacing: -0.03em; line-height: 1.06;"
+				style="font-family: var(--m-font-display); font-size: clamp(1.75rem, 3.5vw, 2.75rem); letter-spacing: -0.03em; line-height: 1.06;"
 			>
 				Real results from real sessions.
 			</h2>
@@ -63,12 +63,15 @@
 				>
 					<!-- Opening quote mark -->
 					<span
-						class="select-none text-[1.1rem] font-semibold leading-none"
+						class="text-[1.1rem] leading-none font-semibold select-none"
 						style="color: var(--primary); font-family: Georgia, serif; letter-spacing: -0.01em;"
-						aria-hidden="true"
-					>"</span>
+						aria-hidden="true">"</span
+					>
 
-					<blockquote class="flex-1 text-[14px] leading-relaxed" style="color: oklch(0.82 0.006 286);">
+					<blockquote
+						class="flex-1 text-[14px] leading-relaxed"
+						style="color: oklch(0.82 0.006 286);"
+					>
 						{t.quote}
 					</blockquote>
 
@@ -84,7 +87,7 @@
 							{t.initials}
 						</div>
 						<div class="min-w-0">
-							<p class="text-[13px] font-semibold leading-snug">
+							<p class="text-[13px] leading-snug font-semibold">
 								{t.name}
 								<span class="font-normal" style="color: var(--m-text-3);">· {t.role}</span>
 							</p>

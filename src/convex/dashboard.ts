@@ -477,12 +477,18 @@ export const getAnalyticsSeries = query({
 				.take(1000),
 			ctx.db
 				.query('email_follow_ups')
-				.withIndex('by_workspaceId_and_status_and_scheduledAt', (q) =>
-					q
-						.eq('workspaceId', args.workspaceId)
-						.eq('status', 'blocked')
-						.gte('scheduledAt', args.rangeStartAt)
-						.lt('scheduledAt', args.rangeEndAt)
+				.withIndex('by_workspaceId_and_status', (q) =>
+					q.eq('workspaceId', args.workspaceId).eq('status', 'blocked')
+				)
+				.filter((q) =>
+					q.or(
+						q.and(
+							q.gte(q.field('scheduledAt'), args.rangeStartAt),
+							q.lt(q.field('scheduledAt'), args.rangeEndAt)
+						),
+						q.eq(q.field('scheduledAt'), undefined),
+						q.eq(q.field('scheduledAt'), null)
+					)
 				)
 				.take(1000)
 		]);

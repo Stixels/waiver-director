@@ -11,6 +11,7 @@ declare global {
 		// interface Platform {}
 		interface Locals {
 			convex: ConvexHttpClient;
+			clerkSessionUnavailable: boolean;
 		}
 	}
 }

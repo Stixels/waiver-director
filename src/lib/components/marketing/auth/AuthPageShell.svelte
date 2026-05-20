@@ -91,7 +91,7 @@
 	}
 
 	.auth-page__title {
-		font-family: 'Bricolage Grotesque', sans-serif;
+		font-family: var(--m-font-display);
 		font-size: clamp(1.85rem, 5vw, 2.5rem);
 		letter-spacing: -0.03em;
 		line-height: 1.15;

@@ -46,7 +46,7 @@
 	}
 
 	.landing-section-heading__title {
-		font-family: 'Bricolage Grotesque', sans-serif;
+		font-family: var(--m-font-display);
 		font-size: clamp(28px, 4vw, 44px);
 		font-weight: 800;
 		letter-spacing: -0.02em;

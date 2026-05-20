@@ -101,7 +101,7 @@
 					</p>
 					<p
 						class="mb-2 leading-none font-black tabular-nums"
-						style="font-family: 'Bricolage Grotesque', sans-serif; font-size: 2.25rem; letter-spacing: -0.03em;"
+						style="font-family: var(--m-font-display); font-size: 2.25rem; letter-spacing: -0.03em;"
 					>
 						{tier.price}
 						<span class="text-[14px] font-medium tracking-normal" style="color: var(--m-text-3);"
