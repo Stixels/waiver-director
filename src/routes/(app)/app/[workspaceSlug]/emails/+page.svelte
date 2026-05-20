@@ -14,7 +14,7 @@
 	import UpgradeOverlay from '$lib/components/app/UpgradeOverlay.svelte';
 	import { useProtectedQuery } from '$lib/components/auth/convex-auth.svelte';
 	import { getConvexErrorMessage } from '$lib/utils/convex-errors';
-	import { escapeHtml } from '$lib/utils/rich-text';
+	import { escapeHtml } from '$lib/utils/rich-text-client';
 	import { parseConvexId, queryString } from '$lib/utils/url';
 
 	import { Button } from '$lib/components/ui/button';
@@ -41,6 +41,7 @@
 	import EmailSaveTemplateDialog from '$lib/components/emails/EmailSaveTemplateDialog.svelte';
 	import RichTextEditor from '$lib/components/emails/RichTextEditor.svelte';
 	import WaiverRichText from '$lib/components/waivers/WaiverRichText.svelte';
+	import WorkspaceLogoUploader from '$lib/components/workspaces/WorkspaceLogoUploader.svelte';
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
 	import CloudIcon from '@lucide/svelte/icons/cloud';
 	import CloudCheckIcon from '@lucide/svelte/icons/cloud-check';
@@ -237,6 +238,11 @@
 	// ─── Sender summary (read-only on this page) ──────────────────────────────
 
 	const businessName = $derived(currentWorkspace?.name ?? 'Your business');
+	const isOwner = $derived(currentWorkspace?.role === 'owner');
+	const brandingQuery = useProtectedQuery(api.workspaces.getWorkspaceBranding, () =>
+		currentWorkspace ? { workspaceId: currentWorkspace.workspaceId } : 'skip'
+	);
+	const workspaceLogoUrl = $derived(brandingQuery.data?.logoUrl ?? null);
 	const hasPlatformFromEmail = $derived(Boolean(senderSettings?.platformFromEmail));
 	const workspaceCanSendEmail = $derived(
 		canUseEmailFollowups && Boolean(senderSettings?.canSendEmails)
@@ -272,7 +278,10 @@
 	let lastSavedAt = $state<number | null>(null);
 	let lastSaveError = $state<string | null>(null);
 	let autosaveTimer: ReturnType<typeof setTimeout> | null = null;
-	let editorRef = $state<{ insertText: (text: string) => void } | null>(null);
+	let editorRef = $state<{
+		insertText: (text: string) => void;
+		insertWorkspaceLogo: (logoUrl?: string | null) => void;
+	} | null>(null);
 	let subjectInputRef = $state<HTMLInputElement | null>(null);
 	let insertTarget = $state<'subject' | 'body'>('body');
 	let subjectSelectionStart = $state(0);
@@ -1692,27 +1701,44 @@
 											after booking · unlinked waivers unscheduled
 										</span>
 									</div>
-									<span class="save-indicator shrink-0" data-state={saveState}>
-										{#if saveState === 'saving'}
-											<LoaderIcon class="size-3.5 animate-spin" />
-										{:else if saveState === 'error'}
-											<CloudOffIcon class="size-3.5" />
-										{:else if saveState === 'dirty'}
-											<CloudIcon class="size-3.5" />
-										{:else}
-											<CloudCheckIcon class="size-3.5" />
+									<div class="compose-meta-end">
+										<span class="save-indicator shrink-0" data-state={saveState} title={savedLabel}>
+											{#if saveState === 'saving'}
+												<LoaderIcon class="size-3.5 animate-spin" />
+											{:else if saveState === 'error'}
+												<CloudOffIcon class="size-3.5" />
+											{:else if saveState === 'dirty'}
+												<CloudIcon class="size-3.5" />
+											{:else}
+												<CloudCheckIcon class="size-3.5" />
+											{/if}
+											<span class="save-indicator-label truncate">{savedLabel}</span>
+										</span>
+										{#if currentWorkspace && (isOwner || workspaceLogoUrl)}
+											<WorkspaceLogoUploader
+												workspaceId={currentWorkspace.workspaceId}
+												variant="inline"
+												canEdit={isOwner}
+												inlineLabel="Add logo"
+												inlineLabelWithLogo={emailPreviewMode ? 'Change logo' : 'Insert logo'}
+												onClickWhenSet={emailPreviewMode
+													? null
+													: () => editorRef?.insertWorkspaceLogo()}
+												onUploadComplete={emailPreviewMode
+													? null
+													: (logoUrl) => editorRef?.insertWorkspaceLogo(logoUrl)}
+											/>
 										{/if}
-										<span class="truncate">{savedLabel}</span>
-									</span>
-									<button
-										type="button"
-										onclick={() => (emailPreviewMode = !emailPreviewMode)}
-										class="preview-toggle"
-										data-active={emailPreviewMode}
-									>
-										<EyeIcon class="size-3" />
-										{emailPreviewMode ? 'Edit' : 'Preview'}
-									</button>
+										<button
+											type="button"
+											onclick={() => (emailPreviewMode = !emailPreviewMode)}
+											class="preview-toggle"
+											data-active={emailPreviewMode}
+										>
+											<EyeIcon class="size-3" />
+											{emailPreviewMode ? 'Edit' : 'Preview'}
+										</button>
+									</div>
 								</div>
 								{#if !isSendAfterValid}
 									<p id="send-after-error" class="compose-error">Enter a positive whole number.</p>
@@ -1771,6 +1797,8 @@
 										class="email-rich-editor"
 										bind:value={body}
 										bind:this={editorRef}
+										{workspaceLogoUrl}
+										workspaceName={businessName}
 									/>
 								</div>
 							{/if}
@@ -2057,6 +2085,7 @@
 		padding: 0.7rem 1rem;
 		background: color-mix(in srgb, var(--card) 60%, transparent);
 		border-bottom: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+		container-type: inline-size;
 	}
 
 	.compose-meta-row {
@@ -2070,9 +2099,17 @@
 		display: flex;
 		align-items: center;
 		gap: 0.4rem;
-		flex: 1;
 		flex-wrap: wrap;
 		min-width: 0;
+	}
+
+	.compose-meta-end {
+		display: flex;
+		align-items: center;
+		gap: 0.4rem;
+		flex-wrap: wrap;
+		justify-content: flex-end;
+		margin-left: auto;
 	}
 
 	.compose-select {
@@ -2104,7 +2141,19 @@
 	.compose-meta-prose {
 		font-size: 0.775rem;
 		color: color-mix(in srgb, var(--muted-foreground) 65%, transparent);
-		white-space: nowrap;
+	}
+
+	@container (max-width: 720px) {
+		.compose-meta-end {
+			width: 100%;
+			margin-left: 0;
+		}
+	}
+
+	@container (max-width: 600px) {
+		.compose-meta-prose {
+			display: none;
+		}
 	}
 
 	.compose-error {
@@ -2411,10 +2460,15 @@
 		white-space: nowrap;
 	}
 
-	.preview-toggle:hover {
+	.preview-toggle:hover:not(:disabled) {
 		color: var(--foreground);
 		border-color: color-mix(in srgb, var(--border) 150%, transparent);
 		background: color-mix(in srgb, var(--muted) 50%, transparent);
+	}
+
+	.preview-toggle:disabled {
+		cursor: not-allowed;
+		opacity: 0.45;
 	}
 
 	.preview-toggle[data-active='true'] {
@@ -2464,6 +2518,7 @@
 		font-size: 0.8rem;
 		font-weight: 600;
 		flex-shrink: 0;
+		overflow: hidden;
 	}
 
 	.email-preview-from-info {
