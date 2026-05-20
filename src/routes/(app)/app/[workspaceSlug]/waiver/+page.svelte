@@ -851,6 +851,8 @@
 							bind:introCopy={draft.introCopy}
 							fields={currentDraft.fields}
 							workspaceName={currentWorkspace?.name}
+							workspaceId={currentWorkspace?.workspaceId ?? null}
+							canEditBranding={currentWorkspace?.role === 'owner'}
 							{saveState}
 							{lastSavedAt}
 						/>

@@ -23,6 +23,7 @@
 		slug: string;
 		versionId: Id<'waiver_versions'>;
 		workspaceName: string;
+		workspaceLogoUrl: string | null;
 		title: string;
 		introCopy: string;
 		fields: WaiverField[];
@@ -131,9 +132,12 @@
 </script>
 
 <div class="min-h-screen bg-background">
-	<WaiverDocumentShell workspaceName={waiver.workspaceName}>
+	<WaiverDocumentShell
+		workspaceName={waiver.workspaceName}
+		workspaceLogoUrl={waiver.workspaceLogoUrl}
+	>
 		{#if isSubmitted}
-			<div class="flex flex-col items-center py-24 text-center">
+			<div class="flex flex-col items-center py-20 text-center">
 				<div
 					class="mb-8 flex h-16 w-16 items-center justify-center rounded-full border-2 border-foreground/20"
 				>
