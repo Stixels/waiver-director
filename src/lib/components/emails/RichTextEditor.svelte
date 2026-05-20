@@ -966,6 +966,29 @@
 			{/each}
 		</div>
 		<span class="image-popover-divider" aria-hidden="true"></span>
+		<div class="image-popover-group" role="group" aria-label="Image alignment">
+			{#each LOGO_ALIGN_PRESETS as preset (preset.value)}
+				{@const isActive = toolbarState.alignment === preset.value}
+				<button
+					type="button"
+					class="image-popover-btn"
+					class:is-active={isActive}
+					aria-pressed={isActive}
+					disabled={!editor || disabled}
+					title={`Align ${preset.label.toLowerCase()}`}
+					onclick={() => setAlignment(preset.value)}
+				>
+					{#if preset.value === 'left'}
+						<AlignLeftIcon class="size-3.5" />
+					{:else if preset.value === 'center'}
+						<AlignCenterIcon class="size-3.5" />
+					{:else if preset.value === 'right'}
+						<AlignRightIcon class="size-3.5" />
+					{/if}
+				</button>
+			{/each}
+		</div>
+		<span class="image-popover-divider" aria-hidden="true"></span>
 		<button
 			type="button"
 			class="image-popover-btn is-destructive"
