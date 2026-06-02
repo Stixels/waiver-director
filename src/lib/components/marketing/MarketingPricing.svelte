@@ -9,12 +9,12 @@
 			id: 'free',
 			name: 'Free',
 			price: '$0',
-			description: 'For getting started.',
+			description: 'For setup and preview.',
 			features: [
 				'1 workspace',
-				'25 submissions / month',
-				'1 public waiver',
-				'Basic dashboard',
+				'Draft waiver builder',
+				'Public signing preview',
+				'Upgrade to publish',
 				'Email support'
 			],
 			cta: 'Get started free',
@@ -29,7 +29,8 @@
 			price: '$29',
 			description: 'For serious operators.',
 			features: [
-				'Unlimited submissions',
+				'Live waiver publishing',
+				'Unlimited signed submissions',
 				'Version history',
 				'Bookeo sync',
 				'More integrations coming soon',

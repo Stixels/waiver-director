@@ -45,13 +45,12 @@
 
 <footer
 	class="relative border-t px-4 py-12 sm:px-6"
-	style="background: var(--m-surface); border-color: var(--border);"
+	style="background: var(--m-surface); border-color: var(--m-border-soft);"
 >
-	<!-- Gradient accent line at top -->
 	<div class="pointer-events-none absolute inset-x-0 top-0 flex justify-center" aria-hidden="true">
 		<div
 			class="h-px w-1/2 max-w-lg"
-			style="background: linear-gradient(90deg, transparent, oklch(0.52 0.22 277 / 35%), transparent);"
+			style="background: linear-gradient(90deg, transparent, oklch(0.52 0.22 277 / 14%), transparent);"
 		></div>
 	</div>
 	<div class="mx-auto max-w-6xl">
@@ -111,7 +110,7 @@
 
 		<div
 			class="flex flex-wrap items-center justify-between gap-4 border-t pt-6"
-			style="border-color: var(--border);"
+			style="border-color: var(--m-border-soft);"
 		>
 			<p class="text-[12px]" style="color: var(--m-text-3);">
 				&copy; {currentYear} Waiver Director. All rights reserved.

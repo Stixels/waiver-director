@@ -3,6 +3,7 @@
 	import { api } from '$convex/_generated/api';
 	import type { FunctionReturnType } from 'convex/server';
 	import { useAppContext } from '$lib/components/app/app-context.svelte';
+	import UpgradeOverlay from '$lib/components/app/UpgradeOverlay.svelte';
 	import { useProtectedQuery } from '$lib/components/auth/convex-auth.svelte';
 	import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
 	import { Skeleton } from '$lib/components/ui/skeleton';
@@ -26,6 +27,13 @@
 	const appContext = useAppContext();
 	const currentWorkspace = $derived(
 		appContext.workspaces.find((w) => w.slug === page.params.workspaceSlug) ?? null
+	);
+	const canViewAnalytics = $derived(Boolean(currentWorkspace?.billing.features.analytics));
+	const workspacePausedOnPro = $derived(Boolean(currentWorkspace?.billing.workspaceLimit.isPaused));
+	const billingHref = $derived(
+		workspacePausedOnPro
+			? `/app/${page.params.workspaceSlug}/account/plan`
+			: `/app/${page.params.workspaceSlug}/account#/billing/plans`
 	);
 
 	function toDateInputValue(date: Date): string {
@@ -54,7 +62,7 @@
 	const analyticsQuery = useProtectedQuery(
 		api.dashboard.getAnalyticsSeries,
 		() =>
-			currentWorkspace
+			currentWorkspace && canViewAnalytics
 				? {
 						workspaceId: currentWorkspace.workspaceId,
 						rangeStartAt,
@@ -70,7 +78,9 @@
 	const analyticsData = $derived((analyticsQuery.data ?? null) as AnalyticsData | null);
 	const analyticsError = $derived(analyticsQuery.error ?? null);
 	const missingWorkspace = $derived(!appContext.isLoading && currentWorkspace == null);
-	const analyticsUnavailable = $derived(Boolean(analyticsError) || missingWorkspace);
+	const analyticsUnavailable = $derived(
+		Boolean(analyticsError) || missingWorkspace || !canViewAnalytics
+	);
 	const isInitialLoading = $derived(
 		(analyticsQuery.isLoading || appContext.isLoading) && !analyticsData
 	);
@@ -196,17 +206,30 @@
 	<title>{currentWorkspace?.name ?? 'Workspace'} Analytics | Waiver Director</title>
 </svelte:head>
 
-<div class="h-full min-h-0 w-full overflow-y-auto p-4 sm:p-6 xl:overflow-hidden">
+<div class="relative h-full min-h-0 w-full overflow-y-auto p-4 sm:p-5 xl:overflow-hidden">
+	{#if !appContext.isLoading && currentWorkspace && !canViewAnalytics}
+		<UpgradeOverlay
+			title={workspacePausedOnPro ? 'Workspace paused on Pro' : 'Upgrade to view analytics'}
+			description={workspacePausedOnPro
+				? 'This workspace is not the primary workspace on your Pro plan. Make it primary to view analytics here, or upgrade to Business for every workspace.'
+				: 'Analytics are available on Pro plans and trials, including booking trends, submission volume, customer activity, and email performance.'}
+			href={billingHref}
+			actionLabel={workspacePausedOnPro ? 'Manage primary workspace' : 'View billing'}
+		/>
+	{/if}
+
 	<div
 		class="mx-auto flex min-h-full w-full max-w-7xl min-w-0 flex-col gap-4 p-px xl:h-full xl:overflow-hidden"
 	>
-		<div class="flex shrink-0 justify-end">
-			<AnalyticsDateRangePicker
-				startDate={startDateStr}
-				endDate={endDateStr}
-				onchange={handleRangeChange}
-			/>
-		</div>
+		{#if canViewAnalytics}
+			<div class="flex shrink-0 justify-end">
+				<AnalyticsDateRangePicker
+					startDate={startDateStr}
+					endDate={endDateStr}
+					onchange={handleRangeChange}
+				/>
+			</div>
+		{/if}
 
 		{#if missingWorkspace}
 			<div

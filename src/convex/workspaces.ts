@@ -10,6 +10,7 @@ import {
 	requireWorkspaceMember,
 	requireWorkspaceOwner
 } from './lib/waivers';
+import { requireCanCreateWorkspace } from './lib/billing';
 import {
 	getOwnedWorkspaceLogoUrl,
 	getWorkspaceMembership,
@@ -94,6 +95,8 @@ export const createWorkspace = mutation({
 				message: `Workspace slug "${slug}" is reserved and cannot be used.`
 			});
 		}
+
+		await requireCanCreateWorkspace(ctx, user._id);
 
 		const existing = await ctx.db
 			.query('workspaces')

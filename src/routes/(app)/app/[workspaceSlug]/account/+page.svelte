@@ -1,7 +1,5 @@
 <script lang="ts">
 	import { UserProfile } from 'svelte-clerk/client';
-	import PageShell from '$lib/components/app/PageShell.svelte';
-	import PageHeader from '$lib/components/app/PageHeader.svelte';
 </script>
 
 <svelte:head>
@@ -9,15 +7,24 @@
 	<meta name="description" content="Manage your Waiver Director account settings." />
 </svelte:head>
 
-<PageHeader
-	title="Account settings"
-	subtitle="Manage your profile, security, and account access."
-/>
-
-<PageShell>
-	<div class="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-		<div class="min-h-[70svh] overflow-auto p-1 sm:p-2">
+<div class="w-full min-w-0 p-4 sm:p-5">
+	<div class="mx-auto w-full max-w-7xl min-w-0 space-y-4">
+		<div class="account-profile min-h-[calc(100svh-8rem)] min-w-0">
 			<UserProfile routing="hash" />
 		</div>
 	</div>
-</PageShell>
+</div>
+
+<style>
+	.account-profile :global(.cl-rootBox),
+	.account-profile :global(.cl-userProfile-root) {
+		width: 100%;
+		max-width: none;
+	}
+
+	.account-profile :global(.cl-cardBox) {
+		width: 100%;
+		max-width: none;
+		box-shadow: none;
+	}
+</style>

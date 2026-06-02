@@ -5,6 +5,7 @@ import type { Doc, Id } from './_generated/dataModel';
 import type { MutationCtx, QueryCtx } from './_generated/server';
 import { internal } from './_generated/api';
 import { bookingSnapshot, bookingSnapshotValidator } from './lib/bookings';
+import { requireWorkspaceFeature, workspaceHasBillingFeature } from './lib/billing';
 import { upsertSignerCustomer } from './lib/customers';
 import { submissionSearchText } from './lib/submissions';
 import { getOwnedWorkspaceLogoUrl } from './lib/workspaces';
@@ -189,6 +190,7 @@ export const publishWorkspaceWaiver = mutation({
 	}),
 	handler: async (ctx, args) => {
 		await requireWorkspaceMember(ctx, args.workspaceId);
+		await requireWorkspaceFeature(ctx, args.workspaceId, 'waiver_publishing');
 
 		const waiver = assertWorkspaceRecord(
 			await ctx.db.get(args.waiverId),
@@ -436,6 +438,9 @@ export const getPublicWaiverBySlug = query({
 		) {
 			return null;
 		}
+		if (!(await workspaceHasBillingFeature(ctx, waiver.workspaceId, 'waiver_publishing'))) {
+			return null;
+		}
 
 		const workspaceLogoUrl = await getOwnedWorkspaceLogoUrl(ctx, workspace);
 
@@ -484,6 +489,9 @@ export const getPublicWaiverForBooking = query({
 			!version ||
 			version.waiverId !== waiver._id
 		) {
+			return null;
+		}
+		if (!(await workspaceHasBillingFeature(ctx, waiver.workspaceId, 'waiver_publishing'))) {
 			return null;
 		}
 		const workspaceLogoUrl = await getOwnedWorkspaceLogoUrl(ctx, workspace);
@@ -547,6 +555,12 @@ export const submitPublicWaiver = mutation({
 			ctx.db.get(waiver.workspaceId)
 		]);
 		if (!workspace || workspace.status === 'archived') {
+			throw new ConvexError({
+				code: 'not_found',
+				message: 'This public waiver is no longer available.'
+			});
+		}
+		if (!(await workspaceHasBillingFeature(ctx, waiver.workspaceId, 'waiver_publishing'))) {
 			throw new ConvexError({
 				code: 'not_found',
 				message: 'This public waiver is no longer available.'

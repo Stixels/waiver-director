@@ -6,18 +6,26 @@
 	import type { Id } from '$convex/_generated/dataModel';
 	import { page } from '$app/state';
 	import { useAppContext } from '$lib/components/app/app-context.svelte';
-	import PageShell from '$lib/components/app/PageShell.svelte';
-	import PageHeader from '$lib/components/app/PageHeader.svelte';
+	import DataTableEmptyState from '$lib/components/app/DataTableEmptyState.svelte';
+	import DataTablePage from '$lib/components/app/DataTablePage.svelte';
+	import DataTablePagination from '$lib/components/app/DataTablePagination.svelte';
+	import DataTableShell from '$lib/components/app/DataTableShell.svelte';
 	import { useProtectedQuery } from '$lib/components/auth/convex-auth.svelte';
 	import SubmissionDetailSheet from '$lib/components/waivers/SubmissionDetailSheet.svelte';
-	import { Button } from '$lib/components/ui/button';
 	import { Skeleton } from '$lib/components/ui/skeleton';
+	import {
+		Table,
+		TableBody,
+		TableCell,
+		TableHead,
+		TableHeader,
+		TableRow
+	} from '$lib/components/ui/table';
 	import { formatBookingTimestamp } from '$lib/utils/date';
 	import { parseConvexId, queryString } from '$lib/utils/url';
 	import { cn } from '$lib/utils';
 	import { onMount } from 'svelte';
 	import CalendarClockIcon from '@lucide/svelte/icons/calendar-clock';
-	import ChevronLeftIcon from '@lucide/svelte/icons/chevron-left';
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 	import MailIcon from '@lucide/svelte/icons/mail';
 	import SearchIcon from '@lucide/svelte/icons/search';
@@ -309,6 +317,12 @@
 		});
 	}
 
+	function handleCustomerRowKeydown(event: KeyboardEvent, customerId: Id<'customers'>) {
+		if (event.key !== 'Enter' && event.key !== ' ') return;
+		event.preventDefault();
+		selectCustomer(customerId);
+	}
+
 	function openSubmission(submissionId: Id<'waiver_submissions'>) {
 		selectedSubmissionId = submissionId;
 		detailOpen = true;
@@ -353,21 +367,23 @@
 	/>
 {/if}
 
-<PageHeader title="Signer contacts" subtitle="Track waiver signers and their repeat-visit history.">
-	{#snippet actions()}
-		<span
-			class="inline-flex h-10 items-center gap-2 rounded-full border border-border bg-card/40 px-3 text-xs font-medium text-muted-foreground"
-		>
-			<UsersRoundIcon class="size-3.5" aria-hidden="true" />
-			{#if isLoadingCustomers && !customerPage}
-				<Skeleton class="h-3 w-10" />
-			{:else}
-				<span class="text-foreground tabular-nums">{totalCount ?? 0}</span>
-				{(totalCount ?? 0) === 1 ? 'customer' : 'customers'}
-			{/if}
-		</span>
-	{/snippet}
-	{#snippet meta()}
+{#snippet customersPagination()}
+	{#if customerPage}
+		<DataTablePagination
+			{currentPage}
+			hasNextPage={!customerPage.isDone}
+			{hasPreviousPage}
+			itemCount={customers.length}
+			itemLabel="customer"
+			{totalCount}
+			onNext={goNextPage}
+			onPrevious={goPreviousPage}
+		/>
+	{/if}
+{/snippet}
+
+<DataTablePage>
+	<div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
 		<div class="relative w-full lg:max-w-md">
 			<SearchIcon
 				class="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground"
@@ -391,17 +407,29 @@
 				</button>
 			{/if}
 		</div>
-	{/snippet}
-</PageHeader>
 
-<PageShell>
-	<div class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_24rem]">
-		<section class="min-w-0 space-y-4">
+		<span
+			class="inline-flex h-9 w-fit items-center gap-2 rounded-full border border-border bg-card/40 px-3 text-xs font-medium text-muted-foreground"
+		>
+			<UsersRoundIcon class="size-3.5" aria-hidden="true" />
+			{#if isLoadingCustomers && !customerPage}
+				<Skeleton class="h-3 w-10" />
+			{:else}
+				<span class="text-foreground tabular-nums">{totalCount ?? 0}</span>
+				{(totalCount ?? 0) === 1 ? 'customer' : 'customers'}
+			{/if}
+		</span>
+	</div>
+
+	<div
+		class="grid min-h-0 flex-1 gap-6 overflow-auto xl:grid-cols-[minmax(0,1fr)_24rem] xl:overflow-hidden"
+	>
+		<section class="flex min-w-0 flex-col gap-4 xl:min-h-0">
 			{#if isLoadingCustomers}
-				<div class="overflow-hidden rounded-xl border border-border">
+				<DataTableShell class="border-0 bg-transparent md:hidden" viewportClass="space-y-2">
 					{#each [0, 1, 2, 3, 4, 5] as item (item)}
 						<div
-							class="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 border-b border-border px-4 py-3.5 last:border-b-0"
+							class="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-xl border border-border bg-background px-4 py-3.5"
 						>
 							<Skeleton class="size-9 rounded-full" />
 							<div class="min-w-0 space-y-1.5">
@@ -414,42 +442,87 @@
 							</div>
 						</div>
 					{/each}
-				</div>
+				</DataTableShell>
+				<DataTableShell class="hidden md:flex">
+					<Table class="table-fixed">
+						<colgroup>
+							<col class="w-[56%]" />
+							<col class="w-[18%]" />
+							<col class="w-[26%]" />
+						</colgroup>
+						<TableHeader>
+							<TableRow class="border-border hover:bg-transparent">
+								<TableHead
+									class="text-xs font-semibold tracking-widest text-muted-foreground uppercase"
+								>
+									Contact
+								</TableHead>
+								<TableHead
+									class="text-xs font-semibold tracking-widest text-muted-foreground uppercase"
+								>
+									Visits
+								</TableHead>
+								<TableHead
+									class="text-xs font-semibold tracking-widest text-muted-foreground uppercase"
+								>
+									Last seen
+								</TableHead>
+							</TableRow>
+						</TableHeader>
+						<TableBody>
+							{#each [0, 1, 2, 3, 4, 5] as item (item)}
+								<TableRow class="h-16 border-border hover:bg-transparent">
+									<TableCell class="px-4 py-3">
+										<div class="flex min-w-0 items-center gap-3">
+											<Skeleton class="size-9 shrink-0 rounded-full" />
+											<div class="min-w-0 flex-1 space-y-1.5">
+												<Skeleton class="h-4 w-40" />
+												<Skeleton class="h-3 w-52" />
+											</div>
+										</div>
+									</TableCell>
+									<TableCell class="px-4 py-3">
+										<Skeleton class="h-4 w-16" />
+									</TableCell>
+									<TableCell class="px-4 py-3">
+										<Skeleton class="h-4 w-20" />
+									</TableCell>
+								</TableRow>
+							{/each}
+						</TableBody>
+					</Table>
+				</DataTableShell>
 			{:else if !currentWorkspace}
-				<div
-					class="rounded-xl border border-dashed border-border p-12 text-center text-sm text-muted-foreground"
-				>
-					Workspace not found.
-				</div>
+				<DataTableShell>
+					<DataTableEmptyState
+						icon={UsersRoundIcon}
+						title="Workspace not found"
+						description="Choose a workspace to review customers."
+					/>
+				</DataTableShell>
 			{:else if customers.length === 0}
-				<div
-					class="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border bg-card/30 px-4 py-16 text-center"
-				>
-					<div
-						class="flex size-10 items-center justify-center rounded-full bg-muted text-muted-foreground"
-					>
-						<UsersRoundIcon class="size-5" aria-hidden="true" />
-					</div>
-					<div class="space-y-1">
-						<p class="text-sm font-medium">
-							{searchQuery.trim() ? 'No matching customers' : 'No customers yet'}
-						</p>
-						<p class="text-xs text-muted-foreground">
-							{searchQuery.trim()
-								? 'Try a different name or email.'
-								: 'Adult signers appear here after they submit a waiver.'}
-						</p>
-					</div>
-				</div>
+				<DataTableShell>
+					<DataTableEmptyState
+						icon={UsersRoundIcon}
+						title={searchQuery.trim() ? 'No matching customers' : 'No customers yet'}
+						description={searchQuery.trim()
+							? 'Try a different name or email.'
+							: 'Adult signers appear here after they submit a waiver.'}
+					/>
+				</DataTableShell>
 			{:else}
-				<div class="overflow-hidden rounded-xl border border-border">
+				<DataTableShell
+					class="border-0 bg-transparent md:hidden"
+					viewportClass="space-y-2"
+					footer={customersPagination}
+				>
 					{#each customers as customer (customer.customerId)}
 						{@const tier = frequencyTier(customer.visitCount)}
 						{@const isSelected = selectedCustomerId === customer.customerId}
 						<button
 							type="button"
 							class={cn(
-								'group relative grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 border-b border-border px-4 py-3.5 text-left transition-colors last:border-b-0 hover:bg-muted/40 focus-visible:bg-muted/40 focus-visible:outline-none',
+								'group relative grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-xl border border-border bg-background px-4 py-3.5 text-left transition-colors hover:bg-muted/40 focus-visible:bg-muted/40 focus-visible:outline-none',
 								isSelected && 'bg-muted/60'
 							)}
 							onclick={() => selectCustomer(customer.customerId)}
@@ -496,35 +569,106 @@
 							/>
 						</button>
 					{/each}
-				</div>
-			{/if}
-
-			{#if customerPage && (hasPreviousPage || !customerPage.isDone)}
-				<div class="flex items-center justify-between gap-3">
-					<p class="text-xs text-muted-foreground tabular-nums">
-						Page {currentPage}
-					</p>
-					<div class="flex items-center gap-2">
-						<Button
-							size="sm"
-							variant="outline"
-							disabled={!hasPreviousPage}
-							onclick={goPreviousPage}
-						>
-							<ChevronLeftIcon class="size-4" aria-hidden="true" />
-							Previous
-						</Button>
-						<Button size="sm" variant="outline" disabled={customerPage.isDone} onclick={goNextPage}>
-							Next
-							<ChevronRightIcon class="size-4" aria-hidden="true" />
-						</Button>
-					</div>
-				</div>
+				</DataTableShell>
+				<DataTableShell class="hidden md:flex" footer={customersPagination}>
+					<Table class="table-fixed">
+						<colgroup>
+							<col class="w-[56%]" />
+							<col class="w-[18%]" />
+							<col class="w-[26%]" />
+						</colgroup>
+						<TableHeader>
+							<TableRow class="border-border hover:bg-transparent">
+								<TableHead
+									class="text-xs font-semibold tracking-widest text-muted-foreground uppercase"
+								>
+									Contact
+								</TableHead>
+								<TableHead
+									class="text-xs font-semibold tracking-widest text-muted-foreground uppercase"
+								>
+									Visits
+								</TableHead>
+								<TableHead
+									class="text-xs font-semibold tracking-widest text-muted-foreground uppercase"
+								>
+									Last seen
+								</TableHead>
+							</TableRow>
+						</TableHeader>
+						<TableBody>
+							{#each customers as customer (customer.customerId)}
+								{@const tier = frequencyTier(customer.visitCount)}
+								{@const isSelected = selectedCustomerId === customer.customerId}
+								<TableRow
+									class={cn(
+										'h-16 cursor-pointer border-border transition-colors hover:bg-muted/40 focus-visible:bg-muted/40 focus-visible:outline-none',
+										isSelected && 'bg-muted/60'
+									)}
+									role="button"
+									tabindex={0}
+									aria-current={isSelected ? 'true' : undefined}
+									onclick={() => selectCustomer(customer.customerId)}
+									onkeydown={(event) => handleCustomerRowKeydown(event, customer.customerId)}
+								>
+									<TableCell class="relative px-4 py-3">
+										{#if isSelected}
+											<span class="absolute inset-y-0 left-0 w-0.5 bg-primary" aria-hidden="true"
+											></span>
+										{/if}
+										<div class="flex min-w-0 items-center gap-3">
+											<div
+												class="flex size-9 shrink-0 items-center justify-center rounded-full border border-border bg-background text-xs font-semibold tracking-tight text-foreground"
+											>
+												{initialsFor(customer.displayName)}
+											</div>
+											<div class="min-w-0 flex-1">
+												<div class="flex min-w-0 items-center gap-2">
+													<p class="truncate text-sm font-medium">
+														{customer.displayName}
+													</p>
+													<span
+														class={cn(
+															'inline-flex shrink-0 items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold tracking-wide uppercase',
+															frequencyClass(tier.tone)
+														)}
+													>
+														{tier.label}
+													</span>
+												</div>
+												<p class="mt-0.5 truncate text-xs text-muted-foreground">
+													{customer.primaryEmail}
+												</p>
+											</div>
+										</div>
+									</TableCell>
+									<TableCell class="px-4 py-3">
+										<p class="text-sm font-semibold tabular-nums">
+											{customer.visitCount}
+											<span class="text-xs font-normal text-muted-foreground">
+												{customer.visitCount === 1 ? 'visit' : 'visits'}
+											</span>
+										</p>
+									</TableCell>
+									<TableCell class="px-4 py-3 text-xs text-muted-foreground tabular-nums">
+										{relativeFromNow(customer.lastSeenAt)}
+									</TableCell>
+								</TableRow>
+							{/each}
+						</TableBody>
+					</Table>
+				</DataTableShell>
 			{/if}
 		</section>
 
-		<aside class="min-w-0 space-y-4">
+		<aside class="flex min-w-0 flex-col gap-4 xl:min-h-0">
 			{#if isLoadingDetail}
+				{#snippet loadingVisitHistoryHeader()}
+					<div class="flex items-center justify-between">
+						<h2 class="text-sm font-semibold tracking-tight">Visit history</h2>
+						<span class="text-xs text-muted-foreground tabular-nums">3 records</span>
+					</div>
+				{/snippet}
 				<div class="overflow-hidden rounded-xl border border-border bg-card/30">
 					<div class="space-y-4 p-4">
 						<div class="flex items-start gap-3">
@@ -543,8 +687,8 @@
 						</div>
 					</div>
 				</div>
-				<div class="rounded-xl border border-border">
-					<div class="border-b border-border px-5 py-4">
+				<DataTableShell class="min-h-0" header={loadingVisitHistoryHeader}>
+					<div class="px-4 py-3">
 						<Skeleton class="h-4 w-28" />
 					</div>
 					<div class="divide-y divide-border">
@@ -558,9 +702,18 @@
 							</div>
 						{/each}
 					</div>
-				</div>
+				</DataTableShell>
 			{:else if selectedCustomerDetail}
 				{@const tier = frequencyTier(selectedCustomerDetail.customer.visitCount)}
+				{#snippet selectedVisitHistoryHeader()}
+					<div class="flex items-center justify-between">
+						<h2 class="text-sm font-semibold tracking-tight">Visit history</h2>
+						<span class="text-xs text-muted-foreground tabular-nums">
+							{selectedCustomerDetail.visits.length}
+							{selectedCustomerDetail.visits.length === 1 ? 'record' : 'records'}
+						</span>
+					</div>
+				{/snippet}
 				<div class="rounded-xl border border-border bg-card/30">
 					<div class="space-y-4 p-4">
 						<div class="flex items-start gap-3">
@@ -617,16 +770,14 @@
 					</div>
 				</div>
 
-				<div class="overflow-hidden rounded-xl border border-border">
-					<div class="flex items-center justify-between border-b border-border px-4 py-3">
-						<h2 class="text-sm font-semibold tracking-tight">Visit history</h2>
-						<span class="text-xs text-muted-foreground tabular-nums">
-							{selectedCustomerDetail.visits.length}
-							{selectedCustomerDetail.visits.length === 1 ? 'record' : 'records'}
-						</span>
-					</div>
+				<DataTableShell class="min-h-0" header={selectedVisitHistoryHeader}>
 					{#if selectedCustomerDetail.visits.length === 0}
-						<div class="px-4 py-8 text-center text-sm text-muted-foreground">No visits found.</div>
+						<DataTableEmptyState
+							class="min-h-72"
+							icon={CalendarClockIcon}
+							title="No visits found"
+							description="This customer does not have waiver visit history yet."
+						/>
 					{:else}
 						<ul class="divide-y divide-border">
 							{#each selectedCustomerDetail.visits as visit (visit.submissionId)}
@@ -682,24 +833,16 @@
 							</p>
 						{/if}
 					{/if}
-				</div>
+				</DataTableShell>
 			{:else}
-				<div
-					class="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border bg-card/30 px-4 py-16 text-center"
-				>
-					<div
-						class="flex size-10 items-center justify-center rounded-full bg-muted text-muted-foreground"
-					>
-						<UserRoundIcon class="size-5" aria-hidden="true" />
-					</div>
-					<div class="space-y-1">
-						<p class="text-sm font-medium">Select a contact</p>
-						<p class="text-xs text-muted-foreground">
-							Choose a signer to view their waiver visit history.
-						</p>
-					</div>
-				</div>
+				<DataTableShell class="min-h-72 flex-none">
+					<DataTableEmptyState
+						icon={UserRoundIcon}
+						title="Select a contact"
+						description="Choose a signer to view their waiver visit history."
+					/>
+				</DataTableShell>
 			{/if}
 		</aside>
 	</div>
-</PageShell>
+</DataTablePage>

@@ -25,6 +25,27 @@ export default defineSchema({
 		.index('by_tokenIdentifier', ['tokenIdentifier'])
 		.index('by_userId', ['userId']),
 
+	user_billing_entitlements: defineTable({
+		userId: v.id('users'),
+		provider: v.literal('clerk'),
+		providerUserId: v.string(),
+		planSlug: v.string(),
+		status: v.string(),
+		featureSlugs: v.array(v.string()),
+		currentPeriodEnd: v.optional(v.number()),
+		trialEndsAt: v.optional(v.number()),
+		cancelAtPeriodEnd: v.optional(v.boolean()),
+		primaryWorkspaceId: v.optional(v.id('workspaces')),
+		primaryWorkspaceSelectedAt: v.optional(v.number()),
+		primaryWorkspaceSwitchPeriod: v.optional(v.string()),
+		lastEventId: v.optional(v.string()),
+		lastEventType: v.optional(v.string()),
+		updatedAt: v.number()
+	})
+		.index('by_userId', ['userId'])
+		.index('by_provider_and_providerUserId', ['provider', 'providerUserId'])
+		.index('by_lastEventId', ['lastEventId']),
+
 	workspaces: defineTable({
 		name: v.string(),
 		slug: v.string(),
