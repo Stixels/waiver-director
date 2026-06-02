@@ -37,11 +37,14 @@
 	import { Popover, PopoverContent, PopoverTrigger } from '$lib/components/ui/popover';
 	import { RangeCalendar } from '$lib/components/ui/range-calendar';
 	import FollowUpPreviewDialog from '$lib/components/emails/FollowUpPreviewDialog.svelte';
+	import EmailAIAssistant from '$lib/components/emails/EmailAIAssistant.svelte';
+	import EmailAIReviewPanel from '$lib/components/emails/EmailAIReviewPanel.svelte';
 	import EmailLoadTemplateDialog from '$lib/components/emails/EmailLoadTemplateDialog.svelte';
 	import EmailSaveTemplateDialog from '$lib/components/emails/EmailSaveTemplateDialog.svelte';
 	import RichTextEditor from '$lib/components/emails/RichTextEditor.svelte';
 	import WaiverRichText from '$lib/components/waivers/WaiverRichText.svelte';
 	import WorkspaceLogoUploader from '$lib/components/workspaces/WorkspaceLogoUploader.svelte';
+	import type { EmailAIResult } from '$lib/domain/email-ai';
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
 	import CloudIcon from '@lucide/svelte/icons/cloud';
 	import CloudCheckIcon from '@lucide/svelte/icons/cloud-check';
@@ -287,6 +290,8 @@
 	let subjectSelectionStart = $state(0);
 	let subjectSelectionEnd = $state(0);
 	let loadedEditorContentWorkspaceId = $state<Id<'workspaces'> | null>(null);
+	let aiReviewResult = $state<EmailAIResult | null>(null);
+	let aiReviewOpen = $state(false);
 
 	const normalizedSendAfterAmount = $derived(clampSendAfterAmount(sendAfterAmount));
 	const isSendAfterValid = $derived(Number.isInteger(sendAfterAmount) && sendAfterAmount >= 1);
@@ -305,6 +310,8 @@
 		lastSaveError = null;
 		editorContentLoaded = false;
 		loadedEditorContentWorkspaceId = null;
+		aiReviewResult = null;
+		aiReviewOpen = false;
 	}
 
 	function currentEditorContentSnapshot(): EditorContentSnapshot {
@@ -530,6 +537,27 @@
 			return;
 		}
 		editorRef?.insertText(variable);
+	}
+
+	function handleAIResult(result: EmailAIResult) {
+		aiReviewResult = result;
+		aiReviewOpen = true;
+	}
+
+	function applyAIProposal(proposal: { subject: string; body: string }) {
+		subject = proposal.subject;
+		body = proposal.body;
+		lastSavedAt = null;
+		lastSaveError = null;
+		emailPreviewMode = false;
+		aiReviewResult = null;
+		aiReviewOpen = false;
+		toast.message('AI proposal applied. Autosave will update the editor content.');
+	}
+
+	function discardAIResult() {
+		aiReviewResult = null;
+		aiReviewOpen = false;
 	}
 
 	async function persistEditorContent(options: { showToast?: boolean } = {}) {
@@ -1655,11 +1683,9 @@
 						</div>
 						<div class="email-rail">
 							<div class="rail-section">
-								<Skeleton class="mb-2 h-2 w-16" />
-								<Skeleton class="mb-3 h-3 w-32" />
-								{#each [0, 1, 2, 3] as i (i)}
-									<Skeleton class="mb-1.5 h-9 w-full rounded" />
-								{/each}
+								<Skeleton class="mb-3 h-5 w-28" />
+								<Skeleton class="mb-2 h-16 w-full rounded-md" />
+								<Skeleton class="h-7 w-full rounded-md" />
 							</div>
 							<div class="rail-section">
 								<Skeleton class="mb-3 h-2 w-20" />
@@ -1807,19 +1833,35 @@
 						<!-- Tool rail (right column) -->
 						<div class="email-rail">
 							<div class="rail-section">
+								{#if currentWorkspace}
+									<EmailAIAssistant
+										workspaceId={currentWorkspace.workspaceId}
+										workspaceSlug={currentWorkspace.slug}
+										workspaceName={currentWorkspace.name}
+										{subject}
+										{body}
+										sendAfterAmount={normalizedSendAfterAmount}
+										{sendAfterUnit}
+										canReview={isSendAfterValid && !isSavingEditorContent}
+										result={aiReviewResult}
+										onResult={handleAIResult}
+										onReopen={() => (aiReviewOpen = true)}
+										onDiscard={discardAIResult}
+									/>
+								{/if}
+							</div>
+
+							<div class="rail-section rail-section--compact">
 								<p class="rail-label">Variables</p>
-								<p class="rail-hint">Click to insert at cursor.</p>
-								<div class="var-list">
+								<div class="var-chip-grid">
 									{#each VARIABLES as variable (variable.value)}
 										<button
 											type="button"
 											onclick={() => insertVariable(variable.value)}
-											class="var-item"
+											class="var-chip"
+											title={variable.description}
 										>
-											<div class="var-item-text">
-												<span class="var-tag">{variable.label}</span>
-												<span class="var-desc">{variable.description}</span>
-											</div>
+											{variable.label}
 										</button>
 									{/each}
 								</div>
@@ -1849,6 +1891,16 @@
 							</div>
 						</div>
 					</div>
+
+					{#if aiReviewResult}
+						<EmailAIReviewPanel
+							bind:open={aiReviewOpen}
+							result={aiReviewResult}
+							currentSubject={subject}
+							currentBody={body}
+							onApply={applyAIProposal}
+						/>
+					{/if}
 				{/if}
 			{/if}
 		</div>
@@ -2040,7 +2092,7 @@
 
 	.email-layout {
 		display: grid;
-		grid-template-columns: 1fr 220px;
+		grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
 		gap: 1.25rem;
 		align-items: stretch;
 		min-height: calc(100svh - 14rem);
@@ -2241,6 +2293,10 @@
 		border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
 	}
 
+	.rail-section--compact {
+		padding-block: 0.75rem;
+	}
+
 	.rail-section:last-child {
 		border-bottom: none;
 	}
@@ -2265,6 +2321,40 @@
 		display: flex;
 		flex-direction: column;
 		gap: 0.2rem;
+	}
+
+	.var-chip-grid {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.35rem;
+		margin-top: 0.45rem;
+	}
+
+	.var-chip {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		max-width: 100%;
+		min-height: 1.55rem;
+		border: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
+		border-radius: var(--radius-sm);
+		background: color-mix(in srgb, var(--muted) 45%, transparent);
+		padding: 0.15rem 0.4rem;
+		font-family: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, monospace;
+		font-size: 0.66rem;
+		line-height: 1.15;
+		color: color-mix(in srgb, var(--foreground) 88%, var(--muted-foreground));
+		cursor: pointer;
+		transition:
+			background 130ms ease,
+			border-color 130ms ease,
+			color 130ms ease;
+	}
+
+	.var-chip:hover {
+		color: var(--foreground);
+		background: color-mix(in srgb, var(--muted) 70%, transparent);
+		border-color: color-mix(in srgb, var(--border) 140%, transparent);
 	}
 
 	.var-item {

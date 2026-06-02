@@ -60,6 +60,7 @@
 	"dependencies": {
 		"@dnd-kit/svelte": "^0.3.2",
 		"@fontsource/geist-sans": "^5.2.5",
+		"@pierre/diffs": "^1.2.5",
 		"@tiptap/core": "^3.22.3",
 		"@tiptap/extension-image": "3.22.4",
 		"@tiptap/extension-link": "^3.22.3",
