@@ -71,7 +71,7 @@ export type WorkspaceLimitState = {
 	ownedWorkspaceCount: number;
 	primaryWorkspaceId: Id<'workspaces'> | null;
 	primaryWorkspaceSelectedAt: number | null;
-	currentSwitchPeriod: string | null;
+	currentSwitchPeriod: string;
 	switchUsedThisPeriod: boolean;
 	canSwitchPrimaryWorkspace: boolean;
 	hasMultiWorkspace: boolean;

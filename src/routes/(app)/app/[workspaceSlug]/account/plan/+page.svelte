@@ -21,6 +21,7 @@
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
 	import ShieldAlertIcon from '@lucide/svelte/icons/shield-alert';
 
+	const PLAN_FEATURES_ID = 'account-plan-features';
 	const convex = useConvexClient();
 	const appContext = useAppContext();
 	const billing = $derived(appContext.billing);
@@ -222,6 +223,8 @@
 								<button
 									type="button"
 									onclick={() => (showFeatures = !showFeatures)}
+									aria-expanded={showFeatures}
+									aria-controls={PLAN_FEATURES_ID}
 									class="flex w-full items-center justify-between text-xs font-semibold text-muted-foreground/90 transition-colors hover:text-foreground"
 								>
 									<span>Plan features ({billing.featureSlugs.length})</span>
@@ -234,7 +237,7 @@
 								</button>
 
 								{#if showFeatures}
-									<div transition:slide={{ duration: 200 }}>
+									<div id={PLAN_FEATURES_ID} transition:slide={{ duration: 200 }}>
 										<ul class="mt-3 space-y-2" aria-label="Features included in your plan">
 											{#each billing.featureSlugs as feature (feature)}
 												<li
@@ -360,7 +363,7 @@
 							{:else}
 								<!-- Safe / Under Limit Info Alert -->
 								<div
-									class="text-emerald-905 flex items-start gap-3 rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-4 dark:bg-emerald-500/10 dark:text-emerald-200"
+									class="flex items-start gap-3 rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-4 text-emerald-950 dark:bg-emerald-500/10 dark:text-emerald-200"
 								>
 									<CheckIcon
 										class="mt-0.5 size-4.5 shrink-0 text-emerald-600 dark:text-emerald-400"

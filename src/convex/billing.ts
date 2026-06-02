@@ -349,14 +349,6 @@ export const selectPrimaryWorkspace = mutation({
 		const selectedAt = Date.now();
 		const currentSwitchPeriod = currentState.currentSwitchPeriod;
 
-		if (!currentSwitchPeriod) {
-			throw new ConvexError({
-				code: 'billing_required',
-				feature: 'multi_workspace',
-				message: 'Upgrade to Business to manage multiple live workspaces.'
-			});
-		}
-
 		if (currentState.primaryWorkspaceId === args.workspaceId) {
 			return {
 				primaryWorkspaceId: args.workspaceId,
@@ -553,13 +545,11 @@ export const verifyAndApplyClerkBillingWebhook = internalAction({
 		if (!isRecord(payload) || !isRecord(payload.data)) return { status: 'ignored' };
 
 		const eventType = asString(payload.type) ?? 'unknown';
-		if (!eventType.startsWith('subscription') && !eventType.startsWith('paymentAttempt')) {
-			return { status: 'ignored' };
-		}
-		if (eventType.startsWith('paymentAttempt')) return { status: 'ignored' };
+		if (!eventType.startsWith('subscription')) return { status: 'ignored' };
 
 		const normalized = normalizeBillingPayload(eventType, payload.data);
-		if (!normalized.providerUserId || normalized.status === 'upcoming') return { status: 'ignored' };
+		if (!normalized.providerUserId || normalized.status === 'upcoming')
+			return { status: 'ignored' };
 
 		const result: ClerkWebhookResult = await ctx.runMutation(
 			internal.billing.applyClerkBillingEvent,

@@ -53,11 +53,21 @@
 	</p>
 	{#if hasPaginationControls}
 		<div class="flex items-center gap-2">
-			<Button size="sm" variant="outline" disabled={!hasPreviousPage} onclick={onPrevious}>
+			<Button
+				size="sm"
+				variant="outline"
+				disabled={!hasPreviousPage || !onPrevious}
+				onclick={onPrevious ? onPrevious : undefined}
+			>
 				<ChevronLeftIcon class="size-4" aria-hidden="true" />
 				{previousLabel}
 			</Button>
-			<Button size="sm" variant="outline" disabled={!hasNextPage} onclick={onNext}>
+			<Button
+				size="sm"
+				variant="outline"
+				disabled={!hasNextPage || !onNext}
+				onclick={onNext ? onNext : undefined}
+			>
 				{nextLabel}
 				<ChevronRightIcon class="size-4" aria-hidden="true" />
 			</Button>

@@ -27,6 +27,8 @@
 		'absolute inset-0 z-30 flex items-center justify-center bg-background/72 p-4 backdrop-blur-[2px]',
 		className
 	)}
+	role="dialog"
+	aria-modal="true"
 	aria-labelledby="upgrade-overlay-title"
 	aria-describedby="upgrade-overlay-description"
 >

@@ -604,11 +604,12 @@
 						<span class="flex-1">Plan usage</span>
 					</DropdownMenuItem>
 					<DropdownMenuItem
+						disabled={!activeWorkspaceSlug}
+						aria-disabled={!activeWorkspaceSlug}
 						onclick={() => {
+							if (!activeWorkspaceSlug) return;
 							handleNavigation();
-							if (activeWorkspaceSlug) {
-								void goto(resolve(accountBillingPathnameFor(activeWorkspaceSlug)));
-							}
+							void goto(resolve(accountBillingPathnameFor(activeWorkspaceSlug)));
 						}}
 					>
 						<CreditCardIcon class="size-3.5 shrink-0" aria-hidden="true" />
