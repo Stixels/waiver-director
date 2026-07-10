@@ -282,6 +282,8 @@
 					signerDateOfBirth={submission.signerDateOfBirth}
 					minors={submission.minors}
 					answers={submission.answers}
+					marketingConsent={submission.marketingConsent}
+					marketingConsentLabel={submission.marketingConsentLabel}
 					signatureDataUrl={submission.signatureDataUrl}
 					submittedAt={submission.submittedAt}
 				/>

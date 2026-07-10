@@ -43,7 +43,10 @@ const WORKSPACE_SCOPED_TABLES = {
 	booking_integrations: true,
 	booking_connection_sessions: true,
 	bookings: true,
-	booking_webhook_events: true
+	booking_webhook_events: true,
+	marketing_integrations: true,
+	marketing_connection_sessions: true,
+	marketing_contact_syncs: true
 } as const satisfies Record<WorkspaceScopedTableName, true>;
 type WorkspaceCleanupTableName = keyof typeof WORKSPACE_SCOPED_TABLES;
 const WORKSPACE_CLEANUP_TABLE_NAMES = Object.keys(

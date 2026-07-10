@@ -27,6 +27,7 @@
 		title: string;
 		introCopy: string;
 		fields: WaiverField[];
+		marketingOptIn: { provider: 'mailchimp'; label: string } | null;
 	};
 
 	type BookingContext = {
@@ -54,6 +55,7 @@
 	let signerDateOfBirth = $state('');
 	let signatureDataUrl = $state('');
 	let answers = $state<Record<string, string | boolean | null>>({});
+	let marketingConsent = $state(false);
 	let minors = $state<MinorFormState[]>([]);
 	let isSubmitting = $state(false);
 	let submitError = $state<string | null>(null);
@@ -106,6 +108,7 @@
 				signerEmail,
 				signerDateOfBirth,
 				signatureDataUrl,
+				marketingConsent,
 				answers,
 				minors: minorsPayload
 			});
@@ -125,6 +128,7 @@
 		signerDateOfBirth = '';
 		signatureDataUrl = '';
 		answers = {};
+		marketingConsent = false;
 		minors = [];
 		submitError = null;
 		isSubmitted = false;
@@ -381,6 +385,43 @@
 									</div>
 								{/each}
 							</WaiverPublicAdditionalInfoSection>
+						{/if}
+
+						{#if waiver.marketingOptIn}
+							<div class="mt-8 border-t border-border pt-8">
+								<h3 class="mb-4 text-lg font-semibold tracking-tight">Stay in touch</h3>
+								<label class="waiver-checkbox-label flex cursor-pointer items-start gap-3">
+									<span
+										class={`waiver-checkbox-box mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center border transition-colors ${marketingConsent ? 'border-foreground bg-foreground' : 'border-foreground/25 bg-transparent'}`}
+										aria-hidden="true"
+									>
+										{#if marketingConsent}
+											<svg
+												xmlns="http://www.w3.org/2000/svg"
+												width="12"
+												height="12"
+												viewBox="0 0 24 24"
+												fill="none"
+												stroke="currentColor"
+												stroke-width="2.5"
+												stroke-linecap="round"
+												stroke-linejoin="round"
+												class="text-background"
+												aria-hidden="true"
+											>
+												<polyline points="20 6 9 17 4 12" />
+											</svg>
+										{/if}
+									</span>
+									<input type="checkbox" class="sr-only" bind:checked={marketingConsent} />
+									<span>
+										<span class="block text-sm">{waiver.marketingOptIn.label}</span>
+										<span class="mt-1 block text-xs leading-relaxed text-muted-foreground">
+											Optional. You can unsubscribe from marketing emails at any time.
+										</span>
+									</span>
+								</label>
+							</div>
 						{/if}
 
 						<div class="mt-8 border-t border-border pt-8">
