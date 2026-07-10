@@ -231,6 +231,15 @@ export default defineSchema({
 		status: v.union(v.literal('submitted')),
 		marketingConsent: v.optional(v.boolean()),
 		marketingConsentLabel: v.optional(v.string()),
+		marketingConsentDestinations: v.optional(
+			v.array(
+				v.object({
+					provider: marketingProviderValidator,
+					audienceId: v.string(),
+					audienceName: v.string()
+				})
+			)
+		),
 		submittedAt: v.number()
 	})
 		.index('by_workspaceId', ['workspaceId'])

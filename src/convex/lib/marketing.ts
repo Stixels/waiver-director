@@ -13,5 +13,5 @@ export const marketingIntegrationStatusValidator = v.union(
 );
 
 export function marketingConsentLabel(workspaceName: string) {
-	return `Yes, I would like to receive marketing emails from ${workspaceName}.`;
+	return `Yes, I would like to receive marketing emails and promotions from ${workspaceName}.`;
 }

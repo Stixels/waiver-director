@@ -25,6 +25,11 @@
 		answers?: Record<string, string | boolean | null>;
 		marketingConsent?: boolean;
 		marketingConsentLabel?: string | null;
+		marketingConsentDestinations?: Array<{
+			provider: 'mailchimp' | 'constant_contact';
+			audienceId: string;
+			audienceName: string;
+		}>;
 		signatureDataUrl?: string;
 		submittedAt?: number;
 	}
@@ -41,6 +46,7 @@
 		answers = {},
 		marketingConsent = false,
 		marketingConsentLabel = null,
+		marketingConsentDestinations = [],
 		signatureDataUrl = '',
 		submittedAt
 	}: Props = $props();
@@ -54,6 +60,13 @@
 	function formatDob(dob: string) {
 		const [y, m, d] = dob.split('-').map(Number);
 		return new Intl.DateTimeFormat('en-US', { dateStyle: 'long' }).format(new Date(y, m - 1, d));
+	}
+
+	function formatMarketingDestination(
+		destination: NonNullable<Props['marketingConsentDestinations']>[number]
+	) {
+		const provider = destination.provider === 'mailchimp' ? 'Mailchimp' : 'Constant Contact';
+		return `${provider}: ${destination.audienceName}`;
 	}
 </script>
 
@@ -135,6 +148,13 @@
 						<p class="mt-2 text-sm font-semibold">
 							{marketingConsent ? 'Opted in' : 'Did not opt in'}
 						</p>
+						{#if marketingConsentDestinations.length > 0}
+							<p class="mt-2 text-xs leading-relaxed text-muted-foreground">
+								Recorded destinations: {marketingConsentDestinations
+									.map(formatMarketingDestination)
+									.join(', ')}
+							</p>
+						{/if}
 					</div>
 				{/if}
 

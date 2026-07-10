@@ -98,21 +98,6 @@ export const getOwnerAccessForAction = internalQuery({
 			args.workspaceId,
 			`manage ${providerName(args.provider)}`
 		);
-		const integrations = await ctx.db
-			.query('marketing_integrations')
-			.withIndex('by_workspaceId', (q) => q.eq('workspaceId', args.workspaceId))
-			.take(2);
-		if (
-			integrations.some(
-				(integration) =>
-					integration.provider !== args.provider && integration.status === 'connected'
-			)
-		) {
-			throw new ConvexError({
-				code: 'conflict',
-				message: 'Disconnect the active marketing integration before connecting another provider.'
-			});
-		}
 		const workspace = await ctx.db.get(args.workspaceId);
 		if (!workspace) {
 			throw new ConvexError({ code: 'not_found', message: 'Workspace not found.' });
@@ -250,21 +235,6 @@ export const saveOAuthConnection = internalMutation({
 				q.eq('workspaceId', args.workspaceId).eq('provider', args.provider)
 			)
 			.unique();
-		const otherIntegrations = await ctx.db
-			.query('marketing_integrations')
-			.withIndex('by_workspaceId', (q) => q.eq('workspaceId', args.workspaceId))
-			.take(2);
-		if (
-			otherIntegrations.some(
-				(integration) =>
-					integration.provider !== args.provider && integration.status === 'connected'
-			)
-		) {
-			throw new ConvexError({
-				code: 'conflict',
-				message: 'Disconnect the active marketing integration before connecting another provider.'
-			});
-		}
 		const now = Date.now();
 		const value = {
 			workspaceId: args.workspaceId,

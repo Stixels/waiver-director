@@ -284,6 +284,7 @@
 					answers={submission.answers}
 					marketingConsent={submission.marketingConsent}
 					marketingConsentLabel={submission.marketingConsentLabel}
+					marketingConsentDestinations={submission.marketingConsentDestinations}
 					signatureDataUrl={submission.signatureDataUrl}
 					submittedAt={submission.submittedAt}
 				/>
