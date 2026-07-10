@@ -56,7 +56,10 @@ const publicWaiverValue = v.object({
 	fields: v.array(waiverFieldValidator),
 	marketingOptIn: v.union(
 		v.null(),
-		v.object({ provider: v.literal('mailchimp'), label: v.string() })
+		v.object({
+			provider: v.union(v.literal('mailchimp'), v.literal('constant_contact')),
+			label: v.string()
+		})
 	)
 });
 
@@ -70,7 +73,10 @@ const publicBookingWaiverValue = v.object({
 	fields: v.array(waiverFieldValidator),
 	marketingOptIn: v.union(
 		v.null(),
-		v.object({ provider: v.literal('mailchimp'), label: v.string() })
+		v.object({
+			provider: v.union(v.literal('mailchimp'), v.literal('constant_contact')),
+			label: v.string()
+		})
 	),
 	booking: v.object({
 		lookupToken: v.string(),
@@ -88,6 +94,27 @@ async function getWorkspaceWaiverRecord(ctx: FunctionCtx, workspaceId: Id<'works
 		.query('workspace_waivers')
 		.withIndex('by_workspaceId', (q) => q.eq('workspaceId', workspaceId))
 		.unique();
+}
+
+async function getActiveMarketingIntegration(ctx: FunctionCtx, workspaceId: Id<'workspaces'>) {
+	const [mailchimp, constantContact] = await Promise.all([
+		ctx.db
+			.query('marketing_integrations')
+			.withIndex('by_workspaceId_and_provider', (q) =>
+				q.eq('workspaceId', workspaceId).eq('provider', 'mailchimp')
+			)
+			.unique(),
+		ctx.db
+			.query('marketing_integrations')
+			.withIndex('by_workspaceId_and_provider', (q) =>
+				q.eq('workspaceId', workspaceId).eq('provider', 'constant_contact')
+			)
+			.unique()
+	]);
+	for (const integration of [mailchimp, constantContact]) {
+		if (integration?.status === 'connected' && integration.audienceId) return integration;
+	}
+	return null;
 }
 
 async function getNextVersionNumber(ctx: MutationCtx, waiverId: Id<'workspace_waivers'>) {
@@ -441,12 +468,7 @@ export const getPublicWaiverBySlug = query({
 		const [workspace, version, marketingIntegration] = await Promise.all([
 			ctx.db.get(waiver.workspaceId),
 			ctx.db.get(waiver.publishedVersionId),
-			ctx.db
-				.query('marketing_integrations')
-				.withIndex('by_workspaceId_and_provider', (q) =>
-					q.eq('workspaceId', waiver.workspaceId).eq('provider', 'mailchimp')
-				)
-				.unique()
+			getActiveMarketingIntegration(ctx, waiver.workspaceId)
 		]);
 
 		if (
@@ -473,7 +495,10 @@ export const getPublicWaiverBySlug = query({
 			fields: version.fields,
 			marketingOptIn:
 				marketingIntegration?.status === 'connected' && marketingIntegration.audienceId
-					? { provider: 'mailchimp' as const, label: marketingConsentLabel(workspace.name) }
+					? {
+							provider: marketingIntegration.provider,
+							label: marketingConsentLabel(workspace.name)
+						}
 					: null
 		};
 	}
@@ -505,12 +530,7 @@ export const getPublicWaiverForBooking = query({
 		const [workspace, version, marketingIntegration] = await Promise.all([
 			ctx.db.get(waiver.workspaceId),
 			ctx.db.get(waiver.publishedVersionId),
-			ctx.db
-				.query('marketing_integrations')
-				.withIndex('by_workspaceId_and_provider', (q) =>
-					q.eq('workspaceId', waiver.workspaceId).eq('provider', 'mailchimp')
-				)
-				.unique()
+			getActiveMarketingIntegration(ctx, waiver.workspaceId)
 		]);
 		if (
 			!workspace ||
@@ -535,7 +555,10 @@ export const getPublicWaiverForBooking = query({
 			fields: version.fields,
 			marketingOptIn:
 				marketingIntegration?.status === 'connected' && marketingIntegration.audienceId
-					? { provider: 'mailchimp' as const, label: marketingConsentLabel(workspace.name) }
+					? {
+							provider: marketingIntegration.provider,
+							label: marketingConsentLabel(workspace.name)
+						}
 					: null,
 			booking: {
 				lookupToken: booking.lookupToken,
@@ -638,12 +661,7 @@ export const submitPublicWaiver = mutation({
 
 		validateSubmissionAnswers(version, args.answers);
 		const minors = validateMinors(args.minors);
-		const marketingIntegration = await ctx.db
-			.query('marketing_integrations')
-			.withIndex('by_workspaceId_and_provider', (q) =>
-				q.eq('workspaceId', waiver.workspaceId).eq('provider', 'mailchimp')
-			)
-			.unique();
+		const marketingIntegration = await getActiveMarketingIntegration(ctx, waiver.workspaceId);
 		const marketingEnabled = Boolean(
 			marketingIntegration?.status === 'connected' && marketingIntegration.audienceId
 		);
@@ -705,14 +723,18 @@ export const submitPublicWaiver = mutation({
 				workspaceId: waiver.workspaceId,
 				integrationId: marketingIntegration._id,
 				submissionId,
-				provider: 'mailchimp',
+				provider: marketingIntegration.provider,
 				audienceId: marketingIntegration.audienceId,
 				status: 'queued',
 				attempts: 0,
 				createdAt: submittedAt,
 				updatedAt: submittedAt
 			});
-			await ctx.scheduler.runAfter(0, internal.mailchimp.syncContact, { syncId });
+			if (marketingIntegration.provider === 'mailchimp') {
+				await ctx.scheduler.runAfter(0, internal.mailchimp.syncContact, { syncId });
+			} else {
+				await ctx.scheduler.runAfter(0, internal.constantContact.syncContact, { syncId });
+			}
 		}
 
 		await ctx.scheduler.runAfter(0, internal.emails.scheduleFollowUpOnSubmission, {

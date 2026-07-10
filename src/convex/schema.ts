@@ -338,6 +338,8 @@ export default defineSchema({
 		provider: marketingProviderValidator,
 		status: marketingIntegrationStatusValidator,
 		encryptedAccessToken: v.optional(v.string()),
+		encryptedRefreshToken: v.optional(v.string()),
+		accessTokenExpiresAt: v.optional(v.number()),
 		serverPrefix: v.optional(v.string()),
 		accountId: v.optional(v.string()),
 		audienceId: v.optional(v.string()),

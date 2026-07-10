@@ -1,6 +1,9 @@
 import { v } from 'convex/values';
 
-export const marketingProviderValidator = v.literal('mailchimp');
+export const marketingProviderValidator = v.union(
+	v.literal('mailchimp'),
+	v.literal('constant_contact')
+);
 
 export const marketingIntegrationStatusValidator = v.union(
 	v.literal('pending_configuration'),

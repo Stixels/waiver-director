@@ -50,7 +50,8 @@ Prerequisites:
 - Clerk application
 - Resend API key for email delivery
 - Bookeo credentials if you are working on booking integrations
-- A registered Mailchimp OAuth app if you are working on marketing-list integrations
+- A registered Mailchimp or Constant Contact OAuth app if you are working on marketing-list
+  integrations
 
 Install dependencies:
 
@@ -113,11 +114,15 @@ BOOKEO_SECRET_KEY=
 BOOKEO_AUTHORIZATION_URL=
 MAILCHIMP_CLIENT_ID=
 MAILCHIMP_CLIENT_SECRET=
+CONSTANT_CONTACT_CLIENT_ID=
+CONSTANT_CONTACT_CLIENT_SECRET=
 INTEGRATION_CREDENTIALS_ENCRYPTION_KEY=
 ```
 
 Register the Mailchimp OAuth callback as `<CONVEX_SITE_URL>/mailchimp/callback`. Keep the client
-secret and credential-encryption key in the Convex runtime environment only.
+secret and credential-encryption key in the Convex runtime environment only. For Constant Contact,
+register `<CONVEX_SITE_URL>/constant-contact/callback` and request the `contact_data` and
+`offline_access` scopes.
 
 Do not commit real secrets or workspace-specific credentials.
 

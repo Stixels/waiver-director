@@ -130,8 +130,8 @@
 			key: 'constant-contact',
 			name: 'Constant Contact',
 			category: 'email',
-			availability: 'coming_soon',
-			status: 'Coming soon',
+			availability: 'available',
+			status: 'Available',
 			description: 'Sync signer contacts to Constant Contact lists.',
 			detailDescription:
 				'Constant Contact will let you route participant emails to a selected contact list after waiver signing.',
@@ -167,13 +167,27 @@
 	);
 
 	const integrations = $derived((integrationsQuery.data ?? []) as Integration[]);
-	const marketingIntegrationQuery = useProtectedQuery(
+	const mailchimpIntegrationQuery = useProtectedQuery(
 		api.marketingIntegrations.getWorkspaceMarketingIntegration,
-		() => (currentWorkspace ? { workspaceId: currentWorkspace.workspaceId } : 'skip'),
+		() =>
+			currentWorkspace
+				? { workspaceId: currentWorkspace.workspaceId, provider: 'mailchimp' as const }
+				: 'skip',
 		() => ({ keepPreviousData: true })
 	);
-	const marketingIntegration = $derived(
-		(marketingIntegrationQuery.data ?? null) as MarketingIntegration
+	const constantContactIntegrationQuery = useProtectedQuery(
+		api.marketingIntegrations.getWorkspaceMarketingIntegration,
+		() =>
+			currentWorkspace
+				? { workspaceId: currentWorkspace.workspaceId, provider: 'constant_contact' as const }
+				: 'skip',
+		() => ({ keepPreviousData: true })
+	);
+	const mailchimpIntegration = $derived(
+		(mailchimpIntegrationQuery.data ?? null) as MarketingIntegration
+	);
+	const constantContactIntegration = $derived(
+		(constantContactIntegrationQuery.data ?? null) as MarketingIntegration
 	);
 	const connectedIntegration = $derived(
 		integrations.find(
@@ -192,7 +206,10 @@
 			: currentWorkspace?.role === 'owner'
 	);
 	const isLoading = $derived(
-		integrationsQuery.isLoading || marketingIntegrationQuery.isLoading || appContext.isLoading
+		integrationsQuery.isLoading ||
+			mailchimpIntegrationQuery.isLoading ||
+			constantContactIntegrationQuery.isLoading ||
+			appContext.isLoading
 	);
 
 	let manualApiKey = $state('');
@@ -222,9 +239,15 @@
 	const selectedProviderIsConnected = $derived(
 		Boolean(selectedIntegration && selectedIntegration.status !== 'disconnected')
 	);
-	const selectedMailchimpIsConnected = $derived(
-		selectedProvider.key === 'mailchimp' &&
-			Boolean(marketingIntegration && marketingIntegration.status !== 'disconnected')
+	const selectedMarketingIntegration = $derived(
+		selectedProvider.key === 'mailchimp'
+			? mailchimpIntegration
+			: selectedProvider.key === 'constant-contact'
+				? constantContactIntegration
+				: null
+	);
+	const selectedMarketingIsConnected = $derived(
+		Boolean(selectedMarketingIntegration && selectedMarketingIntegration.status !== 'disconnected')
 	);
 	const webhookEventsQuery = useProtectedQuery(
 		api.integrations.listRecentWebhookEvents,
@@ -278,17 +301,23 @@
 	}
 
 	function hasActiveConnection(provider: ProviderDefinition) {
-		if (provider.key === 'mailchimp') {
-			return Boolean(marketingIntegration && marketingIntegration.status !== 'disconnected');
+		if (provider.key === 'mailchimp' || provider.key === 'constant-contact') {
+			return Boolean(
+				(provider.key === 'mailchimp' ? mailchimpIntegration : constantContactIntegration) &&
+				(provider.key === 'mailchimp' ? mailchimpIntegration : constantContactIntegration)
+					?.status !== 'disconnected'
+			);
 		}
 		const integration = integrationForProvider(provider.key);
 		return Boolean(integration && integration.status !== 'disconnected');
 	}
 
 	function providerStateFor(provider: ProviderDefinition): ProviderState {
-		if (provider.key === 'mailchimp') {
-			if (marketingIntegration && marketingIntegration.status !== 'disconnected') {
-				return marketingIntegration.status;
+		if (provider.key === 'mailchimp' || provider.key === 'constant-contact') {
+			const integration =
+				provider.key === 'mailchimp' ? mailchimpIntegration : constantContactIntegration;
+			if (integration && integration.status !== 'disconnected') {
+				return integration.status;
 			}
 			return provider.availability;
 		}
@@ -315,14 +344,15 @@
 		return `Connect ${providerName} to organize waiver submissions by booking.`;
 	}
 
-	function mailchimpStatusCopy(integration: NonNullable<MarketingIntegration>) {
+	function marketingStatusCopy(integration: NonNullable<MarketingIntegration>) {
+		const providerName = integration.provider === 'mailchimp' ? 'Mailchimp' : 'Constant Contact';
 		if (integration.status === 'pending_configuration') {
-			return 'Mailchimp is connected. Choose the audience that should receive opted-in signers.';
+			return `${providerName} is connected. Choose the list that should receive opted-in signers.`;
 		}
 		if (integration.status === 'error') {
-			return 'Mailchimp is connected, but recent contact syncs need attention.';
+			return `${providerName} is connected, but recent contact syncs need attention.`;
 		}
-		return 'Mailchimp is connected and sends opted-in signer contacts to the selected audience.';
+		return `${providerName} is connected and sends opted-in signer contacts to the selected list.`;
 	}
 
 	function formatTimestamp(timestamp: number | null) {
@@ -721,8 +751,8 @@
 							<p class="text-sm leading-relaxed text-muted-foreground">
 								{#if selectedProviderIsConnected && selectedIntegration}
 									{statusCopy(selectedIntegration)}
-								{:else if selectedMailchimpIsConnected && marketingIntegration}
-									{mailchimpStatusCopy(marketingIntegration)}
+								{:else if selectedMarketingIsConnected && selectedMarketingIntegration}
+									{marketingStatusCopy(selectedMarketingIntegration)}
 								{:else}
 									{selectedProvider.detailDescription}
 								{/if}
@@ -730,13 +760,13 @@
 						</div>
 					</div>
 
-					{#if selectedMailchimpIsConnected && marketingIntegration}
+					{#if selectedMarketingIsConnected && selectedMarketingIntegration}
 						<Button
 							size="sm"
 							variant="outline"
 							class="shrink-0 self-start"
 							onclick={() => (mailchimpDisconnectDialogOpen = true)}
-							disabled={convex.disabled || !marketingIntegration.canManage}
+							disabled={convex.disabled || !selectedMarketingIntegration.canManage}
 						>
 							<UnplugIcon class="size-3.5" aria-hidden="true" />
 							Disconnect
@@ -755,11 +785,12 @@
 					{/if}
 				</div>
 
-				{#if selectedProvider.key === 'mailchimp'}
+				{#if selectedProvider.key === 'mailchimp' || selectedProvider.key === 'constant-contact'}
 					<MailchimpIntegrationPanel
 						workspaceId={currentWorkspace.workspaceId}
-						integration={marketingIntegration}
-						canManage={marketingIntegration?.canManage ?? currentWorkspace.role === 'owner'}
+						integration={selectedMarketingIntegration}
+						provider={selectedProvider.key === 'mailchimp' ? 'mailchimp' : 'constant_contact'}
+						canManage={selectedMarketingIntegration?.canManage ?? currentWorkspace.role === 'owner'}
 						bind:disconnectDialogOpen={mailchimpDisconnectDialogOpen}
 					/>
 				{:else if selectedProviderIsConnected && selectedIntegration}
