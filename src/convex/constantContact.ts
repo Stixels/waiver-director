@@ -292,14 +292,18 @@ export const completeOAuthCallback = internalAction({
 				sessionId: session.sessionId,
 				status: 'expired'
 			});
-			return { redirectUrl: `${integrationUrl}?constant-contact=expired` };
+			return {
+				redirectUrl: `${integrationUrl}?marketing=constant-contact&marketing-status=expired`
+			};
 		}
 		if (args.error || !args.code) {
 			await ctx.runMutation(internal.marketingIntegrations.markConnectionSession, {
 				sessionId: session.sessionId,
 				status: 'failed'
 			});
-			return { redirectUrl: `${integrationUrl}?constant-contact=denied` };
+			return {
+				redirectUrl: `${integrationUrl}?marketing=constant-contact&marketing-status=denied`
+			};
 		}
 		try {
 			const tokens = await exchangeToken(
@@ -321,7 +325,9 @@ export const completeOAuthCallback = internalAction({
 				sessionId: session.sessionId,
 				status: 'completed'
 			});
-			return { redirectUrl: `${integrationUrl}?constant-contact=connected` };
+			return {
+				redirectUrl: `${integrationUrl}?marketing=constant-contact&marketing-status=authorized`
+			};
 		} catch (error) {
 			console.error('[constant-contact/oauth] unable to complete OAuth callback', {
 				error: providerErrorMessage(error),
@@ -331,7 +337,9 @@ export const completeOAuthCallback = internalAction({
 				sessionId: session.sessionId,
 				status: 'failed'
 			});
-			return { redirectUrl: `${integrationUrl}?constant-contact=callback-error` };
+			return {
+				redirectUrl: `${integrationUrl}?marketing=constant-contact&marketing-status=callback-error`
+			};
 		}
 	}
 });

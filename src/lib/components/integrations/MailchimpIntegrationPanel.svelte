@@ -28,6 +28,8 @@
 		integration: Integration;
 		provider: 'mailchimp' | 'constant_contact';
 		canManage: boolean;
+		requestAudiencePicker?: boolean;
+		onAudiencePickerOpened?: () => void;
 		disconnectDialogOpen?: boolean;
 	}
 
@@ -36,6 +38,8 @@
 		integration,
 		provider,
 		canManage,
+		requestAudiencePicker = false,
+		onAudiencePickerOpened,
 		disconnectDialogOpen = $bindable(false)
 	}: Props = $props();
 	const convex = useConvexClient();
@@ -49,6 +53,7 @@
 	let audienceDialogOpen = $state(false);
 	let audiences = $state<Audience[]>([]);
 	let selectedAudienceId = $state('');
+	let hasHandledAudiencePickerRequest = $state(false);
 
 	function formatTimestamp(timestamp: number | null) {
 		if (!timestamp) return 'Not recorded';
@@ -95,6 +100,23 @@
 			isLoadingAudiences = false;
 		}
 	}
+
+	$effect(() => {
+		if (!requestAudiencePicker) {
+			hasHandledAudiencePickerRequest = false;
+			return;
+		}
+		if (
+			hasHandledAudiencePickerRequest ||
+			integration?.status !== 'pending_configuration' ||
+			!canManage
+		) {
+			return;
+		}
+		hasHandledAudiencePickerRequest = true;
+		void openAudiencePicker();
+		onAudiencePickerOpened?.();
+	});
 
 	async function saveAudience() {
 		if (convex.disabled || !selectedAudienceId || !canManage) return;

@@ -246,14 +246,14 @@ export const completeOAuthCallback = internalAction({
 				sessionId: session.sessionId,
 				status: 'expired'
 			});
-			return { redirectUrl: `${integrationUrl}?mailchimp=expired` };
+			return { redirectUrl: `${integrationUrl}?marketing=mailchimp&marketing-status=expired` };
 		}
 		if (args.error || !args.code) {
 			await ctx.runMutation(internal.marketingIntegrations.markConnectionSession, {
 				sessionId: session.sessionId,
 				status: 'failed'
 			});
-			return { redirectUrl: `${integrationUrl}?mailchimp=denied` };
+			return { redirectUrl: `${integrationUrl}?marketing=mailchimp&marketing-status=denied` };
 		}
 
 		try {
@@ -318,7 +318,7 @@ export const completeOAuthCallback = internalAction({
 				sessionId: session.sessionId,
 				status: 'completed'
 			});
-			return { redirectUrl: `${integrationUrl}?mailchimp=connected` };
+			return { redirectUrl: `${integrationUrl}?marketing=mailchimp&marketing-status=authorized` };
 		} catch (error) {
 			console.error('[mailchimp/oauth] unable to complete OAuth callback', {
 				error: providerErrorMessage(error),
@@ -328,7 +328,9 @@ export const completeOAuthCallback = internalAction({
 				sessionId: session.sessionId,
 				status: 'failed'
 			});
-			return { redirectUrl: `${integrationUrl}?mailchimp=callback-error` };
+			return {
+				redirectUrl: `${integrationUrl}?marketing=mailchimp&marketing-status=callback-error`
+			};
 		}
 	}
 });

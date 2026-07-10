@@ -2,6 +2,8 @@
 	import type { FunctionReturnType } from 'convex/server';
 	import { useConvexClient } from 'convex-svelte';
 	import { dev } from '$app/environment';
+	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { toast } from 'svelte-sonner';
 	import { api } from '$convex/_generated/api';
@@ -211,9 +213,9 @@
 			constantContactIntegrationQuery.isLoading ||
 			appContext.isLoading
 	);
-
 	let manualApiKey = $state('');
 	let selectedProviderKey = $state('bookeo');
+	let lastMarketingCallback = $state<string | null>(null);
 	let connectSheetOpen = $state(false);
 	let isStartingConnect = $state(false);
 	let isConnectingManually = $state(false);
@@ -221,6 +223,16 @@
 	let showManualFallback = $state(false);
 	let disconnectDialogOpen = $state(false);
 	let mailchimpDisconnectDialogOpen = $state(false);
+	const marketingCallbackProvider = $derived.by(() => {
+		const provider = page.url.searchParams.get('marketing');
+		return provider === 'mailchimp' || provider === 'constant-contact' ? provider : null;
+	});
+	const marketingCallbackStatus = $derived(page.url.searchParams.get('marketing-status'));
+	const shouldOpenMarketingAudiencePicker = $derived(
+		marketingCallbackProvider !== null &&
+			marketingCallbackStatus === 'authorized' &&
+			selectedProviderKey === marketingCallbackProvider
+	);
 	let disconnectConfirmation = $state('');
 	const disconnectConfirmationPhrase = 'DISCONNECT';
 	const canConfirmDisconnect = $derived(
@@ -329,6 +341,45 @@
 	function providerNameFor(providerKey: string) {
 		return ALL_PROVIDERS.find((provider) => provider.key === providerKey)?.name ?? providerKey;
 	}
+
+	async function clearMarketingCallbackParams() {
+		const params = new URLSearchParams(page.url.searchParams);
+		params.delete('marketing');
+		params.delete('marketing-status');
+		const pathname =
+			`/app/${page.params.workspaceSlug}/integrations` as `/app/${string}/integrations`;
+		const href = params.size > 0 ? `${pathname}?${params}` : pathname;
+		await goto(resolve(href as `/app/${string}/integrations`), {
+			replaceState: true,
+			noScroll: true,
+			keepFocus: true
+		});
+	}
+
+	function handleAudiencePickerOpened() {
+		void clearMarketingCallbackParams();
+	}
+
+	$effect(() => {
+		if (!marketingCallbackProvider || !marketingCallbackStatus) return;
+		selectedProviderKey = marketingCallbackProvider;
+		const callbackKey = `${marketingCallbackProvider}:${marketingCallbackStatus}`;
+		if (lastMarketingCallback === callbackKey) return;
+		lastMarketingCallback = callbackKey;
+		const providerName = providerNameFor(marketingCallbackProvider);
+		if (marketingCallbackStatus === 'authorized') {
+			toast.success(`${providerName} authorized. Choose a destination to finish setup.`);
+			return;
+		}
+		if (marketingCallbackStatus === 'denied') {
+			toast.error(`${providerName} authorization was cancelled.`);
+		} else if (marketingCallbackStatus === 'expired') {
+			toast.error(`${providerName} authorization expired. Please try again.`);
+		} else {
+			toast.error(`Unable to complete ${providerName} authorization. Please try again.`);
+		}
+		void clearMarketingCallbackParams();
+	});
 
 	function statusCopy(integration: Integration) {
 		const providerName = providerNameFor(integration.provider);
@@ -791,6 +842,8 @@
 						integration={selectedMarketingIntegration}
 						provider={selectedProvider.key === 'mailchimp' ? 'mailchimp' : 'constant_contact'}
 						canManage={selectedMarketingIntegration?.canManage ?? currentWorkspace.role === 'owner'}
+						requestAudiencePicker={shouldOpenMarketingAudiencePicker}
+						onAudiencePickerOpened={handleAudiencePickerOpened}
 						bind:disconnectDialogOpen={mailchimpDisconnectDialogOpen}
 					/>
 				{:else if selectedProviderIsConnected && selectedIntegration}
