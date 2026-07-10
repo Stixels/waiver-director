@@ -113,6 +113,21 @@ function providerErrorMessage(error: unknown) {
 	return 'Mailchimp request failed.';
 }
 
+async function fetchWithTimeout(input: string, init: RequestInit = {}) {
+	const controller = new AbortController();
+	const timeout = setTimeout(() => controller.abort(), MAILCHIMP_REQUEST_TIMEOUT_MS);
+	try {
+		return await fetch(input, { ...init, signal: controller.signal });
+	} catch (error) {
+		if (error instanceof Error && error.name === 'AbortError') {
+			throw new ConvexError({ code: 'provider_error', message: 'Mailchimp request timed out.' });
+		}
+		throw error;
+	} finally {
+		clearTimeout(timeout);
+	}
+}
+
 async function mailchimpFetch(
 	serverPrefix: string,
 	accessToken: string,
@@ -240,7 +255,7 @@ export const completeOAuthCallback = internalAction({
 		}
 
 		try {
-			const tokenResponse = await fetch('https://login.mailchimp.com/oauth2/token', {
+			const tokenResponse = await fetchWithTimeout('https://login.mailchimp.com/oauth2/token', {
 				method: 'POST',
 				body: new URLSearchParams({
 					grant_type: 'authorization_code',
@@ -264,9 +279,12 @@ export const completeOAuthCallback = internalAction({
 				});
 			}
 
-			const metadataResponse = await fetch('https://login.mailchimp.com/oauth2/metadata', {
-				headers: { Authorization: `OAuth ${tokenBody.access_token}` }
-			});
+			const metadataResponse = await fetchWithTimeout(
+				'https://login.mailchimp.com/oauth2/metadata',
+				{
+					headers: { Authorization: `OAuth ${tokenBody.access_token}` }
+				}
+			);
 			if (!metadataResponse.ok) {
 				throw new ConvexError({
 					code: 'provider_error',

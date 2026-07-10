@@ -330,7 +330,9 @@ export default defineSchema({
 	})
 		.index('by_submissionId', ['submissionId'])
 		.index('by_integrationId_and_submissionId', ['integrationId', 'submissionId'])
-		.index('by_workspaceId_and_status', ['workspaceId', 'status']),
+		.index('by_workspaceId_and_status', ['workspaceId', 'status'])
+		.index('by_integrationId_and_status', ['integrationId', 'status'])
+		.index('by_status_and_updatedAt', ['status', 'updatedAt']),
 
 	booking_connection_sessions: defineTable({
 		workspaceId: v.id('workspaces'),

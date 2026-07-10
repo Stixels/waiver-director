@@ -1,9 +1,45 @@
 import { ConvexError, v } from 'convex/values';
-import { internalMutation, internalQuery, mutation, query } from './_generated/server';
+import { internal } from './_generated/api';
+import {
+	internalMutation,
+	internalQuery,
+	mutation,
+	query,
+	type MutationCtx
+} from './_generated/server';
+import type { Id } from './_generated/dataModel';
 import { marketingIntegrationStatusValidator, marketingProviderValidator } from './lib/marketing';
 import { requireWorkspaceMember, requireWorkspaceOwner } from './lib/waivers';
 
 const CONNECTION_SESSION_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
+const CONTACT_SYNC_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+const CONTACT_SYNC_BATCH_SIZE = 100;
+const DISCONNECTED_CONTACT_SYNC_ERROR = 'Mailchimp was disconnected.';
+
+async function failQueuedContactSyncBatch(
+	ctx: MutationCtx,
+	integrationId: Id<'marketing_integrations'>,
+	workspaceId: Id<'workspaces'>,
+	disconnectedAt: number
+) {
+	const syncs = await ctx.db
+		.query('marketing_contact_syncs')
+		.withIndex('by_integrationId_and_status', (q) =>
+			q.eq('integrationId', integrationId).eq('status', 'queued')
+		)
+		.take(CONTACT_SYNC_BATCH_SIZE);
+	let failedCount = 0;
+	for (const sync of syncs) {
+		if (sync.workspaceId !== workspaceId || sync.createdAt > disconnectedAt) continue;
+		await ctx.db.patch(sync._id, {
+			status: 'failed',
+			lastError: DISCONNECTED_CONTACT_SYNC_ERROR,
+			updatedAt: disconnectedAt
+		});
+		failedCount += 1;
+	}
+	return failedCount;
+}
 
 const marketingIntegrationSummary = v.object({
 	integrationId: v.id('marketing_integrations'),
@@ -146,6 +182,32 @@ export const pruneOldConnectionSessionsCron = internalMutation({
 	}
 });
 
+export const pruneOldContactSyncsCron = internalMutation({
+	args: {},
+	returns: v.object({ deletedCount: v.number() }),
+	handler: async (ctx) => {
+		const cutoff = Date.now() - CONTACT_SYNC_RETENTION_MS;
+		const statuses = ['synced', 'failed'] as const;
+		let deletedCount = 0;
+		let hasMore = false;
+		for (const status of statuses) {
+			const syncs = await ctx.db
+				.query('marketing_contact_syncs')
+				.withIndex('by_status_and_updatedAt', (q) => q.eq('status', status).lt('updatedAt', cutoff))
+				.take(CONTACT_SYNC_BATCH_SIZE);
+			for (const sync of syncs) {
+				await ctx.db.delete(sync._id);
+				deletedCount += 1;
+			}
+			hasMore ||= syncs.length === CONTACT_SYNC_BATCH_SIZE;
+		}
+		if (hasMore) {
+			await ctx.scheduler.runAfter(0, internal.marketingIntegrations.pruneOldContactSyncsCron, {});
+		}
+		return { deletedCount };
+	}
+});
+
 export const saveOAuthConnection = internalMutation({
 	args: {
 		workspaceId: v.id('workspaces'),
@@ -267,6 +329,44 @@ export const disconnectMailchimp = mutation({
 			disconnectedAt: now,
 			updatedAt: now
 		});
+		const failedCount = await failQueuedContactSyncBatch(
+			ctx,
+			integration._id,
+			args.workspaceId,
+			now
+		);
+		if (failedCount === CONTACT_SYNC_BATCH_SIZE) {
+			await ctx.scheduler.runAfter(
+				0,
+				internal.marketingIntegrations.failQueuedContactSyncsForDisconnectedIntegration,
+				{ integrationId: integration._id, workspaceId: args.workspaceId, disconnectedAt: now }
+			);
+		}
+		return null;
+	}
+});
+
+export const failQueuedContactSyncsForDisconnectedIntegration = internalMutation({
+	args: {
+		integrationId: v.id('marketing_integrations'),
+		workspaceId: v.id('workspaces'),
+		disconnectedAt: v.number()
+	},
+	returns: v.null(),
+	handler: async (ctx, args) => {
+		const failedCount = await failQueuedContactSyncBatch(
+			ctx,
+			args.integrationId,
+			args.workspaceId,
+			args.disconnectedAt
+		);
+		if (failedCount === CONTACT_SYNC_BATCH_SIZE) {
+			await ctx.scheduler.runAfter(
+				0,
+				internal.marketingIntegrations.failQueuedContactSyncsForDisconnectedIntegration,
+				args
+			);
+		}
 		return null;
 	}
 });
