@@ -129,6 +129,14 @@ pnpm exec convex env set --from-file .env.local
 
 Use `--force` only when intentionally replacing existing Convex values.
 
+## Preview Deployments
+
+Vercel preview builds deploy an isolated Convex preview backend and compile its URL into the app.
+The Vercel build command also derives `PUBLIC_APP_URL` from that deployment's `VERCEL_URL`, so
+copied links in a preview stay on that preview rather than pointing at production. See
+[Vercel preview deployments](docs/operations/vercel-preview-deployments.md) for the deployment
+contract and validation steps.
+
 ## Development Scripts
 
 ```sh
