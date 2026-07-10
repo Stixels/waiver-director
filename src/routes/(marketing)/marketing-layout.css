@@ -51,6 +51,8 @@ body:has(.mkt) {
 	--m-text-1: oklch(0.97 0 0);
 	--m-text-2: oklch(0.65 0.005 286);
 	--m-text-3: oklch(0.6 0.005 286);
+	/* Keep semantic text utilities aligned with this fixed dark theme. */
+	--foreground: var(--m-text-1);
 	--muted-foreground: var(--m-text-3);
 
 	/* Typography */
