@@ -14,6 +14,7 @@
 	import UpgradeOverlay from '$lib/components/app/UpgradeOverlay.svelte';
 	import { useProtectedQuery } from '$lib/components/auth/convex-auth.svelte';
 	import { getConvexErrorMessage } from '$lib/utils/convex-errors';
+	import { billingUpgradeHref } from '$lib/utils/billing';
 	import { escapeHtml } from '$lib/utils/rich-text-client';
 	import { parseConvexId, queryString } from '$lib/utils/url';
 
@@ -76,9 +77,10 @@
 	const canUseEmailFollowups = $derived(Boolean(currentWorkspace?.billing.features.emailFollowups));
 	const workspacePausedOnPro = $derived(Boolean(currentWorkspace?.billing.workspaceLimit.isPaused));
 	const billingHref = $derived(
-		workspacePausedOnPro
-			? `/app/${currentWorkspace?.slug ?? page.params.workspaceSlug}/account/plan`
-			: `/app/${currentWorkspace?.slug ?? page.params.workspaceSlug}/account#/billing/plans`
+		billingUpgradeHref(
+			currentWorkspace?.slug ?? page.params.workspaceSlug ?? '',
+			workspacePausedOnPro
+		)
 	);
 
 	// ─── Queries ───────────────────────────────────────────────────────────────

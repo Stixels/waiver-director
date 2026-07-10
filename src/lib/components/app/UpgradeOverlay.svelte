@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { cn } from '$lib/utils';
 	import ArrowRightIcon from '@lucide/svelte/icons/arrow-right';
@@ -20,9 +21,16 @@
 		actionLabel = 'View billing',
 		class: className = ''
 	}: Props = $props();
+
+	let overlayElement: HTMLDivElement | null = null;
+
+	onMount(() => {
+		overlayElement?.focus();
+	});
 </script>
 
 <div
+	bind:this={overlayElement}
 	class={cn(
 		'absolute inset-0 z-30 flex items-center justify-center bg-background/72 p-4 backdrop-blur-[2px]',
 		className
@@ -31,6 +39,7 @@
 	aria-modal="true"
 	aria-labelledby="upgrade-overlay-title"
 	aria-describedby="upgrade-overlay-description"
+	tabindex="-1"
 >
 	<div
 		class="w-full max-w-md overflow-hidden rounded-lg border border-border bg-card text-card-foreground shadow-xl shadow-foreground/10"

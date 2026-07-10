@@ -1,5 +1,6 @@
 import { defineSchema, defineTable } from 'convex/server';
 import { v } from 'convex/values';
+import { billingFeatureValidator } from './lib/billing';
 import { bookingProviderValidator, bookingSnapshotValidator } from './lib/bookings';
 import { marketingIntegrationStatusValidator, marketingProviderValidator } from './lib/marketing';
 
@@ -32,7 +33,7 @@ export default defineSchema({
 		providerUserId: v.string(),
 		planSlug: v.string(),
 		status: v.string(),
-		featureSlugs: v.array(v.string()),
+		featureSlugs: v.array(billingFeatureValidator),
 		currentPeriodEnd: v.optional(v.number()),
 		trialEndsAt: v.optional(v.number()),
 		cancelAtPeriodEnd: v.optional(v.boolean()),
@@ -46,6 +47,12 @@ export default defineSchema({
 		.index('by_userId', ['userId'])
 		.index('by_provider_and_providerUserId', ['provider', 'providerUserId'])
 		.index('by_lastEventId', ['lastEventId']),
+
+	clerk_billing_webhook_events: defineTable({
+		eventId: v.string(),
+		eventType: v.string(),
+		processedAt: v.number()
+	}).index('by_eventId', ['eventId']),
 
 	workspaces: defineTable({
 		name: v.string(),

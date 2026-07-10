@@ -60,11 +60,11 @@ export function escapeHtml(value: string): string {
 export function decodeHtml(value: string): string {
 	return value
 		.replaceAll('&nbsp;', ' ')
-		.replaceAll('&amp;', '&')
 		.replaceAll('&lt;', '<')
 		.replaceAll('&gt;', '>')
 		.replaceAll('&quot;', '"')
-		.replaceAll('&#39;', "'");
+		.replaceAll('&#39;', "'")
+		.replaceAll('&amp;', '&');
 }
 
 export function hasSupportedHtmlTag(input: string): boolean {

@@ -38,6 +38,7 @@
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { cn } from '$lib/utils';
 	import { getConvexErrorMessage } from '$lib/utils/convex-errors';
+	import { billingUpgradeHref } from '$lib/utils/billing';
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
 	import ExternalLinkIcon from '@lucide/svelte/icons/external-link';
 	import KeyRoundIcon from '@lucide/svelte/icons/key-round';
@@ -216,9 +217,7 @@
 	);
 	const workspacePausedOnPro = $derived(Boolean(currentWorkspace?.billing.workspaceLimit.isPaused));
 	const billingHref = $derived(
-		workspacePausedOnPro
-			? `/app/${page.params.workspaceSlug}/account/plan`
-			: `/app/${page.params.workspaceSlug}/account#/billing/plans`
+		billingUpgradeHref(page.params.workspaceSlug ?? '', workspacePausedOnPro)
 	);
 	const selectedProviderIsConnected = $derived(
 		Boolean(selectedIntegration && selectedIntegration.status !== 'disconnected')
@@ -356,16 +355,20 @@
 		return 'bg-muted-foreground';
 	}
 
+	function isBookingIntegrationAccessBlocked() {
+		if (canUseBookingIntegrations) return false;
+
+		toast.message(
+			workspacePausedOnPro
+				? 'Make this your primary workspace to connect booking integrations.'
+				: 'Upgrade to Pro to connect booking integrations.'
+		);
+		return true;
+	}
+
 	async function startBookeoConnect() {
 		if (!currentWorkspace || convex.disabled) return;
-		if (!canUseBookingIntegrations) {
-			toast.message(
-				workspacePausedOnPro
-					? 'Make this your primary workspace to connect booking integrations.'
-					: 'Upgrade to Pro to connect booking integrations.'
-			);
-			return;
-		}
+		if (isBookingIntegrationAccessBlocked()) return;
 		isStartingConnect = true;
 		try {
 			const result = await convex.action(api.integrations.startBookeoConnect, {
@@ -381,14 +384,7 @@
 
 	async function connectManually() {
 		if (!currentWorkspace || convex.disabled) return;
-		if (!canUseBookingIntegrations) {
-			toast.message(
-				workspacePausedOnPro
-					? 'Make this your primary workspace to connect booking integrations.'
-					: 'Upgrade to Pro to connect booking integrations.'
-			);
-			return;
-		}
+		if (isBookingIntegrationAccessBlocked()) return;
 		const apiKeyTrimmed = manualApiKey.trim();
 		isConnectingManually = true;
 		try {

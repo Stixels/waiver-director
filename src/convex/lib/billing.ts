@@ -284,10 +284,7 @@ export async function requireWorkspaceFeature(
 }
 
 export async function canCreateWorkspace(ctx: FunctionCtx, userId: Id<'users'>) {
-	const ownedWorkspace = await ctx.db
-		.query('workspaces')
-		.withIndex('by_createdByUserId', (query) => query.eq('createdByUserId', userId))
-		.first();
+	const ownedWorkspace = (await listOwnedWorkspacesForBilling(ctx, userId))[0];
 
 	if (!ownedWorkspace) return true;
 	return await userHasBillingFeature(ctx, userId, 'multi_workspace');
