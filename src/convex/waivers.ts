@@ -7,6 +7,7 @@ import { internal } from './_generated/api';
 import { bookingSnapshot, bookingSnapshotValidator } from './lib/bookings';
 import { upsertSignerCustomer } from './lib/customers';
 import { submissionSearchText } from './lib/submissions';
+import { marketingConsentLabel } from './lib/marketing';
 import {
 	assertWorkspaceRecord,
 	minorInputValidator,
@@ -49,7 +50,11 @@ const publicWaiverValue = v.object({
 	workspaceName: v.string(),
 	title: v.string(),
 	introCopy: v.string(),
-	fields: v.array(waiverFieldValidator)
+	fields: v.array(waiverFieldValidator),
+	marketingOptIn: v.union(
+		v.null(),
+		v.object({ provider: v.literal('mailchimp'), label: v.string() })
+	)
 });
 
 const publicBookingWaiverValue = v.object({
@@ -59,6 +64,10 @@ const publicBookingWaiverValue = v.object({
 	title: v.string(),
 	introCopy: v.string(),
 	fields: v.array(waiverFieldValidator),
+	marketingOptIn: v.union(
+		v.null(),
+		v.object({ provider: v.literal('mailchimp'), label: v.string() })
+	),
 	booking: v.object({
 		lookupToken: v.string(),
 		activityName: v.string(),
@@ -289,7 +298,9 @@ export const getSubmission = query({
 			workspaceName: v.string(),
 			waiver: waiverDefinitionValidator,
 			minors: v.array(v.string()),
-			booking: v.union(v.null(), bookingSnapshotValidator)
+			booking: v.union(v.null(), bookingSnapshotValidator),
+			marketingConsent: v.boolean(),
+			marketingConsentLabel: v.union(v.string(), v.null())
 		})
 	),
 	handler: async (ctx, args) => {
@@ -344,7 +355,9 @@ export const getSubmission = query({
 				fields: version.fields
 			},
 			minors: submission.minors.map((participant) => participant.fullName),
-			booking: submission.bookingSnapshot ?? null
+			booking: submission.bookingSnapshot ?? null,
+			marketingConsent: submission.marketingConsent ?? false,
+			marketingConsentLabel: submission.marketingConsentLabel ?? null
 		};
 	}
 });
@@ -420,9 +433,15 @@ export const getPublicWaiverBySlug = query({
 			return null;
 		}
 
-		const [workspace, version] = await Promise.all([
+		const [workspace, version, marketingIntegration] = await Promise.all([
 			ctx.db.get(waiver.workspaceId),
-			ctx.db.get(waiver.publishedVersionId)
+			ctx.db.get(waiver.publishedVersionId),
+			ctx.db
+				.query('marketing_integrations')
+				.withIndex('by_workspaceId_and_provider', (q) =>
+					q.eq('workspaceId', waiver.workspaceId).eq('provider', 'mailchimp')
+				)
+				.unique()
 		]);
 
 		if (!workspace || !version || version.waiverId !== waiver._id) {
@@ -438,7 +457,11 @@ export const getPublicWaiverBySlug = query({
 			workspaceName: workspace.name,
 			title: version.title,
 			introCopy: version.introCopy,
-			fields: version.fields
+			fields: version.fields,
+			marketingOptIn:
+				marketingIntegration?.status === 'connected' && marketingIntegration.audienceId
+					? { provider: 'mailchimp' as const, label: marketingConsentLabel(workspace.name) }
+					: null
 		};
 	}
 });
@@ -466,9 +489,15 @@ export const getPublicWaiverForBooking = query({
 			return null;
 		}
 
-		const [workspace, version] = await Promise.all([
+		const [workspace, version, marketingIntegration] = await Promise.all([
 			ctx.db.get(waiver.workspaceId),
-			ctx.db.get(waiver.publishedVersionId)
+			ctx.db.get(waiver.publishedVersionId),
+			ctx.db
+				.query('marketing_integrations')
+				.withIndex('by_workspaceId_and_provider', (q) =>
+					q.eq('workspaceId', waiver.workspaceId).eq('provider', 'mailchimp')
+				)
+				.unique()
 		]);
 		if (!workspace || !version || version.waiverId !== waiver._id) {
 			throw new ConvexError({
@@ -483,6 +512,10 @@ export const getPublicWaiverForBooking = query({
 			title: version.title,
 			introCopy: version.introCopy,
 			fields: version.fields,
+			marketingOptIn:
+				marketingIntegration?.status === 'connected' && marketingIntegration.audienceId
+					? { provider: 'mailchimp' as const, label: marketingConsentLabel(workspace.name) }
+					: null,
 			booking: {
 				lookupToken: booking.lookupToken,
 				activityName: booking.activityName,
@@ -505,6 +538,7 @@ export const submitPublicWaiver = mutation({
 		signerEmail: v.string(),
 		signerDateOfBirth: v.string(),
 		signatureDataUrl: v.string(),
+		marketingConsent: v.optional(v.boolean()),
 		answers: v.record(v.string(), waiverAnswerValueValidator),
 		minors: v.array(minorInputValidator)
 	},
@@ -568,6 +602,23 @@ export const submitPublicWaiver = mutation({
 
 		validateSubmissionAnswers(version, args.answers);
 		const minors = validateMinors(args.minors);
+		const [workspace, marketingIntegration] = await Promise.all([
+			ctx.db.get(waiver.workspaceId),
+			ctx.db
+				.query('marketing_integrations')
+				.withIndex('by_workspaceId_and_provider', (q) =>
+					q.eq('workspaceId', waiver.workspaceId).eq('provider', 'mailchimp')
+				)
+				.unique()
+		]);
+		if (!workspace) {
+			throw new ConvexError({ code: 'not_found', message: 'Workspace not found.' });
+		}
+		const marketingEnabled = Boolean(
+			marketingIntegration?.status === 'connected' && marketingIntegration.audienceId
+		);
+		const marketingConsent = marketingEnabled && args.marketingConsent === true;
+		const consentLabel = marketingEnabled ? marketingConsentLabel(workspace.name) : null;
 		let booking: Doc<'bookings'> | null = null;
 		const bookingLookupToken = args.bookingLookupToken;
 		if (bookingLookupToken) {
@@ -605,6 +656,8 @@ export const submitPublicWaiver = mutation({
 			answers: args.answers,
 			minors,
 			status: 'submitted',
+			marketingConsent,
+			...(consentLabel ? { marketingConsentLabel: consentLabel } : {}),
 			submittedAt
 		});
 		const customerId = await upsertSignerCustomer(ctx, {
@@ -616,6 +669,21 @@ export const submitPublicWaiver = mutation({
 			latestSubmissionId: submissionId
 		});
 		await ctx.db.patch(submissionId, { customerId });
+
+		if (marketingConsent && marketingIntegration?.audienceId) {
+			const syncId = await ctx.db.insert('marketing_contact_syncs', {
+				workspaceId: waiver.workspaceId,
+				integrationId: marketingIntegration._id,
+				submissionId,
+				provider: 'mailchimp',
+				audienceId: marketingIntegration.audienceId,
+				status: 'queued',
+				attempts: 0,
+				createdAt: submittedAt,
+				updatedAt: submittedAt
+			});
+			await ctx.scheduler.runAfter(0, internal.mailchimp.syncContact, { syncId });
+		}
 
 		await ctx.scheduler.runAfter(0, internal.emails.scheduleFollowUpOnSubmission, {
 			workspaceId: waiver.workspaceId,
