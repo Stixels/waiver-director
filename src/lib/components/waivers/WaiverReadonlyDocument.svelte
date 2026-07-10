@@ -23,6 +23,8 @@
 		signerDateOfBirth?: string;
 		minors?: string[];
 		answers?: Record<string, string | boolean | null>;
+		marketingConsent?: boolean;
+		marketingConsentLabel?: string | null;
 		signatureDataUrl?: string;
 		submittedAt?: number;
 	}
@@ -37,6 +39,8 @@
 		signerDateOfBirth = '',
 		minors = [],
 		answers = {},
+		marketingConsent = false,
+		marketingConsentLabel = null,
 		signatureDataUrl = '',
 		submittedAt
 	}: Props = $props();
@@ -122,6 +126,16 @@
 							<WaiverFieldDisplay {field} value={answers[field.id]} {preview} />
 						{/each}
 					</WaiverPublicAdditionalInfoSection>
+				{/if}
+
+				{#if !preview && marketingConsentLabel}
+					<div class="mt-8 border-t border-border pt-8">
+						<h3 class="mb-4 text-lg font-semibold tracking-tight">Marketing consent</h3>
+						<p class="text-sm">{marketingConsentLabel}</p>
+						<p class="mt-2 text-sm font-semibold">
+							{marketingConsent ? 'Opted in' : 'Did not opt in'}
+						</p>
+					</div>
 				{/if}
 
 				<div class="mt-8 border-t border-border pt-8">

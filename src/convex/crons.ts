@@ -17,4 +17,11 @@ crons.interval(
 	{}
 );
 
+crons.interval(
+	'prune old marketing connection sessions',
+	{ hours: 24 },
+	internal.marketingIntegrations.pruneOldConnectionSessionsCron,
+	{}
+);
+
 export default crons;

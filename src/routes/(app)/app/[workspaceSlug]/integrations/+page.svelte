@@ -14,6 +14,7 @@
 	import { useAppContext } from '$lib/components/app/app-context.svelte';
 	import PageHeader from '$lib/components/app/PageHeader.svelte';
 	import PageShell from '$lib/components/app/PageShell.svelte';
+	import MailchimpIntegrationPanel from '$lib/components/integrations/MailchimpIntegrationPanel.svelte';
 	import { useProtectedQuery } from '$lib/components/auth/convex-auth.svelte';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
@@ -46,8 +47,14 @@
 	import UnplugIcon from '@lucide/svelte/icons/unplug';
 
 	type Integration = FunctionReturnType<typeof api.integrations.listWorkspaceIntegrations>[number];
+	type MarketingIntegration = FunctionReturnType<
+		typeof api.marketingIntegrations.getWorkspaceMarketingIntegration
+	>;
 	type ProviderAvailability = 'available' | 'coming_soon';
-	type ProviderState = Integration['status'] | ProviderAvailability;
+	type ProviderState =
+		| Integration['status']
+		| NonNullable<MarketingIntegration>['status']
+		| ProviderAvailability;
 	type ProviderCategory = 'booking' | 'email';
 	type ProviderDefinition = {
 		key: string;
@@ -112,8 +119,8 @@
 			key: 'mailchimp',
 			name: 'Mailchimp',
 			category: 'email',
-			availability: 'coming_soon',
-			status: 'Coming soon',
+			availability: 'available',
+			status: 'Available',
 			description: 'Push signer contacts to Mailchimp audiences.',
 			detailDescription:
 				'Mailchimp will let you send participant emails to a selected audience after waiver signing.',
@@ -160,6 +167,14 @@
 	);
 
 	const integrations = $derived((integrationsQuery.data ?? []) as Integration[]);
+	const marketingIntegrationQuery = useProtectedQuery(
+		api.marketingIntegrations.getWorkspaceMarketingIntegration,
+		() => (currentWorkspace ? { workspaceId: currentWorkspace.workspaceId } : 'skip'),
+		() => ({ keepPreviousData: true })
+	);
+	const marketingIntegration = $derived(
+		(marketingIntegrationQuery.data ?? null) as MarketingIntegration
+	);
 	const connectedIntegration = $derived(
 		integrations.find(
 			(integration) =>
@@ -176,7 +191,9 @@
 			? connectedIntegration.canManage
 			: currentWorkspace?.role === 'owner'
 	);
-	const isLoading = $derived(integrationsQuery.isLoading || appContext.isLoading);
+	const isLoading = $derived(
+		integrationsQuery.isLoading || marketingIntegrationQuery.isLoading || appContext.isLoading
+	);
 
 	let manualApiKey = $state('');
 	let selectedProviderKey = $state('bookeo');
@@ -186,6 +203,7 @@
 	let isDisconnecting = $state(false);
 	let showManualFallback = $state(false);
 	let disconnectDialogOpen = $state(false);
+	let mailchimpDisconnectDialogOpen = $state(false);
 	let disconnectConfirmation = $state('');
 	const disconnectConfirmationPhrase = 'DISCONNECT';
 	const canConfirmDisconnect = $derived(
@@ -196,6 +214,10 @@
 	const selectedProviderState = $derived(providerStateFor(selectedProvider));
 	const selectedProviderIsConnected = $derived(
 		Boolean(selectedIntegration && selectedIntegration.status !== 'disconnected')
+	);
+	const selectedMailchimpIsConnected = $derived(
+		selectedProvider.key === 'mailchimp' &&
+			Boolean(marketingIntegration && marketingIntegration.status !== 'disconnected')
 	);
 	const webhookEventsQuery = useProtectedQuery(
 		api.integrations.listRecentWebhookEvents,
@@ -213,6 +235,7 @@
 
 	function statusLabel(value: ProviderState) {
 		if (value === 'connected') return 'Connected';
+		if (value === 'pending_configuration') return 'Choose audience';
 		if (value === 'syncing') return 'Syncing';
 		if (value === 'error') return 'Attention needed';
 		if (value === 'available') return 'Available';
@@ -222,6 +245,7 @@
 
 	function statusDotClass(value: ProviderState) {
 		if (value === 'connected') return 'bg-emerald-500';
+		if (value === 'pending_configuration') return 'bg-amber-500';
 		if (value === 'syncing') return 'bg-amber-500 animate-pulse';
 		if (value === 'error') return 'bg-destructive';
 		if (value === 'available') return 'bg-emerald-500';
@@ -246,7 +270,21 @@
 		return integrations.find((integration) => integration.provider === providerKey) ?? null;
 	}
 
+	function hasActiveConnection(provider: ProviderDefinition) {
+		if (provider.key === 'mailchimp') {
+			return Boolean(marketingIntegration && marketingIntegration.status !== 'disconnected');
+		}
+		const integration = integrationForProvider(provider.key);
+		return Boolean(integration && integration.status !== 'disconnected');
+	}
+
 	function providerStateFor(provider: ProviderDefinition): ProviderState {
+		if (provider.key === 'mailchimp') {
+			if (marketingIntegration && marketingIntegration.status !== 'disconnected') {
+				return marketingIntegration.status;
+			}
+			return provider.availability;
+		}
 		const integration = integrationForProvider(provider.key);
 		if (integration && integration.status !== 'disconnected') return integration.status;
 		return provider.availability;
@@ -268,6 +306,16 @@
 			return `${providerName} is connected, but sync needs attention.`;
 		}
 		return `Connect ${providerName} to organize waiver submissions by booking.`;
+	}
+
+	function mailchimpStatusCopy(integration: NonNullable<MarketingIntegration>) {
+		if (integration.status === 'pending_configuration') {
+			return 'Mailchimp is connected. Choose the audience that should receive opted-in signers.';
+		}
+		if (integration.status === 'error') {
+			return 'Mailchimp is connected, but recent contact syncs need attention.';
+		}
+		return 'Mailchimp is connected and sends opted-in signer contacts to the selected audience.';
 	}
 
 	function formatTimestamp(timestamp: number | null) {
@@ -560,7 +608,7 @@
 						<div class="flex flex-col gap-0.5">
 							{#each section.providers as provider (provider.key)}
 								{@const providerStatus = providerStateFor(provider)}
-								{@const providerIntegration = integrationForProvider(provider.key)}
+								{@const providerHasActiveConnection = hasActiveConnection(provider)}
 								{@const isSelected = selectedProviderKey === provider.key}
 								<button
 									type="button"
@@ -589,7 +637,7 @@
 									<span class="flex min-w-0 flex-1 flex-col">
 										<span class="flex min-w-0 items-center gap-1.5">
 											<span class="truncate font-medium">{provider.name}</span>
-											{#if providerIntegration && providerIntegration.status !== 'disconnected'}
+											{#if providerHasActiveConnection}
 												<span
 													class={cn(
 														'size-1.5 shrink-0 rounded-full',
@@ -643,6 +691,8 @@
 							<p class="text-sm leading-relaxed text-muted-foreground">
 								{#if selectedProviderIsConnected && selectedIntegration}
 									{statusCopy(selectedIntegration)}
+								{:else if selectedMailchimpIsConnected && marketingIntegration}
+									{mailchimpStatusCopy(marketingIntegration)}
 								{:else}
 									{selectedProvider.detailDescription}
 								{/if}
@@ -650,7 +700,18 @@
 						</div>
 					</div>
 
-					{#if selectedProviderIsConnected && selectedIntegration}
+					{#if selectedMailchimpIsConnected && marketingIntegration}
+						<Button
+							size="sm"
+							variant="outline"
+							class="shrink-0 self-start"
+							onclick={() => (mailchimpDisconnectDialogOpen = true)}
+							disabled={convex.disabled || !marketingIntegration.canManage}
+						>
+							<UnplugIcon class="size-3.5" aria-hidden="true" />
+							Disconnect
+						</Button>
+					{:else if selectedProviderIsConnected && selectedIntegration}
 						<Button
 							size="sm"
 							variant="outline"
@@ -664,7 +725,14 @@
 					{/if}
 				</div>
 
-				{#if selectedProviderIsConnected && selectedIntegration}
+				{#if selectedProvider.key === 'mailchimp'}
+					<MailchimpIntegrationPanel
+						workspaceId={currentWorkspace.workspaceId}
+						integration={marketingIntegration}
+						canManage={marketingIntegration?.canManage ?? currentWorkspace.role === 'owner'}
+						bind:disconnectDialogOpen={mailchimpDisconnectDialogOpen}
+					/>
+				{:else if selectedProviderIsConnected && selectedIntegration}
 					<section class="flex min-w-0 flex-col gap-4 border-t pt-4">
 						<div class="grid gap-3 md:grid-cols-2">
 							<div class="rounded-lg border bg-card p-4">
