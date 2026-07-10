@@ -56,6 +56,7 @@
 				mode="sidebar"
 				initialWorkspaces={appContext.workspaces}
 				isLoadingWorkspaces={appContext.isLoading}
+				canCreateWorkspace={appContext.billing?.canCreateWorkspace ?? true}
 			/>
 		</aside>
 	{/if}
@@ -107,6 +108,7 @@
 							onNavigate={closeMobileNav}
 							initialWorkspaces={appContext.workspaces}
 							isLoadingWorkspaces={appContext.isLoading}
+							canCreateWorkspace={appContext.billing?.canCreateWorkspace ?? true}
 						/>
 					{/if}
 				</SheetContent>

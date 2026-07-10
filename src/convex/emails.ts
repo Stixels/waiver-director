@@ -12,6 +12,7 @@ import type { Doc } from './_generated/dataModel';
 import type { MutationCtx, QueryCtx } from './_generated/server';
 import { Resend } from 'resend';
 import { internal } from './_generated/api';
+import { requireWorkspaceFeature } from './lib/billing';
 import { requireWorkspaceMember } from './lib/waivers';
 import { escapeHtml, sanitizeRichTextHtml } from '../lib/utils/rich-text';
 
@@ -677,6 +678,7 @@ export const sendFollowUpNow = mutation({
 		}
 
 		await requireWorkspaceMember(ctx, followUp.workspaceId);
+		await requireWorkspaceFeature(ctx, followUp.workspaceId, 'email_followups');
 		await requireWorkspaceVerifiedReplyTo(ctx, followUp.workspaceId);
 
 		if (!['queued', 'blocked', 'unscheduled', 'failed'].includes(followUp.status)) {
@@ -716,6 +718,7 @@ export const sendSelected = mutation({
 	},
 	handler: async (ctx, args) => {
 		await requireWorkspaceMember(ctx, args.workspaceId);
+		await requireWorkspaceFeature(ctx, args.workspaceId, 'email_followups');
 		await requireWorkspaceVerifiedReplyTo(ctx, args.workspaceId);
 		for (const followUpId of args.followUpIds) {
 			const followUp = await ctx.db.get(followUpId);
@@ -1240,6 +1243,21 @@ export const deliverFollowUpEmail = internalAction({
 		});
 
 		if (!followUp || followUp.status !== 'queued') return;
+
+		const canSendFollowUps: boolean = await ctx.runQuery(
+			internal.billing.getWorkspaceFeatureAccess,
+			{
+				workspaceId: followUp.workspaceId,
+				feature: 'email_followups'
+			}
+		);
+		if (!canSendFollowUps) {
+			await ctx.runMutation(internal.emails.markFollowUpBlocked, {
+				followUpId: args.followUpId,
+				reason: 'Upgrade to Pro to send waiver follow-up emails.'
+			});
+			return;
+		}
 
 		const template = await ctx.runQuery(internal.emails.getTemplateForWorkspace, {
 			workspaceId: followUp.workspaceId

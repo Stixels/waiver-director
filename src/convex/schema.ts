@@ -1,5 +1,6 @@
 import { defineSchema, defineTable } from 'convex/server';
 import { v } from 'convex/values';
+import { billingFeatureValidator } from './lib/billing';
 import { bookingProviderValidator, bookingSnapshotValidator } from './lib/bookings';
 import { marketingIntegrationStatusValidator, marketingProviderValidator } from './lib/marketing';
 
@@ -9,7 +10,9 @@ export default defineSchema({
 		primaryEmail: v.optional(v.string()),
 		imageUrl: v.optional(v.string()),
 		defaultWorkspaceId: v.optional(v.id('workspaces'))
-	}).index('by_primaryEmail', ['primaryEmail']),
+	})
+		.index('by_primaryEmail', ['primaryEmail'])
+		.index('by_defaultWorkspaceId', ['defaultWorkspaceId']),
 
 	// App-owned mapping between internal users and whichever auth provider is active.
 	auth_identities: defineTable({
@@ -24,15 +27,65 @@ export default defineSchema({
 		.index('by_tokenIdentifier', ['tokenIdentifier'])
 		.index('by_userId', ['userId']),
 
+	user_billing_entitlements: defineTable({
+		userId: v.id('users'),
+		provider: v.literal('clerk'),
+		providerUserId: v.string(),
+		planSlug: v.string(),
+		status: v.string(),
+		featureSlugs: v.array(billingFeatureValidator),
+		currentPeriodEnd: v.optional(v.number()),
+		trialEndsAt: v.optional(v.number()),
+		cancelAtPeriodEnd: v.optional(v.boolean()),
+		primaryWorkspaceId: v.optional(v.id('workspaces')),
+		primaryWorkspaceSelectedAt: v.optional(v.number()),
+		primaryWorkspaceSwitchPeriod: v.optional(v.string()),
+		lastEventId: v.optional(v.string()),
+		lastEventType: v.optional(v.string()),
+		updatedAt: v.number()
+	})
+		.index('by_userId', ['userId'])
+		.index('by_provider_and_providerUserId', ['provider', 'providerUserId'])
+		.index('by_lastEventId', ['lastEventId']),
+
+	clerk_billing_webhook_events: defineTable({
+		eventId: v.string(),
+		eventType: v.string(),
+		processedAt: v.number()
+	}).index('by_eventId', ['eventId']),
+
 	workspaces: defineTable({
 		name: v.string(),
 		slug: v.string(),
 		status: v.union(v.literal('active'), v.literal('archived')),
 		createdByUserId: v.optional(v.id('users')),
-		customerCount: v.number()
+		customerCount: v.number(),
+		logoStorageId: v.optional(v.id('_storage')),
+		archivedAt: v.optional(v.number())
 	})
 		.index('by_slug', ['slug'])
 		.index('by_createdByUserId', ['createdByUserId']),
+
+	workspace_logo_uploads: defineTable({
+		workspaceId: v.id('workspaces'),
+		requestedByUserId: v.id('users'),
+		uploadToken: v.string(),
+		status: v.union(
+			v.literal('issued'),
+			v.literal('consumed'),
+			v.literal('expired'),
+			v.literal('removed')
+		),
+		storageId: v.optional(v.id('_storage')),
+		createdAt: v.number(),
+		expiresAt: v.number(),
+		consumedAt: v.optional(v.number()),
+		removedAt: v.optional(v.number())
+	})
+		.index('by_workspaceId', ['workspaceId'])
+		.index('by_uploadToken', ['uploadToken'])
+		.index('by_storageId', ['storageId'])
+		.index('by_workspaceId_and_storageId', ['workspaceId', 'storageId']),
 
 	workspace_memberships: defineTable({
 		workspaceId: v.id('workspaces'),
@@ -329,6 +382,7 @@ export default defineSchema({
 		syncedAt: v.optional(v.number())
 	})
 		.index('by_submissionId', ['submissionId'])
+		.index('by_workspaceId', ['workspaceId'])
 		.index('by_integrationId_and_submissionId', ['integrationId', 'submissionId'])
 		.index('by_workspaceId_and_status', ['workspaceId', 'status'])
 		.index('by_integrationId_and_status', ['integrationId', 'status'])

@@ -5,8 +5,10 @@ import type { Doc, Id } from './_generated/dataModel';
 import type { MutationCtx, QueryCtx } from './_generated/server';
 import { internal } from './_generated/api';
 import { bookingSnapshot, bookingSnapshotValidator } from './lib/bookings';
+import { requireWorkspaceFeature, workspaceHasBillingFeature } from './lib/billing';
 import { upsertSignerCustomer } from './lib/customers';
 import { submissionSearchText } from './lib/submissions';
+import { getOwnedWorkspaceLogoUrl } from './lib/workspaces';
 import { marketingConsentLabel } from './lib/marketing';
 import {
 	assertWorkspaceRecord,
@@ -48,6 +50,7 @@ const publicWaiverValue = v.object({
 	slug: v.string(),
 	versionId: v.id('waiver_versions'),
 	workspaceName: v.string(),
+	workspaceLogoUrl: v.union(v.string(), v.null()),
 	title: v.string(),
 	introCopy: v.string(),
 	fields: v.array(waiverFieldValidator),
@@ -61,6 +64,7 @@ const publicBookingWaiverValue = v.object({
 	slug: v.string(),
 	versionId: v.id('waiver_versions'),
 	workspaceName: v.string(),
+	workspaceLogoUrl: v.union(v.string(), v.null()),
 	title: v.string(),
 	introCopy: v.string(),
 	fields: v.array(waiverFieldValidator),
@@ -195,6 +199,7 @@ export const publishWorkspaceWaiver = mutation({
 	}),
 	handler: async (ctx, args) => {
 		await requireWorkspaceMember(ctx, args.workspaceId);
+		await requireWorkspaceFeature(ctx, args.workspaceId, 'waiver_publishing');
 
 		const waiver = assertWorkspaceRecord(
 			await ctx.db.get(args.waiverId),
@@ -444,17 +449,25 @@ export const getPublicWaiverBySlug = query({
 				.unique()
 		]);
 
-		if (!workspace || !version || version.waiverId !== waiver._id) {
-			throw new ConvexError({
-				code: 'not_found',
-				message: 'This public waiver is no longer available.'
-			});
+		if (
+			!workspace ||
+			workspace.status === 'archived' ||
+			!version ||
+			version.waiverId !== waiver._id
+		) {
+			return null;
 		}
+		if (!(await workspaceHasBillingFeature(ctx, waiver.workspaceId, 'waiver_publishing'))) {
+			return null;
+		}
+
+		const workspaceLogoUrl = await getOwnedWorkspaceLogoUrl(ctx, workspace);
 
 		return {
 			slug: waiver.publicSlug,
 			versionId: version._id,
 			workspaceName: workspace.name,
+			workspaceLogoUrl: workspaceLogoUrl ?? null,
 			title: version.title,
 			introCopy: version.introCopy,
 			fields: version.fields,
@@ -499,16 +512,24 @@ export const getPublicWaiverForBooking = query({
 				)
 				.unique()
 		]);
-		if (!workspace || !version || version.waiverId !== waiver._id) {
-			throw new ConvexError({
-				code: 'not_found',
-				message: 'This public waiver is no longer available.'
-			});
+		if (
+			!workspace ||
+			workspace.status === 'archived' ||
+			!version ||
+			version.waiverId !== waiver._id
+		) {
+			return null;
 		}
+		if (!(await workspaceHasBillingFeature(ctx, waiver.workspaceId, 'waiver_publishing'))) {
+			return null;
+		}
+		const workspaceLogoUrl = await getOwnedWorkspaceLogoUrl(ctx, workspace);
+
 		return {
 			slug: waiver.publicSlug,
 			versionId: version._id,
 			workspaceName: workspace.name,
+			workspaceLogoUrl: workspaceLogoUrl ?? null,
 			title: version.title,
 			introCopy: version.introCopy,
 			fields: version.fields,
@@ -563,7 +584,22 @@ export const submitPublicWaiver = mutation({
 			});
 		}
 
-		const version = await ctx.db.get(waiver.publishedVersionId);
+		const [version, workspace] = await Promise.all([
+			ctx.db.get(waiver.publishedVersionId),
+			ctx.db.get(waiver.workspaceId)
+		]);
+		if (!workspace || workspace.status === 'archived') {
+			throw new ConvexError({
+				code: 'not_found',
+				message: 'This public waiver is no longer available.'
+			});
+		}
+		if (!(await workspaceHasBillingFeature(ctx, waiver.workspaceId, 'waiver_publishing'))) {
+			throw new ConvexError({
+				code: 'not_found',
+				message: 'This public waiver is no longer available.'
+			});
+		}
 		if (!version || version.waiverId !== waiver._id) {
 			throw new ConvexError({
 				code: 'not_found',
@@ -602,18 +638,12 @@ export const submitPublicWaiver = mutation({
 
 		validateSubmissionAnswers(version, args.answers);
 		const minors = validateMinors(args.minors);
-		const [workspace, marketingIntegration] = await Promise.all([
-			ctx.db.get(waiver.workspaceId),
-			ctx.db
-				.query('marketing_integrations')
-				.withIndex('by_workspaceId_and_provider', (q) =>
-					q.eq('workspaceId', waiver.workspaceId).eq('provider', 'mailchimp')
-				)
-				.unique()
-		]);
-		if (!workspace) {
-			throw new ConvexError({ code: 'not_found', message: 'Workspace not found.' });
-		}
+		const marketingIntegration = await ctx.db
+			.query('marketing_integrations')
+			.withIndex('by_workspaceId_and_provider', (q) =>
+				q.eq('workspaceId', waiver.workspaceId).eq('provider', 'mailchimp')
+			)
+			.unique();
 		const marketingEnabled = Boolean(
 			marketingIntegration?.status === 'connected' && marketingIntegration.audienceId
 		);

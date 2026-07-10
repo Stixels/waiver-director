@@ -34,6 +34,7 @@
 	import PanelLeftOpenIcon from '@lucide/svelte/icons/panel-left-open';
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import SettingsIcon from '@lucide/svelte/icons/settings';
+	import CreditCardIcon from '@lucide/svelte/icons/credit-card';
 	import LogOutIcon from '@lucide/svelte/icons/log-out';
 	import EllipsisIcon from '@lucide/svelte/icons/ellipsis';
 	import Building2Icon from '@lucide/svelte/icons/building-2';
@@ -48,6 +49,7 @@
 		onNavigate?: () => void;
 		initialWorkspaces?: WorkspaceSummary[];
 		isLoadingWorkspaces?: boolean;
+		canCreateWorkspace?: boolean;
 	}
 
 	type WorkspaceSummary = FunctionReturnType<typeof api.app.current>['workspaces'][number];
@@ -62,7 +64,8 @@
 		mode = 'sidebar',
 		onNavigate,
 		initialWorkspaces = [],
-		isLoadingWorkspaces = false
+		isLoadingWorkspaces = false,
+		canCreateWorkspace = true
 	}: Props = $props();
 
 	const convexAuth = useConvexAuthState();
@@ -127,6 +130,18 @@
 
 	function workspacePathnameFor(workspaceSlug: string): `/app/${string}` {
 		return `/app/${workspaceSlug}${currentWorkspaceSubpath}` as `/app/${string}`;
+	}
+
+	function accountBillingPathnameFor(workspaceSlug: string): `/app/${string}` {
+		return `/app/${workspaceSlug}/account#/billing/plans` as `/app/${string}`;
+	}
+
+	function accountPlanPathname(): `/app/${string}` | '/app' {
+		if (!activeWorkspaceSlug) {
+			return '/app';
+		}
+
+		return `/app/${activeWorkspaceSlug}/account/plan` as `/app/${string}`;
 	}
 
 	function accountPathname(): `/app/${string}` | '/app' {
@@ -201,6 +216,20 @@
 			invalidate: ['app:bootstrap'],
 			noScroll: true
 		});
+	}
+
+	function handleCreateWorkspaceClick() {
+		if (canCreateWorkspace) {
+			createWorkspaceDialogOpen = true;
+			return;
+		}
+		const workspaceSlug = activeWorkspaceSlug ?? workspaces[0]?.slug;
+		if (!workspaceSlug) {
+			toast.message('Upgrade to Business to create multiple workspaces.');
+			return;
+		}
+		handleNavigation();
+		void goto(resolve(accountBillingPathnameFor(workspaceSlug)), { noScroll: true });
 	}
 
 	async function handleSignOut(): Promise<void> {
@@ -335,7 +364,13 @@
 									</div>
 									<div class="min-w-0 flex-1">
 										<div class="truncate text-[12px] font-medium">{ws.name}</div>
-										<div class="text-[10px] text-muted-foreground capitalize">{ws.role}</div>
+										<div class="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+											<span class="capitalize">{ws.role}</span>
+											{#if ws.billing.workspaceLimit.isPaused}
+												<span aria-hidden="true">·</span>
+												<span>Paused</span>
+											{/if}
+										</div>
 									</div>
 									{#if ws.slug === activeWorkspaceSlug}
 										<div
@@ -349,10 +384,10 @@
 					{/if}
 				</DropdownMenuGroup>
 				<DropdownMenuSeparator />
-				<DropdownMenuItem onclick={() => (createWorkspaceDialogOpen = true)}>
+				<DropdownMenuItem onclick={handleCreateWorkspaceClick}>
 					<div class="flex w-full items-center gap-2">
 						<PlusIcon class="size-3.5" aria-hidden="true" />
-						Create workspace
+						{canCreateWorkspace ? 'Create workspace' : 'Upgrade for another workspace'}
 					</div>
 				</DropdownMenuItem>
 			</DropdownMenuContent>
@@ -558,6 +593,27 @@
 					>
 						<SettingsIcon class="size-3.5 shrink-0" aria-hidden="true" />
 						<span class="flex-1">Settings</span>
+					</DropdownMenuItem>
+					<DropdownMenuItem
+						onclick={() => {
+							handleNavigation();
+							void goto(resolve(accountPlanPathname()));
+						}}
+					>
+						<Building2Icon class="size-3.5 shrink-0" aria-hidden="true" />
+						<span class="flex-1">Plan usage</span>
+					</DropdownMenuItem>
+					<DropdownMenuItem
+						disabled={!activeWorkspaceSlug}
+						aria-disabled={!activeWorkspaceSlug}
+						onclick={() => {
+							if (!activeWorkspaceSlug) return;
+							handleNavigation();
+							void goto(resolve(accountBillingPathnameFor(activeWorkspaceSlug)));
+						}}
+					>
+						<CreditCardIcon class="size-3.5 shrink-0" aria-hidden="true" />
+						<span class="flex-1">Billing plans</span>
 					</DropdownMenuItem>
 				</DropdownMenuGroup>
 				<DropdownMenuSeparator />

@@ -12,8 +12,7 @@
 	import resovaIcon from '$lib/assets/providers/resova-icon.webp';
 	import xolaIcon from '$lib/assets/providers/xola-icon.webp';
 	import { useAppContext } from '$lib/components/app/app-context.svelte';
-	import PageHeader from '$lib/components/app/PageHeader.svelte';
-	import PageShell from '$lib/components/app/PageShell.svelte';
+	import UpgradeOverlay from '$lib/components/app/UpgradeOverlay.svelte';
 	import MailchimpIntegrationPanel from '$lib/components/integrations/MailchimpIntegrationPanel.svelte';
 	import { useProtectedQuery } from '$lib/components/auth/convex-auth.svelte';
 	import { Badge } from '$lib/components/ui/badge';
@@ -39,6 +38,7 @@
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { cn } from '$lib/utils';
 	import { getConvexErrorMessage } from '$lib/utils/convex-errors';
+	import { billingUpgradeHref } from '$lib/utils/billing';
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
 	import ExternalLinkIcon from '@lucide/svelte/icons/external-link';
 	import KeyRoundIcon from '@lucide/svelte/icons/key-round';
@@ -212,6 +212,13 @@
 	const selectedProvider = $derived(providerForKey(selectedProviderKey) ?? BOOKING_PROVIDERS[0]);
 	const selectedIntegration = $derived(integrationForProvider(selectedProvider.key));
 	const selectedProviderState = $derived(providerStateFor(selectedProvider));
+	const canUseBookingIntegrations = $derived(
+		Boolean(currentWorkspace?.billing.features.bookingIntegrations)
+	);
+	const workspacePausedOnPro = $derived(Boolean(currentWorkspace?.billing.workspaceLimit.isPaused));
+	const billingHref = $derived(
+		billingUpgradeHref(page.params.workspaceSlug ?? '', workspacePausedOnPro)
+	);
 	const selectedProviderIsConnected = $derived(
 		Boolean(selectedIntegration && selectedIntegration.status !== 'disconnected')
 	);
@@ -348,8 +355,20 @@
 		return 'bg-muted-foreground';
 	}
 
+	function isBookingIntegrationAccessBlocked() {
+		if (canUseBookingIntegrations) return false;
+
+		toast.message(
+			workspacePausedOnPro
+				? 'Make this your primary workspace to connect booking integrations.'
+				: 'Upgrade to Pro to connect booking integrations.'
+		);
+		return true;
+	}
+
 	async function startBookeoConnect() {
 		if (!currentWorkspace || convex.disabled) return;
+		if (isBookingIntegrationAccessBlocked()) return;
 		isStartingConnect = true;
 		try {
 			const result = await convex.action(api.integrations.startBookeoConnect, {
@@ -365,6 +384,7 @@
 
 	async function connectManually() {
 		if (!currentWorkspace || convex.disabled) return;
+		if (isBookingIntegrationAccessBlocked()) return;
 		const apiKeyTrimmed = manualApiKey.trim();
 		isConnectingManually = true;
 		try {
@@ -557,15 +577,23 @@
 	</SheetContent>
 </Sheet>
 
-<PageHeader
-	title="Integrations"
-	subtitle="Connect booking and email providers for this workspace."
-/>
+<div class="relative h-full min-h-0 w-full overflow-hidden p-4 sm:p-5">
+	{#if !isLoading && currentWorkspace && !canUseBookingIntegrations}
+		<UpgradeOverlay
+			title={workspacePausedOnPro ? 'Workspace paused on Pro' : 'Upgrade to connect integrations'}
+			description={workspacePausedOnPro
+				? 'This workspace is not the primary workspace on your Pro plan. Make it primary to connect Bookeo here, or upgrade to Business for every workspace.'
+				: 'Booking integrations are available on Pro plans and trials. Upgrade to connect Bookeo and keep booking-linked waiver operations in sync.'}
+			href={billingHref}
+			actionLabel={workspacePausedOnPro ? 'Manage primary workspace' : 'View billing'}
+		/>
+	{/if}
 
-<PageShell>
 	{#if isLoading}
-		<section class="grid min-h-128 overflow-hidden border-y md:grid-cols-[15rem_minmax(0,1fr)]">
-			<div class="flex min-h-60 flex-col gap-4 border-b p-3 md:border-r md:border-b-0">
+		<section
+			class="-mx-4 grid h-full min-h-0 overflow-hidden border-y sm:-mx-5 md:grid-cols-[calc(15rem+1.25rem)_minmax(0,1fr)]"
+		>
+			<div class="flex min-h-60 flex-col gap-4 border-b px-5 py-3 md:border-r md:border-b-0">
 				<Skeleton class="h-4 w-24" />
 				<Skeleton class="h-10 w-full rounded-md" />
 				<Skeleton class="h-10 w-full rounded-md" />
@@ -573,7 +601,7 @@
 				<Skeleton class="h-10 w-full rounded-md" />
 				<Skeleton class="h-10 w-full rounded-md" />
 			</div>
-			<div class="flex min-w-0 flex-col gap-5 p-5">
+			<div class="flex min-w-0 flex-col gap-5 px-5 py-5">
 				<div class="flex min-w-0 items-start gap-4">
 					<Skeleton class="size-12 rounded-md" />
 					<div class="min-w-0 flex-1">
@@ -592,9 +620,11 @@
 			Workspace not found.
 		</div>
 	{:else}
-		<article class="grid min-h-128 overflow-hidden border-y md:grid-cols-[15rem_minmax(0,1fr)]">
+		<article
+			class="-mx-4 grid h-full min-h-0 overflow-hidden border-y sm:-mx-5 md:grid-cols-[calc(15rem+1.25rem)_minmax(0,1fr)]"
+		>
 			<aside
-				class="flex flex-col gap-4 border-b p-3 md:border-r md:border-b-0"
+				class="flex flex-col gap-4 border-b px-5 py-3 md:border-r md:border-b-0"
 				aria-label="Integration providers"
 			>
 				<p class="px-2 pb-0.5 text-sm font-semibold">Integrations</p>
@@ -657,7 +687,7 @@
 				{/each}
 			</aside>
 
-			<div class="flex min-w-0 flex-col gap-5 p-5">
+			<div class="flex min-w-0 flex-col gap-5 px-5 py-5">
 				<div class="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
 					<div class="flex min-w-0 items-start gap-4">
 						<span
@@ -846,6 +876,20 @@
 									Only workspace owners can connect booking providers.
 								</p>
 							</div>
+						{:else if !canUseBookingIntegrations}
+							<div class="rounded-lg border border-dashed bg-card/50 p-10 text-center">
+								<p class="text-sm font-medium">
+									{workspacePausedOnPro ? 'Workspace paused on Pro' : 'Upgrade to connect Bookeo'}
+								</p>
+								<p class="mt-1 text-xs text-muted-foreground">
+									{workspacePausedOnPro
+										? 'Make this workspace primary to connect Bookeo here.'
+										: 'Booking integrations are available on Pro plans and trials.'}
+								</p>
+								<Button class="mt-4" href={billingHref}>
+									{workspacePausedOnPro ? 'Manage primary workspace' : 'View billing'}
+								</Button>
+							</div>
 						{:else if connectedIntegration}
 							<div class="rounded-lg border border-dashed bg-card/50 p-10 text-center">
 								<p class="text-sm font-medium">{connectedProviderName} is already connected</p>
@@ -901,4 +945,4 @@
 			</div>
 		</article>
 	{/if}
-</PageShell>
+</div>

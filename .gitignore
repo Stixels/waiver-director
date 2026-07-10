@@ -12,6 +12,8 @@ node_modules
 # OS
 .DS_Store
 Thumbs.db
+.playwright-mcp
+.playwright-cli
 
 # Env
 .env

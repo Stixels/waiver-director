@@ -9,6 +9,7 @@
  */
 
 import type * as app from "../app.js";
+import type * as billing from "../billing.js";
 import type * as bookings from "../bookings.js";
 import type * as crons from "../crons.js";
 import type * as customers from "../customers.js";
@@ -17,6 +18,7 @@ import type * as emails from "../emails.js";
 import type * as http from "../http.js";
 import type * as integrations from "../integrations.js";
 import type * as lib_auth from "../lib/auth.js";
+import type * as lib_billing from "../lib/billing.js";
 import type * as lib_bookingSignatures from "../lib/bookingSignatures.js";
 import type * as lib_bookings from "../lib/bookings.js";
 import type * as lib_customers from "../lib/customers.js";
@@ -39,6 +41,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   app: typeof app;
+  billing: typeof billing;
   bookings: typeof bookings;
   crons: typeof crons;
   customers: typeof customers;
@@ -47,6 +50,7 @@ declare const fullApi: ApiFromModules<{
   http: typeof http;
   integrations: typeof integrations;
   "lib/auth": typeof lib_auth;
+  "lib/billing": typeof lib_billing;
   "lib/bookingSignatures": typeof lib_bookingSignatures;
   "lib/bookings": typeof lib_bookings;
   "lib/customers": typeof lib_customers;

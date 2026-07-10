@@ -24,6 +24,7 @@
 	import UsersRoundIcon from '@lucide/svelte/icons/users-round';
 	import XIcon from '@lucide/svelte/icons/x';
 	import ChartColumnIcon from '@lucide/svelte/icons/chart-column';
+	import CreditCardIcon from '@lucide/svelte/icons/credit-card';
 
 	interface Props {
 		open: boolean;
@@ -64,7 +65,8 @@
 			| 'settings'
 			| 'settings/general'
 			| 'settings/email'
-			| 'account';
+			| 'account'
+			| 'account/plan';
 	};
 	type FlatItem =
 		| { kind: 'action'; key: string; data: ActionItem; target: SearchTarget | null }
@@ -224,6 +226,15 @@
 			path: 'account',
 			aliases: ['account', 'profile', 'user', 'billing'],
 			icon: UserRoundIcon
+		},
+		{
+			key: 'account-plan',
+			label: 'Plan usage',
+			description: 'Primary workspace and plan limits',
+			path: 'account/plan',
+			aliases: ['plan', 'billing', 'primary workspace', 'workspace limit', 'pro workspace'],
+			icon: CreditCardIcon,
+			showWhenEmpty: false
 		}
 	];
 

@@ -7,6 +7,7 @@ export type AppWorkspace = AppContextData['workspaces'][number];
 
 export type AppContextState = {
 	currentUser: AppContextData['currentUser'];
+	billing: AppContextData['billing'];
 	workspaces: AppWorkspace[];
 	isLoading: boolean;
 	error: Error | null;

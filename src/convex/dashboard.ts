@@ -1,5 +1,6 @@
 import { ConvexError, v } from 'convex/values';
 import { query } from './_generated/server';
+import { requireWorkspaceFeature } from './lib/billing';
 import { requireWorkspaceMember } from './lib/waivers';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -374,6 +375,7 @@ export const getAnalyticsSeries = query({
 	}),
 	handler: async (ctx, args) => {
 		await requireWorkspaceMember(ctx, args.workspaceId);
+		await requireWorkspaceFeature(ctx, args.workspaceId, 'analytics');
 
 		if (args.rangeEndAt - args.rangeStartAt > MAX_ANALYTICS_RANGE_MS) {
 			throw new ConvexError({

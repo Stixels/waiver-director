@@ -120,4 +120,45 @@ http.route({
 	})
 });
 
+http.route({
+	path: '/clerk/billing/webhook',
+	method: 'POST',
+	handler: httpAction(async (ctx, request) => {
+		const svixId = request.headers.get('svix-id') ?? '';
+		const svixTimestamp = request.headers.get('svix-timestamp') ?? '';
+		const svixSignature = request.headers.get('svix-signature') ?? '';
+		const body = await request.text();
+
+		if (!svixId || !svixTimestamp || !svixSignature) {
+			return new Response('Bad request', { status: 400 });
+		}
+
+		let result: { status: 'accepted' | 'duplicate' | 'ignored' | 'rejected' };
+		try {
+			result = await ctx.runAction(internal.billing.verifyAndApplyClerkBillingWebhook, {
+				body,
+				svixId,
+				svixTimestamp,
+				svixSignature
+			});
+		} catch (error) {
+			if (
+				error instanceof Error &&
+				(error.name === 'ArgumentValidationError' ||
+					error.message.includes('ArgumentValidationError'))
+			) {
+				return new Response('Bad request', { status: 400 });
+			}
+			console.error('[clerk/billing/webhook] unexpected webhook error', error);
+			return new Response('Internal server error', { status: 500 });
+		}
+
+		if (result.status === 'rejected') {
+			return new Response('Rejected', { status: 401 });
+		}
+
+		return new Response(result.status, { status: 200 });
+	})
+});
+
 export default http;

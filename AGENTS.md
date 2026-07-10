@@ -2,6 +2,7 @@
 
 Waiver Director is a multi-tenant SaaS for waiver operations; preserve strict workspace isolation, server-side authorization, and signed-record integrity in every change.
 
+- Assume the application is already running locally at `localhost:5173`
 - Package manager: `pnpm`
 - Common validation: `pnpm run check`, `pnpm run lint`
 

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { sanitizeRichTextHtml } from '$lib/utils/rich-text';
+	import { sanitizeRichTextHtml } from '$lib/utils/rich-text-client';
 
 	interface Props {
 		html: string;
@@ -100,5 +100,13 @@
 
 	.waiver-rich-text :global(s) {
 		text-decoration: line-through;
+	}
+
+	.waiver-rich-text :global(img) {
+		display: block;
+		max-width: 100%;
+		height: auto;
+		margin: 1rem auto;
+		border-radius: 4px;
 	}
 </style>

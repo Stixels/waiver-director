@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { beforeNavigate } from '$app/navigation';
+	import { beforeNavigate, goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { onMount, tick, untrack } from 'svelte';
@@ -40,6 +40,7 @@
 		type WaiverDefinition
 	} from '$lib/domain/waivers';
 	import { getConvexErrorMessage } from '$lib/utils/convex-errors';
+	import { billingUpgradeHref } from '$lib/utils/billing';
 	import EllipsisIcon from '@lucide/svelte/icons/ellipsis';
 	import ClipboardIcon from '@lucide/svelte/icons/clipboard';
 	import Code2Icon from '@lucide/svelte/icons/code-xml';
@@ -94,8 +95,14 @@
 
 	let confirmKind = $state<ConfirmKind | null>(null);
 	let confirmOpen = $state(false);
+	const canPublishWaiver = $derived(Boolean(currentWorkspace?.billing.features.waiverPublishing));
+	const workspacePausedOnPro = $derived(Boolean(currentWorkspace?.billing.workspaceLimit.isPaused));
+	const billingHref = $derived(
+		billingUpgradeHref(page.params.workspaceSlug ?? '', workspacePausedOnPro)
+	);
 
 	const activePublicHref = $derived.by(() => {
+		if (!canPublishWaiver) return null;
 		if (!workspaceWaiver?.publishedVersionId) return null;
 		return resolve(`/w/${workspaceWaiver.publicSlug}` as `/w/${string}`);
 	});
@@ -127,7 +134,9 @@
 			isDirty ||
 			isSaving ||
 			!workspaceWaiver ||
-			(!!workspaceWaiver.publishedVersionId && !workspaceWaiver.hasUnpublishedChanges)
+			(canPublishWaiver &&
+				!!workspaceWaiver.publishedVersionId &&
+				!workspaceWaiver.hasUnpublishedChanges)
 	);
 
 	const saveState = $derived<SaveState>(
@@ -330,6 +339,8 @@
 	}
 
 	function publishButtonLabel(waiver: WorkspaceWaiverSummary | null) {
+		if (!canPublishWaiver)
+			return workspacePausedOnPro ? 'Make primary to publish' : 'Upgrade to publish';
 		if (!waiver) return 'Publish';
 		if (waiver.publishedVersionId && !waiver.hasUnpublishedChanges) return 'Live';
 		if (waiver.publishedVersionId && waiver.hasUnpublishedChanges) return 'Publish changes';
@@ -340,6 +351,14 @@
 	function openConfirm(kind: ConfirmKind) {
 		confirmKind = kind;
 		confirmOpen = true;
+	}
+
+	async function handlePublishClick() {
+		if (!canPublishWaiver) {
+			await goto(resolve(billingHref as `/app/${string}`));
+			return;
+		}
+		openConfirm('publish');
 	}
 
 	function confirmConfig(kind: ConfirmKind) {
@@ -597,7 +616,11 @@
 						Not live
 					</span>
 					<p class="truncate text-[13px] text-muted-foreground">
-						Publish this waiver to share a public signing link with your guests.
+						{canPublishWaiver
+							? 'Publish this waiver to share a public signing link with your guests.'
+							: workspacePausedOnPro
+								? 'Make this your primary workspace to publish and accept signed submissions here.'
+								: 'Upgrade to Pro to publish this waiver and accept signed submissions.'}
 					</p>
 				</div>
 			{/if}
@@ -627,7 +650,7 @@
 					<Button
 						type="button"
 						size="sm"
-						onclick={() => openConfirm('publish')}
+						onclick={handlePublishClick}
 						disabled={publishDisabled}
 						class="publish-btn ml-1 h-8 gap-1.5"
 					>
@@ -851,6 +874,8 @@
 							bind:introCopy={draft.introCopy}
 							fields={currentDraft.fields}
 							workspaceName={currentWorkspace?.name}
+							workspaceId={currentWorkspace?.workspaceId ?? null}
+							canEditBranding={currentWorkspace?.role === 'owner'}
 							{saveState}
 							{lastSavedAt}
 						/>
