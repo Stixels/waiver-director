@@ -9,7 +9,7 @@ A business that collects waivers as part of running activities, services, events
 _Avoid_: Account, client, tenant
 
 **Workspace**:
-An isolated waiver-operations boundary that can represent a distinct business or a specific operational unit or location of a larger business.
+An isolated waiver-operations boundary. A user may own multiple workspaces for unrelated businesses or for locations of one business; every workspace remains independently scoped, and their relationship is not modeled.
 _Avoid_: Legal entity, global account
 
 **Waiver Operations**:
