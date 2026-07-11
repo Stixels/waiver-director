@@ -5,6 +5,8 @@ Waiver Director is a multi-tenant SaaS for waiver operations; preserve strict wo
 - Assume the application is already running locally at `localhost:5173`
 - Package manager: `pnpm`
 - Common validation: `pnpm run check`, `pnpm run lint`
+- For tracked delivery work, follow the Linear-to-GitHub workflow in `docs/agents/workflow-and-validation.md`; use the Linear issue for scope, its intended base branch, and its branch name when provided.
+- Do not change hosted-service configuration, credentials, environment variables, or deployments unless the task explicitly authorizes it.
 
 Relevant docs:
 

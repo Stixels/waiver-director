@@ -20,7 +20,7 @@
 - Treat Linear as the source of truth for feature scope and delivery status. Read the issue, parent issue, relations, and comments before changing code.
 - When actively taking a ticket, assign it to the current developer and move it to `In Progress`. Do not change status for read-only investigation.
 - Keep one focused implementation or documentation concern per Linear issue and PR. Create a dedicated issue for cross-cutting LLM context rather than repurposing an existing product-feature issue.
-- Branch from the latest `origin/main` and include the Linear identifier in the branch name. Prefer the issue's `gitBranchName` when Linear provides one; otherwise confirm the repository convention before choosing a prefix. `codex/<issue-id>-<short-slug>` is an agent fallback, not this repository's established convention.
+- Branch from the issue's intended base branch (or the PR target when continuing existing work), not an assumed default. Prefer the issue's `gitBranchName` when Linear provides one (`username/identifier-title`); otherwise confirm the repository convention before choosing a prefix. Include the Linear identifier in the branch name.
 - Keep the ticket identifier in commits and the pull request title or body so Linear and GitHub can associate the work.
 - GitHub calls merge requests “pull requests” (PRs). Open a focused PR with the Linear link, implementation summary, validation performed, and any deployment, schema, credential, or follow-up requirements.
 - Set the branch name before opening the PR. Renaming a remote PR head branch can close the PR, so open a replacement PR if GitHub does not preserve the association.
