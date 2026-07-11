@@ -46,11 +46,6 @@ Prerequisites:
 
 - Node.js compatible with the installed SvelteKit/Vite toolchain
 - pnpm
-- Convex account and project
-- Clerk application
-- Resend API key for email delivery
-- Bookeo credentials if you are working on booking integrations
-- A registered Mailchimp OAuth app if you are working on marketing-list integrations
 
 Install dependencies:
 
@@ -58,76 +53,13 @@ Install dependencies:
 pnpm install
 ```
 
-Create a local environment file:
-
-```sh
-touch .env.local
-```
-
-Then add the environment variables your local workflow needs from the list below.
-
-Run the app:
+Run the application:
 
 ```sh
 pnpm run dev
 ```
 
-Run Convex in a second terminal when working against a local/dev Convex deployment:
-
-```sh
-pnpm exec convex dev
-```
-
-## Environment Variables
-
-Public SvelteKit values:
-
-```sh
-PUBLIC_APP_URL=
-PUBLIC_CONVEX_URL=
-PUBLIC_CONVEX_SITE_URL=
-```
-
-Server-only SvelteKit values:
-
-```sh
-CLERK_SECRET_KEY=
-CLERK_FRONTEND_API_URL=
-RESEND_API_KEY=
-BOOKEO_API_KEY=
-BOOKEO_SECRET_KEY=
-```
-
-Convex runtime values used by backend functions:
-
-```sh
-APP_URL=
-PUBLIC_APP_URL=
-SITE_URL=
-CONVEX_SITE_URL=
-PUBLIC_CONVEX_SITE_URL=
-CLERK_FRONTEND_API_URL=
-RESEND_API_KEY=
-RESEND_FROM_EMAIL=
-BOOKEO_SECRET_KEY=
-BOOKEO_AUTHORIZATION_URL=
-MAILCHIMP_CLIENT_ID=
-MAILCHIMP_CLIENT_SECRET=
-INTEGRATION_CREDENTIALS_ENCRYPTION_KEY=
-```
-
-Register the Mailchimp OAuth callback as `<CONVEX_SITE_URL>/mailchimp/callback`. Keep the client
-secret and credential-encryption key in the Convex runtime environment only.
-
-Do not commit real secrets or workspace-specific credentials.
-
-To sync local environment values into Convex when needed:
-
-```sh
-pnpm exec convex env set --from-file .env.local
-```
-
-Use `--force` only when intentionally replacing existing Convex values.
+Local service configuration, credentials, and deployment procedures are intentionally not documented in this public repository. Authorized maintainers receive that information through private operational channels. Never commit configuration values, credentials, customer data, or provider account details.
 
 ## Preview Deployments
 
@@ -187,7 +119,8 @@ git diff --check
 
 ## Contributing
 
-Issues and pull requests should keep changes focused and explain the product behavior being changed. For code changes, include the validation commands you ran.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution expectations. For suspected vulnerabilities, follow
+[SECURITY.md](SECURITY.md) rather than opening a public issue.
 
 ## License
 
