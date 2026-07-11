@@ -10,6 +10,7 @@ test('creates a URL-safe workspace handle from a display name', () => {
 	assert.equal(workspaceHandleBase('  Caf\u00e9 & Co.  '), 'cafe-co');
 	assert.equal(workspaceHandleBase('Workspaces'), 'workspace');
 	assert.equal(workspaceHandleBase('!!!'), 'workspace');
+	assert.equal(workspaceHandleBase(''), 'workspace');
 });
 
 test('creates deterministic collision-safe handle candidates', () => {
@@ -18,6 +19,8 @@ test('creates deterministic collision-safe handle candidates', () => {
 	assert.equal(workspaceHandleCandidate(base, 1), 'atlas-escape-vr');
 	assert.equal(workspaceHandleCandidate(base, 2), 'atlas-escape-vr-2');
 	assert.equal(workspaceHandleCandidate(base, 3), 'atlas-escape-vr-3');
+	assert.throws(() => workspaceHandleCandidate(base, 0), /positive integer/);
+	assert.throws(() => workspaceHandleCandidate(base, -1), /positive integer/);
 });
 
 test('preserves the maximum handle length when adding a collision suffix', () => {

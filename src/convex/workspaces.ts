@@ -56,6 +56,7 @@ const WORKSPACE_PRIMARY_CLEANUP_TABLE_NAMES = WORKSPACE_CLEANUP_TABLE_NAMES.filt
 );
 const CLEANUP_BATCH_PER_TABLE = 50;
 const USER_DEFAULT_WORKSPACE_CLEANUP_BATCH = 50;
+const MAX_WORKSPACE_HANDLE_ATTEMPTS = 1000;
 
 export const createWorkspace = mutation({
 	args: {
@@ -85,9 +86,9 @@ export const createWorkspace = mutation({
 		await requireCanCreateWorkspace(ctx, user._id);
 
 		const handleBase = workspaceHandleBase(name);
-		let slug = handleBase;
+		let slug: string | null = null;
 		// A concurrent insert changes this indexed read and causes Convex to retry the mutation.
-		for (let attempt = 1; ; attempt += 1) {
+		for (let attempt = 1; attempt <= MAX_WORKSPACE_HANDLE_ATTEMPTS; attempt += 1) {
 			const candidate = workspaceHandleCandidate(handleBase, attempt);
 			const existing = await ctx.db
 				.query('workspaces')
@@ -97,6 +98,12 @@ export const createWorkspace = mutation({
 				slug = candidate;
 				break;
 			}
+		}
+		if (!slug) {
+			throw new ConvexError({
+				code: 'internal_error',
+				message: 'Unable to generate a unique workspace URL handle. Please try again.'
+			});
 		}
 
 		const workspaceId = await ctx.db.insert('workspaces', {

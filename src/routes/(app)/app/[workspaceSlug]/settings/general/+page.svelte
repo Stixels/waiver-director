@@ -109,12 +109,24 @@
 	title="Workspace URL handle"
 	description="The stable path used in your app URLs. It is generated when the workspace is created and cannot be changed."
 >
-	<div class="handle-field">
+	<div
+		class="handle-field"
+		class:handle-field--disabled={!currentWorkspace}
+		aria-disabled={!currentWorkspace}
+	>
 		<span class="handle-prefix" aria-hidden="true">app /</span>
-		<code class="handle-value">{currentWorkspace?.slug ?? 'workspace-handle'}</code>
+		{#if currentWorkspace}
+			<code class="handle-value">{currentWorkspace.slug}</code>
+		{:else}
+			<span class="handle-placeholder">Workspace handle loading…</span>
+		{/if}
 	</div>
 	<p class="settings-hint">
-		Renaming the workspace does not change this handle or any existing links.
+		{#if currentWorkspace}
+			Renaming the workspace does not change this handle or any existing links.
+		{:else}
+			The workspace URL handle will appear after the workspace loads.
+		{/if}
 	</p>
 
 	{#snippet footer()}
@@ -170,6 +182,10 @@
 		background: color-mix(in srgb, var(--muted) 28%, transparent);
 	}
 
+	.handle-field--disabled {
+		opacity: 0.55;
+	}
+
 	.handle-prefix,
 	.handle-value {
 		font-family: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, monospace;
@@ -183,5 +199,10 @@
 	.handle-value {
 		color: var(--foreground);
 		font-weight: 500;
+	}
+
+	.handle-placeholder {
+		color: var(--muted-foreground);
+		font-size: 0.78rem;
 	}
 </style>
