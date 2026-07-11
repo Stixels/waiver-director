@@ -14,7 +14,11 @@ import { requireWorkspaceMember, requireWorkspaceOwner } from './lib/waivers';
 const CONNECTION_SESSION_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 const CONTACT_SYNC_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 const CONTACT_SYNC_BATCH_SIZE = 100;
-const DISCONNECTED_CONTACT_SYNC_ERROR = 'Mailchimp was disconnected.';
+const DISCONNECTED_CONTACT_SYNC_ERROR = 'The marketing integration was disconnected.';
+
+function providerName(provider: 'mailchimp' | 'constant_contact') {
+	return provider === 'mailchimp' ? 'Mailchimp' : 'Constant Contact';
+}
 
 async function failQueuedContactSyncBatch(
 	ctx: MutationCtx,
@@ -55,14 +59,14 @@ const marketingIntegrationSummary = v.object({
 });
 
 export const getWorkspaceMarketingIntegration = query({
-	args: { workspaceId: v.id('workspaces') },
+	args: { workspaceId: v.id('workspaces'), provider: marketingProviderValidator },
 	returns: v.union(v.null(), marketingIntegrationSummary),
 	handler: async (ctx, args) => {
 		const { membership } = await requireWorkspaceMember(ctx, args.workspaceId);
 		const integration = await ctx.db
 			.query('marketing_integrations')
 			.withIndex('by_workspaceId_and_provider', (q) =>
-				q.eq('workspaceId', args.workspaceId).eq('provider', 'mailchimp')
+				q.eq('workspaceId', args.workspaceId).eq('provider', args.provider)
 			)
 			.unique();
 
@@ -83,13 +87,17 @@ export const getWorkspaceMarketingIntegration = query({
 });
 
 export const getOwnerAccessForAction = internalQuery({
-	args: { workspaceId: v.id('workspaces') },
+	args: { workspaceId: v.id('workspaces'), provider: marketingProviderValidator },
 	returns: v.object({
 		userId: v.id('users'),
 		workspaceSlug: v.string()
 	}),
 	handler: async (ctx, args) => {
-		const { user } = await requireWorkspaceOwner(ctx, args.workspaceId, 'manage Mailchimp');
+		const { user } = await requireWorkspaceOwner(
+			ctx,
+			args.workspaceId,
+			`manage ${providerName(args.provider)}`
+		);
 		const workspace = await ctx.db.get(args.workspaceId);
 		if (!workspace) {
 			throw new ConvexError({ code: 'not_found', message: 'Workspace not found.' });
@@ -101,6 +109,7 @@ export const getOwnerAccessForAction = internalQuery({
 export const createConnectionSession = internalMutation({
 	args: {
 		workspaceId: v.id('workspaces'),
+		provider: marketingProviderValidator,
 		requestedByUserId: v.id('users'),
 		state: v.string(),
 		expiresAt: v.number()
@@ -109,7 +118,7 @@ export const createConnectionSession = internalMutation({
 	handler: async (ctx, args) => {
 		return await ctx.db.insert('marketing_connection_sessions', {
 			workspaceId: args.workspaceId,
-			provider: 'mailchimp',
+			provider: args.provider,
 			requestedByUserId: args.requestedByUserId,
 			state: args.state,
 			status: 'pending',
@@ -120,7 +129,7 @@ export const createConnectionSession = internalMutation({
 });
 
 export const getPendingConnectionSession = internalQuery({
-	args: { state: v.string() },
+	args: { state: v.string(), provider: marketingProviderValidator },
 	returns: v.union(
 		v.null(),
 		v.object({
@@ -135,7 +144,7 @@ export const getPendingConnectionSession = internalQuery({
 			.query('marketing_connection_sessions')
 			.withIndex('by_state', (q) => q.eq('state', args.state))
 			.unique();
-		if (!session || session.provider !== 'mailchimp' || session.status !== 'pending') return null;
+		if (!session || session.provider !== args.provider || session.status !== 'pending') return null;
 
 		const workspace = await ctx.db.get(session.workspaceId);
 		if (!workspace) return null;
@@ -211,8 +220,11 @@ export const pruneOldContactSyncsCron = internalMutation({
 export const saveOAuthConnection = internalMutation({
 	args: {
 		workspaceId: v.id('workspaces'),
+		provider: marketingProviderValidator,
 		encryptedAccessToken: v.string(),
-		serverPrefix: v.string(),
+		encryptedRefreshToken: v.optional(v.string()),
+		accessTokenExpiresAt: v.optional(v.number()),
+		serverPrefix: v.optional(v.string()),
 		accountId: v.optional(v.string())
 	},
 	returns: v.id('marketing_integrations'),
@@ -220,16 +232,18 @@ export const saveOAuthConnection = internalMutation({
 		const existing = await ctx.db
 			.query('marketing_integrations')
 			.withIndex('by_workspaceId_and_provider', (q) =>
-				q.eq('workspaceId', args.workspaceId).eq('provider', 'mailchimp')
+				q.eq('workspaceId', args.workspaceId).eq('provider', args.provider)
 			)
 			.unique();
 		const now = Date.now();
 		const value = {
 			workspaceId: args.workspaceId,
-			provider: 'mailchimp' as const,
+			provider: args.provider,
 			status: 'pending_configuration' as const,
 			encryptedAccessToken: args.encryptedAccessToken,
-			serverPrefix: args.serverPrefix,
+			...(args.encryptedRefreshToken ? { encryptedRefreshToken: args.encryptedRefreshToken } : {}),
+			...(args.accessTokenExpiresAt ? { accessTokenExpiresAt: args.accessTokenExpiresAt } : {}),
+			...(args.serverPrefix ? { serverPrefix: args.serverPrefix } : {}),
 			...(args.accountId ? { accountId: args.accountId } : {}),
 			connectedAt: now,
 			updatedAt: now
@@ -242,32 +256,38 @@ export const saveOAuthConnection = internalMutation({
 });
 
 export const getConnectionForOwnerAction = internalQuery({
-	args: { workspaceId: v.id('workspaces') },
+	args: { workspaceId: v.id('workspaces'), provider: marketingProviderValidator },
 	returns: v.object({
 		integrationId: v.id('marketing_integrations'),
 		encryptedAccessToken: v.string(),
-		serverPrefix: v.string()
+		encryptedRefreshToken: v.union(v.string(), v.null()),
+		accessTokenExpiresAt: v.union(v.number(), v.null()),
+		serverPrefix: v.union(v.string(), v.null())
 	}),
 	handler: async (ctx, args) => {
-		await requireWorkspaceOwner(ctx, args.workspaceId, 'manage Mailchimp');
+		await requireWorkspaceOwner(ctx, args.workspaceId, `manage ${providerName(args.provider)}`);
 		const integration = await ctx.db
 			.query('marketing_integrations')
 			.withIndex('by_workspaceId_and_provider', (q) =>
-				q.eq('workspaceId', args.workspaceId).eq('provider', 'mailchimp')
+				q.eq('workspaceId', args.workspaceId).eq('provider', args.provider)
 			)
 			.unique();
 		if (
 			!integration ||
 			integration.status === 'disconnected' ||
-			!integration.encryptedAccessToken ||
-			!integration.serverPrefix
+			!integration.encryptedAccessToken
 		) {
-			throw new ConvexError({ code: 'not_found', message: 'Mailchimp is not connected.' });
+			throw new ConvexError({
+				code: 'not_found',
+				message: `${providerName(args.provider)} is not connected.`
+			});
 		}
 		return {
 			integrationId: integration._id,
 			encryptedAccessToken: integration.encryptedAccessToken,
-			serverPrefix: integration.serverPrefix
+			encryptedRefreshToken: integration.encryptedRefreshToken ?? null,
+			accessTokenExpiresAt: integration.accessTokenExpiresAt ?? null,
+			serverPrefix: integration.serverPrefix ?? null
 		};
 	}
 });
@@ -275,57 +295,61 @@ export const getConnectionForOwnerAction = internalQuery({
 export const selectAudience = internalMutation({
 	args: {
 		workspaceId: v.id('workspaces'),
+		provider: marketingProviderValidator,
 		integrationId: v.id('marketing_integrations'),
 		audienceId: v.string(),
 		audienceName: v.string()
 	},
 	returns: v.null(),
 	handler: async (ctx, args) => {
-		await requireWorkspaceOwner(ctx, args.workspaceId, 'configure Mailchimp');
+		await requireWorkspaceOwner(ctx, args.workspaceId, `configure ${providerName(args.provider)}`);
 		const integration = await ctx.db.get(args.integrationId);
 		if (
 			!integration ||
 			integration.workspaceId !== args.workspaceId ||
-			integration.provider !== 'mailchimp' ||
-			!integration.encryptedAccessToken ||
-			!integration.serverPrefix
+			integration.provider !== args.provider ||
+			!integration.encryptedAccessToken
 		) {
-			throw new ConvexError({ code: 'not_found', message: 'Mailchimp is not connected.' });
+			throw new ConvexError({
+				code: 'not_found',
+				message: `${providerName(args.provider)} is not connected.`
+			});
 		}
 		const now = Date.now();
-		await ctx.db.replace(integration._id, {
-			workspaceId: integration.workspaceId,
-			provider: 'mailchimp',
+		await ctx.db.patch(integration._id, {
 			status: 'connected',
-			encryptedAccessToken: integration.encryptedAccessToken,
-			serverPrefix: integration.serverPrefix,
-			...(integration.accountId ? { accountId: integration.accountId } : {}),
 			audienceId: args.audienceId,
 			audienceName: args.audienceName,
 			connectedAt: integration.connectedAt ?? now,
+			disconnectedAt: undefined,
 			updatedAt: now
 		});
 		return null;
 	}
 });
 
-export const disconnectMailchimp = mutation({
-	args: { workspaceId: v.id('workspaces') },
+export const disconnectMarketingIntegration = mutation({
+	args: { workspaceId: v.id('workspaces'), provider: marketingProviderValidator },
 	returns: v.null(),
 	handler: async (ctx, args) => {
-		await requireWorkspaceOwner(ctx, args.workspaceId, 'disconnect Mailchimp');
+		await requireWorkspaceOwner(ctx, args.workspaceId, `disconnect ${providerName(args.provider)}`);
 		const integration = await ctx.db
 			.query('marketing_integrations')
 			.withIndex('by_workspaceId_and_provider', (q) =>
-				q.eq('workspaceId', args.workspaceId).eq('provider', 'mailchimp')
+				q.eq('workspaceId', args.workspaceId).eq('provider', args.provider)
 			)
 			.unique();
 		if (!integration) return null;
 		const now = Date.now();
-		await ctx.db.replace(integration._id, {
-			workspaceId: integration.workspaceId,
-			provider: 'mailchimp',
+		await ctx.db.patch(integration._id, {
 			status: 'disconnected',
+			encryptedAccessToken: undefined,
+			encryptedRefreshToken: undefined,
+			accessTokenExpiresAt: undefined,
+			serverPrefix: undefined,
+			audienceId: undefined,
+			audienceName: undefined,
+			lastSyncError: undefined,
 			disconnectedAt: now,
 			updatedAt: now
 		});
@@ -378,10 +402,13 @@ export const getContactSyncContext = internalQuery({
 		v.object({
 			syncId: v.id('marketing_contact_syncs'),
 			integrationId: v.id('marketing_integrations'),
+			provider: marketingProviderValidator,
 			audienceId: v.string(),
 			signerEmail: v.string(),
 			encryptedAccessToken: v.string(),
-			serverPrefix: v.string(),
+			encryptedRefreshToken: v.union(v.string(), v.null()),
+			accessTokenExpiresAt: v.union(v.number(), v.null()),
+			serverPrefix: v.union(v.string(), v.null()),
 			attempts: v.number()
 		})
 	),
@@ -399,7 +426,6 @@ export const getContactSyncContext = internalQuery({
 			submission.workspaceId !== sync.workspaceId ||
 			integration.status !== 'connected' ||
 			!integration.encryptedAccessToken ||
-			!integration.serverPrefix ||
 			!submission.marketingConsent
 		) {
 			return null;
@@ -407,12 +433,43 @@ export const getContactSyncContext = internalQuery({
 		return {
 			syncId: sync._id,
 			integrationId: integration._id,
+			provider: integration.provider,
 			audienceId: sync.audienceId,
 			signerEmail: submission.signerEmail,
 			encryptedAccessToken: integration.encryptedAccessToken,
-			serverPrefix: integration.serverPrefix,
+			encryptedRefreshToken: integration.encryptedRefreshToken ?? null,
+			accessTokenExpiresAt: integration.accessTokenExpiresAt ?? null,
+			serverPrefix: integration.serverPrefix ?? null,
 			attempts: sync.attempts
 		};
+	}
+});
+
+export const saveRefreshedAccessToken = internalMutation({
+	args: {
+		integrationId: v.id('marketing_integrations'),
+		provider: v.literal('constant_contact'),
+		encryptedAccessToken: v.string(),
+		encryptedRefreshToken: v.string(),
+		accessTokenExpiresAt: v.number()
+	},
+	returns: v.null(),
+	handler: async (ctx, args) => {
+		const integration = await ctx.db.get(args.integrationId);
+		if (
+			!integration ||
+			integration.provider !== args.provider ||
+			integration.status === 'disconnected'
+		) {
+			throw new ConvexError({ code: 'not_found', message: 'Constant Contact is not connected.' });
+		}
+		await ctx.db.patch(integration._id, {
+			encryptedAccessToken: args.encryptedAccessToken,
+			encryptedRefreshToken: args.encryptedRefreshToken,
+			accessTokenExpiresAt: args.accessTokenExpiresAt,
+			updatedAt: Date.now()
+		});
+		return null;
 	}
 });
 

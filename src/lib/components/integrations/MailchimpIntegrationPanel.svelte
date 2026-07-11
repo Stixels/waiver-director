@@ -21,22 +21,30 @@
 	type Integration = FunctionReturnType<
 		typeof api.marketingIntegrations.getWorkspaceMarketingIntegration
 	>;
-	type Audience = FunctionReturnType<typeof api.mailchimp.listAudiences>[number];
+	type Audience = { id: string; name: string; memberCount: number };
 
 	interface Props {
 		workspaceId: Id<'workspaces'>;
 		integration: Integration;
+		provider: 'mailchimp' | 'constant_contact';
 		canManage: boolean;
+		requestAudiencePicker?: boolean;
+		onAudiencePickerOpened?: () => void;
 		disconnectDialogOpen?: boolean;
 	}
 
 	let {
 		workspaceId,
 		integration,
+		provider,
 		canManage,
+		requestAudiencePicker = false,
+		onAudiencePickerOpened,
 		disconnectDialogOpen = $bindable(false)
 	}: Props = $props();
 	const convex = useConvexClient();
+	const providerName = $derived(provider === 'mailchimp' ? 'Mailchimp' : 'Constant Contact');
+	const destinationLabel = $derived(provider === 'mailchimp' ? 'audience' : 'list');
 
 	let isStartingConnect = $state(false);
 	let isLoadingAudiences = $state(false);
@@ -45,6 +53,7 @@
 	let audienceDialogOpen = $state(false);
 	let audiences = $state<Audience[]>([]);
 	let selectedAudienceId = $state('');
+	let hasHandledAudiencePickerRequest = $state(false);
 
 	function formatTimestamp(timestamp: number | null) {
 		if (!timestamp) return 'Not recorded';
@@ -58,10 +67,13 @@
 		if (convex.disabled || !canManage) return;
 		isStartingConnect = true;
 		try {
-			const result = await convex.action(api.mailchimp.startConnect, { workspaceId });
+			const result = await convex.action(
+				provider === 'mailchimp' ? api.mailchimp.startConnect : api.constantContact.startConnect,
+				{ workspaceId }
+			);
 			window.location.href = result.authorizationUrl;
 		} catch (error) {
-			toast.error(getConvexErrorMessage(error, 'Unable to start Mailchimp connection.'));
+			toast.error(getConvexErrorMessage(error, `Unable to start ${providerName} connection.`));
 		} finally {
 			isStartingConnect = false;
 		}
@@ -73,29 +85,62 @@
 		selectedAudienceId = integration?.audienceId ?? '';
 		isLoadingAudiences = true;
 		try {
-			audiences = await convex.action(api.mailchimp.listAudiences, { workspaceId });
+			audiences = await convex.action(
+				provider === 'mailchimp' ? api.mailchimp.listAudiences : api.constantContact.listLists,
+				{ workspaceId }
+			);
 			if (!selectedAudienceId && audiences.length === 1) {
 				selectedAudienceId = audiences[0].id;
 			}
 		} catch (error) {
-			toast.error(getConvexErrorMessage(error, 'Unable to load Mailchimp audiences.'));
+			toast.error(
+				getConvexErrorMessage(error, `Unable to load ${providerName} ${destinationLabel}s.`)
+			);
 		} finally {
 			isLoadingAudiences = false;
 		}
 	}
 
+	$effect(() => {
+		if (!requestAudiencePicker) {
+			hasHandledAudiencePickerRequest = false;
+			return;
+		}
+		if (
+			hasHandledAudiencePickerRequest ||
+			integration?.status !== 'pending_configuration' ||
+			!canManage
+		) {
+			return;
+		}
+		hasHandledAudiencePickerRequest = true;
+		void openAudiencePicker();
+		onAudiencePickerOpened?.();
+	});
+
 	async function saveAudience() {
 		if (convex.disabled || !selectedAudienceId || !canManage) return;
 		isSavingAudience = true;
 		try {
-			await convex.action(api.mailchimp.chooseAudience, {
-				workspaceId,
-				audienceId: selectedAudienceId
-			});
+			if (provider === 'mailchimp') {
+				await convex.action(api.mailchimp.chooseAudience, {
+					workspaceId,
+					audienceId: selectedAudienceId
+				});
+			} else {
+				await convex.action(api.constantContact.chooseList, {
+					workspaceId,
+					listId: selectedAudienceId
+				});
+			}
 			audienceDialogOpen = false;
-			toast.success('Mailchimp audience selected. Marketing opt-in is now available on waivers.');
+			toast.success(
+				`${providerName} ${destinationLabel} selected. Marketing opt-in is now available on waivers.`
+			);
 		} catch (error) {
-			toast.error(getConvexErrorMessage(error, 'Unable to select that Mailchimp audience.'));
+			toast.error(
+				getConvexErrorMessage(error, `Unable to select that ${providerName} ${destinationLabel}.`)
+			);
 		} finally {
 			isSavingAudience = false;
 		}
@@ -105,11 +150,14 @@
 		if (convex.disabled || !canManage) return;
 		isDisconnecting = true;
 		try {
-			await convex.mutation(api.marketingIntegrations.disconnectMailchimp, { workspaceId });
+			await convex.mutation(api.marketingIntegrations.disconnectMarketingIntegration, {
+				workspaceId,
+				provider
+			});
 			disconnectDialogOpen = false;
-			toast.success('Mailchimp disconnected.');
+			toast.success(`${providerName} disconnected.`);
 		} catch (error) {
-			toast.error(getConvexErrorMessage(error, 'Unable to disconnect Mailchimp.'));
+			toast.error(getConvexErrorMessage(error, `Unable to disconnect ${providerName}.`));
 		} finally {
 			isDisconnecting = false;
 		}
@@ -119,7 +167,7 @@
 <Dialog bind:open={audienceDialogOpen}>
 	<DialogContent class="max-w-md">
 		<DialogHeader>
-			<DialogTitle>Choose a Mailchimp audience</DialogTitle>
+			<DialogTitle>Choose a {providerName} {destinationLabel}</DialogTitle>
 			<DialogDescription>
 				Only signers who explicitly opt in will be added to this audience.
 			</DialogDescription>
@@ -132,14 +180,14 @@
 				</p>
 			{:else if audiences.length === 0}
 				<div class="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
-					No audiences were found in this Mailchimp account. Create one in Mailchimp, then try
-					again.
+					No {destinationLabel}s were found in this {providerName} account. Create one in
+					{providerName}, then try again.
 				</div>
 			{:else}
-				<label class="space-y-2 text-sm font-medium" for="mailchimp-audience">
-					<span>Audience</span>
+				<label class="space-y-2 text-sm font-medium" for="marketing-destination">
+					<span>{destinationLabel}</span>
 					<select
-						id="mailchimp-audience"
+						id="marketing-destination"
 						class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
 						bind:value={selectedAudienceId}
 					>
@@ -160,7 +208,7 @@
 				onclick={saveAudience}
 				disabled={convex.disabled || !selectedAudienceId || isSavingAudience}
 			>
-				{isSavingAudience ? 'Saving...' : 'Use this audience'}
+				{isSavingAudience ? 'Saving...' : `Use this ${destinationLabel}`}
 			</Button>
 		</DialogFooter>
 	</DialogContent>
@@ -169,16 +217,16 @@
 <Dialog bind:open={disconnectDialogOpen}>
 	<DialogContent class="max-w-md">
 		<DialogHeader>
-			<DialogTitle>Disconnect Mailchimp?</DialogTitle>
+			<DialogTitle>Disconnect {providerName}?</DialogTitle>
 			<DialogDescription>
 				The marketing opt-in will be removed from public waivers immediately. Existing signed
-				waivers and Mailchimp contacts are not changed.
+				waivers and {providerName} contacts are not changed.
 			</DialogDescription>
 		</DialogHeader>
 		<DialogFooter>
 			<Button variant="outline" onclick={() => (disconnectDialogOpen = false)}>Cancel</Button>
 			<Button variant="destructive" onclick={disconnect} disabled={isDisconnecting}>
-				{isDisconnecting ? 'Disconnecting...' : 'Disconnect Mailchimp'}
+				{isDisconnecting ? 'Disconnecting...' : `Disconnect ${providerName}`}
 			</Button>
 		</DialogFooter>
 	</DialogContent>
@@ -189,25 +237,27 @@
 		<div class="rounded-lg border border-dashed bg-card/50 p-10 text-center">
 			<p class="text-sm font-medium">Owner access required</p>
 			<p class="mt-1 text-xs text-muted-foreground">
-				Only workspace owners can connect or configure Mailchimp.
+				Only workspace owners can connect or configure {providerName}.
 			</p>
 		</div>
 	{:else if !integration || integration.status === 'disconnected'}
 		<div class="space-y-1">
-			<h3 class="text-sm font-semibold">Connect your Mailchimp account</h3>
+			<h3 class="text-sm font-semibold">Connect your {providerName} account</h3>
 			<p class="text-sm leading-relaxed text-muted-foreground">
-				Authorize Waiver Director, then choose the audience that should receive opted-in signers.
+				Authorize Waiver Director, then choose the {destinationLabel} that should receive opted-in signers.
 			</p>
 		</div>
-		<div class="overflow-hidden border-y" aria-label="Mailchimp connection workflow">
+		<div class="overflow-hidden border-y" aria-label={`${providerName} connection workflow`}>
 			<div class="flex gap-3 border-b py-3">
 				<span
 					class="mt-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground"
 					>1</span
 				>
 				<div>
-					<p class="text-sm font-medium">Authorize Mailchimp</p>
-					<p class="text-sm text-muted-foreground">Sign in and approve access through Mailchimp.</p>
+					<p class="text-sm font-medium">Authorize {providerName}</p>
+					<p class="text-sm text-muted-foreground">
+						Sign in and approve access through {providerName}.
+					</p>
 				</div>
 			</div>
 			<div class="flex gap-3 py-3">
@@ -216,7 +266,7 @@
 					>2</span
 				>
 				<div>
-					<p class="text-sm font-medium">Choose an audience</p>
+					<p class="text-sm font-medium">Choose a {destinationLabel}</p>
 					<p class="text-sm text-muted-foreground">
 						Opted-in waiver signers are added automatically after submission.
 					</p>
@@ -224,23 +274,23 @@
 			</div>
 		</div>
 		<Button class="self-start" onclick={connect} disabled={convex.disabled || isStartingConnect}>
-			{isStartingConnect ? 'Opening Mailchimp...' : 'Connect Mailchimp'}
+			{isStartingConnect ? `Opening ${providerName}...` : `Connect ${providerName}`}
 			<ExternalLinkIcon class="size-3.5" aria-hidden="true" />
 		</Button>
 	{:else if integration.status === 'pending_configuration'}
 		<div class="rounded-lg border bg-card p-5">
-			<h3 class="text-sm font-semibold">Mailchimp authorized</h3>
+			<h3 class="text-sm font-semibold">{providerName} authorized</h3>
 			<p class="mt-1 text-sm leading-relaxed text-muted-foreground">
-				Choose an audience to enable the optional marketing checkbox on public waivers.
+				Choose a {destinationLabel} to enable the optional marketing checkbox on public waivers.
 			</p>
 			<Button class="mt-4" onclick={openAudiencePicker} disabled={isLoadingAudiences}>
-				{isLoadingAudiences ? 'Loading audiences...' : 'Choose audience'}
+				{isLoadingAudiences ? `Loading ${destinationLabel}s...` : `Choose ${destinationLabel}`}
 			</Button>
 		</div>
 	{:else}
 		<div class="grid gap-3 md:grid-cols-2">
 			<div class="rounded-lg border bg-card p-4">
-				<p class="text-xs font-medium text-muted-foreground">Audience</p>
+				<p class="text-xs font-medium text-muted-foreground">{destinationLabel}</p>
 				<p class="mt-2 text-sm font-semibold">{integration.audienceName ?? 'Not selected'}</p>
 			</div>
 			<div class="rounded-lg border bg-card p-4">
@@ -266,7 +316,7 @@
 		<div class="flex flex-wrap gap-2">
 			<Button variant="outline" size="sm" onclick={openAudiencePicker}>
 				<RefreshCwIcon class="size-3.5" aria-hidden="true" />
-				Change audience
+				Change {destinationLabel}
 			</Button>
 		</div>
 	{/if}

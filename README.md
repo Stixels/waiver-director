@@ -50,7 +50,8 @@ Prerequisites:
 - Clerk application
 - Resend API key for email delivery
 - Bookeo credentials if you are working on booking integrations
-- A registered Mailchimp OAuth app if you are working on marketing-list integrations
+- A registered Mailchimp or Constant Contact OAuth app if you are working on marketing-list
+  integrations
 
 Install dependencies:
 
@@ -113,11 +114,15 @@ BOOKEO_SECRET_KEY=
 BOOKEO_AUTHORIZATION_URL=
 MAILCHIMP_CLIENT_ID=
 MAILCHIMP_CLIENT_SECRET=
+CONSTANT_CONTACT_CLIENT_ID=
+CONSTANT_CONTACT_CLIENT_SECRET=
 INTEGRATION_CREDENTIALS_ENCRYPTION_KEY=
 ```
 
 Register the Mailchimp OAuth callback as `<CONVEX_SITE_URL>/mailchimp/callback`. Keep the client
-secret and credential-encryption key in the Convex runtime environment only.
+secret and credential-encryption key in the Convex runtime environment only. For Constant Contact,
+register `<CONVEX_SITE_URL>/constant-contact/callback` and request the `contact_data` and
+`offline_access` scopes.
 
 Do not commit real secrets or workspace-specific credentials.
 
@@ -128,6 +133,14 @@ pnpm exec convex env set --from-file .env.local
 ```
 
 Use `--force` only when intentionally replacing existing Convex values.
+
+## Preview Deployments
+
+Vercel preview builds deploy an isolated Convex preview backend and compile its URL into the app.
+The Vercel build command also derives `PUBLIC_APP_URL` from that deployment's `VERCEL_URL`, so
+copied links in a preview stay on that preview rather than pointing at production. See
+[Vercel preview deployments](docs/operations/vercel-preview-deployments.md) for the deployment
+contract and validation steps.
 
 ## Development Scripts
 

@@ -27,7 +27,7 @@
 		title: string;
 		introCopy: string;
 		fields: WaiverField[];
-		marketingOptIn: { provider: 'mailchimp'; label: string } | null;
+		marketingOptIn: { label: string } | null;
 	};
 
 	type BookingContext = {

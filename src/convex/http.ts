@@ -70,6 +70,37 @@ http.route({
 });
 
 http.route({
+	path: '/constant-contact/callback',
+	method: 'GET',
+	handler: httpAction(async (ctx, request) => {
+		const url = new URL(request.url);
+		const state = url.searchParams.get('state') ?? '';
+		const code = url.searchParams.get('code') ?? undefined;
+		const error = url.searchParams.get('error') ?? undefined;
+
+		if (!state) return new Response('Bad request', { status: 400 });
+
+		try {
+			const result: { redirectUrl: string } = await ctx.runAction(
+				internal.constantContact.completeOAuthCallback,
+				{
+					state,
+					...(code ? { code } : {}),
+					...(error ? { error } : {})
+				}
+			);
+			return Response.redirect(result.redirectUrl, 303);
+		} catch (callbackError) {
+			console.error('[constant-contact/callback] unable to complete callback', {
+				error: callbackError,
+				state
+			});
+			return Response.redirect(new URL('/app?constant-contact=callback-error', request.url), 303);
+		}
+	})
+});
+
+http.route({
 	path: '/bookeo/webhook',
 	method: 'POST',
 	handler: httpAction(async (ctx, request) => {

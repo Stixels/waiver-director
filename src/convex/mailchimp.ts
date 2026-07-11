@@ -201,11 +201,12 @@ export const startConnect = action({
 	handler: async (ctx, args): Promise<{ authorizationUrl: string }> => {
 		const access: { userId: Id<'users'>; workspaceSlug: string } = await ctx.runQuery(
 			internal.marketingIntegrations.getOwnerAccessForAction,
-			{ workspaceId: args.workspaceId }
+			{ workspaceId: args.workspaceId, provider: 'mailchimp' }
 		);
 		const state = connectionState();
 		await ctx.runMutation(internal.marketingIntegrations.createConnectionSession, {
 			workspaceId: args.workspaceId,
+			provider: 'mailchimp',
 			requestedByUserId: access.userId,
 			state,
 			expiresAt: Date.now() + CONNECTION_STATE_TTL_MS
@@ -234,7 +235,8 @@ export const completeOAuthCallback = internalAction({
 			workspaceSlug: string;
 			expiresAt: number;
 		} | null = await ctx.runQuery(internal.marketingIntegrations.getPendingConnectionSession, {
-			state: args.state
+			state: args.state,
+			provider: 'mailchimp'
 		});
 		if (!session) return { redirectUrl: `${appUrl()}/app?mailchimp=callback-error` };
 
@@ -244,14 +246,14 @@ export const completeOAuthCallback = internalAction({
 				sessionId: session.sessionId,
 				status: 'expired'
 			});
-			return { redirectUrl: `${integrationUrl}?mailchimp=expired` };
+			return { redirectUrl: `${integrationUrl}?marketing=mailchimp&marketing-status=expired` };
 		}
 		if (args.error || !args.code) {
 			await ctx.runMutation(internal.marketingIntegrations.markConnectionSession, {
 				sessionId: session.sessionId,
 				status: 'failed'
 			});
-			return { redirectUrl: `${integrationUrl}?mailchimp=denied` };
+			return { redirectUrl: `${integrationUrl}?marketing=mailchimp&marketing-status=denied` };
 		}
 
 		try {
@@ -305,6 +307,7 @@ export const completeOAuthCallback = internalAction({
 			await mailchimpFetch(metadata.dc, tokenBody.access_token, '/ping');
 			await ctx.runMutation(internal.marketingIntegrations.saveOAuthConnection, {
 				workspaceId: session.workspaceId,
+				provider: 'mailchimp',
 				encryptedAccessToken: encryptAccessToken(tokenBody.access_token),
 				serverPrefix: metadata.dc,
 				...(metadata.login?.login_id !== undefined
@@ -315,7 +318,7 @@ export const completeOAuthCallback = internalAction({
 				sessionId: session.sessionId,
 				status: 'completed'
 			});
-			return { redirectUrl: `${integrationUrl}?mailchimp=connected` };
+			return { redirectUrl: `${integrationUrl}?marketing=mailchimp&marketing-status=authorized` };
 		} catch (error) {
 			console.error('[mailchimp/oauth] unable to complete OAuth callback', {
 				error: providerErrorMessage(error),
@@ -325,7 +328,9 @@ export const completeOAuthCallback = internalAction({
 				sessionId: session.sessionId,
 				status: 'failed'
 			});
-			return { redirectUrl: `${integrationUrl}?mailchimp=callback-error` };
+			return {
+				redirectUrl: `${integrationUrl}?marketing=mailchimp&marketing-status=callback-error`
+			};
 		}
 	}
 });
@@ -337,8 +342,17 @@ export const listAudiences = action({
 		const connection: {
 			integrationId: Id<'marketing_integrations'>;
 			encryptedAccessToken: string;
-			serverPrefix: string;
-		} = await ctx.runQuery(internal.marketingIntegrations.getConnectionForOwnerAction, args);
+			serverPrefix: string | null;
+		} = await ctx.runQuery(internal.marketingIntegrations.getConnectionForOwnerAction, {
+			...args,
+			provider: 'mailchimp'
+		});
+		if (!connection.serverPrefix) {
+			throw new ConvexError({
+				code: 'invalid_state',
+				message: 'Mailchimp server prefix is missing.'
+			});
+		}
 		return await fetchAudiences(
 			connection.serverPrefix,
 			decryptAccessToken(connection.encryptedAccessToken)
@@ -353,10 +367,17 @@ export const chooseAudience = action({
 		const connection: {
 			integrationId: Id<'marketing_integrations'>;
 			encryptedAccessToken: string;
-			serverPrefix: string;
+			serverPrefix: string | null;
 		} = await ctx.runQuery(internal.marketingIntegrations.getConnectionForOwnerAction, {
-			workspaceId: args.workspaceId
+			workspaceId: args.workspaceId,
+			provider: 'mailchimp'
 		});
+		if (!connection.serverPrefix) {
+			throw new ConvexError({
+				code: 'invalid_state',
+				message: 'Mailchimp server prefix is missing.'
+			});
+		}
 		const audiences = await fetchAudiences(
 			connection.serverPrefix,
 			decryptAccessToken(connection.encryptedAccessToken)
@@ -367,6 +388,7 @@ export const chooseAudience = action({
 		}
 		await ctx.runMutation(internal.marketingIntegrations.selectAudience, {
 			workspaceId: args.workspaceId,
+			provider: 'mailchimp',
 			integrationId: connection.integrationId,
 			audienceId: audience.id,
 			audienceName: audience.name
@@ -382,13 +404,20 @@ export const syncContact = internalAction({
 		const sync: {
 			syncId: Id<'marketing_contact_syncs'>;
 			integrationId: Id<'marketing_integrations'>;
+			provider: 'mailchimp' | 'constant_contact';
 			audienceId: string;
 			signerEmail: string;
 			encryptedAccessToken: string;
-			serverPrefix: string;
+			serverPrefix: string | null;
 			attempts: number;
 		} | null = await ctx.runQuery(internal.marketingIntegrations.getContactSyncContext, args);
-		if (!sync) return null;
+		if (!sync || sync.provider !== 'mailchimp') return null;
+		if (!sync.serverPrefix) {
+			throw new ConvexError({
+				code: 'invalid_state',
+				message: 'Mailchimp server prefix is missing.'
+			});
+		}
 
 		try {
 			const email = sync.signerEmail.trim().toLowerCase();
