@@ -82,7 +82,7 @@
 			<div class="rounded-md border border-destructive/25 bg-destructive/5 px-3.5 py-3">
 				<p class="text-xs leading-5 text-destructive/85">
 					Deleting <strong>{currentWorkspace?.name}</strong> will hide it from your team and break
-					any public waiver links sharing
+					its app URL and public waiver links. Its app URL is
 					<code class="rounded bg-destructive/10 px-1 py-0.5 font-mono text-[11px]"
 						>app/{currentWorkspace?.slug}</code
 					>. Customer records, submissions, and bookings will no longer be accessible from the app.
@@ -156,7 +156,7 @@
 			{#if !isOwner}
 				<span class="status-idle">Only owners can delete a workspace</span>
 			{:else}
-				<span class="status-idle">No undo. Type the slug to confirm.</span>
+				<span class="status-idle">No undo. Type the URL handle to confirm.</span>
 			{/if}
 		</div>
 		<Button
