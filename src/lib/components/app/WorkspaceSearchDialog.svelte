@@ -204,9 +204,17 @@
 		{
 			key: 'settings-general',
 			label: 'General settings',
-			description: 'Workspace name and URL slug',
+			description: 'Workspace name and URL handle',
 			path: 'settings/general',
-			aliases: ['general', 'workspace name', 'workspace slug', 'slug', 'url slug', 'identity'],
+			aliases: [
+				'general',
+				'workspace name',
+				'workspace handle',
+				'handle',
+				'slug',
+				'url handle',
+				'identity'
+			],
 			icon: Building2Icon,
 			showWhenEmpty: false
 		},
