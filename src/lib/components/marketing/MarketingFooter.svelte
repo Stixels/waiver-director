@@ -24,7 +24,6 @@
 			title: 'Integrations',
 			entries: [
 				{ label: 'Bookeo', href: '/features' },
-				{ label: 'Resova', comingSoon: true },
 				{ label: 'Xola', comingSoon: true },
 				{ label: 'Mailchimp', comingSoon: true },
 				{ label: 'Constant Contact', comingSoon: true },

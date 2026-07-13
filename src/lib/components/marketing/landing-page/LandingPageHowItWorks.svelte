@@ -4,7 +4,6 @@
 	const waiverFields = ['Full Name', 'Date of Birth', 'Emergency Contact'];
 	const providers = [
 		{ name: 'Bookeo', connected: true },
-		{ name: 'Resova', connected: false },
 		{ name: 'Xola', connected: false }
 	];
 	const shareMethods = ['Email', 'SMS', 'Booking confirmation'];
@@ -109,8 +108,8 @@
 					<div class="landing-how-it-works__step-number" aria-hidden="true">02</div>
 					<h3 class="landing-how-it-works__step-title">Connect your booking system.</h3>
 					<p class="text-[15px] leading-relaxed" style="color: var(--m-text-2);">
-						Connect Bookeo now. Resova, Xola, and other booking integrations are coming soon. Each
-						workspace connects one booking provider at a time so sessions stay matched cleanly.
+						Connect Bookeo now. Xola and other booking integrations are coming soon. Each workspace
+						connects one booking provider at a time so sessions stay matched cleanly.
 					</p>
 				</div>
 

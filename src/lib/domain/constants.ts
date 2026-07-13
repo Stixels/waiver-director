@@ -7,7 +7,7 @@ export type MembershipStatus = (typeof membershipStatuses)[number];
 export const authProviderIds = ['clerk', 'better-auth'] as const;
 export type AuthProviderId = (typeof authProviderIds)[number];
 
-export const bookingProviderIds = ['bookeo', 'resova', 'xola'] as const;
+export const bookingProviderIds = ['bookeo', 'xola'] as const;
 export type BookingProviderId = (typeof bookingProviderIds)[number];
 
 export const sourceKinds = ['manual', 'provider'] as const;
