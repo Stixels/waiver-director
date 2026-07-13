@@ -26,8 +26,7 @@
 		{
 			icon: Link2,
 			title: 'Booking Sync',
-			description:
-				'Connect Bookeo now. Resova, Xola, and other booking integrations are coming soon.'
+			description: 'Connect Bookeo now. Xola and other booking integrations are coming soon.'
 		},
 		{
 			icon: Mail,
