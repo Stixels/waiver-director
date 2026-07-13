@@ -12,6 +12,7 @@
 	} from '$lib/components/ui/sheet/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import MenuIcon from '@lucide/svelte/icons/menu';
+	import waiverDirectorIcon from '$lib/assets/waiver-director-icon.svg';
 
 	let { children } = $props();
 	const appContext = useAppContext();
@@ -86,13 +87,7 @@
 				aria-label="Waiver Director dashboard"
 				class="flex min-w-0 items-center gap-2 no-underline"
 			>
-				<div
-					class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[11px] font-black"
-					style="background: var(--primary); color: var(--primary-foreground);"
-					aria-hidden="true"
-				>
-					WD
-				</div>
+				<img src={waiverDirectorIcon} alt="" class="h-7 w-7 shrink-0" aria-hidden="true" />
 				<span class="truncate text-[13px] font-semibold tracking-tight"> Waiver Director </span>
 			</a>
 		</header>
