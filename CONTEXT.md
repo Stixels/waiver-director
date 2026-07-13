@@ -152,8 +152,12 @@ _Avoid_: Draft campaign, missing email
 The send timing for a follow-up candidate, initially calculated from the booking snapshot captured on the signed submission rather than silently recalculated from later provider changes.
 _Avoid_: Live booking reschedule, implicit timing change
 
+**Manual Follow-Up Schedule**:
+An Owner- or Staff-selected future date and time, expressed in the operator's local time and saved as one exact send instant, for one Unscheduled Follow-Up or an explicitly selected group of Unscheduled Follow-Ups. It is distinct from the booking-derived Follow-Up Schedule; Canceled Follow-Ups are excluded from batch scheduling, a batch applies only if every selected Follow-Up remains eligible, an operator changes a schedule by unscheduling it before choosing a new time, and provider-booking cancellation suppresses the pending delivery.
+_Avoid_: Automatic follow-up timing, canceled-follow-up restore
+
 **Canceled Follow-Up**:
-A follow-up candidate removed from automatic sending because its booking was canceled before delivery; it remains visible in follow-up history but is not part of the send queue.
+A follow-up candidate whose scheduled delivery was pending is permanently removed from sending because its booking was canceled before delivery; it remains visible in follow-up history with its cancellation reason and time, and later booking reactivation requires an operator to send it explicitly. Follow-ups without a schedule, and follow-ups already sent or failed, retain their existing status; Owners and Staff may make an explicit one-off send, but a canceled follow-up never returns to automatic or bulk delivery.
 _Avoid_: Automatic thank-you, deleted follow-up, queued follow-up
 
 **Unscheduled Follow-Up**:
