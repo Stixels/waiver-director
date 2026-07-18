@@ -252,6 +252,16 @@ export default defineSchema({
 		updatedAt: v.number()
 	}).index('by_workspaceId', ['workspaceId']),
 
+	email_ai_rate_limits: defineTable({
+		workspaceId: v.id('workspaces'),
+		scopeKey: v.string(),
+		windowStartedAt: v.number(),
+		requestCount: v.number(),
+		updatedAt: v.number()
+	})
+		.index('by_workspaceId', ['workspaceId'])
+		.index('by_workspaceId_and_scopeKey', ['workspaceId', 'scopeKey']),
+
 	email_templates: defineTable({
 		workspaceId: v.id('workspaces'),
 		name: v.string(),

@@ -12,7 +12,6 @@
 	interface Props {
 		workspaceId: Id<'workspaces'>;
 		workspaceSlug: string;
-		workspaceName: string;
 		subject: string;
 		body: string;
 		sendAfterAmount: number;
@@ -27,7 +26,6 @@
 	let {
 		workspaceId,
 		workspaceSlug,
-		workspaceName,
 		subject,
 		body,
 		sendAfterAmount,
@@ -71,7 +69,6 @@
 					body,
 					sendAfterAmount,
 					sendAfterUnit,
-					workspaceName,
 					goal: trimmedGoal
 				})
 			});

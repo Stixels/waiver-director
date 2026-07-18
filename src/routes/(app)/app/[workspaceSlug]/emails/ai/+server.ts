@@ -1,23 +1,26 @@
 import { json, type RequestHandler } from '@sveltejs/kit';
+import { ConvexError } from 'convex/values';
 import { env } from '$env/dynamic/private';
 import { api } from '$convex/_generated/api';
 import type { Id } from '$convex/_generated/dataModel';
 import {
 	EMAIL_AI_ALLOWED_VARIABLES,
 	EMAIL_AI_RUBRIC_KEYS,
-	EMAIL_AI_RUBRIC_MAX,
-	type EmailAIResult,
-	type EmailAIRubric
+	EMAIL_AI_RUBRIC_MAX
 } from '$lib/domain/email-ai';
+import {
+	EMAIL_AI_MAX_BODY_LENGTH,
+	EMAIL_AI_MAX_LIST_ITEMS,
+	EMAIL_AI_MAX_SUBJECT_LENGTH,
+	parseEmailAIModelJson,
+	validateEmailAIResult
+} from '$lib/domain/email-ai-validation';
 import { sanitizeRichTextHtml } from '$lib/utils/rich-text';
 
-const DEFAULT_OLLAMA_BASE_URL = 'http://localhost:11434';
-const DEFAULT_OLLAMA_MODEL = 'gemma4:e4b';
-const OLLAMA_TIMEOUT_MS = 120_000;
-const MAX_SUBJECT_LENGTH = 240;
-const MAX_BODY_LENGTH = 20_000;
+const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/interactions';
+const DEFAULT_GEMINI_MODEL = 'gemini-3.5-flash';
+const GEMINI_TIMEOUT_MS = 120_000;
 const MAX_GOAL_LENGTH = 240;
-const MAX_LIST_ITEMS = 6;
 
 type EmailAIRequest = {
 	workspaceId: Id<'workspaces'>;
@@ -25,31 +28,71 @@ type EmailAIRequest = {
 	body: string;
 	sendAfterAmount: number;
 	sendAfterUnit: 'minutes' | 'hours' | 'days';
-	workspaceName: string;
 	goal: string;
 };
 
-type OllamaChatResponse = {
-	message?: {
-		content?: string;
-	};
-	response?: string;
+type GeminiInteractionResponse = {
+	output_text?: string;
+	steps?: Array<{
+		type?: string;
+		content?: Array<{
+			type?: string;
+			text?: string;
+		}>;
+	}>;
 };
 
-type RawEmailAIResult = {
-	score?: unknown;
-	rubric?: unknown;
-	issues?: unknown;
-	suggestions?: unknown;
-	proposedSubject?: unknown;
-	proposedBody?: unknown;
-	rationale?: unknown;
-};
+const emailAIResponseSchema = {
+	type: 'object',
+	properties: {
+		score: { type: 'integer', minimum: 0, maximum: 100 },
+		rubric: {
+			type: 'object',
+			properties: Object.fromEntries(
+				EMAIL_AI_RUBRIC_KEYS.map((key) => [
+					key,
+					{ type: 'integer', minimum: 0, maximum: EMAIL_AI_RUBRIC_MAX }
+				])
+			),
+			required: [...EMAIL_AI_RUBRIC_KEYS],
+			additionalProperties: false
+		},
+		issues: {
+			type: 'array',
+			items: { type: 'string' },
+			maxItems: EMAIL_AI_MAX_LIST_ITEMS
+		},
+		suggestions: {
+			type: 'array',
+			items: { type: 'string' },
+			maxItems: EMAIL_AI_MAX_LIST_ITEMS
+		},
+		proposedSubject: { type: 'string' },
+		proposedBody: { type: 'string' },
+		rationale: { type: 'string' }
+	},
+	required: [
+		'score',
+		'rubric',
+		'issues',
+		'suggestions',
+		'proposedSubject',
+		'proposedBody',
+		'rationale'
+	],
+	additionalProperties: false
+} as const;
 
-const variableTokenPattern = /\{\{?\s*([a-zA-Z0-9_]+)\s*\}?\}/g;
+function errorResponse(message: string, status = 400, headers?: Record<string, string>) {
+	return json({ message }, { status, headers });
+}
 
-function errorResponse(message: string, status = 400) {
-	return json({ message }, { status });
+function isConvexAccessError(error: unknown) {
+	if (!(error instanceof ConvexError) || !error.data || typeof error.data !== 'object') {
+		return false;
+	}
+	if (!('code' in error.data)) return false;
+	return error.data.code === 'unauthenticated' || error.data.code === 'forbidden';
 }
 
 function isRequestBody(value: unknown): value is EmailAIRequest {
@@ -59,140 +102,23 @@ function isRequestBody(value: unknown): value is EmailAIRequest {
 		typeof body.workspaceId === 'string' &&
 		typeof body.subject === 'string' &&
 		typeof body.body === 'string' &&
-		typeof body.workspaceName === 'string' &&
 		typeof body.goal === 'string' &&
 		typeof body.sendAfterAmount === 'number' &&
 		['minutes', 'hours', 'days'].includes(String(body.sendAfterUnit))
 	);
 }
 
-function clampScore(value: unknown): number | null {
-	if (typeof value !== 'number' || !Number.isFinite(value)) return null;
-	const rounded = Math.round(value);
-	if (rounded < 0 || rounded > 100) return null;
-	return rounded;
-}
+function extractGeminiText(payload: GeminiInteractionResponse): string {
+	if (typeof payload.output_text === 'string') return payload.output_text;
 
-function parseStringList(value: unknown): string[] {
-	if (!Array.isArray(value)) return [];
-	return value
-		.filter((item): item is string => typeof item === 'string')
-		.map((item) => item.trim())
-		.filter(Boolean)
-		.slice(0, MAX_LIST_ITEMS);
-}
-
-function extractVariables(value: string): Set<string> {
-	const variables = new Set<string>();
-	for (const match of value.matchAll(variableTokenPattern)) {
-		const variableName = match[1];
-		if (variableName) variables.add(variableName);
-	}
-	return variables;
-}
-
-function unsupportedVariables(value: string): string[] {
-	const allowed = new Set<string>(EMAIL_AI_ALLOWED_VARIABLES);
-	return [...extractVariables(value)].filter((variable) => !allowed.has(variable));
-}
-
-function missingOriginalVariables(source: string, proposed: string): string[] {
-	const original = extractVariables(source);
-	const next = extractVariables(proposed);
-	return [...original].filter((variable) => !next.has(variable));
-}
-
-function clampRubricScore(value: unknown): number | null {
-	if (typeof value !== 'number' || !Number.isFinite(value)) return null;
-	// Models occasionally answer on a 0–100 scale; rescale those into the 0–10 rubric range.
-	const normalized = value > EMAIL_AI_RUBRIC_MAX ? value / 10 : value;
-	const rounded = Math.round(normalized);
-	return Math.max(0, Math.min(EMAIL_AI_RUBRIC_MAX, rounded));
-}
-
-function validateRubric(value: unknown): EmailAIRubric | null {
-	if (!value || typeof value !== 'object') return null;
-	const source = value as Record<string, unknown>;
-	const rubric = {} as EmailAIRubric;
-	for (const key of EMAIL_AI_RUBRIC_KEYS) {
-		const score = clampRubricScore(source[key]);
-		if (score === null) return null;
-		rubric[key] = score;
-	}
-	return rubric;
-}
-
-function parseModelJson(content: string): RawEmailAIResult | null {
-	const trimmed = content.trim();
-	const fenced = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i)?.[1]?.trim();
-	const primaryCandidate = fenced ?? trimmed;
-	const candidates = [primaryCandidate];
-	const objectStart = primaryCandidate.indexOf('{');
-	const objectEnd = primaryCandidate.lastIndexOf('}');
-	if (objectStart >= 0 && objectEnd > objectStart) {
-		candidates.push(primaryCandidate.slice(objectStart, objectEnd + 1));
-	}
-
-	for (const candidate of candidates) {
-		try {
-			const parsed = JSON.parse(candidate) as unknown;
-			if (parsed && typeof parsed === 'object') return parsed as RawEmailAIResult;
-		} catch {
-			// Try the next candidate; validation still rejects malformed or incomplete objects.
+	for (const step of [...(payload.steps ?? [])].reverse()) {
+		if (step.type !== 'model_output') continue;
+		for (const content of [...(step.content ?? [])].reverse()) {
+			if (content.type === 'text' && typeof content.text === 'string') return content.text;
 		}
 	}
-	return null;
-}
 
-function validateAIResult(raw: RawEmailAIResult, source: { subject: string; body: string }) {
-	const score = clampScore(raw.score);
-	const rubric = validateRubric(raw.rubric);
-	const proposedSubject = typeof raw.proposedSubject === 'string' ? raw.proposedSubject.trim() : '';
-	const proposedBody =
-		typeof raw.proposedBody === 'string' ? sanitizeRichTextHtml(raw.proposedBody) : '';
-	const rationale = typeof raw.rationale === 'string' ? raw.rationale.trim() : '';
-	const issues = parseStringList(raw.issues);
-	const suggestions = parseStringList(raw.suggestions);
-
-	if (score === null || !rubric) {
-		return { ok: false as const, message: 'AI response did not include a valid score rubric.' };
-	}
-	if (!proposedSubject || proposedSubject.length > MAX_SUBJECT_LENGTH) {
-		return { ok: false as const, message: 'AI response returned an invalid subject.' };
-	}
-	if (!proposedBody || proposedBody.length > MAX_BODY_LENGTH) {
-		return { ok: false as const, message: 'AI response returned an invalid body.' };
-	}
-	const unsupported = unsupportedVariables(`${proposedSubject}\n${proposedBody}`);
-	if (unsupported.length > 0) {
-		return {
-			ok: false as const,
-			message: `AI response used unsupported variables: ${unsupported.join(', ')}.`
-		};
-	}
-	const missing = missingOriginalVariables(
-		`${source.subject}\n${source.body}`,
-		`${proposedSubject}\n${proposedBody}`
-	);
-	if (missing.length > 0) {
-		return {
-			ok: false as const,
-			message: `AI response removed existing variables: ${missing.join(', ')}.`
-		};
-	}
-
-	return {
-		ok: true as const,
-		result: {
-			score,
-			rubric,
-			issues,
-			suggestions,
-			proposedSubject,
-			proposedBody,
-			rationale
-		} satisfies EmailAIResult
-	};
+	return '';
 }
 
 function htmlToText(html: string): string {
@@ -204,7 +130,7 @@ function htmlToText(html: string): string {
 		.trim();
 }
 
-function buildPrompt(args: EmailAIRequest & { sanitizedBody: string }) {
+function buildPrompt(args: EmailAIRequest & { sanitizedBody: string; workspaceName: string }) {
 	const allowedVariables = EMAIL_AI_ALLOWED_VARIABLES.map((variable) => `{{${variable}}}`).join(
 		', '
 	);
@@ -248,78 +174,90 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	const subject = body.subject.trim();
 	const sanitizedBody = sanitizeRichTextHtml(body.body);
 	const goal = body.goal.trim().slice(0, MAX_GOAL_LENGTH);
-	const workspaceName = body.workspaceName.trim() || 'Your business';
 
-	if (!subject || subject.length > MAX_SUBJECT_LENGTH) {
+	if (!subject || subject.length > EMAIL_AI_MAX_SUBJECT_LENGTH) {
 		return errorResponse('Subject is required and must be shorter than 240 characters.');
 	}
-	if (!sanitizedBody || sanitizedBody.length > MAX_BODY_LENGTH) {
+	if (!sanitizedBody || sanitizedBody.length > EMAIL_AI_MAX_BODY_LENGTH) {
 		return errorResponse('Email body is required and must be shorter than 20,000 characters.');
 	}
 	if (!Number.isInteger(body.sendAfterAmount) || body.sendAfterAmount < 1) {
 		return errorResponse('Send delay must be a positive whole number.');
 	}
 
+	let quota: { allowed: boolean; retryAfterSeconds: number; workspaceName: string };
 	try {
-		const membership = await locals.convex.query(api.workspaces.currentWorkspaceMembership, {
+		quota = await locals.convex.mutation(api.emailAI.consumeReviewQuota, {
 			workspaceId: body.workspaceId
 		});
-		if (!membership || membership.status !== 'active') {
-			return errorResponse('You do not have access to this workspace.', 403);
+	} catch (error) {
+		if (isConvexAccessError(error)) {
+			return errorResponse('Only workspace owners may review follow-up content with AI.', 403);
 		}
-	} catch {
-		return errorResponse('Unable to verify workspace access.', 403);
+		return errorResponse('Unable to verify AI review access.', 503);
+	}
+	if (!quota.allowed) {
+		return errorResponse('Too many AI review requests. Please try again later.', 429, {
+			'Retry-After': String(quota.retryAfterSeconds)
+		});
 	}
 
-	const ollamaBaseUrl = (env.OLLAMA_BASE_URL || DEFAULT_OLLAMA_BASE_URL).replace(/\/$/, '');
-	const model = env.OLLAMA_MODEL || DEFAULT_OLLAMA_MODEL;
+	const apiKey = env.GEMINI_API_KEY?.trim();
+	if (!apiKey) {
+		return errorResponse('Email AI is not configured. Set GEMINI_API_KEY.', 503);
+	}
+
+	const model = env.GEMINI_MODEL?.trim() || DEFAULT_GEMINI_MODEL;
 	const controller = new AbortController();
-	const timeout = setTimeout(() => controller.abort(), OLLAMA_TIMEOUT_MS);
+	const timeout = setTimeout(() => controller.abort(), GEMINI_TIMEOUT_MS);
 
 	try {
-		const response = await fetch(`${ollamaBaseUrl}/api/chat`, {
+		const response = await fetch(GEMINI_API_URL, {
 			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
+			headers: {
+				'Content-Type': 'application/json',
+				'x-goog-api-key': apiKey
+			},
 			body: JSON.stringify({
 				model,
-				stream: false,
-				format: 'json',
-				messages: [
-					{
-						role: 'system',
-						content:
-							'You return strict JSON for an email template review tool. You never include markdown or prose outside JSON.'
-					},
-					{
-						role: 'user',
-						content: buildPrompt({
-							...body,
-							subject,
-							workspaceName,
-							goal,
-							sanitizedBody
-						})
-					}
-				],
-				options: {
-					temperature: 0.35
+				input: buildPrompt({
+					...body,
+					subject,
+					workspaceName: quota.workspaceName,
+					goal,
+					sanitizedBody
+				}),
+				response_format: {
+					type: 'text',
+					mime_type: 'application/json',
+					schema: emailAIResponseSchema
 				}
 			}),
 			signal: controller.signal
 		});
 
 		if (!response.ok) {
-			return errorResponse(`Ollama returned ${response.status}.`, 502);
+			if (response.status === 429) {
+				return errorResponse('Gemini API quota is currently exhausted.', 429);
+			}
+			if (response.status === 401 || response.status === 403) {
+				return errorResponse('Gemini API authentication failed. Check GEMINI_API_KEY.', 502);
+			}
+			return errorResponse(`Gemini API returned ${response.status}.`, 502);
 		}
 
-		const payload = (await response.json()) as OllamaChatResponse;
-		const content = payload.message?.content ?? payload.response ?? '';
-		const rawResult = parseModelJson(content);
+		const payload = (await response.json()) as GeminiInteractionResponse;
+		const content = extractGeminiText(payload);
+		const rawResult = parseEmailAIModelJson(content);
 		if (!rawResult) {
 			return errorResponse('AI response was not valid JSON.', 502);
 		}
 
-		const result = validateAIResult(rawResult, { subject, body: sanitizedBody });
+		const result = validateEmailAIResult(
+			rawResult,
+			{ subject, body: sanitizedBody },
+			sanitizeRichTextHtml
+		);
 		if (!result.ok) {
 			return errorResponse(result.message, 502);
 		}
@@ -327,9 +265,9 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		return json(result.result);
 	} catch (error) {
 		if (error instanceof DOMException && error.name === 'AbortError') {
-			return errorResponse('Ollama did not respond before the timeout.', 504);
+			return errorResponse('Gemini API did not respond before the timeout.', 504);
 		}
-		return errorResponse('Unable to reach Ollama.', 502);
+		return errorResponse('Unable to reach Gemini API.', 502);
 	} finally {
 		clearTimeout(timeout);
 	}

@@ -1835,11 +1835,10 @@
 						<!-- Tool rail (right column) -->
 						<div class="email-rail">
 							<div class="rail-section">
-								{#if currentWorkspace}
+								{#if currentWorkspace && isOwner}
 									<EmailAIAssistant
 										workspaceId={currentWorkspace.workspaceId}
 										workspaceSlug={currentWorkspace.slug}
-										workspaceName={currentWorkspace.name}
 										{subject}
 										{body}
 										sendAfterAmount={normalizedSendAfterAmount}
@@ -1850,6 +1849,11 @@
 										onReopen={() => (aiReviewOpen = true)}
 										onDiscard={discardAIResult}
 									/>
+								{:else}
+									<p class="rail-label">AI review</p>
+									<p class="rail-hint">
+										Only workspace owners can review and replace follow-up content.
+									</p>
 								{/if}
 							</div>
 

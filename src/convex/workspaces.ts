@@ -35,6 +35,7 @@ const WORKSPACE_SCOPED_TABLES = {
 	customers: true,
 	waiver_submissions: true,
 	email_editor_content: true,
+	email_ai_rate_limits: true,
 	email_templates: true,
 	workspace_logo_uploads: true,
 	workspace_email_settings: true,
