@@ -53,8 +53,7 @@
 			id: 'booking-sync',
 			icon: Link2,
 			title: 'Booking Sync',
-			description:
-				'Connect Bookeo now. Resova, Xola, and other booking integrations are coming soon.',
+			description: 'Connect Bookeo now. Xola and other booking integrations are coming soon.',
 			detail:
 				'Link one booking provider per workspace so upcoming sessions appear in your dashboard with expected guest counts. Waivers are automatically matched to the correct session — no per-session setup required.',
 			hero: false
@@ -104,7 +103,6 @@
 
 	const integrations = [
 		{ name: 'Bookeo', status: 'live', description: 'Session sync + participant counts' },
-		{ name: 'Resova', status: 'soon', description: 'Coming soon' },
 		{ name: 'Xola', status: 'soon', description: 'Coming soon' },
 		{ name: 'Mailchimp', status: 'soon', description: 'Coming soon' },
 		{ name: 'Constant Contact', status: 'soon', description: 'Coming soon' }
@@ -489,7 +487,7 @@
 						</div>
 					{:else if feature.id === 'booking-sync'}
 						<div class="mt-auto flex flex-wrap gap-2" aria-hidden="true">
-							{#each [{ name: 'Bookeo ✓', live: true }, { name: 'Resova (soon)', live: false }, { name: 'Xola (soon)', live: false }] as chip (chip.name)}
+							{#each [{ name: 'Bookeo ✓', live: true }, { name: 'Xola (soon)', live: false }] as chip (chip.name)}
 								<span
 									class="rounded-full border px-2.5 py-1 text-[11px] font-medium"
 									style="background: var(--m-elevated); border-color: var(--m-border-strong); color: {chip.live

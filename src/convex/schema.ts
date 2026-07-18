@@ -1,6 +1,8 @@
 import { defineSchema, defineTable } from 'convex/server';
 import { v } from 'convex/values';
+import { billingFeatureValidator } from './lib/billing';
 import { bookingProviderValidator, bookingSnapshotValidator } from './lib/bookings';
+import { marketingIntegrationStatusValidator, marketingProviderValidator } from './lib/marketing';
 
 export default defineSchema({
 	users: defineTable({
@@ -31,7 +33,7 @@ export default defineSchema({
 		providerUserId: v.string(),
 		planSlug: v.string(),
 		status: v.string(),
-		featureSlugs: v.array(v.string()),
+		featureSlugs: v.array(billingFeatureValidator),
 		currentPeriodEnd: v.optional(v.number()),
 		trialEndsAt: v.optional(v.number()),
 		cancelAtPeriodEnd: v.optional(v.boolean()),
@@ -45,6 +47,12 @@ export default defineSchema({
 		.index('by_userId', ['userId'])
 		.index('by_provider_and_providerUserId', ['provider', 'providerUserId'])
 		.index('by_lastEventId', ['lastEventId']),
+
+	clerk_billing_webhook_events: defineTable({
+		eventId: v.string(),
+		eventType: v.string(),
+		processedAt: v.number()
+	}).index('by_eventId', ['eventId']),
 
 	workspaces: defineTable({
 		name: v.string(),
@@ -221,6 +229,8 @@ export default defineSchema({
 			})
 		),
 		status: v.union(v.literal('submitted')),
+		marketingConsent: v.optional(v.boolean()),
+		marketingConsentLabel: v.optional(v.string()),
 		submittedAt: v.number()
 	})
 		.index('by_workspaceId', ['workspaceId'])
@@ -322,6 +332,61 @@ export default defineSchema({
 	})
 		.index('by_workspaceId', ['workspaceId'])
 		.index('by_workspaceId_and_provider', ['workspaceId', 'provider']),
+
+	marketing_integrations: defineTable({
+		workspaceId: v.id('workspaces'),
+		provider: marketingProviderValidator,
+		status: marketingIntegrationStatusValidator,
+		encryptedAccessToken: v.optional(v.string()),
+		serverPrefix: v.optional(v.string()),
+		accountId: v.optional(v.string()),
+		audienceId: v.optional(v.string()),
+		audienceName: v.optional(v.string()),
+		lastSyncError: v.optional(v.string()),
+		connectedAt: v.optional(v.number()),
+		disconnectedAt: v.optional(v.number()),
+		updatedAt: v.number()
+	})
+		.index('by_workspaceId', ['workspaceId'])
+		.index('by_workspaceId_and_provider', ['workspaceId', 'provider']),
+
+	marketing_connection_sessions: defineTable({
+		workspaceId: v.id('workspaces'),
+		provider: marketingProviderValidator,
+		requestedByUserId: v.id('users'),
+		state: v.string(),
+		status: v.union(
+			v.literal('pending'),
+			v.literal('completed'),
+			v.literal('failed'),
+			v.literal('expired')
+		),
+		createdAt: v.number(),
+		expiresAt: v.number()
+	})
+		.index('by_state', ['state'])
+		.index('by_workspaceId', ['workspaceId'])
+		.index('by_status_and_createdAt', ['status', 'createdAt']),
+
+	marketing_contact_syncs: defineTable({
+		workspaceId: v.id('workspaces'),
+		integrationId: v.id('marketing_integrations'),
+		submissionId: v.id('waiver_submissions'),
+		provider: marketingProviderValidator,
+		audienceId: v.string(),
+		status: v.union(v.literal('queued'), v.literal('synced'), v.literal('failed')),
+		attempts: v.number(),
+		lastError: v.optional(v.string()),
+		createdAt: v.number(),
+		updatedAt: v.number(),
+		syncedAt: v.optional(v.number())
+	})
+		.index('by_submissionId', ['submissionId'])
+		.index('by_workspaceId', ['workspaceId'])
+		.index('by_integrationId_and_submissionId', ['integrationId', 'submissionId'])
+		.index('by_workspaceId_and_status', ['workspaceId', 'status'])
+		.index('by_integrationId_and_status', ['integrationId', 'status'])
+		.index('by_status_and_updatedAt', ['status', 'updatedAt']),
 
 	booking_connection_sessions: defineTable({
 		workspaceId: v.id('workspaces'),

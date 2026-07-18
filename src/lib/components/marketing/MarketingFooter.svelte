@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
+	import waiverDirectorIcon from '$lib/assets/waiver-director-icon.svg';
 
 	type FooterEntry =
 		| {
@@ -24,7 +25,6 @@
 			title: 'Integrations',
 			entries: [
 				{ label: 'Bookeo', href: '/features' },
-				{ label: 'Resova', comingSoon: true },
 				{ label: 'Xola', comingSoon: true },
 				{ label: 'Mailchimp', comingSoon: true },
 				{ label: 'Constant Contact', comingSoon: true },
@@ -57,13 +57,7 @@
 		<div class="mb-10 grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-4">
 			<div>
 				<a href={resolve('/')} class="mb-3 flex items-center gap-2 no-underline">
-					<div
-						class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[11px] font-black"
-						style="background: var(--primary); color: var(--primary-foreground); font-family: var(--m-font-display);"
-						aria-hidden="true"
-					>
-						WD
-					</div>
+					<img src={waiverDirectorIcon} alt="" class="h-7 w-7 shrink-0" aria-hidden="true" />
 					<span class="text-[15px] font-bold" style="font-family: var(--m-font-display);"
 						>Waiver Director</span
 					>

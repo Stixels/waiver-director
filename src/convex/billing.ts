@@ -459,8 +459,8 @@ export const applyClerkBillingEvent = internalMutation({
 	returns: clerkWebhookResultValue,
 	handler: async (ctx, args): Promise<ClerkWebhookResult> => {
 		const existingEvent = await ctx.db
-			.query('user_billing_entitlements')
-			.withIndex('by_lastEventId', (query) => query.eq('lastEventId', args.eventId))
+			.query('clerk_billing_webhook_events')
+			.withIndex('by_eventId', (query) => query.eq('eventId', args.eventId))
 			.unique();
 		if (existingEvent) return { status: 'duplicate' };
 
@@ -519,6 +519,11 @@ export const applyClerkBillingEvent = internalMutation({
 		} else {
 			await ctx.db.insert('user_billing_entitlements', patch);
 		}
+		await ctx.db.insert('clerk_billing_webhook_events', {
+			eventId: args.eventId,
+			eventType: args.eventType,
+			processedAt: args.receivedAt
+		});
 
 		return { status: 'accepted' };
 	}

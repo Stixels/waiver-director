@@ -621,7 +621,7 @@ export const disconnectBookingIntegration = action({
 	handler: async (ctx, args) => {
 		const integration: {
 			integrationId: Id<'booking_integrations'>;
-			provider: 'bookeo' | 'resova' | 'xola';
+			provider: 'bookeo' | 'xola';
 			status: 'connected' | 'syncing' | 'error' | 'disconnected';
 			encryptedApiKey: string | null;
 		} = await ctx.runQuery(internal.integrations.getIntegrationForDisconnect, {
@@ -1408,7 +1408,7 @@ export const syncBookeoIntegration = internalAction({
 		const integration: {
 			integrationId: Id<'booking_integrations'>;
 			workspaceId: Id<'workspaces'>;
-			provider: 'bookeo' | 'resova' | 'xola';
+			provider: 'bookeo' | 'xola';
 			status: 'connected' | 'syncing' | 'error' | 'disconnected';
 			encryptedApiKey: string | null;
 		} | null = await ctx.runQuery(internal.integrations.getIntegrationSecret, {
@@ -1472,7 +1472,7 @@ export const completeBookeoCallback = internalAction({
 		const session: {
 			sessionId: Id<'booking_connection_sessions'>;
 			workspaceId: Id<'workspaces'>;
-			provider: 'bookeo' | 'resova' | 'xola';
+			provider: 'bookeo' | 'xola';
 			status: 'pending' | 'completed' | 'failed' | 'expired';
 			expiresAt: number;
 		} | null = await ctx.runQuery(internal.integrations.getPendingConnectionSession, {

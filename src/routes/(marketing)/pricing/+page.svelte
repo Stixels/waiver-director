@@ -28,7 +28,7 @@
 		{
 			id: 'integrations',
 			q: 'How do the booking system integrations work?',
-			a: 'Connect Bookeo once from your integrations settings. After that, upcoming sessions sync automatically with expected participant counts. Each workspace connects one booking provider at a time. Resova, Xola, and other providers are coming soon.'
+			a: 'Connect Bookeo once from your integrations settings. After that, upcoming sessions sync automatically with expected participant counts. Each workspace connects one booking provider at a time. Xola and other providers are coming soon.'
 		},
 		{
 			id: 'email-verification',

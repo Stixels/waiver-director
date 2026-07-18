@@ -30,9 +30,9 @@ function sanitizeElement(element: Element, documentRef: Document): Node | null {
 		return fragment;
 	}
 
-	if (tagName === 'img') {
-		const src = element.getAttribute('src')?.trim() ?? '';
-		if (!src || !CONVEX_STORAGE_URL_PATTERN.test(src)) {
+	const imageSrc = tagName === 'img' ? (element.getAttribute('src')?.trim() ?? '') : null;
+	if (imageSrc !== null) {
+		if (!imageSrc || !CONVEX_STORAGE_URL_PATTERN.test(imageSrc)) {
 			return documentRef.createTextNode('');
 		}
 	}
@@ -54,7 +54,7 @@ function sanitizeElement(element: Element, documentRef: Document): Node | null {
 	}
 
 	if (tagName === 'img') {
-		next.setAttribute('src', element.getAttribute('src') ?? '');
+		next.setAttribute('src', imageSrc ?? '');
 		next.setAttribute('alt', element.getAttribute('alt') ?? '');
 		for (const attr of ['width', 'height']) {
 			const value = element.getAttribute(attr)?.trim();

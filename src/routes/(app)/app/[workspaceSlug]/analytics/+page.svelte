@@ -5,6 +5,7 @@
 	import { useAppContext } from '$lib/components/app/app-context.svelte';
 	import UpgradeOverlay from '$lib/components/app/UpgradeOverlay.svelte';
 	import { useProtectedQuery } from '$lib/components/auth/convex-auth.svelte';
+	import { billingUpgradeHref } from '$lib/utils/billing';
 	import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { ChartContainer, ChartTooltip, type ChartConfig } from '$lib/components/ui/chart';
@@ -31,9 +32,7 @@
 	const canViewAnalytics = $derived(Boolean(currentWorkspace?.billing.features.analytics));
 	const workspacePausedOnPro = $derived(Boolean(currentWorkspace?.billing.workspaceLimit.isPaused));
 	const billingHref = $derived(
-		workspacePausedOnPro
-			? `/app/${page.params.workspaceSlug}/account/plan`
-			: `/app/${page.params.workspaceSlug}/account#/billing/plans`
+		billingUpgradeHref(page.params.workspaceSlug ?? '', workspacePausedOnPro)
 	);
 
 	function toDateInputValue(date: Date): string {

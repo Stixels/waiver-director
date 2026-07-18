@@ -28,6 +28,7 @@
 		DialogTitle
 	} from '$lib/components/ui/dialog/index.js';
 	import { mode as themeMode, setMode } from 'mode-watcher';
+	import waiverDirectorIcon from '$lib/assets/waiver-director-icon.svg';
 
 	import ChevronsUpDownIcon from '@lucide/svelte/icons/chevrons-up-down';
 	import PanelLeftCloseIcon from '@lucide/svelte/icons/panel-left-close';
@@ -263,13 +264,7 @@
 			aria-label="Waiver Director dashboard"
 			class="sidebar-brand-link flex w-full min-w-0 items-center gap-2.5 no-underline"
 		>
-			<div
-				class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[11px] font-black"
-				style="background: var(--primary); color: var(--primary-foreground);"
-				aria-hidden="true"
-			>
-				WD
-			</div>
+			<img src={waiverDirectorIcon} alt="" class="h-7 w-7 shrink-0" aria-hidden="true" />
 			<span
 				class="sidebar-copy sidebar-brand-copy truncate text-[13.5px] font-semibold tracking-tight"
 			>

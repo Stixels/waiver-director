@@ -16,9 +16,8 @@ import {
 	getWorkspaceMembership,
 	listWorkspaceMembershipsForUser
 } from './lib/workspaces';
+import { workspaceHandleBase, workspaceHandleCandidate } from './lib/workspaceHandles';
 
-const WORKSPACE_SLUG_REGEX = /^[a-z0-9](?:[a-z0-9-]{0,46}[a-z0-9])$/;
-const RESERVED_SLUGS = ['workspaces'];
 const WORKSPACE_LOGO_ALLOWED_CONTENT_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp']);
 const WORKSPACE_LOGO_MAX_BYTES = 2 * 1024 * 1024;
 const WORKSPACE_LOGO_UPLOAD_TTL_MS = 30 * 60 * 1000;
@@ -43,7 +42,10 @@ const WORKSPACE_SCOPED_TABLES = {
 	booking_integrations: true,
 	booking_connection_sessions: true,
 	bookings: true,
-	booking_webhook_events: true
+	booking_webhook_events: true,
+	marketing_integrations: true,
+	marketing_connection_sessions: true,
+	marketing_contact_syncs: true
 } as const satisfies Record<WorkspaceScopedTableName, true>;
 type WorkspaceCleanupTableName = keyof typeof WORKSPACE_SCOPED_TABLES;
 const WORKSPACE_CLEANUP_TABLE_NAMES = Object.keys(
@@ -54,11 +56,11 @@ const WORKSPACE_PRIMARY_CLEANUP_TABLE_NAMES = WORKSPACE_CLEANUP_TABLE_NAMES.filt
 );
 const CLEANUP_BATCH_PER_TABLE = 50;
 const USER_DEFAULT_WORKSPACE_CLEANUP_BATCH = 50;
+const MAX_WORKSPACE_HANDLE_ATTEMPTS = 1000;
 
 export const createWorkspace = mutation({
 	args: {
-		name: v.string(),
-		slug: v.string()
+		name: v.string()
 	},
 	returns: v.object({
 		workspaceId: v.id('workspaces'),
@@ -74,7 +76,6 @@ export const createWorkspace = mutation({
 		}
 
 		const name = args.name.trim();
-		const slug = args.slug.trim().toLowerCase();
 
 		if (name.length < 2 || name.length > 80) {
 			throw new ConvexError({
@@ -82,30 +83,26 @@ export const createWorkspace = mutation({
 				message: 'Workspace name must be between 2 and 80 characters.'
 			});
 		}
-		if (!WORKSPACE_SLUG_REGEX.test(slug)) {
-			throw new ConvexError({
-				code: 'invalid_argument',
-				message:
-					'Workspace slug must be 2-48 characters: lowercase letters, numbers, and hyphens only. It must start and end with a letter or number.'
-			});
-		}
-		if (RESERVED_SLUGS.includes(slug)) {
-			throw new ConvexError({
-				code: 'invalid_argument',
-				message: `Workspace slug "${slug}" is reserved and cannot be used.`
-			});
-		}
-
 		await requireCanCreateWorkspace(ctx, user._id);
 
-		const existing = await ctx.db
-			.query('workspaces')
-			.withIndex('by_slug', (q) => q.eq('slug', slug))
-			.unique();
-		if (existing) {
+		const handleBase = workspaceHandleBase(name);
+		let slug: string | null = null;
+		// A concurrent insert changes this indexed read and causes Convex to retry the mutation.
+		for (let attempt = 1; attempt <= MAX_WORKSPACE_HANDLE_ATTEMPTS; attempt += 1) {
+			const candidate = workspaceHandleCandidate(handleBase, attempt);
+			const existing = await ctx.db
+				.query('workspaces')
+				.withIndex('by_slug', (q) => q.eq('slug', candidate))
+				.unique();
+			if (!existing) {
+				slug = candidate;
+				break;
+			}
+		}
+		if (!slug) {
 			throw new ConvexError({
-				code: 'already_exists',
-				message: 'Workspace slug already in use'
+				code: 'internal_error',
+				message: 'Unable to generate a unique workspace URL handle. Please try again.'
 			});
 		}
 
@@ -200,14 +197,12 @@ export const listCurrentUserWorkspaces = query({
 export const updateWorkspace = mutation({
 	args: {
 		workspaceId: v.id('workspaces'),
-		name: v.optional(v.string()),
-		slug: v.optional(v.string())
+		name: v.optional(v.string())
 	},
 	returns: v.object({
 		workspaceId: v.id('workspaces'),
 		name: v.string(),
-		slug: v.string(),
-		slugChanged: v.boolean()
+		slug: v.string()
 	}),
 	handler: async (ctx, args) => {
 		await requireWorkspaceOwner(ctx, args.workspaceId, 'change workspace settings');
@@ -217,8 +212,7 @@ export const updateWorkspace = mutation({
 			throw new ConvexError({ code: 'not_found', message: 'Workspace not found.' });
 		}
 
-		const patch: { name?: string; slug?: string } = {};
-		let slugChanged = false;
+		const patch: { name?: string } = {};
 
 		if (args.name !== undefined) {
 			const name = args.name.trim();
@@ -229,37 +223,6 @@ export const updateWorkspace = mutation({
 				});
 			}
 			if (name !== workspace.name) patch.name = name;
-		}
-
-		if (args.slug !== undefined) {
-			const slug = args.slug.trim().toLowerCase();
-			if (!WORKSPACE_SLUG_REGEX.test(slug)) {
-				throw new ConvexError({
-					code: 'invalid_argument',
-					message:
-						'Workspace slug must be 2-48 characters: lowercase letters, numbers, and hyphens only. It must start and end with a letter or number.'
-				});
-			}
-			if (RESERVED_SLUGS.includes(slug)) {
-				throw new ConvexError({
-					code: 'invalid_argument',
-					message: `Workspace slug "${slug}" is reserved and cannot be used.`
-				});
-			}
-			if (slug !== workspace.slug) {
-				const existing = await ctx.db
-					.query('workspaces')
-					.withIndex('by_slug', (q) => q.eq('slug', slug))
-					.unique();
-				if (existing && existing._id !== args.workspaceId) {
-					throw new ConvexError({
-						code: 'already_exists',
-						message: 'Workspace slug already in use'
-					});
-				}
-				patch.slug = slug;
-				slugChanged = true;
-			}
 		}
 
 		if (Object.keys(patch).length > 0) {
@@ -274,8 +237,7 @@ export const updateWorkspace = mutation({
 		return {
 			workspaceId: next._id,
 			name: next.name,
-			slug: next.slug,
-			slugChanged
+			slug: next.slug
 		};
 	}
 });
@@ -461,7 +423,7 @@ export const archiveWorkspace = mutation({
 		if (args.confirmSlug.trim() !== workspace.slug) {
 			throw new ConvexError({
 				code: 'invalid_argument',
-				message: 'Confirmation text does not match the workspace slug.'
+				message: 'Confirmation text does not match the workspace URL handle.'
 			});
 		}
 

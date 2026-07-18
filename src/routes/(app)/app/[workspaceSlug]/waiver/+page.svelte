@@ -40,6 +40,7 @@
 		type WaiverDefinition
 	} from '$lib/domain/waivers';
 	import { getConvexErrorMessage } from '$lib/utils/convex-errors';
+	import { billingUpgradeHref } from '$lib/utils/billing';
 	import EllipsisIcon from '@lucide/svelte/icons/ellipsis';
 	import ClipboardIcon from '@lucide/svelte/icons/clipboard';
 	import Code2Icon from '@lucide/svelte/icons/code-xml';
@@ -97,9 +98,7 @@
 	const canPublishWaiver = $derived(Boolean(currentWorkspace?.billing.features.waiverPublishing));
 	const workspacePausedOnPro = $derived(Boolean(currentWorkspace?.billing.workspaceLimit.isPaused));
 	const billingHref = $derived(
-		workspacePausedOnPro
-			? `/app/${page.params.workspaceSlug}/account/plan`
-			: `/app/${page.params.workspaceSlug}/account#/billing/plans`
+		billingUpgradeHref(page.params.workspaceSlug ?? '', workspacePausedOnPro)
 	);
 
 	const activePublicHref = $derived.by(() => {

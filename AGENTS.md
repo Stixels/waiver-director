@@ -5,6 +5,8 @@ Waiver Director is a multi-tenant SaaS for waiver operations; preserve strict wo
 - Assume the application is already running locally at `localhost:5173`
 - Package manager: `pnpm`
 - Common validation: `pnpm run check`, `pnpm run lint`
+- For tracked delivery work, follow the Linear-to-GitHub workflow in `docs/agents/workflow-and-validation.md`; use the Linear issue for scope, its intended base branch, and its branch name when provided.
+- Do not change hosted-service configuration, credentials, environment variables, or deployments unless the task explicitly authorizes it.
 
 Relevant docs:
 
@@ -18,8 +20,12 @@ Relevant docs:
 
 This project uses [Convex](https://convex.dev) as its backend.
 
-When working on Convex code, **always read `src/convex/_generated/ai/guidelines.md` first** for important guidelines on how to correctly use Convex APIs and patterns. The file contains rules that override what you may have learned about Convex from training data.
+When working on Convex code, **always read
+`src/convex/_generated/ai/guidelines.md` first** for important guidelines on
+how to correctly use Convex APIs and patterns. The file contains rules that
+override what you may have learned about Convex from training data.
 
-Convex agent skills for common tasks can be installed by running `npx convex ai-files install`.
+Convex agent skills for common tasks can be installed by running
+`npx convex ai-files install`.
 
 <!-- convex-ai-end -->
