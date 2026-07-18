@@ -1880,7 +1880,7 @@
 										variant="outline"
 										size="sm"
 										onclick={() => (loadTemplateOpen = true)}
-										class="w-full justify-start text-xs"
+										class="template-action-btn w-full justify-start text-xs"
 									>
 										Load template
 									</Button>
@@ -1889,7 +1889,7 @@
 										size="sm"
 										onclick={openSaveTemplate}
 										disabled={isSavingEditorContent || !isSendAfterValid}
-										class="w-full justify-start text-xs"
+										class="template-action-btn w-full justify-start text-xs"
 									>
 										Save as template
 									</Button>
@@ -2425,6 +2425,16 @@
 		display: flex;
 		flex-direction: column;
 		gap: 0.35rem;
+	}
+
+	:global(.template-action-btn) {
+		cursor: pointer;
+	}
+
+	:global(.template-action-btn:hover:not(:disabled)) {
+		color: var(--foreground);
+		border-color: color-mix(in srgb, var(--border) 150%, transparent);
+		background: color-mix(in srgb, var(--muted) 50%, transparent);
 	}
 
 	/* ─── Sender blocking banner (email tab) ─────────────────────────────────── */
