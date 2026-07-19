@@ -49,6 +49,26 @@ test('accepts a valid proposal and preserves supported variables', () => {
 	assert.equal(validation.result.proposedSubject, 'Your waiver for {{business_name}}');
 });
 
+test('rejects out-of-range rubric scores and rounds in-range scores', () => {
+	for (const clarity of [-0.1, 10.1, 80]) {
+		const validation = validateEmailAIResult(
+			validResult({ rubric: { ...validRubric, clarity } }),
+			source,
+			(body) => body
+		);
+		assert.equal(validation.ok, false);
+	}
+
+	const validation = validateEmailAIResult(
+		validResult({ rubric: { ...validRubric, clarity: 8.6 } }),
+		source,
+		(body) => body
+	);
+	assert.equal(validation.ok, true);
+	if (!validation.ok) return;
+	assert.equal(validation.result.rubric.clarity, 9);
+});
+
 test('rejects proposals that remove original variables', () => {
 	const validation = validateEmailAIResult(
 		validResult({ proposedBody: '<p>Hello there, please complete your waiver.</p>' }),
@@ -71,6 +91,24 @@ test('rejects proposals that introduce unsupported variables', () => {
 	assert.equal(validation.ok, false);
 	if (validation.ok) return;
 	assert.match(validation.message, /unsupported variables: booking_date/);
+});
+
+test('recognizes only double-braced variables while preserving inner whitespace', () => {
+	const singleBraced = validateEmailAIResult(
+		validResult({ proposedBody: '<p>Hello {{customer_name}} on {booking_date}</p>' }),
+		source,
+		(body) => body
+	);
+	assert.equal(singleBraced.ok, true);
+
+	const doubleBraced = validateEmailAIResult(
+		validResult({ proposedBody: '<p>Hello {{customer_name}} on {{ booking_date }}</p>' }),
+		source,
+		(body) => body
+	);
+	assert.equal(doubleBraced.ok, false);
+	if (doubleBraced.ok) return;
+	assert.match(doubleBraced.message, /unsupported variables: booking_date/);
 });
 
 test('validates the sanitized body rather than raw model HTML', () => {

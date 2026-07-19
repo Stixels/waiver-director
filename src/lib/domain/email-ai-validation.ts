@@ -20,7 +20,7 @@ export type RawEmailAIResult = {
 	rationale?: unknown;
 };
 
-const variableTokenPattern = /\{\{?\s*([a-zA-Z0-9_]+)\s*\}?\}/g;
+const variableTokenPattern = /(?<!\{)\{\{\s*([a-zA-Z0-9_]+)\s*\}\}(?!\})/g;
 
 function clampScore(value: unknown): number | null {
 	if (typeof value !== 'number' || !Number.isFinite(value)) return null;
@@ -60,9 +60,8 @@ function missingOriginalVariables(source: string, proposed: string): string[] {
 
 function clampRubricScore(value: unknown): number | null {
 	if (typeof value !== 'number' || !Number.isFinite(value)) return null;
-	const normalized = value > EMAIL_AI_RUBRIC_MAX ? value / 10 : value;
-	const rounded = Math.round(normalized);
-	return Math.max(0, Math.min(EMAIL_AI_RUBRIC_MAX, rounded));
+	if (value < 0 || value > EMAIL_AI_RUBRIC_MAX) return null;
+	return Math.round(value);
 }
 
 function validateRubric(value: unknown): EmailAIRubric | null {
