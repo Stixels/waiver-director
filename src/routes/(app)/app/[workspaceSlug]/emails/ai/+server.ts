@@ -15,11 +15,16 @@ import {
 	parseEmailAIModelJson,
 	validateEmailAIResult
 } from '$lib/domain/email-ai-validation';
+import {
+	AI_GATEWAY_API_URL,
+	buildAIGatewayRequest,
+	DEFAULT_AI_GATEWAY_MODEL,
+	extractAIGatewayText,
+	getAIGatewayFailure
+} from '$lib/server/email-ai-gateway';
 import { sanitizeRichTextHtml } from '$lib/utils/rich-text';
 
-const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/interactions';
-const DEFAULT_GEMINI_MODEL = 'gemini-3.5-flash';
-const GEMINI_TIMEOUT_MS = 120_000;
+const AI_GATEWAY_TIMEOUT_MS = 120_000;
 const MAX_GOAL_LENGTH = 240;
 
 type EmailAIRequest = {
@@ -29,17 +34,6 @@ type EmailAIRequest = {
 	sendAfterAmount: number;
 	sendAfterUnit: 'minutes' | 'hours' | 'days';
 	goal: string;
-};
-
-type GeminiInteractionResponse = {
-	output_text?: string;
-	steps?: Array<{
-		type?: string;
-		content?: Array<{
-			type?: string;
-			text?: string;
-		}>;
-	}>;
 };
 
 const emailAIResponseSchema = {
@@ -106,19 +100,6 @@ function isRequestBody(value: unknown): value is EmailAIRequest {
 		typeof body.sendAfterAmount === 'number' &&
 		['minutes', 'hours', 'days'].includes(String(body.sendAfterUnit))
 	);
-}
-
-function extractGeminiText(payload: GeminiInteractionResponse): string {
-	if (typeof payload.output_text === 'string') return payload.output_text;
-
-	for (const step of [...(payload.steps ?? [])].reverse()) {
-		if (step.type !== 'model_output') continue;
-		for (const content of [...(step.content ?? [])].reverse()) {
-			if (content.type === 'text' && typeof content.text === 'string') return content.text;
-		}
-	}
-
-	return '';
 }
 
 function htmlToText(html: string): string {
@@ -202,52 +183,45 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		});
 	}
 
-	const apiKey = env.GEMINI_API_KEY?.trim();
+	const apiKey = env.AI_GATEWAY_API_KEY?.trim();
 	if (!apiKey) {
-		return errorResponse('Email AI is not configured. Set GEMINI_API_KEY.', 503);
+		return errorResponse('Email AI is not configured. Set AI_GATEWAY_API_KEY.', 503);
 	}
 
-	const model = env.GEMINI_MODEL?.trim() || DEFAULT_GEMINI_MODEL;
+	const model = env.AI_GATEWAY_MODEL?.trim() || DEFAULT_AI_GATEWAY_MODEL;
 	const controller = new AbortController();
-	const timeout = setTimeout(() => controller.abort(), GEMINI_TIMEOUT_MS);
+	const timeout = setTimeout(() => controller.abort(), AI_GATEWAY_TIMEOUT_MS);
 
 	try {
-		const response = await fetch(GEMINI_API_URL, {
+		const response = await fetch(AI_GATEWAY_API_URL, {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/json',
-				'x-goog-api-key': apiKey
+				Authorization: `Bearer ${apiKey}`
 			},
-			body: JSON.stringify({
-				model,
-				input: buildPrompt({
-					...body,
-					subject,
-					workspaceName: quota.workspaceName,
-					goal,
-					sanitizedBody
-				}),
-				response_format: {
-					type: 'text',
-					mime_type: 'application/json',
-					schema: emailAIResponseSchema
-				}
-			}),
+			body: JSON.stringify(
+				buildAIGatewayRequest(
+					model,
+					buildPrompt({
+						...body,
+						subject,
+						workspaceName: quota.workspaceName,
+						goal,
+						sanitizedBody
+					}),
+					emailAIResponseSchema
+				)
+			),
 			signal: controller.signal
 		});
 
 		if (!response.ok) {
-			if (response.status === 429) {
-				return errorResponse('Gemini API quota is currently exhausted.', 429);
-			}
-			if (response.status === 401 || response.status === 403) {
-				return errorResponse('Gemini API authentication failed. Check GEMINI_API_KEY.', 502);
-			}
-			return errorResponse(`Gemini API returned ${response.status}.`, 502);
+			const failure = getAIGatewayFailure(response.status);
+			return errorResponse(failure.message, failure.status);
 		}
 
-		const payload = (await response.json()) as GeminiInteractionResponse;
-		const content = extractGeminiText(payload);
+		const payload = await response.json();
+		const content = extractAIGatewayText(payload);
 		const rawResult = parseEmailAIModelJson(content);
 		if (!rawResult) {
 			return errorResponse('AI response was not valid JSON.', 502);
@@ -265,9 +239,9 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		return json(result.result);
 	} catch (error) {
 		if (error instanceof DOMException && error.name === 'AbortError') {
-			return errorResponse('Gemini API did not respond before the timeout.', 504);
+			return errorResponse('AI Gateway did not respond before the timeout.', 504);
 		}
-		return errorResponse('Unable to reach Gemini API.', 502);
+		return errorResponse('Unable to reach AI Gateway.', 502);
 	} finally {
 		clearTimeout(timeout);
 	}

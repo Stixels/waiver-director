@@ -5,6 +5,11 @@ import {
 	validateEmailAIResult,
 	type RawEmailAIResult
 } from '../src/lib/domain/email-ai-validation.ts';
+import {
+	buildAIGatewayRequest,
+	extractAIGatewayText,
+	getAIGatewayFailure
+} from '../src/lib/server/email-ai-gateway.ts';
 
 const validRubric = {
 	clarity: 8,
@@ -117,4 +122,63 @@ test('validates the sanitized body rather than raw model HTML', () => {
 	assert.equal(validation.ok, false);
 	if (validation.ok) return;
 	assert.equal(validation.message, 'AI response returned an invalid body.');
+});
+
+test('builds a provider-neutral AI Gateway structured-output request', () => {
+	const schema = { type: 'object', properties: { score: { type: 'integer' } } };
+	const request = buildAIGatewayRequest('anthropic/claude-sonnet-4.6', 'Review this.', schema);
+
+	assert.equal(request.model, 'anthropic/claude-sonnet-4.6');
+	assert.deepEqual(request.messages, [{ role: 'user', content: 'Review this.' }]);
+	assert.equal(request.stream, false);
+	assert.equal(request.response_format.type, 'json_schema');
+	assert.equal(request.response_format.json_schema.name, 'email_review');
+	assert.equal(request.response_format.json_schema.schema, schema);
+	assert.equal(request.providerOptions.gateway.disallowPromptTraining, true);
+});
+
+test('extracts text from AI Gateway chat completion responses', () => {
+	assert.equal(
+		extractAIGatewayText({ choices: [{ message: { content: '{"score":82}' } }] }),
+		'{"score":82}'
+	);
+	assert.equal(
+		extractAIGatewayText({
+			choices: [
+				{
+					message: {
+						content: [
+							{ type: 'text', text: '{"score":' },
+							{ type: 'text', text: '82}' }
+						]
+					}
+				}
+			]
+		}),
+		'{"score":82}'
+	);
+	assert.equal(extractAIGatewayText({}), '');
+});
+
+test('maps AI Gateway failures to safe application errors', () => {
+	assert.deepEqual(getAIGatewayFailure(401), {
+		message: 'AI Gateway authentication failed. Check AI_GATEWAY_API_KEY.',
+		status: 502
+	});
+	assert.deepEqual(getAIGatewayFailure(402), {
+		message: 'AI Gateway credits are currently exhausted.',
+		status: 503
+	});
+	assert.deepEqual(getAIGatewayFailure(404), {
+		message: 'The configured AI Gateway model is unavailable. Check AI_GATEWAY_MODEL.',
+		status: 502
+	});
+	assert.deepEqual(getAIGatewayFailure(429), {
+		message: 'AI Gateway quota is currently exhausted.',
+		status: 429
+	});
+	assert.deepEqual(getAIGatewayFailure(500), {
+		message: 'AI Gateway returned 500.',
+		status: 502
+	});
 });
