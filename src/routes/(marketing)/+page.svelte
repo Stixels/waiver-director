@@ -1,18 +1,15 @@
 <script lang="ts">
 	import { PUBLIC_APP_URL } from '$env/static/public';
 
-	import LandingPageAnalyticsPreview from '$lib/components/marketing/landing-page/LandingPageAnalyticsPreview.svelte';
+	import LandingPageBuyerGuide from '$lib/components/marketing/landing-page/LandingPageBuyerGuide.svelte';
 	import LandingPageCta from '$lib/components/marketing/landing-page/LandingPageCta.svelte';
-	import LandingPageDifferentiator from '$lib/components/marketing/landing-page/LandingPageDifferentiator.svelte';
-	import LandingPageEmailPipeline from '$lib/components/marketing/landing-page/LandingPageEmailPipeline.svelte';
-	import LandingPageFeatureTeaser from '$lib/components/marketing/landing-page/LandingPageFeatureTeaser.svelte';
 	import LandingPageHero from '$lib/components/marketing/landing-page/LandingPageHero.svelte';
-	import LandingPageHowItWorks from '$lib/components/marketing/landing-page/LandingPageHowItWorks.svelte';
-	import LandingPageTestimonials from '$lib/components/marketing/landing-page/LandingPageTestimonials.svelte';
+	import LandingPageProductStory from '$lib/components/marketing/landing-page/LandingPageProductStory.svelte';
+	import MarketingMotion from '$lib/components/marketing/MarketingMotion.svelte';
 
-	const pageTitle = 'Waiver Director — Digital Waivers for Any Booking Experience';
+	const pageTitle = 'Waiver Director - Digital Waiver Operations, Connected';
 	const pageDescription =
-		"Digital waivers for tours & activities: capture every guest's email, sync Bookeo bookings, and automate on-demand or delayed follow-up emails. More integrations are coming soon.";
+		'Build, publish, and share digital waivers. Manage bookings, signed records, customers, follow-up emails, integrations, and analytics from one workspace.';
 
 	const siteBase = (PUBLIC_APP_URL ?? '').replace(/\/$/, '');
 	const canonicalUrl = siteBase ? `${siteBase}/` : '';
@@ -34,10 +31,7 @@
 </svelte:head>
 
 <LandingPageHero />
-<LandingPageDifferentiator />
-<LandingPageHowItWorks />
-<LandingPageFeatureTeaser />
-<LandingPageEmailPipeline />
-<LandingPageAnalyticsPreview />
-<LandingPageTestimonials />
+<LandingPageBuyerGuide />
+<LandingPageProductStory />
 <LandingPageCta />
+<MarketingMotion />

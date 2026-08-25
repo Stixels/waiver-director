@@ -23,18 +23,18 @@
 		use:scrollReveal={{ delay: 0 }}
 	>
 		<h2 class="landing-cta__title mb-5 max-w-2xl font-extrabold tracking-tight text-balance">
-			Stop leaving half your<br />group&apos;s emails behind.
+			Give every waiver a clear operational home.
 		</h2>
 		<p class="mb-9 max-w-[420px] text-[16px] leading-relaxed" style="color: var(--m-text-2);">
-			Every person who signs a waiver becomes a contact. Waiver Director turns your compliance step
-			into your best email list.
+			Draft your waiver for free, preview the signing experience, and upgrade when you are ready to
+			publish and run live operations.
 		</p>
 		<div class="flex flex-wrap items-center justify-center gap-3">
 			<Button
 				href={resolve('/sign-up')}
 				class="btn-mkt-accent h-11 gap-2 rounded-xl px-10 text-sm font-semibold"
 			>
-				Get early access
+				Start for free
 				<ArrowRight size={15} aria-hidden="true" />
 			</Button>
 			<Button
@@ -45,9 +45,6 @@
 				Explore features
 			</Button>
 		</div>
-		<p class="mt-5 text-[12px]" style="color: var(--m-text-3);">
-			Free to start · No credit card required
-		</p>
 	</div>
 </section>
 

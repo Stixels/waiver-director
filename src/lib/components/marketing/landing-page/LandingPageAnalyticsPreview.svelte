@@ -106,17 +106,17 @@
 				class="mb-3 text-[11px] font-semibold tracking-widest uppercase"
 				style="color: var(--primary);"
 			>
-				Dashboard
+				Live operations
 			</p>
 			<h2
 				class="mb-4 max-w-xl font-extrabold tracking-tight"
 				style="font-family: var(--m-font-display); font-size: clamp(1.75rem, 3.5vw, 2.75rem); letter-spacing: -0.03em; line-height: 1.06;"
 			>
-				Know your completion rate for every session.
+				See what is happening without assembling a spreadsheet.
 			</h2>
 			<p class="mb-10 max-w-xl text-[15px] leading-relaxed" style="color: var(--m-text-2);">
-				Signed, expected, and completion stats in one view. Numbers update as waivers come in — not
-				a stale snapshot.
+				Track bookings, submissions, follow-up delivery, and customer activity from the same data
+				that powers your day-to-day workspace.
 			</p>
 		</div>
 

@@ -11,6 +11,9 @@ importers:
       '@dnd-kit/svelte':
         specifier: ^0.3.2
         version: 0.3.2(svelte@5.56.4(@typescript-eslint/types@8.58.0))
+      '@fontsource-variable/outfit':
+        specifier: ^5.3.0
+        version: 5.3.0
       '@fontsource/geist-sans':
         specifier: ^5.2.5
         version: 5.2.5
@@ -44,6 +47,9 @@ importers:
       convex-svelte:
         specifier: 0.0.12
         version: 0.0.12(convex@1.42.1)(svelte@5.56.4(@typescript-eslint/types@8.58.0))
+      gsap:
+        specifier: ^3.15.0
+        version: 3.15.0
       mode-watcher:
         specifier: ^1.1.0
         version: 1.1.0(svelte@5.56.4(@typescript-eslint/types@8.58.0))
@@ -587,6 +593,9 @@ packages:
 
   '@fontsource-variable/noto-sans@5.2.10':
     resolution: {integrity: sha512-wyFgKkFu7jki5kEL8qv7avjQ8rxHX0J/nhLWvbR9T0hOH1HRKZEvb9EW9lMjZfWHHfEzKkYf5J+NadwgCS7TXA==}
+
+  '@fontsource-variable/outfit@5.3.0':
+    resolution: {integrity: sha512-fPb5XnYK0k7SbR++HEmm4+ZqDszmLKQ+sPRUr8oQ/KNC0vy6r6hazJFe8iYozv4cqlHbvJ/JECkJWrfDodUMVQ==}
 
   '@fontsource/geist-sans@5.2.5':
     resolution: {integrity: sha512-anllOHyJbElRs9fV15TeDRqAeb1IKm4bSknPl6ZMoyPTx1BBy7logudcUwpNjmQLkzn4Q0JGQLRCUKJYoyST6A==}
@@ -1644,6 +1653,9 @@ packages:
 
   graceful-fs@4.2.11:
     resolution: {integrity: sha512-RbJ5/jmFcNNCcDV5o9eTnBLJ/HszWV0P73bc+Ff4nS/rJj+YaS6IGyiOL0VoBYX+l1Wrl3k63h/KrH+nhJ0XvQ==}
+
+  gsap@3.15.0:
+    resolution: {integrity: sha512-dMW4CWBTUK1AEEDeZc1g4xpPGIrSf9fJF960qbTZmN/QwZIWY5wgliS6JWl9/25fpTGJrMRtSjGtOmPnfjZB+A==}
 
   htmlparser2@10.1.0:
     resolution: {integrity: sha512-VTZkM9GWRAtEpveh7MSF6SjjrpNVNNVJfFup7xTY3UpFtm67foy9HDVXneLtFVt4pMz5kZtgNcvCniNFb1hlEQ==}
@@ -2703,6 +2715,8 @@ snapshots:
 
   '@fontsource-variable/noto-sans@5.2.10': {}
 
+  '@fontsource-variable/outfit@5.3.0': {}
+
   '@fontsource/geist-sans@5.2.5': {}
 
   '@humanfs/core@0.19.1': {}
@@ -3737,6 +3751,8 @@ snapshots:
   globals@17.4.0: {}
 
   graceful-fs@4.2.11: {}
+
+  gsap@3.15.0: {}
 
   htmlparser2@10.1.0:
     dependencies:

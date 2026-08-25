@@ -46,12 +46,11 @@
 				class="mb-4 max-w-xl font-extrabold tracking-tight"
 				style="font-family: var(--m-font-display); font-size: clamp(1.75rem, 3.5vw, 2.75rem); letter-spacing: -0.03em; line-height: 1.06;"
 			>
-				Every signer gets their own follow-up.
+				Follow-ups that start with a real signature.
 			</h2>
 			<p class="mb-14 max-w-xl text-[15px] leading-relaxed" style="color: var(--m-text-2);">
-				Not just the lead booker. Every guest who signs can receive an on-demand email or an
-				individually timed follow-up after their booking. Verify your email to finish setup and
-				start sending.
+				Compose branded email, save reusable templates, and manage every signer from a clear queue.
+				Send on demand or schedule delivery from the connected booking time.
 			</p>
 		</div>
 
@@ -165,7 +164,7 @@
 							style="border-color: var(--m-border-soft);"
 						>
 							<span class="text-[11px]" style="color: var(--m-text-3);">
-								Post-visit feedback · 2 days after signing
+								Post-visit feedback · 2 days after booking
 							</span>
 							<button
 								class="flex items-center gap-1 rounded-md px-2 py-1 text-[11px]"

@@ -28,7 +28,7 @@
 		{
 			id: 'integrations',
 			q: 'How do the booking system integrations work?',
-			a: 'Connect Bookeo once from your integrations settings. After that, upcoming sessions sync automatically with expected participant counts. Each workspace connects one booking provider at a time. Xola and other providers are coming soon.'
+			a: 'Connect Bookeo once from your integrations settings. After that, upcoming bookings sync with expected participant counts. Each workspace connects one booking provider at a time. Additional providers remain roadmap items.'
 		},
 		{
 			id: 'email-verification',
@@ -43,7 +43,7 @@
 		{
 			id: 'data',
 			q: 'Who owns the signed waiver data?',
-			a: 'You do. Signed records belong to your workspace. You can export any submission as a PDF at any time. If you ever leave, you keep your exports.'
+			a: 'You do. Signed records belong to your workspace and remain tied to the published waiver version that was signed. Owner-only PDF exports are planned but are not available yet.'
 		}
 	] as const;
 
@@ -156,15 +156,14 @@
 			Start capturing every guest today.
 		</h2>
 		<p class="mb-8 text-[16px] leading-relaxed" style="color: var(--m-text-2);">
-			Free to start. No credit card required. See how much of your guest list you've been leaving
-			behind.
+			Draft and preview your waiver for free, then upgrade when you are ready to publish.
 		</p>
 		<div class="flex flex-wrap items-center justify-center gap-3">
 			<Button
 				href={resolve('/sign-up')}
 				class="btn-mkt-accent h-11 gap-2 rounded-xl px-8 text-sm font-semibold"
 			>
-				Get early access
+				Start for free
 				<ArrowRight size={15} aria-hidden="true" />
 			</Button>
 			<Button
