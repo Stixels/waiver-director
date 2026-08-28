@@ -328,7 +328,7 @@ body:has(.mkt) {
 	width: 5px;
 	height: 5px;
 	border-radius: 999px;
-	background: currentColor;
+	background: currentcolor;
 	flex: 0 0 auto;
 }
 

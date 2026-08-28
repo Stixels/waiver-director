@@ -1,8 +1,6 @@
 <script lang="ts">
 	import { Copy, QrCode } from '@lucide/svelte';
 
-	import { Button } from '$lib/components/ui/button';
-
 	type Participant = {
 		initials: string;
 		name: string;
@@ -93,13 +91,12 @@
 				</button>
 			</span>
 
-			<Button
-				variant="outline"
-				class="btn-mkt-outline h-9 gap-2 rounded-[9px] px-3.5 text-[0.82rem] font-medium"
+			<span
+				class="btn-mkt-outline inline-flex h-9 items-center gap-2 rounded-[9px] px-3.5 text-[0.82rem] font-medium"
 			>
 				<QrCode size={15} aria-hidden="true" />
 				Booking QR
-			</Button>
+			</span>
 
 			<span class="mkt-idchip__flash" role="status" aria-live="polite">
 				{copied ? 'Copied' : ''}

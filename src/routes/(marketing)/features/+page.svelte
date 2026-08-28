@@ -52,7 +52,7 @@
 		}
 	] as const;
 
-	const productAreas: ProductArea[] = [
+	const productAreas: readonly ProductArea[] = [
 		{
 			id: 'waivers',
 			plans: ['Free', 'Pro'],
@@ -186,8 +186,8 @@
 		</h1>
 		<div class="mt-8 grid max-w-5xl gap-7 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
 			<p class="marketing-copy max-w-2xl">
-				Everything here ships today, shown with fictional Apex Adventures data. Building a waiver is
-				free — Pro adds publishing and live operations.
+				The product areas below ship today, shown with fictional Apex Adventures data. Building a
+				waiver is free — Pro adds publishing and live operations.
 			</p>
 			<Button
 				href={resolve('/sign-up')}

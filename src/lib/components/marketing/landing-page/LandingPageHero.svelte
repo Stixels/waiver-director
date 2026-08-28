@@ -68,13 +68,12 @@
 			transform: translateY(0);
 		}
 	}
-
 	.landing-hero {
 		--mkt-hero-top: 5rem;
 
 		display: flex;
 		flex-direction: column;
-		min-height: min(100svh, 64rem);
+		min-height: auto;
 		padding-bottom: 0;
 	}
 
@@ -191,10 +190,9 @@
 
 	.landing-hero__visual {
 		display: flex;
-		flex: 1;
 		align-items: flex-end;
 		width: 100%;
-		margin-top: clamp(3.5rem, 7vw, 6.5rem);
+		margin-top: clamp(1.75rem, 3vw, 3rem);
 	}
 
 	/* Capped below the source capture's intrinsic width (1694px) so the workspace

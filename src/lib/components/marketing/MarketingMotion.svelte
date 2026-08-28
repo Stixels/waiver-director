@@ -17,15 +17,15 @@
 					gsap.utils.toArray<HTMLElement>('[data-gsap-image]').forEach((element) => {
 						gsap.fromTo(
 							element,
-							{ y: 26, opacity: 0.55 },
+							{ y: 26, opacity: 0.86 },
 							{
 								y: 0,
 								opacity: 1,
 								ease: 'none',
 								scrollTrigger: {
 									trigger: element,
-									start: 'top 94%',
-									end: 'center 62%',
+									start: 'top 96%',
+									end: 'top 68%',
 									scrub: 0.7
 								}
 							}

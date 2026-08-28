@@ -56,7 +56,7 @@
 			<div class="mkt-vig__body qr-card__body">
 				<div class="qr-card__code">
 					{#if dataUrls[code.title]}
-						<img src={dataUrls[code.title]} alt="QR code for the {code.title.toLowerCase()}" />
+						<img src={dataUrls[code.title]} alt={code.description} />
 					{:else}
 						<div class="qr-card__fallback" aria-hidden="true"></div>
 					{/if}
