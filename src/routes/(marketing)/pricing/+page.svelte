@@ -109,7 +109,7 @@
 			class="mb-12 font-extrabold tracking-tight"
 			style="font-family: var(--m-font-display); font-size: clamp(1.75rem, 3.5vw, 2.5rem); letter-spacing: -0.025em; line-height: 1.1;"
 		>
-			Frequently asked questions.
+			Frequently Asked Questions
 		</h2>
 
 		<div class="flex flex-col" use:scrollReveal={{ delay: 80 }}>
