@@ -23,27 +23,23 @@
 		use:scrollReveal={{ delay: 0 }}
 	>
 		<h2 class="landing-cta__title mb-5 max-w-2xl font-extrabold tracking-tight text-balance">
-			Give every waiver a clear operational home.
+			Write your waiver today.
 		</h2>
-		<p class="mb-9 max-w-[420px] text-[16px] leading-relaxed" style="color: var(--m-text-2);">
-			Draft your waiver for free, preview the signing experience, and upgrade when you are ready to
-			publish and run live operations.
+		<p class="landing-cta__deck mb-9 max-w-[430px]">
+			Set it up, brand it, and preview the guest page before you publish.
 		</p>
-		<div class="flex flex-wrap items-center justify-center gap-3">
+		<div class="landing-cta__actions">
 			<Button
 				href={resolve('/sign-up')}
 				class="btn-mkt-accent h-11 gap-2 rounded-xl px-10 text-sm font-semibold"
 			>
-				Start for free
+				Start building free
 				<ArrowRight size={15} aria-hidden="true" />
 			</Button>
-			<Button
-				href={resolve('/features')}
-				variant="outline"
-				class="btn-mkt-outline h-11 rounded-xl px-8 text-sm font-medium"
-			>
-				Explore features
-			</Button>
+			<a href={resolve('/pricing')} class="landing-cta__pricing">
+				See pricing
+				<ArrowRight size={15} aria-hidden="true" />
+			</a>
 		</div>
 	</div>
 </section>
@@ -51,8 +47,44 @@
 <style>
 	.landing-cta__title {
 		font-family: var(--m-font-display);
-		font-size: clamp(2rem, 5vw, 3.5rem);
-		letter-spacing: -0.035em;
-		line-height: 1.06;
+		font-size: clamp(2.2rem, 4.8vw, 3.6rem);
+		letter-spacing: -0.045em;
+		line-height: 1.04;
+	}
+
+	.landing-cta__deck {
+		color: var(--m-text-2);
+		font-size: 1rem;
+		line-height: 1.7;
+	}
+
+	.landing-cta__actions {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		justify-content: center;
+		gap: 0.7rem 1.4rem;
+	}
+
+	.landing-cta__pricing {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.45rem;
+		color: var(--m-accent-text);
+		font-size: 0.875rem;
+		font-weight: 600;
+		letter-spacing: -0.012em;
+		text-decoration: none;
+		transition: gap 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+	}
+
+	.landing-cta__pricing:hover {
+		gap: 0.72rem;
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.landing-cta__pricing {
+			transition: none;
+		}
 	}
 </style>

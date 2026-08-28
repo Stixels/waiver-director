@@ -1,15 +1,15 @@
 <script lang="ts">
 	import { PUBLIC_APP_URL } from '$env/static/public';
 
-	import LandingPageBuyerGuide from '$lib/components/marketing/landing-page/LandingPageBuyerGuide.svelte';
 	import LandingPageCta from '$lib/components/marketing/landing-page/LandingPageCta.svelte';
+	import LandingPageFaq from '$lib/components/marketing/landing-page/LandingPageFaq.svelte';
 	import LandingPageHero from '$lib/components/marketing/landing-page/LandingPageHero.svelte';
-	import LandingPageProductStory from '$lib/components/marketing/landing-page/LandingPageProductStory.svelte';
+	import LandingPageSigningLine from '$lib/components/marketing/landing-page/LandingPageSigningLine.svelte';
 	import MarketingMotion from '$lib/components/marketing/MarketingMotion.svelte';
 
-	const pageTitle = 'Waiver Director - Digital Waiver Operations, Connected';
+	const pageTitle = 'Waiver Director - Every guest signed before they arrive';
 	const pageDescription =
-		'Build, publish, and share digital waivers. Manage bookings, signed records, customers, follow-up emails, integrations, and analytics from one workspace.';
+		'Build a digital waiver, share it by link, QR code, or embed, and see which guests still have not signed. Bookeo booking coverage, signed records, follow-up emails, and Mailchimp sync.';
 
 	const siteBase = (PUBLIC_APP_URL ?? '').replace(/\/$/, '');
 	const canonicalUrl = siteBase ? `${siteBase}/` : '';
@@ -31,7 +31,7 @@
 </svelte:head>
 
 <LandingPageHero />
-<LandingPageBuyerGuide />
-<LandingPageProductStory />
+<LandingPageSigningLine />
+<LandingPageFaq />
 <LandingPageCta />
 <MarketingMotion />

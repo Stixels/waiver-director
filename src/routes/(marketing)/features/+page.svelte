@@ -1,82 +1,96 @@
 <script lang="ts">
 	import { PUBLIC_APP_URL } from '$env/static/public';
 	import { resolve } from '$app/paths';
-	import {
-		ArrowRight,
-		BarChart3,
-		CalendarCheck,
-		Check,
-		FileClock,
-		FileDown,
-		MailCheck,
-		UsersRound
-	} from '@lucide/svelte';
+	import type { Component } from 'svelte';
+	import { ArrowRight, CalendarCheck, Check, FileDown, MailCheck } from '@lucide/svelte';
 
 	import bookeoLogo from '$lib/assets/providers/bookeo-icon.webp';
 	import mailchimpLogo from '$lib/assets/providers/mailchimp-icon.webp';
+	import QrPlacementPreview from '$lib/components/marketing/landing-page/previews/QrPlacementPreview.svelte';
 	import MarketingMotion from '$lib/components/marketing/MarketingMotion.svelte';
 	import MarketingScreenshotFrame from '$lib/components/marketing/MarketingScreenshotFrame.svelte';
 	import { Button } from '$lib/components/ui/button';
 
+	/** A product area shows either a workspace capture or a live preview
+	 *  component, never both. */
+	type ProductArea = {
+		id: string;
+		plans: readonly ('Free' | 'Pro')[];
+		title: string;
+		description: string;
+		points: readonly string[];
+		src?: string;
+		alt?: string;
+		label?: string;
+		/** Intrinsic size of `src`, when it differs from the frame's default. */
+		width?: number;
+		height?: number;
+		crop?: { x: number; y: number; width: number; height: number };
+		preview?: Component;
+	};
+
 	const pageTitle = 'Features | Waiver Director';
 	const pageDescription =
-		'Explore Waiver Director features for waiver creation, Bookeo booking coverage, signed records, customer follow-ups, Mailchimp, and operations analytics.';
+		'Waiver building, QR codes, Bookeo booking coverage, signed records, follow-up emails, and analytics — every Waiver Director feature in one place.';
 	const siteBase = (PUBLIC_APP_URL ?? '').replace(/\/$/, '');
 	const canonicalUrl = siteBase ? `${siteBase}/features` : '';
 	const roadmapItems = [
 		{
 			icon: FileDown,
 			name: 'PDF exports',
-			description: 'Owners can export signed records'
+			description: 'Export signed records'
 		},
 		{
 			icon: CalendarCheck,
 			name: 'Xola',
-			description: 'Connect bookings to waiver activity'
+			description: 'A second booking provider'
 		},
 		{
 			icon: MailCheck,
 			name: 'Constant Contact',
-			description: 'Sync customers who agree to marketing'
+			description: 'A second marketing list'
 		}
 	] as const;
 
-	const productAreas = [
+	const productAreas: ProductArea[] = [
 		{
 			id: 'waivers',
-			icon: FileClock,
-			plan: 'Free to draft, Pro to publish',
-			title: 'Waiver builder and public signing',
+			plans: ['Free', 'Pro'],
+			title: 'Waiver builder and signing page',
 			description:
-				'Draft the complete signing experience for free. Pro workspaces can publish a frozen version and collect signed records without future edits changing what a guest accepted.',
-			detail:
-				'Publishing creates a durable snapshot of the document and every field in it. Guests receive a focused, branded signing flow while your team keeps drafts and signed versions clearly separated.',
+				'Build the document, the questions, and the branding for free. Publishing freezes that version, so later edits never change a signed record.',
 			points: [
-				'Rich text editor and branding',
-				'Text, date, select, and checkbox fields',
-				'Drawn signatures, minors, and consent',
-				'Published version history',
-				'Public links, embeds, and QR codes'
+				'Rich text, custom fields, branding',
+				'Signatures, minors, and consent',
+				'Link, QR code, or embed'
 			],
 			src: '/marketing/apex-waiver-builder.png',
 			alt: 'Waiver Director waiver builder populated with the fictional Apex Adventures participation waiver',
 			label: 'Apex Adventures / Waiver builder'
 		},
 		{
+			id: 'qr-codes',
+			plans: ['Pro'],
+			title: 'QR codes for the counter',
+			description:
+				'Every published waiver has a QR code, and so does every booking. A guest who turns up unsigned scans and signs on the spot.',
+			points: [
+				'Present a QR code at the front desk',
+				'One device signs the whole booking',
+				'Copy a plain link instead'
+			],
+			preview: QrPlacementPreview
+		},
+		{
 			id: 'operations',
-			icon: CalendarCheck,
-			plan: 'Pro',
+			plans: ['Pro'],
 			title: 'Booking coverage',
 			description:
-				'Bring Bookeo activity, timing, booking number, lead customer, and participant counts into Waiver Director. Staff can see incomplete coverage before guests arrive.',
-			detail:
-				'Filter the day, open the booking context, and share a booking-specific signing route when coverage is incomplete. Updates from Bookeo keep the operating view aligned with the source booking.',
+				'Connect your booking system and every booking lands with the detail your staff need, so gaps show up before guests do. Bookeo today, with Xola and more to follow.',
 			points: [
-				'Booking imports and webhook updates',
-				'Signed versus expected counts',
-				'Complete, partial, and unsigned states',
-				'Booking-specific QR codes',
-				'Activity and customer context'
+				'Activity, time, and customer details',
+				'Signed vs. expected counts',
+				'Share a booking link or QR code'
 			],
 			src: '/marketing/apex-bookings.png',
 			alt: 'Waiver Director Bookeo booking operations showing fictional activities and participant waiver coverage',
@@ -84,18 +98,13 @@
 		},
 		{
 			id: 'customers',
-			icon: UsersRound,
-			plan: 'Pro',
+			plans: ['Pro'],
 			title: 'Signed records and customers',
 			description:
-				'Keep the exact waiver version, signer details, answers, signatures, consent, covered minors, and booking snapshot together as one durable record.',
-			detail:
-				'Search the workspace by signer or visit, inspect every captured answer, and follow a customer across repeat visits without losing the context of what was signed each time.',
+				'Each signature is stored against the waiver version it was signed on, with the answers given, consent, covered minors, and its booking.',
 			points: [
-				'Immutable signed versions',
-				'Answers and signatures',
-				'Minor and consent records',
-				'Booking snapshots',
+				'Signed version on file',
+				'Answers, signatures, and consent',
 				'Customer history and search'
 			],
 			src: '/marketing/apex-submissions.png',
@@ -104,40 +113,48 @@
 		},
 		{
 			id: 'follow-ups',
-			icon: MailCheck,
-			plan: 'Pro',
+			plans: ['Pro'],
 			title: 'Customer follow-ups',
 			description:
-				'Create reusable emails, send them immediately, or schedule them relative to booking time. The queue keeps delivery work visible instead of hiding it in automation.',
-			detail:
-				'Templates and delivery rules stay reusable, while the operational queue makes scheduled, blocked, queued, sent, and failed messages available for staff review.',
+				'Write a template once, then send it now or time it against the booking. The queue shows where every message stands.',
 			points: [
-				'Reusable rich email templates',
-				'Send now or schedule later',
-				'Booking-relative delivery',
-				'Queued, sent, and failed states',
-				'Unscheduled message review'
+				'Reusable email templates',
+				'Scheduled from booking time',
+				'Queued, sent, and failed states'
 			],
 			src: '/marketing/apex-follow-ups.png',
 			alt: 'Waiver Director follow-up queue with fictional Apex Adventures signer emails and delivery states',
 			label: 'Apex Adventures / Follow-up queue'
 		},
 		{
+			id: 'email-ai',
+			plans: ['Pro'],
+			title: 'AI review for your emails',
+			description:
+				'Say what the email is meant to do. The review scores your draft out of 100, names what is wrong, and proposes a rewrite you can apply as a diff.',
+			points: [
+				'Scored out of 100, with specific issues',
+				'Reads your copy against send timing',
+				'Apply or discard as a line diff'
+			],
+			src: '/marketing/apex-email-ai-review.png',
+			alt: 'Waiver Director AI review panel scoring a follow-up email draft 52 out of 100, listing issues and suggestions beside a line diff of the proposed rewrite',
+			label: 'Apex Adventures / AI email review',
+			// This capture is the review modal over a dimmed workspace, so it is
+			// taller than the 1294x912 workspace screenshots elsewhere on the page.
+			width: 1942,
+			height: 1609,
+			// Crop to the dialog. Uncropped, the modal reads as a postage stamp in a
+			// field of dead space and its body text is illegible at column width.
+			crop: { x: 150, y: 275, width: 1602, height: 1129 }
+		},
+		{
 			id: 'analytics',
-			icon: BarChart3,
-			plan: 'Pro',
+			plans: ['Pro'],
 			title: 'Operations analytics',
 			description:
-				'Review the operational picture across the date range that matters, with prior-period comparisons for bookings, submissions, customers, and email delivery.',
-			detail:
-				'Use one reporting surface to understand volume, coverage, audience growth, repeat customers, and follow-up delivery—then change the range without rebuilding the report.',
-			points: [
-				'Custom date ranges',
-				'Prior-period comparisons',
-				'Booking and submission trends',
-				'New and returning customers',
-				'Email delivery status mix'
-			],
+				'One report for bookings, submissions, customers, and email delivery — over any date range, measured against the prior period.',
+			points: ['Any date range', 'Prior-period comparison', 'New vs. returning customers'],
 			src: '/marketing/apex-analytics.png',
 			alt: 'Waiver Director analytics showing fictional Apex Adventures submission, booking, customer, and email trends',
 			label: 'Apex Adventures / Analytics'
@@ -164,14 +181,13 @@
 	<div class="features-hero__grid absolute inset-0" aria-hidden="true"></div>
 	<div class="features-hero__glow absolute" aria-hidden="true"></div>
 	<div class="relative mx-auto w-full max-w-6xl pt-28 pb-20 md:pt-32 md:pb-24">
-		<p class="marketing-kicker">Product capabilities</p>
 		<h1 class="features-hero__title marketing-display mt-7 max-w-5xl text-[clamp(3rem,7vw,6.5rem)]">
 			See exactly what Waiver Director does.
 		</h1>
 		<div class="mt-8 grid max-w-5xl gap-7 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
 			<p class="marketing-copy max-w-2xl">
-				Build waivers, monitor booking coverage, protect signed records, send follow-ups, and report
-				from one workspace.
+				Everything here ships today, shown with fictional Apex Adventures data. Building a waiver is
+				free — Pro adds publishing and live operations.
 			</p>
 			<Button
 				href={resolve('/sign-up')}
@@ -183,53 +199,30 @@
 	</div>
 </section>
 
-<nav class="features-jump border-b" aria-label="Feature categories">
-	<div class="mx-auto flex max-w-6xl gap-7 overflow-x-auto px-4 py-4 sm:px-6">
-		<a href="#waivers">Waivers</a>
-		<a href="#operations">Bookings</a>
-		<a href="#customers">Records</a>
-		<a href="#follow-ups">Follow-ups</a>
-		<a href="#analytics">Analytics</a>
-		<a href="#integrations">Integrations</a>
-	</div>
-</nav>
-
 <section class="features-detail border-b" style="border-color: var(--m-border-soft);">
-	<div class="mx-auto max-w-7xl px-4 py-20 sm:px-6 md:py-28">
-		<div class="max-w-3xl" data-gsap-copy>
-			<h2 class="marketing-display text-[clamp(2.6rem,5vw,4.8rem)]">
-				Follow the work from waiver to follow-up.
-			</h2>
-			<p class="marketing-copy mt-6 max-w-2xl">
-				Five real product surfaces, populated with fictional Apex Adventures data and shown at a
-				scale where the operational details are clear.
-			</p>
-		</div>
-
-		<div class="mt-16 grid gap-24 md:gap-32">
+	<div class="mx-auto max-w-7xl px-4 py-16 sm:px-6 md:py-24">
+		<div class="grid gap-20 md:gap-24">
 			{#each productAreas as area, index (area.id)}
-				{@const Icon = area.icon}
 				<article
 					id={area.id}
 					class={`features-detail__row ${index % 2 === 1 ? 'features-detail__row--reverse' : ''}`}
 				>
 					<div class="features-detail__copy" data-gsap-copy>
-						<div class="flex items-center justify-between gap-4">
-							<span class="features-icon"><Icon size={18} aria-hidden="true" /></span>
-							<span class="features-plan">{area.plan}</span>
+						<div class="flex flex-wrap items-center gap-2">
+							{#each area.plans as plan (plan)}
+								<span class={['features-chip', plan === 'Pro' && 'features-chip--pro']}>{plan}</span
+								>
+							{/each}
 						</div>
 						<h3
-							class="mt-6 text-[clamp(2.35rem,4vw,4.4rem)] leading-[0.98] font-semibold tracking-[-0.055em]"
+							class="mt-5 text-[clamp(2.35rem,4vw,4.4rem)] leading-[0.98] font-semibold tracking-[-0.055em]"
 						>
 							{area.title}
 						</h3>
 						<p class="mt-6 text-base leading-7" style="color: var(--m-text-2);">
 							{area.description}
 						</p>
-						<p class="mt-4 text-sm leading-6" style="color: var(--m-text-3);">
-							{area.detail}
-						</p>
-						<ul class="mt-7 grid gap-3 sm:grid-cols-2">
+						<ul class="mt-7 grid gap-3">
 							{#each area.points as point (point)}
 								<li class="flex items-center gap-2.5 text-sm" style="color: var(--m-text-2);">
 									<Check class="size-4 shrink-0 text-violet-300" aria-hidden="true" />
@@ -239,13 +232,23 @@
 						</ul>
 					</div>
 
-					<MarketingScreenshotFrame
-						src={area.src}
-						alt={area.alt}
-						label={area.label}
-						priority={index === 0}
-						class="features-detail__image"
-					/>
+					{#if area.preview}
+						{@const Preview = area.preview}
+						<div class="features-detail__image features-detail__preview">
+							<Preview />
+						</div>
+					{:else if area.src && area.alt && area.label}
+						<MarketingScreenshotFrame
+							src={area.src}
+							alt={area.alt}
+							label={area.label}
+							width={area.width}
+							height={area.height}
+							crop={area.crop}
+							priority={index === 0}
+							class="features-detail__image"
+						/>
+					{/if}
 				</article>
 			{/each}
 		</div>
@@ -253,9 +256,9 @@
 </section>
 
 <section id="integrations" class="border-b" style="border-color: var(--m-border-soft);">
-	<div class="mx-auto max-w-6xl px-4 py-20 sm:px-6 md:py-28">
+	<div class="mx-auto max-w-6xl px-4 py-16 sm:px-6 md:py-24">
 		<div class="grid gap-10 lg:grid-cols-[1.15fr_0.85fr]">
-			<div data-gsap-copy>
+			<div class="features-integrations__col" data-gsap-copy>
 				<h2 class="marketing-display text-[clamp(2.5rem,4.5vw,4.4rem)]">
 					Integrations available now.
 				</h2>
@@ -265,10 +268,10 @@
 						<div>
 							<div class="flex items-center justify-between gap-3">
 								<h3 class="text-xl font-semibold">Bookeo</h3>
-								<span class="features-plan">Pro</span>
+								<span class="features-chip features-chip--pro">Pro</span>
 							</div>
 							<p class="mt-3 text-sm leading-6" style="color: var(--m-text-2);">
-								Import bookings, receive updates, and connect coverage to activity context.
+								Import bookings, receive updates, and see coverage per activity.
 							</p>
 						</div>
 					</article>
@@ -277,10 +280,10 @@
 						<div>
 							<div class="flex items-center justify-between gap-3">
 								<h3 class="text-xl font-semibold">Mailchimp</h3>
-								<span class="features-plan">Pro</span>
+								<span class="features-chip features-chip--pro">Pro</span>
 							</div>
 							<p class="mt-3 text-sm leading-6" style="color: var(--m-text-2);">
-								Sync consenting customers to the audience configured by the workspace owner.
+								Sync consenting customers to the audience you choose.
 							</p>
 						</div>
 					</article>
@@ -342,8 +345,7 @@
 <MarketingMotion />
 
 <style>
-	.features-hero,
-	.features-jump {
+	.features-hero {
 		border-color: var(--m-border-soft);
 	}
 
@@ -363,35 +365,6 @@
 		filter: blur(100px);
 	}
 
-	.features-jump {
-		position: sticky;
-		top: var(--mkt-nav-offset);
-		z-index: 20;
-		background: oklch(0.07 0.005 286 / 90%);
-		backdrop-filter: blur(18px);
-	}
-
-	.features-jump > div {
-		scrollbar-width: none;
-	}
-
-	.features-jump > div::-webkit-scrollbar {
-		display: none;
-	}
-
-	.features-jump a {
-		flex: 0 0 auto;
-		font-size: 0.72rem;
-		font-weight: 650;
-		color: var(--m-text-3);
-		text-decoration: none;
-		transition: color 0.18s ease;
-	}
-
-	.features-jump a:hover {
-		color: var(--m-text-1);
-	}
-
 	.features-integrations article,
 	.features-roadmap {
 		border: 1px solid var(--m-border-soft);
@@ -407,32 +380,41 @@
 	.features-detail__row {
 		display: grid;
 		gap: 3rem;
-		scroll-margin-top: calc(var(--mkt-nav-offset) + 3rem);
+		scroll-margin-top: calc(var(--mkt-nav-offset) + 2.5rem);
 	}
 
 	.features-detail__copy {
 		max-width: 35rem;
 	}
 
-	.features-icon,
 	.features-roadmap__icon {
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
+		width: 2.25rem;
+		height: 2.25rem;
 		border: 1px solid var(--m-accent-border-soft);
 		border-radius: 0.7rem;
 		background: var(--m-accent-dim);
 		color: var(--m-accent-text);
 	}
 
-	.features-icon {
-		width: 2.3rem;
-		height: 2.3rem;
+	.features-chip {
+		display: inline-flex;
+		align-items: center;
+		padding: 0.2rem 0.65rem;
+		border: 1px solid var(--m-border-soft);
+		border-radius: 999px;
+		background: var(--m-elevated);
+		font-size: 0.72rem;
+		font-weight: 650;
+		color: var(--m-text-3);
 	}
 
-	.features-roadmap__icon {
-		width: 2.25rem;
-		height: 2.25rem;
+	.features-chip--pro {
+		border-color: var(--m-accent-border-soft);
+		background: var(--m-accent-dim);
+		color: var(--m-accent-text);
 	}
 
 	.features-plan {
@@ -443,8 +425,20 @@
 		color: var(--m-accent-text);
 	}
 
+	/* The roadmap card is the taller of the two columns, so the provider cards
+	   grow to meet its bottom edge rather than stopping short of it. */
+	.features-integrations__col {
+		display: flex;
+		flex-direction: column;
+	}
+
+	.features-integrations {
+		flex: 1;
+	}
+
 	.features-integrations article {
 		display: grid;
+		align-content: start;
 		gap: 1.25rem;
 		padding: 1.5rem;
 	}
@@ -524,12 +518,6 @@
 	@media (max-width: 30rem) {
 		.features-hero__title {
 			font-size: 2.75rem;
-		}
-	}
-
-	@media (prefers-reduced-motion: reduce) {
-		.features-jump a {
-			transition: none;
 		}
 	}
 </style>

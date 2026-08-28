@@ -6,6 +6,15 @@
 		class?: string;
 		priority?: boolean;
 		compact?: boolean;
+		/** Intrinsic pixel size of the source image. The defaults match the
+		 *  workspace captures in `static/marketing`, which are all 1294x912.
+		 *  These reserve the loading box, so a wrong ratio visibly distorts
+		 *  the image until it decodes. */
+		width?: number;
+		height?: number;
+		/** Show only a region of the source, given in source pixels. For captures
+		 *  that carry large dead margins around the part worth reading. */
+		crop?: { x: number; y: number; width: number; height: number };
 	};
 
 	let {
@@ -14,8 +23,23 @@
 		label,
 		class: className = '',
 		priority = false,
-		compact = false
+		compact = false,
+		width = 1294,
+		height = 912,
+		crop
 	}: Props = $props();
+
+	// Percentages resolve against the viewport's width — including margin-top —
+	// so the crop scales with the frame instead of needing fixed pixel offsets.
+	const viewportStyle = $derived(crop ? `aspect-ratio: ${crop.width} / ${crop.height};` : '');
+	const imageStyle = $derived(
+		crop
+			? `width: ${(width / crop.width) * 100}%;` +
+					`margin-left: ${(-crop.x / crop.width) * 100}%;` +
+					`margin-top: ${(-crop.y / crop.width) * 100}%;` +
+					'max-width: none;'
+			: ''
+	);
 </script>
 
 <figure
@@ -35,14 +59,15 @@
 			</span>
 			<span class="size-2 rounded-full bg-emerald-400/80" aria-hidden="true"></span>
 		</div>
-		<div class="marketing-shot__viewport overflow-hidden">
+		<div class="marketing-shot__viewport overflow-hidden" style={viewportStyle}>
 			<img
 				{src}
 				{alt}
-				width="1440"
-				height="900"
+				{width}
+				{height}
 				loading={priority ? 'eager' : 'lazy'}
 				fetchpriority={priority ? 'high' : 'auto'}
+				style={imageStyle}
 				class="block h-auto w-full transition-transform duration-700 ease-out group-hover:scale-[1.018]"
 			/>
 		</div>

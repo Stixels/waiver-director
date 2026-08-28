@@ -17,15 +17,15 @@
 					gsap.utils.toArray<HTMLElement>('[data-gsap-image]').forEach((element) => {
 						gsap.fromTo(
 							element,
-							{ scale: 0.9, opacity: 0.48 },
+							{ y: 26, opacity: 0.55 },
 							{
-								scale: 1,
+								y: 0,
 								opacity: 1,
 								ease: 'none',
 								scrollTrigger: {
 									trigger: element,
-									start: 'top 92%',
-									end: 'center 58%',
+									start: 'top 94%',
+									end: 'center 62%',
 									scrub: 0.7
 								}
 							}
@@ -61,12 +61,12 @@
 								start: 'top 18%',
 								end: () => {
 									const pinnedTop = window.innerHeight * 0.18;
-									const releaseLine = Math.min(
-										window.innerHeight - 32,
-										pinnedTop + element.offsetHeight + 64
-									);
+									const sectionBottom = section.getBoundingClientRect().bottom + window.scrollY;
 
-									return `bottom ${releaseLine}px`;
+									return Math.max(
+										pinnedTop + 1,
+										sectionBottom - (pinnedTop + element.offsetHeight + 48)
+									);
 								},
 								pin: true,
 								pinSpacing: false,

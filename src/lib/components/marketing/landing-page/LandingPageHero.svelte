@@ -6,54 +6,53 @@
 	import { Button } from '$lib/components/ui/button';
 </script>
 
-<section class="mkt-hero landing-hero relative overflow-hidden px-4 pb-28 sm:px-6 md:pb-44">
+<section class="mkt-hero landing-hero relative overflow-hidden px-4 sm:px-6">
 	<div class="landing-hero__grid absolute inset-0" aria-hidden="true"></div>
 	<div class="landing-hero__orb landing-hero__orb--one" aria-hidden="true"></div>
 	<div class="landing-hero__orb landing-hero__orb--two" aria-hidden="true"></div>
 
-	<div class="relative z-10 mx-auto w-full max-w-6xl">
-		<div class="landing-hero__copy max-w-6xl">
-			<p class="marketing-kicker landing-hero__animate landing-hero__delay-1">
-				Built for experience operators
-			</p>
-			<h1 class="marketing-display landing-hero__animate landing-hero__delay-1 mt-7 max-w-[58rem]">
-				Run every waiver operation.
-				<span>One connected workspace.</span>
+	<div class="landing-hero__inner relative z-10">
+		<div class="landing-hero__lede">
+			<h1 class="marketing-display landing-hero__animate landing-hero__delay-1">
+				Every guest <span>signed</span> before they arrive.
 			</h1>
 
-			<div
-				class="landing-hero__animate landing-hero__delay-2 mt-8 grid max-w-4xl gap-7 md:grid-cols-[minmax(0,1fr)_auto] md:items-end"
-			>
-				<p class="marketing-copy max-w-2xl">
-					Build waivers, connect Bookeo bookings, organize signed records, send follow-ups, and
-					monitor the operation.
+			<div class="landing-hero__aside landing-hero__animate landing-hero__delay-2">
+				<p class="landing-hero__deck">
+					Build your waiver, share it as a link or a QR code, and see who still hasn't signed.
 				</p>
-				<div class="flex flex-wrap items-center gap-3">
+				<div class="landing-hero__actions">
 					<Button
 						href={resolve('/sign-up')}
-						class="btn-mkt-accent h-11 gap-2 rounded-xl px-7 text-sm font-semibold"
+						class="btn-mkt-accent h-12 gap-2 rounded-xl px-7 text-[0.95rem] font-semibold"
 					>
-						Start for free
-						<ArrowRight size={15} aria-hidden="true" />
+						Start building free
+						<ArrowRight size={16} aria-hidden="true" />
 					</Button>
 					<Button
 						href={resolve('/features')}
 						variant="outline"
-						class="btn-mkt-outline h-11 rounded-xl px-7 text-sm font-medium"
+						class="btn-mkt-outline h-12 rounded-xl px-6 text-[0.95rem] font-medium"
 					>
-						See the product
+						See all features
 					</Button>
 				</div>
+				<p class="landing-hero__meta">No credit card required.</p>
 			</div>
 		</div>
 
-		<div class="landing-hero__visual landing-hero__animate landing-hero__delay-3 mt-16 lg:ml-24">
-			<MarketingScreenshotFrame
-				src="/marketing/apex-dashboard.png"
-				alt="Waiver Director dashboard showing Apex Adventures bookings, signed waiver completion, submissions, and follow-up status"
-				label="Apex Adventures / Live dashboard"
-				priority
-			/>
+		<!-- The workspace deliberately meets the fold, so the first screen invites the scroll. -->
+		<div class="landing-hero__visual landing-hero__animate landing-hero__delay-3">
+			<div class="landing-hero__stage">
+				<MarketingScreenshotFrame
+					src="/marketing/apex-dashboard.png"
+					alt="Waiver Director workspace for the fictional Apex Adventures demo, showing today's bookings, signed waiver completion, submissions, and follow-up status"
+					label="Apex Adventures / Live workspace"
+					width={1694}
+					height={908}
+					priority
+				/>
+			</div>
 		</div>
 	</div>
 </section>
@@ -70,33 +69,145 @@
 		}
 	}
 
+	.landing-hero {
+		--mkt-hero-top: 5rem;
+
+		display: flex;
+		flex-direction: column;
+		min-height: min(100svh, 64rem);
+		padding-bottom: 0;
+	}
+
+	@media (min-width: 768px) {
+		.landing-hero {
+			--mkt-hero-top: 6.5rem;
+		}
+	}
+
+	.landing-hero__inner {
+		display: flex;
+		flex: 1;
+		flex-direction: column;
+		width: 100%;
+	}
+
 	.landing-hero__grid {
-		background-image: radial-gradient(circle, oklch(1 0 0 / 8%) 1px, transparent 1px);
-		background-size: 30px 30px;
-		mask-image: linear-gradient(to bottom, black 0%, transparent 88%);
+		background-image: radial-gradient(circle, oklch(1 0 0 / 7%) 1px, transparent 1px);
+		background-size: 32px 32px;
+		mask-image: linear-gradient(to bottom, black 0%, transparent 82%);
 	}
 
 	.landing-hero__orb {
 		position: absolute;
 		border-radius: 999px;
-		filter: blur(90px);
+		filter: blur(110px);
 		pointer-events: none;
 	}
 
 	.landing-hero__orb--one {
-		width: 34rem;
-		height: 34rem;
-		right: -4%;
-		top: 18%;
-		background: oklch(0.52 0.22 277 / 15%);
+		width: 46rem;
+		height: 46rem;
+		right: -10%;
+		top: -16%;
+		background: oklch(0.52 0.22 277 / 18%);
 	}
 
 	.landing-hero__orb--two {
-		width: 24rem;
-		height: 24rem;
-		left: 4%;
-		top: 6%;
-		background: oklch(0.58 0.18 255 / 7%);
+		width: 28rem;
+		height: 28rem;
+		left: -2%;
+		top: 16%;
+		background: oklch(0.58 0.18 255 / 9%);
+	}
+
+	/* The copy stays on the text measure; the workspace is allowed to run wider. */
+	.landing-hero__lede {
+		display: grid;
+		gap: clamp(2rem, 4vw, 3.5rem);
+		align-items: end;
+		width: 100%;
+		max-width: 80rem;
+		margin-inline: auto;
+	}
+
+	@media (min-width: 1000px) {
+		.landing-hero__lede {
+			grid-template-columns: minmax(0, 1.32fr) minmax(0, 1fr);
+			gap: clamp(3rem, 5vw, 5.5rem);
+		}
+	}
+
+	h1 {
+		font-size: clamp(3.2rem, 7.8vw, 6rem);
+		text-wrap: balance;
+		max-width: 13ch;
+	}
+
+	h1 span {
+		color: var(--m-accent-text);
+	}
+
+	.landing-hero__aside {
+		display: grid;
+		gap: 1.9rem;
+	}
+
+	@media (min-width: 1000px) {
+		.landing-hero__aside {
+			position: relative;
+			padding-left: 2.15rem;
+			padding-bottom: 0.5rem;
+		}
+
+		.landing-hero__aside::before {
+			content: '';
+			position: absolute;
+			left: 0;
+			top: 0.35rem;
+			bottom: 0.35rem;
+			width: 1px;
+			background: linear-gradient(to bottom, var(--m-accent-line), oklch(1 0 0 / 4%));
+		}
+	}
+
+	.landing-hero__deck {
+		color: var(--m-text-2);
+		font-size: clamp(1.08rem, 1.5vw, 1.3rem);
+		line-height: 1.62;
+	}
+
+	.landing-hero__actions {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.75rem;
+	}
+
+	.landing-hero__meta {
+		color: var(--m-text-3);
+		font-size: 0.8125rem;
+		line-height: 1.5;
+	}
+
+	.landing-hero__visual {
+		display: flex;
+		flex: 1;
+		align-items: flex-end;
+		width: 100%;
+		margin-top: clamp(3.5rem, 7vw, 6.5rem);
+	}
+
+	/* Capped below the source capture's intrinsic width (1694px) so the workspace
+	   is never upscaled. Going wider than this is what made it look soft. */
+	.landing-hero__stage {
+		position: relative;
+		width: 100%;
+		max-width: 78rem;
+		margin-inline: auto;
+	}
+
+	.landing-hero__stage :global(.marketing-shot) {
+		width: 100%;
 	}
 
 	.landing-hero__animate {
@@ -113,32 +224,6 @@
 
 	.landing-hero__delay-3 {
 		animation-delay: 0.28s;
-	}
-
-	h1 {
-		font-size: clamp(3.25rem, 6vw, 5.7rem);
-	}
-
-	h1 span {
-		display: block;
-		background: linear-gradient(100deg, oklch(0.62 0.2 280), oklch(0.76 0.13 280));
-		-webkit-background-clip: text;
-		background-clip: text;
-		-webkit-text-fill-color: transparent;
-	}
-
-	.landing-hero__visual {
-		width: min(100%, 68rem);
-	}
-
-	@media (max-width: 767px) {
-		h1 {
-			font-size: 2.75rem;
-		}
-
-		.landing-hero__visual {
-			width: 118%;
-		}
 	}
 
 	@media (prefers-reduced-motion: reduce) {
