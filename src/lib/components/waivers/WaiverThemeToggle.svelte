@@ -56,8 +56,6 @@
 		padding: 0;
 		border-radius: var(--radius-sm);
 		cursor: pointer;
-		font-size: 0.67rem;
-		font-weight: 600;
 		color: var(--muted-foreground);
 		transition:
 			background-color 150ms ease,

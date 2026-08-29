@@ -101,7 +101,7 @@
 	let linkError = $state<string | null>(null);
 	let linkInputEl = $state<HTMLInputElement | null>(null);
 	let toolbarState = $state({
-		blockShortLabel: '<p>',
+		blockLabel: 'Paragraph',
 		alignment: 'left' as TextAlignValue,
 		bold: false,
 		italic: false,
@@ -239,10 +239,10 @@
 	function syncToolbarState(sourceEditor: Editor | null) {
 		if (!sourceEditor) return;
 
-		let blockShortLabel = '<p>';
+		let blockLabel = 'Paragraph';
 		for (let level = 1; level <= 6; level += 1) {
 			if (sourceEditor.isActive('heading', { level })) {
-				blockShortLabel = `<h${level}>`;
+				blockLabel = `Heading ${level}`;
 				break;
 			}
 		}
@@ -252,7 +252,7 @@
 		) ?? 'left') as TextAlignValue;
 
 		toolbarState = {
-			blockShortLabel,
+			blockLabel,
 			alignment,
 			bold: sourceEditor.isActive('bold'),
 			italic: sourceEditor.isActive('italic'),
@@ -408,7 +408,6 @@
 				{/if}
 				<span class="truncate">{savedLabel}</span>
 			</span>
-			<WaiverThemeToggle bind:theme />
 		</div>
 
 		<div class="flex shrink-0 items-center gap-1">
@@ -417,23 +416,24 @@
 				<DropdownMenuTrigger class="toolbar-select" disabled={!editor} aria-label="Text style">
 					{#snippet child({ props })}
 						<button {...props}>
-							<span class="toolbar-select-label">{toolbarState.blockShortLabel}</span>
+							<span class="toolbar-select-label">{toolbarState.blockLabel}</span>
 							<ChevronDownIcon class="size-3" />
 						</button>
 					{/snippet}
 				</DropdownMenuTrigger>
 				<DropdownMenuContent align="end" class="w-40">
-					<DropdownMenuItem onclick={() => command((e) => e.chain().focus().setParagraph().run())}>
-						<span class="font-mono text-[11px]">&lt;p&gt;</span>
+					<DropdownMenuItem
+						class={toolbarState.blockLabel === 'Paragraph' ? 'font-semibold' : undefined}
+						onclick={() => command((e) => e.chain().focus().setParagraph().run())}
+					>
 						<span>Paragraph</span>
 					</DropdownMenuItem>
 					<DropdownMenuSeparator />
 					{#each headingLevels as level (level)}
 						<DropdownMenuItem
-							class={toolbarState.blockShortLabel === `<h${level}>` ? 'font-semibold' : undefined}
+							class={toolbarState.blockLabel === `Heading ${level}` ? 'font-semibold' : undefined}
 							onclick={() => command((e) => e.chain().focus().toggleHeading({ level }).run())}
 						>
-							<span class="font-mono text-[11px]">{`<h${level}>`}</span>
 							<span>Heading {level}</span>
 						</DropdownMenuItem>
 					{/each}
@@ -591,6 +591,10 @@
 			>
 				<RemoveFormattingIcon class="size-3.5" />
 			</button>
+
+			<span class="toolbar-divider"></span>
+
+			<WaiverThemeToggle bind:theme />
 		</div>
 	</div>
 
@@ -794,7 +798,7 @@
 	}
 
 	.toolbar-select-label {
-		min-width: 1.4rem;
+		min-width: 4.75rem;
 		text-align: left;
 		font-variant: all-small-caps;
 		letter-spacing: 0.03em;

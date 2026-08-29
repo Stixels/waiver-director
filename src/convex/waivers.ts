@@ -10,6 +10,7 @@ import { upsertSignerCustomer } from './lib/customers';
 import { submissionSearchText } from './lib/submissions';
 import { getOwnedWorkspaceLogoUrl } from './lib/workspaces';
 import { marketingConsentLabel } from './lib/marketing';
+import { sanitizeRichTextHtml } from '../lib/utils/rich-text';
 import {
 	assertWorkspaceRecord,
 	minorInputValidator,
@@ -482,7 +483,7 @@ export const getPublicWaiverBySlug = query({
 			workspaceName: workspace.name,
 			workspaceLogoUrl: workspaceLogoUrl ?? null,
 			title: version.title,
-			introCopy: version.introCopy,
+			introCopy: sanitizeRichTextHtml(version.introCopy),
 			theme: version.theme ?? 'dark',
 			fields: version.fields,
 			marketingOptIn:
@@ -545,7 +546,7 @@ export const getPublicWaiverForBooking = query({
 			workspaceName: workspace.name,
 			workspaceLogoUrl: workspaceLogoUrl ?? null,
 			title: version.title,
-			introCopy: version.introCopy,
+			introCopy: sanitizeRichTextHtml(version.introCopy),
 			theme: version.theme ?? 'dark',
 			fields: version.fields,
 			marketingOptIn:

@@ -75,7 +75,7 @@
 	const DEFAULT_SIZE_LABEL = '14';
 	const DEFAULT_OPTION_LABEL = 'Default';
 	const DEFAULT_TOOLBAR_STATE = {
-		blockShortLabel: '<p>',
+		blockLabel: 'Paragraph',
 		alignment: 'left' as TextAlignValue,
 		bold: false,
 		italic: false,
@@ -473,10 +473,10 @@
 			return;
 		}
 
-		let blockShortLabel = '<p>';
+		let blockLabel = 'Paragraph';
 		for (let level = 1; level <= 6; level += 1) {
 			if (sourceEditor.isActive('heading', { level })) {
-				blockShortLabel = `<h${level}>`;
+				blockLabel = `Heading ${level}`;
 				break;
 			}
 		}
@@ -496,7 +496,7 @@
 		const computedStyle = getSelectionComputedStyle(sourceEditor);
 
 		toolbarState = {
-			blockShortLabel,
+			blockLabel,
 			alignment,
 			bold: sourceEditor.isActive('bold'),
 			italic: sourceEditor.isActive('italic'),
@@ -681,7 +681,7 @@
 						class="toolbar-select toolbar-select-block"
 						disabled={!editor || disabled}
 					>
-						<span class="toolbar-select-label">{toolbarState.blockShortLabel}</span>
+						<span class="toolbar-select-label">{toolbarState.blockLabel}</span>
 						<ChevronDownIcon class="size-3" />
 					</button>
 				</DropdownMenuTrigger>
@@ -689,17 +689,15 @@
 					<DropdownMenuItem
 						onclick={() => command((editor) => editor.chain().focus().setParagraph().run())}
 					>
-						<span class="font-mono text-[11px]">&lt;p&gt;</span>
 						<span>Paragraph</span>
 					</DropdownMenuItem>
 					<DropdownMenuSeparator />
 					{#each headingLevels as level (level)}
 						<DropdownMenuItem
-							class={toolbarState.blockShortLabel === `<h${level}>` ? 'font-semibold' : undefined}
+							class={toolbarState.blockLabel === `Heading ${level}` ? 'font-semibold' : undefined}
 							onclick={() =>
 								command((editor) => editor.chain().focus().toggleHeading({ level }).run())}
 						>
-							<span class="font-mono text-[11px]">{`<h${level}>`}</span>
 							<span>Heading {level}</span>
 						</DropdownMenuItem>
 					{/each}
@@ -1143,7 +1141,7 @@
 	}
 
 	.toolbar-select-block {
-		min-width: 0;
+		min-width: 4.75rem;
 	}
 
 	.toolbar-select-font {
