@@ -98,7 +98,7 @@
 	let linkError = $state<string | null>(null);
 	let linkInputEl = $state<HTMLInputElement | null>(null);
 	let toolbarState = $state({
-		blockShortLabel: 'Text',
+		blockShortLabel: '<p>',
 		alignment: 'left' as TextAlignValue,
 		bold: false,
 		italic: false,
@@ -236,10 +236,10 @@
 	function syncToolbarState(sourceEditor: Editor | null) {
 		if (!sourceEditor) return;
 
-		let blockShortLabel = 'Text';
+		let blockShortLabel = '<p>';
 		for (let level = 1; level <= 6; level += 1) {
 			if (sourceEditor.isActive('heading', { level })) {
-				blockShortLabel = `H${level}`;
+				blockShortLabel = `<h${level}>`;
 				break;
 			}
 		}
@@ -414,15 +414,17 @@
 				</DropdownMenuTrigger>
 				<DropdownMenuContent align="end" class="w-40">
 					<DropdownMenuItem onclick={() => command((e) => e.chain().focus().setParagraph().run())}>
-						Paragraph
+						<span class="font-mono text-[11px]">&lt;p&gt;</span>
+						<span>Paragraph</span>
 					</DropdownMenuItem>
 					<DropdownMenuSeparator />
 					{#each headingLevels as level (level)}
 						<DropdownMenuItem
-							class={toolbarState.blockShortLabel === `H${level}` ? 'font-semibold' : undefined}
+							class={toolbarState.blockShortLabel === `<h${level}>` ? 'font-semibold' : undefined}
 							onclick={() => command((e) => e.chain().focus().toggleHeading({ level }).run())}
 						>
-							Heading {level}
+							<span class="font-mono text-[11px]">{`<h${level}>`}</span>
+							<span>Heading {level}</span>
 						</DropdownMenuItem>
 					{/each}
 				</DropdownMenuContent>
@@ -815,28 +817,31 @@
 	:global(.waiver-canvas-editor h4),
 	:global(.waiver-canvas-editor h5),
 	:global(.waiver-canvas-editor h6) {
-		margin: 1.5rem 0 0.75rem;
+		margin: 1.25rem 0 0.75rem;
 		font-weight: 700;
 		line-height: 1.2;
 		color: var(--foreground);
 	}
 
 	:global(.waiver-canvas-editor h1) {
-		font-size: 1.75rem;
+		font-size: 1.875rem;
 	}
 
 	:global(.waiver-canvas-editor h2) {
-		font-size: 1.375rem;
+		font-size: 1.5rem;
 	}
 
 	:global(.waiver-canvas-editor h3) {
-		font-size: 1.2rem;
+		font-size: 1.25rem;
 	}
 
-	:global(.waiver-canvas-editor h4),
+	:global(.waiver-canvas-editor h4) {
+		font-size: 1.125rem;
+	}
+
 	:global(.waiver-canvas-editor h5),
 	:global(.waiver-canvas-editor h6) {
-		font-size: 1.05rem;
+		font-size: 1rem;
 	}
 
 	:global(.waiver-canvas-editor ul),
@@ -846,6 +851,7 @@
 	}
 
 	:global(.waiver-canvas-editor li) {
+		display: list-item;
 		margin: 0.2rem 0;
 	}
 

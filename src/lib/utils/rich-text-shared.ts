@@ -58,17 +58,59 @@ export function escapeHtml(value: string): string {
 }
 
 export function decodeHtml(value: string): string {
-	return value
-		.replaceAll('&nbsp;', ' ')
-		.replaceAll('&lt;', '<')
-		.replaceAll('&gt;', '>')
-		.replaceAll('&quot;', '"')
-		.replaceAll('&#39;', "'")
-		.replaceAll('&amp;', '&');
+	return value.replace(
+		/&(#(\d+)|#x([\da-f]+)|nbsp|amp|lt|gt|quot|apos);/gi,
+		(entity, _match, decimal, hexadecimal) => {
+			if (decimal || hexadecimal) {
+				const codePoint = decimal ? Number.parseInt(decimal, 10) : Number.parseInt(hexadecimal, 16);
+
+				if (
+					!Number.isInteger(codePoint) ||
+					codePoint < 0 ||
+					codePoint > 0x10ffff ||
+					(codePoint >= 0xd800 && codePoint <= 0xdfff)
+				) {
+					return entity;
+				}
+
+				return String.fromCodePoint(codePoint);
+			}
+
+			switch (entity.toLowerCase()) {
+				case '&nbsp;':
+					return ' ';
+				case '&amp;':
+					return '&';
+				case '&lt;':
+					return '<';
+				case '&gt;':
+					return '>';
+				case '&quot;':
+					return '"';
+				case '&apos;':
+					return "'";
+				default:
+					return entity;
+			}
+		}
+	);
 }
 
 export function hasSupportedHtmlTag(input: string): boolean {
 	return /<\/?[a-z][^>]*>/i.test(input);
+}
+
+/**
+ * Older rich-text values can contain an entity-encoded HTML document. Decode
+ * that wrapper before sanitizing so its tags render instead of appearing as
+ * visible text. Plain text with ordinary entities remains plain text.
+ */
+export function normalizeRichTextSource(input: string): string {
+	const source = input.replace(/\r\n?/g, '\n').trim();
+	if (!source || hasSupportedHtmlTag(source)) return source;
+
+	const decoded = decodeHtml(source);
+	return hasSupportedHtmlTag(decoded) ? decoded : source;
 }
 
 export function sanitizeHref(value: string | null): string | null {
@@ -93,6 +135,27 @@ export function plainTextToRichHtml(input: string): string {
 	});
 
 	return paragraphs.join('');
+}
+
+/** Convert sanitized rich-text HTML into the plain-text alternative used by email clients. */
+export function richTextHtmlToPlainText(input: string): string {
+	const source = normalizeRichTextSource(input);
+	if (!source) return '';
+
+	return decodeHtml(
+		source
+			.replace(/<br\s*\/?>/gi, '\n')
+			.replace(/<li\b[^>]*>/gi, '- ')
+			.replace(/<\/(?:p|h[1-6])\s*>/gi, '\n\n')
+			.replace(/<\/li\s*>/gi, '\n')
+			.replace(/<[^>]+>/g, '')
+	)
+		.replace(/\u00a0/g, ' ')
+		.replace(/[ \t]+\n/g, '\n')
+		.replace(/\n[ \t]+/g, '\n')
+		.replace(/[ \t]{2,}/g, ' ')
+		.replace(/\n{3,}/g, '\n\n')
+		.trim();
 }
 
 export function sanitizeStyle(tagName: string, style: string | null): string | null {

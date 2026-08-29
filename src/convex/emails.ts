@@ -15,6 +15,7 @@ import { internal } from './_generated/api';
 import { requireWorkspaceFeature } from './lib/billing';
 import { requireWorkspaceMember } from './lib/waivers';
 import { escapeHtml, sanitizeRichTextHtml } from '../lib/utils/rich-text';
+import { richTextHtmlToPlainText } from '../lib/utils/rich-text-shared';
 
 const DEFAULT_SEND_AFTER_AMOUNT = 2;
 const DEFAULT_SEND_AFTER_UNIT = 'hours' as const;
@@ -1112,47 +1113,11 @@ function resolveHtmlVariables(
 	});
 }
 
-function decodeHtmlEntities(value: string): string {
-	return value.replace(
-		/&(#(\d+)|#x([\da-f]+)|amp|lt|gt|quot|apos);/gi,
-		(entity, _match, dec, hex) => {
-			if (dec) return String.fromCodePoint(Number(dec));
-			if (hex) return String.fromCodePoint(Number.parseInt(hex, 16));
-
-			switch (entity.toLowerCase()) {
-				case '&amp;':
-					return '&';
-				case '&lt;':
-					return '<';
-				case '&gt;':
-					return '>';
-				case '&quot;':
-					return '"';
-				case '&apos;':
-					return "'";
-				default:
-					return entity;
-			}
-		}
-	);
-}
-
-function htmlTemplateToText(template: string): string {
-	return decodeHtmlEntities(
-		template
-			.replace(/<[^>]+>/g, ' ')
-			.replace(/\s{2,}/g, ' ')
-			.trim()
-	);
-}
-
 function plainTextTemplateWithVariables(
 	template: string,
 	vars: { signerName: string; bookingId: string; businessName: string; activityDate: string }
 ): string {
-	return resolveVariables(htmlTemplateToText(template), vars)
-		.replace(/\s{2,}/g, ' ')
-		.trim();
+	return resolveVariables(richTextHtmlToPlainText(template), vars).trim();
 }
 
 function mergeInlineStyleAttributes(attributes: string | undefined, styles: string): string {

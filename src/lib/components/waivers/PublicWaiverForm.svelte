@@ -9,6 +9,7 @@
 	import WaiverPublicAboutSignerCard from '$lib/components/waivers/WaiverPublicAboutSignerCard.svelte';
 	import WaiverPublicAdditionalInfoSection from '$lib/components/waivers/WaiverPublicAdditionalInfoSection.svelte';
 	import WaiverPublicMinorsBlock from '$lib/components/waivers/WaiverPublicMinorsBlock.svelte';
+	import WaiverThemeToggle from '$lib/components/waivers/WaiverThemeToggle.svelte';
 	import {
 		waiverAddMinorButtonClass,
 		waiverFieldLabelClass,
@@ -136,6 +137,7 @@
 </script>
 
 <div class="min-h-screen bg-background">
+	<WaiverThemeToggle />
 	<WaiverDocumentShell
 		workspaceName={waiver.workspaceName}
 		workspaceLogoUrl={waiver.workspaceLogoUrl}

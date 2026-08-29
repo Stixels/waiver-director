@@ -169,7 +169,7 @@
 			</div>
 			<DropdownMenu>
 				<DropdownMenuTrigger
-					class="h-8 shrink-0 gap-1 rounded-md px-2.5 text-[11px] font-medium tracking-wide"
+					class="h-8 shrink-0 cursor-pointer gap-1 rounded-md px-2.5 text-[11px] font-medium tracking-wide disabled:cursor-not-allowed"
 					disabled={!canAddField}
 				>
 					{#snippet child({ props })}

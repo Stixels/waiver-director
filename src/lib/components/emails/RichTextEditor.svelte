@@ -75,7 +75,7 @@
 	const DEFAULT_SIZE_LABEL = '14';
 	const DEFAULT_OPTION_LABEL = 'Default';
 	const DEFAULT_TOOLBAR_STATE = {
-		blockShortLabel: 'Text',
+		blockShortLabel: '<p>',
 		alignment: 'left' as TextAlignValue,
 		bold: false,
 		italic: false,
@@ -473,10 +473,10 @@
 			return;
 		}
 
-		let blockShortLabel = 'Text';
+		let blockShortLabel = '<p>';
 		for (let level = 1; level <= 6; level += 1) {
 			if (sourceEditor.isActive('heading', { level })) {
-				blockShortLabel = `H${level}`;
+				blockShortLabel = `<h${level}>`;
 				break;
 			}
 		}
@@ -689,16 +689,18 @@
 					<DropdownMenuItem
 						onclick={() => command((editor) => editor.chain().focus().setParagraph().run())}
 					>
-						Paragraph
+						<span class="font-mono text-[11px]">&lt;p&gt;</span>
+						<span>Paragraph</span>
 					</DropdownMenuItem>
 					<DropdownMenuSeparator />
 					{#each headingLevels as level (level)}
 						<DropdownMenuItem
-							class={toolbarState.blockShortLabel === `H${level}` ? 'font-semibold' : undefined}
+							class={toolbarState.blockShortLabel === `<h${level}>` ? 'font-semibold' : undefined}
 							onclick={() =>
 								command((editor) => editor.chain().focus().toggleHeading({ level }).run())}
 						>
-							Heading {level}
+							<span class="font-mono text-[11px]">{`<h${level}>`}</span>
+							<span>Heading {level}</span>
 						</DropdownMenuItem>
 					{/each}
 				</DropdownMenuContent>
