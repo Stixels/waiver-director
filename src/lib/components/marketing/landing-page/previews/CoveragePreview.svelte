@@ -95,7 +95,7 @@
 				class="btn-mkt-outline inline-flex h-9 items-center gap-2 rounded-[9px] px-3.5 text-[0.82rem] font-medium"
 			>
 				<QrCode size={15} aria-hidden="true" />
-				Booking QR
+				Waiver QR
 			</span>
 
 			<span class="mkt-idchip__flash" role="status" aria-live="polite">

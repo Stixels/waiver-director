@@ -57,7 +57,7 @@
 			</span>
 			<span class="mkt-way">
 				<CalendarCheck size={16} aria-hidden="true" />
-				<span>QR for one booking</span>
+				<span>Booking details on the form</span>
 			</span>
 		</div>
 	</div>

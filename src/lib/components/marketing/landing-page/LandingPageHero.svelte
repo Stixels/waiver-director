@@ -14,30 +14,33 @@
 	<div class="landing-hero__inner relative z-10">
 		<div class="landing-hero__lede">
 			<h1 class="marketing-display landing-hero__animate landing-hero__delay-1">
-				Every guest <span>signed</span> before they arrive.
+				More signatures before arrival. <span>More relationships after.</span>
 			</h1>
 
 			<div class="landing-hero__aside landing-hero__animate landing-hero__delay-2">
 				<p class="landing-hero__deck">
-					Build your waiver, share it as a link or a QR code, and see who still hasn't signed.
+					Share waivers by link or QR code, track every booking live, and automatically follow up
+					with participants for feedback and reviews.
 				</p>
-				<div class="landing-hero__actions">
-					<Button
-						href={resolve('/sign-up')}
-						class="btn-mkt-accent h-12 gap-2 rounded-xl px-7 text-[0.95rem] font-semibold"
-					>
-						Start building free
-						<ArrowRight size={16} aria-hidden="true" />
-					</Button>
-					<Button
-						href={resolve('/features')}
-						variant="outline"
-						class="btn-mkt-outline h-12 rounded-xl px-6 text-[0.95rem] font-medium"
-					>
-						See all features
-					</Button>
+				<div class="landing-hero__cta">
+					<div class="landing-hero__actions">
+						<Button
+							href={resolve('/sign-up')}
+							class="btn-mkt-accent h-12 gap-2 rounded-xl px-7 text-[0.95rem] font-semibold"
+						>
+							Start building free
+							<ArrowRight size={16} aria-hidden="true" />
+						</Button>
+						<Button
+							href={resolve('/features')}
+							variant="outline"
+							class="btn-mkt-outline h-12 rounded-xl px-6 text-[0.95rem] font-medium"
+						>
+							See all features
+						</Button>
+					</div>
+					<p class="landing-hero__meta">No credit card required.</p>
 				</div>
-				<p class="landing-hero__meta">No credit card required.</p>
 			</div>
 		</div>
 
@@ -120,30 +123,27 @@
 		background: oklch(0.58 0.18 255 / 9%);
 	}
 
-	/* The copy stays on the text measure; the workspace is allowed to run wider. */
+	/* Capped to the stage width below it so the headline, the deck, and the
+	   workspace all break on the same left and right edges. */
 	.landing-hero__lede {
 		display: grid;
-		gap: clamp(2rem, 4vw, 3.5rem);
-		align-items: end;
+		gap: clamp(1.75rem, 3.2vw, 3.25rem);
 		width: 100%;
-		max-width: 80rem;
+		max-width: 78rem;
 		margin-inline: auto;
 	}
 
-	@media (min-width: 1000px) {
-		.landing-hero__lede {
-			grid-template-columns: minmax(0, 1.32fr) minmax(0, 1fr);
-			gap: clamp(3rem, 5vw, 5.5rem);
-		}
-	}
-
+	/* Sized so each sentence holds its own line from 1000px up: the longest of
+	   the two runs 12.92em, which clears the 78rem stage at the 5.75rem cap. */
 	h1 {
-		font-size: clamp(3.2rem, 7.8vw, 6rem);
+		font-size: clamp(2.75rem, 7.2vw, 5.75rem);
 		text-wrap: balance;
-		max-width: 13ch;
 	}
 
+	/* Blocks rather than an inline run, so the colour change always lands on a
+	   line start instead of mid-sentence when the headline wraps. */
 	h1 span {
+		display: block;
 		color: var(--m-accent-text);
 	}
 
@@ -154,12 +154,32 @@
 
 	@media (min-width: 1000px) {
 		.landing-hero__aside {
+			grid-template-columns: minmax(0, 1fr) auto;
+			align-items: start;
+			gap: clamp(2.5rem, 4vw, 4rem);
+		}
+	}
+
+	.landing-hero__deck {
+		color: var(--m-text-2);
+		font-size: clamp(1.08rem, 1.5vw, 1.3rem);
+		line-height: 1.62;
+		max-width: 52ch;
+	}
+
+	.landing-hero__cta {
+		display: grid;
+		gap: 1.15rem;
+	}
+
+	@media (min-width: 1000px) {
+		.landing-hero__cta {
 			position: relative;
 			padding-left: 2.15rem;
-			padding-bottom: 0.5rem;
+			justify-items: start;
 		}
 
-		.landing-hero__aside::before {
+		.landing-hero__cta::before {
 			content: '';
 			position: absolute;
 			left: 0;
@@ -168,12 +188,6 @@
 			width: 1px;
 			background: linear-gradient(to bottom, var(--m-accent-line), oklch(1 0 0 / 4%));
 		}
-	}
-
-	.landing-hero__deck {
-		color: var(--m-text-2);
-		font-size: clamp(1.08rem, 1.5vw, 1.3rem);
-		line-height: 1.62;
 	}
 
 	.landing-hero__actions {

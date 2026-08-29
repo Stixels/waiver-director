@@ -10,12 +10,12 @@
 		{
 			id: 'qr-code',
 			q: 'How do I use a QR code to get people signed?',
-			a: 'The general link and every booking link both render as a QR code. Print one for the counter or show it on screen, and the guest signs on their own phone — no app, no account.'
+			a: 'Your published waiver renders as a QR code. Print it for the counter or show it on screen, and the guest signs on their own phone — no app, no account. Open that code from a booking and the activity, time, and signed count ride along on the form.'
 		},
 		{
 			id: 'unsigned-arrival',
 			q: 'Someone turns up without a waiver. What do I do?',
-			a: 'Show that booking’s QR code at the desk. They sign on their own phone, and the signed count moves while they are still standing there. If they never had a booking, your general waiver link covers walk-ins.'
+			a: 'Open their booking and show the waiver QR code from there. They sign on their own phone, the form carries their activity and time, and the signed count moves while they are still standing there. If they never had a booking, the same waiver covers walk-ins.'
 		},
 		{
 			id: 'find-record',

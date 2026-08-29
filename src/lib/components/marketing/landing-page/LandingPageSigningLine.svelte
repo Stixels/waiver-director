@@ -23,7 +23,7 @@
 			stage: 'Display QR codes',
 			title: 'Share your waiver anywhere.',
 			description:
-				'Use it as a link, embed it on your website, open it on a front-desk kiosk, or display a QR code. Create booking-specific QR codes for guests who still need to sign.',
+				'Use it as a link, embed it on your website, open it on a front-desk kiosk, or display a QR code. Open the same waiver from a booking and that booking’s details appear on the form the guest signs.',
 			link: 'Where QR codes live',
 			href: '/features#qr-codes',
 			preview: SharePreview
@@ -33,7 +33,7 @@
 			stage: 'View your bookings',
 			title: 'See every booking in one place.',
 			description:
-				'Bring bookings in from integrations such as Bookeo. See the activity, time, customer details, expected guest count, and how many waivers are signed, then share a booking link or QR code.',
+				'Bring bookings in from integrations such as Bookeo. See the activity, time, customer details, expected guest count, and how many waivers are signed, then open the waiver for that booking.',
 			link: 'Booking coverage',
 			href: '/features#operations',
 			preview: CoveragePreview

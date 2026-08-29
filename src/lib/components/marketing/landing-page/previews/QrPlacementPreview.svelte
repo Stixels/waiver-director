@@ -2,42 +2,34 @@
 	import QRCode from 'qrcode';
 	import { Link2 } from '@lucide/svelte';
 
-	// Mirrors the two QrCodeDialog entry points in the app: one for the published
-	// waiver, one scoped to a single booking. Titles and descriptions are the
-	// dialogs' own copy.
-	const codes = [
-		{
-			title: 'Waiver QR code',
-			description: 'Scan to open the live waiver form.',
-			where: 'Waiver page, once the waiver is published',
-			url: 'https://apex.waiver.link/ride'
-		},
-		{
-			title: 'Booking QR code',
-			description: 'Scan to open the waiver for Sunset Kayak Tour.',
-			where: 'Bookings list, and inside any booking',
-			url: 'https://apex.waiver.link/b/BK-4471-QT'
-		}
-	] as const;
+	// Mirrors the QrCodeDialog in the app: one waiver QR code, reachable from the
+	// waiver page and from any booking. Title and description are the dialog's own
+	// copy; the note is what changes when it is opened from a booking.
+	const code = {
+		title: 'Waiver QR code',
+		description: 'Scan to open the live waiver form.',
+		where: 'Waiver page, once the waiver is published',
+		note: 'Open it from a booking and that booking’s activity, time, and signed count appear on the form.',
+		url: 'https://apex.waiver.link/ride'
+	} as const;
 
-	let dataUrls = $state<Record<string, string | null>>({});
+	let dataUrl = $state<string | null>(null);
 
 	$effect(() => {
 		let cancelled = false;
 
-		for (const code of codes) {
-			void QRCode.toDataURL(code.url, {
-				margin: 1,
-				width: 240,
-				color: { dark: '#221d2b', light: '#f7f7f8' }
+		void QRCode.toDataURL(code.url, {
+			margin: 1,
+			width: 360,
+			color: { dark: '#221d2b', light: '#f7f7f8' }
+		})
+			.then((next: string) => {
+				if (!cancelled) dataUrl = next;
 			})
-				.then((next: string) => {
-					if (!cancelled) dataUrls = { ...dataUrls, [code.title]: next };
-				})
-				.catch((error: unknown) => {
-					console.error('[marketing/qr-placement] unable to generate QR code', error);
-				});
-		}
+			.catch((error: unknown) => {
+				if (!cancelled) dataUrl = null;
+				console.error('[marketing/qr-placement] unable to generate QR code', error);
+			});
 
 		return () => {
 			cancelled = true;
@@ -45,48 +37,41 @@
 	});
 </script>
 
-<div class="qr-placement">
-	{#each codes as code (code.title)}
-		<div class="mkt-vig qr-card" data-gsap-image>
-			<div class="mkt-vig__head">
-				<span class="mkt-vig__title">{code.title}</span>
-				<span class="mkt-pill mkt-pill--accent">QR</span>
-			</div>
+<div class="mkt-vig qr-card" data-gsap-image>
+	<div class="mkt-vig__head">
+		<span class="mkt-vig__title">{code.title}</span>
+		<span class="mkt-pill mkt-pill--accent">QR</span>
+	</div>
 
-			<div class="mkt-vig__body qr-card__body">
-				<div class="qr-card__code">
-					{#if dataUrls[code.title]}
-						<img src={dataUrls[code.title]} alt={code.description} />
-					{:else}
-						<div class="qr-card__fallback" aria-hidden="true"></div>
-					{/if}
-				</div>
-
-				<div class="qr-card__meta">
-					<p class="qr-card__desc">{code.description}</p>
-					<p class="qr-card__where">{code.where}</p>
-					<span class="mkt-way qr-card__link">
-						<Link2 size={15} aria-hidden="true" />
-						<span>Copy link</span>
-					</span>
-				</div>
-			</div>
+	<div class="mkt-vig__body qr-card__body">
+		<div class="qr-card__code">
+			{#if dataUrl}
+				<img src={dataUrl} alt={code.description} />
+			{:else}
+				<div class="qr-card__fallback" aria-hidden="true"></div>
+			{/if}
 		</div>
-	{/each}
+
+		<div class="qr-card__meta">
+			<p class="qr-card__desc">{code.description}</p>
+			<p class="qr-card__where">{code.where}</p>
+			<span class="mkt-way qr-card__link">
+				<Link2 size={15} aria-hidden="true" />
+				<span>Copy link</span>
+			</span>
+		</div>
+	</div>
+
+	<p class="qr-card__note">{code.note}</p>
 </div>
 
 <style>
-	.qr-placement {
-		display: grid;
-		gap: 1rem;
-		min-width: 0;
-	}
-
 	.qr-card__body {
 		display: grid;
-		grid-template-columns: minmax(0, 6.5rem) minmax(0, 1fr);
-		gap: 1rem;
+		grid-template-columns: minmax(0, 9.25rem) minmax(0, 1fr);
+		gap: 1.35rem;
 		align-items: center;
+		padding-block: 0.35rem;
 	}
 
 	@media (max-width: 480px) {
@@ -118,23 +103,34 @@
 
 	.qr-card__meta {
 		display: grid;
-		gap: 0.5rem;
+		gap: 0.65rem;
 		min-width: 0;
 	}
 
 	.qr-card__desc {
-		font-size: 0.84rem;
+		font-size: 0.92rem;
 		line-height: 1.5;
+		letter-spacing: -0.015em;
 		color: var(--m-text-2);
 	}
 
 	.qr-card__where {
-		font-size: 0.72rem;
+		font-size: 0.76rem;
 		line-height: 1.45;
 		color: var(--m-text-3);
 	}
 
 	.qr-card__link {
 		justify-self: start;
+	}
+
+	/* Sits below the body so the booking note reads as a footnote on the one
+	   code rather than a second, separate QR feature. */
+	.qr-card__note {
+		border-top: 1px solid var(--m-border-soft);
+		padding: 0.85rem 1rem 1rem;
+		font-size: 0.78rem;
+		line-height: 1.55;
+		color: var(--m-text-3);
 	}
 </style>

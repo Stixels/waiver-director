@@ -2,32 +2,32 @@
 	import { PUBLIC_APP_URL } from '$env/static/public';
 	import { resolve } from '$app/paths';
 	import type { Component } from 'svelte';
-	import { ArrowRight, CalendarCheck, Check, FileDown, MailCheck } from '@lucide/svelte';
+	import { ArrowRight, CalendarCheck, FileDown, MailCheck } from '@lucide/svelte';
 
 	import bookeoLogo from '$lib/assets/providers/bookeo-icon.webp';
 	import mailchimpLogo from '$lib/assets/providers/mailchimp-icon.webp';
+	import AnalyticsPreview from '$lib/components/marketing/features/previews/AnalyticsPreview.svelte';
+	import BookingCoveragePreview from '$lib/components/marketing/features/previews/BookingCoveragePreview.svelte';
+	import EmailQueuePreview from '$lib/components/marketing/features/previews/EmailQueuePreview.svelte';
+	import EmailReviewPreview from '$lib/components/marketing/features/previews/EmailReviewPreview.svelte';
+	import SignedRecordsPreview from '$lib/components/marketing/features/previews/SignedRecordsPreview.svelte';
+	import WaiverStudioPreview from '$lib/components/marketing/features/previews/WaiverStudioPreview.svelte';
 	import QrPlacementPreview from '$lib/components/marketing/landing-page/previews/QrPlacementPreview.svelte';
 	import MarketingMotion from '$lib/components/marketing/MarketingMotion.svelte';
-	import MarketingScreenshotFrame from '$lib/components/marketing/MarketingScreenshotFrame.svelte';
 	import { Button } from '$lib/components/ui/button';
 
-	/** A product area shows either a workspace capture or a live preview
-	 *  component, never both. */
+	/** Every product area renders a built preview rather than a screen capture,
+	 *  so the page stays legible on a phone and never goes stale against the
+	 *  app's own UI. */
 	type ProductArea = {
 		id: string;
 		plans: readonly ('Free' | 'Pro')[];
 		title: string;
 		description: string;
-		points: readonly string[];
-		src?: string;
-		alt?: string;
-		label?: string;
-		/** Intrinsic size of `src`, when it differs from the frame's default. */
-		width?: number;
-		height?: number;
-		crop?: { x: number; y: number; width: number; height: number };
-		mobileCrop?: { x: number; y: number; width: number; height: number };
-		preview?: Component;
+		preview: Component;
+		/** Give the copy the wide column. For areas whose preview is a single
+		 *  small card, where the default split starves the text of measure. */
+		wideCopy?: boolean;
 	};
 
 	const pageTitle = 'Features | Waiver Director';
@@ -53,8 +53,6 @@
 		}
 	] as const;
 
-	const workspaceMobileCrop = { x: 224, y: 0, width: 1050, height: 740 };
-
 	const productAreas: readonly ProductArea[] = [
 		{
 			id: 'waivers',
@@ -62,28 +60,16 @@
 			title: 'Waiver builder and signing page',
 			description:
 				'Build the document, the questions, and the branding for free. Publishing freezes that version, so later edits never change a signed record.',
-			points: [
-				'Rich text, custom fields, branding',
-				'Signatures, minors, and consent',
-				'Link, QR code, or embed'
-			],
-			src: '/marketing/apex-waiver-builder.png',
-			alt: 'Waiver Director waiver builder populated with the fictional Apex Adventures participation waiver',
-			label: 'Apex Adventures / Waiver builder',
-			mobileCrop: workspaceMobileCrop
+			preview: WaiverStudioPreview
 		},
 		{
 			id: 'qr-codes',
 			plans: ['Pro'],
 			title: 'QR codes for the counter',
 			description:
-				'Every published waiver has a QR code, and so does every booking. A guest who turns up unsigned scans and signs on the spot.',
-			points: [
-				'Present a QR code at the front desk',
-				'One device signs the whole booking',
-				'Copy a plain link instead'
-			],
-			preview: QrPlacementPreview
+				'Every published waiver has a QR code. A guest who turns up unsigned scans it and signs on the spot, and opening that code from a booking puts the booking details on the form they sign.',
+			preview: QrPlacementPreview,
+			wideCopy: true
 		},
 		{
 			id: 'operations',
@@ -91,15 +77,7 @@
 			title: 'Booking coverage',
 			description:
 				'Connect your booking system and every booking lands with the detail your staff need, so gaps show up before guests do. Bookeo today, with Xola and more to follow.',
-			points: [
-				'Activity, time, and customer details',
-				'Signed vs. expected counts',
-				'Share a booking link or QR code'
-			],
-			src: '/marketing/apex-bookings.png',
-			alt: 'Waiver Director Bookeo booking operations showing fictional activities and participant waiver coverage',
-			label: 'Apex Adventures / Booking coverage',
-			mobileCrop: workspaceMobileCrop
+			preview: BookingCoveragePreview
 		},
 		{
 			id: 'customers',
@@ -107,15 +85,7 @@
 			title: 'Signed records and customers',
 			description:
 				'Each signature is stored against the waiver version it was signed on, with the answers given, consent, covered minors, and its booking.',
-			points: [
-				'Signed version on file',
-				'Answers, signatures, and consent',
-				'Customer history and search'
-			],
-			src: '/marketing/apex-submissions.png',
-			alt: 'Waiver Director signed submissions page with fictional Apex Adventures signer records',
-			label: 'Apex Adventures / Signed records',
-			mobileCrop: workspaceMobileCrop
+			preview: SignedRecordsPreview
 		},
 		{
 			id: 'follow-ups',
@@ -123,37 +93,7 @@
 			title: 'Customer follow-ups',
 			description:
 				'Write a template once, then send it now or time it against the booking. The queue shows where every message stands.',
-			points: [
-				'Reusable email templates',
-				'Scheduled from booking time',
-				'Queued, sent, and failed states'
-			],
-			src: '/marketing/apex-follow-ups.png',
-			alt: 'Waiver Director follow-up queue with fictional Apex Adventures signer emails and delivery states',
-			label: 'Apex Adventures / Follow-up queue',
-			mobileCrop: workspaceMobileCrop
-		},
-		{
-			id: 'email-ai',
-			plans: ['Pro'],
-			title: 'AI review for your emails',
-			description:
-				'Say what the email is meant to do. The review scores your draft out of 100, names what is wrong, and proposes a rewrite you can apply as a diff.',
-			points: [
-				'Scored out of 100, with specific issues',
-				'Reads your copy against send timing',
-				'Apply or discard as a line diff'
-			],
-			src: '/marketing/apex-email-ai-review.png',
-			alt: 'Waiver Director AI review panel scoring a follow-up email draft 52 out of 100, listing issues and suggestions beside a line diff of the proposed rewrite',
-			label: 'Apex Adventures / AI email review',
-			// This capture is the review modal over a dimmed workspace, so it is
-			// taller than the 1294x912 workspace screenshots elsewhere on the page.
-			width: 1942,
-			height: 1609,
-			// Crop to the dialog. Uncropped, the modal reads as a postage stamp in a
-			// field of dead space and its body text is illegible at column width.
-			crop: { x: 150, y: 275, width: 1602, height: 1129 }
+			preview: EmailQueuePreview
 		},
 		{
 			id: 'analytics',
@@ -161,11 +101,15 @@
 			title: 'Operations analytics',
 			description:
 				'One report for bookings, submissions, customers, and email delivery — over any date range, measured against the prior period.',
-			points: ['Any date range', 'Prior-period comparison', 'New vs. returning customers'],
-			src: '/marketing/apex-analytics.png',
-			alt: 'Waiver Director analytics showing fictional Apex Adventures submission, booking, customer, and email trends',
-			label: 'Apex Adventures / Analytics',
-			mobileCrop: workspaceMobileCrop
+			preview: AnalyticsPreview
+		},
+		{
+			id: 'email-ai',
+			plans: ['Pro'],
+			title: 'AI review for your emails',
+			description:
+				'Say what the email is meant to do. The review scores your draft out of 100, names what is wrong, and proposes a rewrite you can apply as a diff.',
+			preview: EmailReviewPreview
 		}
 	] as const;
 </script>
@@ -211,9 +155,14 @@
 	<div class="mx-auto max-w-7xl px-4 py-16 sm:px-6 md:py-24">
 		<div class="grid gap-20 md:gap-24">
 			{#each productAreas as area, index (area.id)}
+				{@const Preview = area.preview}
 				<article
 					id={area.id}
-					class={`features-detail__row ${index % 2 === 1 ? 'features-detail__row--reverse' : ''}`}
+					class={[
+						'features-detail__row',
+						index % 2 === 1 && 'features-detail__row--reverse',
+						area.wideCopy && 'features-detail__row--wide-copy'
+					]}
 				>
 					<div class="features-detail__copy" data-gsap-copy>
 						<div class="flex flex-wrap items-center gap-2">
@@ -230,34 +179,11 @@
 						<p class="mt-6 text-base leading-7" style="color: var(--m-text-2);">
 							{area.description}
 						</p>
-						<ul class="mt-7 grid gap-3">
-							{#each area.points as point (point)}
-								<li class="flex items-center gap-2.5 text-sm" style="color: var(--m-text-2);">
-									<Check class="size-4 shrink-0 text-violet-300" aria-hidden="true" />
-									{point}
-								</li>
-							{/each}
-						</ul>
 					</div>
 
-					{#if area.preview}
-						{@const Preview = area.preview}
-						<div class="features-detail__image features-detail__preview">
-							<Preview />
-						</div>
-					{:else if area.src && area.alt && area.label}
-						<MarketingScreenshotFrame
-							src={area.src}
-							alt={area.alt}
-							label={area.label}
-							width={area.width}
-							height={area.height}
-							crop={area.crop}
-							mobileCrop={area.mobileCrop}
-							priority={index === 0}
-							class="features-detail__image"
-						/>
-					{/if}
+					<div class="features-detail__image">
+						<Preview />
+					</div>
 				</article>
 			{/each}
 		</div>
@@ -509,6 +435,20 @@
 
 		.features-detail__row--reverse {
 			grid-template-columns: minmax(0, 1.38fr) minmax(20rem, 0.82fr);
+		}
+
+		/* A single QR card does not need 728px, and the copy beside it was running
+		   at a 40-character measure. This trades the surplus back to the text. */
+		.features-detail__row--wide-copy {
+			grid-template-columns: minmax(20rem, 1.35fr) minmax(0, 1fr);
+		}
+
+		.features-detail__row--wide-copy.features-detail__row--reverse {
+			grid-template-columns: minmax(0, 1fr) minmax(20rem, 1.35fr);
+		}
+
+		.features-detail__row--wide-copy .features-detail__copy {
+			max-width: 44rem;
 		}
 
 		.features-detail__row--reverse .features-detail__copy {
