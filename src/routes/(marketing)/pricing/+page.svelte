@@ -1,9 +1,10 @@
 <script lang="ts">
 	import { PUBLIC_APP_URL } from '$env/static/public';
 	import { resolve } from '$app/paths';
-	import { ArrowRight, ChevronDown } from '@lucide/svelte';
+	import { ArrowRight } from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { scrollReveal } from '$lib/actions/scroll-reveal';
+	import MarketingFaq from '$lib/components/marketing/MarketingFaq.svelte';
 	import MarketingPricing from '$lib/components/marketing/MarketingPricing.svelte';
 
 	const siteBase = (PUBLIC_APP_URL ?? '').replace(/\/$/, '');
@@ -46,12 +47,6 @@
 			a: 'You do. Signed records belong to your workspace and remain tied to the published waiver version that was signed. Owner-only PDF exports are planned but are not available yet.'
 		}
 	] as const;
-
-	let openFaq = $state<string | null>(null);
-
-	function toggleFaq(id: string) {
-		openFaq = openFaq === id ? null : id;
-	}
 </script>
 
 <svelte:head>
@@ -97,54 +92,9 @@
 </section>
 
 <!-- FAQ section -->
-<section class="border-t px-4 py-28 sm:px-6 md:py-36" style="border-color: var(--m-border-soft);">
-	<div class="mx-auto max-w-3xl" use:scrollReveal={{ delay: 0 }}>
-		<p
-			class="mb-4 text-[11px] font-semibold tracking-widest uppercase"
-			style="color: var(--primary);"
-		>
-			FAQ
-		</p>
-		<h2
-			class="mb-12 font-extrabold tracking-tight"
-			style="font-family: var(--m-font-display); font-size: clamp(1.75rem, 3.5vw, 2.5rem); letter-spacing: -0.025em; line-height: 1.1;"
-		>
-			Frequently Asked Questions
-		</h2>
-
-		<div class="flex flex-col" use:scrollReveal={{ delay: 80 }}>
-			{#each faqs as faq, i (faq.id)}
-				<div
-					class="faq-item border-t"
-					style="border-color: var(--m-border-soft);"
-					class:border-b={i === faqs.length - 1}
-				>
-					<button
-						type="button"
-						class="faq-trigger flex w-full items-center justify-between gap-4 py-5 text-left"
-						onclick={() => toggleFaq(faq.id)}
-						aria-expanded={openFaq === faq.id}
-					>
-						<span class="text-[15px] leading-snug font-semibold">{faq.q}</span>
-						<span
-							class="faq-chevron shrink-0"
-							class:faq-chevron--open={openFaq === faq.id}
-							aria-hidden="true"
-						>
-							<ChevronDown size={16} style="color: var(--m-text-3);" />
-						</span>
-					</button>
-
-					{#if openFaq === faq.id}
-						<div class="pb-5">
-							<p class="text-[14px] leading-relaxed" style="color: var(--m-text-2);">{faq.a}</p>
-						</div>
-					{/if}
-				</div>
-			{/each}
-		</div>
-	</div>
-</section>
+<div use:scrollReveal={{ delay: 0 }}>
+	<MarketingFaq {faqs} name="pricing-faq" />
+</div>
 
 <!-- CTA -->
 <section class="border-t px-4 py-20 sm:px-6 md:py-28" style="border-color: var(--m-border-soft);">
@@ -179,43 +129,3 @@
 		</p>
 	</div>
 </section>
-
-<style>
-	.faq-trigger {
-		background: none;
-		border: none;
-		cursor: pointer;
-		color: inherit;
-		font-family: inherit;
-		transition: color 0.15s ease;
-	}
-
-	@media (hover: hover) {
-		.faq-trigger:hover span:first-child {
-			color: oklch(0.97 0 0);
-		}
-	}
-
-	.faq-trigger:focus-visible {
-		outline: none;
-		box-shadow:
-			0 0 0 2px oklch(0.07 0.005 286),
-			0 0 0 4px oklch(0.52 0.22 277 / 40%);
-		border-radius: var(--radius-md);
-	}
-
-	.faq-chevron {
-		display: flex;
-		transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-	}
-
-	.faq-chevron--open {
-		transform: rotate(180deg);
-	}
-
-	@media (prefers-reduced-motion: reduce) {
-		.faq-chevron {
-			transition: none;
-		}
-	}
-</style>
