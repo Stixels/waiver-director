@@ -779,7 +779,7 @@
 		align-items: center;
 		gap: 0.25rem;
 		border-radius: var(--radius-md);
-		padding: 0 0.55rem;
+		padding: 0 0.4rem;
 		font-size: 0.72rem;
 		font-weight: 500;
 		color: var(--foreground);
@@ -798,8 +798,6 @@
 	}
 
 	.toolbar-select-label {
-		min-width: 4.75rem;
-		text-align: left;
 		font-variant: all-small-caps;
 		letter-spacing: 0.03em;
 	}
