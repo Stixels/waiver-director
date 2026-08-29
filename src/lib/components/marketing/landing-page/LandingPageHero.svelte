@@ -50,6 +50,7 @@
 					label="Apex Adventures / Live workspace"
 					width={1694}
 					height={908}
+					mobileCrop={{ x: 200, y: 8, width: 1295, height: 895 }}
 					priority
 				/>
 			</div>

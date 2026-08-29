@@ -1,11 +1,12 @@
 <script lang="ts">
+	type CropRect = { x: number; y: number; width: number; height: number };
+
 	type Props = {
 		src: string;
 		alt: string;
 		label: string;
 		class?: string;
 		priority?: boolean;
-		compact?: boolean;
 		/** Intrinsic pixel size of the source image. The defaults match the
 		 *  workspace captures in `static/marketing`, which are all 1294x912.
 		 *  These reserve the loading box, so a wrong ratio visibly distorts
@@ -14,7 +15,9 @@
 		height?: number;
 		/** Show only a region of the source, given in source pixels. For captures
 		 *  that carry large dead margins around the part worth reading. */
-		crop?: { x: number; y: number; width: number; height: number };
+		crop?: CropRect;
+		/** The region to show on phones. Falls back to `crop`. */
+		mobileCrop?: CropRect;
 	};
 
 	let {
@@ -23,27 +26,30 @@
 		label,
 		class: className = '',
 		priority = false,
-		compact = false,
 		width = 1294,
 		height = 912,
-		crop
+		crop,
+		mobileCrop
 	}: Props = $props();
 
 	// Percentages resolve against the viewport's width — including margin-top —
 	// so the crop scales with the frame instead of needing fixed pixel offsets.
-	const viewportStyle = $derived(crop ? `aspect-ratio: ${crop.width} / ${crop.height};` : '');
-	const imageStyle = $derived(
-		crop
-			? `width: ${(width / crop.width) * 100}%;` +
-					`margin-left: ${(-crop.x / crop.width) * 100}%;` +
-					`margin-top: ${(-crop.y / crop.width) * 100}%;` +
-					'max-width: none;'
-			: ''
-	);
+	function regionVars(region: CropRect | undefined, scope: string) {
+		const r = region ?? { x: 0, y: 0, width, height };
+		return (
+			`--shot-${scope}-ratio: ${r.width} / ${r.height};` +
+			`--shot-${scope}-width: ${(width / r.width) * 100}%;` +
+			`--shot-${scope}-left: ${(-r.x / r.width) * 100}%;` +
+			`--shot-${scope}-top: ${(-r.y / r.width) * 100}%;`
+		);
+	}
+
+	const frameStyle = $derived(regionVars(crop, 'wide') + regionVars(mobileCrop ?? crop, 'narrow'));
 </script>
 
 <figure
-	class={`marketing-shot group relative min-w-0 ${compact ? 'is-compact' : ''} ${className}`}
+	class={`marketing-shot group relative min-w-0 ${className}`}
+	style={frameStyle}
 	data-gsap-image
 >
 	<div class="marketing-shot__glow" aria-hidden="true"></div>
@@ -59,7 +65,7 @@
 			</span>
 			<span class="size-2 rounded-full bg-emerald-400/80" aria-hidden="true"></span>
 		</div>
-		<div class="marketing-shot__viewport overflow-hidden" style={viewportStyle}>
+		<div class="marketing-shot__viewport overflow-hidden">
 			<img
 				{src}
 				{alt}
@@ -67,8 +73,7 @@
 				{height}
 				loading={priority ? 'eager' : 'lazy'}
 				fetchpriority={priority ? 'high' : 'auto'}
-				style={imageStyle}
-				class="block h-auto w-full transition-transform duration-700 ease-out group-hover:scale-[1.018]"
+				class="block h-auto transition-transform duration-700 ease-out group-hover:scale-[1.018]"
 			/>
 		</div>
 	</div>
@@ -99,17 +104,27 @@
 	}
 
 	.marketing-shot__viewport {
+		aspect-ratio: var(--shot-wide-ratio);
 		background: oklch(0.97 0.004 286);
 	}
 
-	.marketing-shot.is-compact .marketing-shot__viewport {
-		aspect-ratio: 16 / 9;
+	.marketing-shot img {
+		width: var(--shot-wide-width);
+		margin-left: var(--shot-wide-left);
+		margin-top: var(--shot-wide-top);
+		max-width: none;
 	}
 
-	.marketing-shot.is-compact img {
-		height: 100%;
-		object-fit: cover;
-		object-position: top;
+	@media (max-width: 39.9375rem) {
+		.marketing-shot__viewport {
+			aspect-ratio: var(--shot-narrow-ratio);
+		}
+
+		.marketing-shot img {
+			width: var(--shot-narrow-width);
+			margin-left: var(--shot-narrow-left);
+			margin-top: var(--shot-narrow-top);
+		}
 	}
 
 	@media (prefers-reduced-motion: reduce) {

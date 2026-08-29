@@ -26,6 +26,7 @@
 		width?: number;
 		height?: number;
 		crop?: { x: number; y: number; width: number; height: number };
+		mobileCrop?: { x: number; y: number; width: number; height: number };
 		preview?: Component;
 	};
 
@@ -52,6 +53,8 @@
 		}
 	] as const;
 
+	const workspaceMobileCrop = { x: 224, y: 0, width: 1050, height: 740 };
+
 	const productAreas: readonly ProductArea[] = [
 		{
 			id: 'waivers',
@@ -66,7 +69,8 @@
 			],
 			src: '/marketing/apex-waiver-builder.png',
 			alt: 'Waiver Director waiver builder populated with the fictional Apex Adventures participation waiver',
-			label: 'Apex Adventures / Waiver builder'
+			label: 'Apex Adventures / Waiver builder',
+			mobileCrop: workspaceMobileCrop
 		},
 		{
 			id: 'qr-codes',
@@ -94,7 +98,8 @@
 			],
 			src: '/marketing/apex-bookings.png',
 			alt: 'Waiver Director Bookeo booking operations showing fictional activities and participant waiver coverage',
-			label: 'Apex Adventures / Booking coverage'
+			label: 'Apex Adventures / Booking coverage',
+			mobileCrop: workspaceMobileCrop
 		},
 		{
 			id: 'customers',
@@ -109,7 +114,8 @@
 			],
 			src: '/marketing/apex-submissions.png',
 			alt: 'Waiver Director signed submissions page with fictional Apex Adventures signer records',
-			label: 'Apex Adventures / Signed records'
+			label: 'Apex Adventures / Signed records',
+			mobileCrop: workspaceMobileCrop
 		},
 		{
 			id: 'follow-ups',
@@ -124,7 +130,8 @@
 			],
 			src: '/marketing/apex-follow-ups.png',
 			alt: 'Waiver Director follow-up queue with fictional Apex Adventures signer emails and delivery states',
-			label: 'Apex Adventures / Follow-up queue'
+			label: 'Apex Adventures / Follow-up queue',
+			mobileCrop: workspaceMobileCrop
 		},
 		{
 			id: 'email-ai',
@@ -157,7 +164,8 @@
 			points: ['Any date range', 'Prior-period comparison', 'New vs. returning customers'],
 			src: '/marketing/apex-analytics.png',
 			alt: 'Waiver Director analytics showing fictional Apex Adventures submission, booking, customer, and email trends',
-			label: 'Apex Adventures / Analytics'
+			label: 'Apex Adventures / Analytics',
+			mobileCrop: workspaceMobileCrop
 		}
 	] as const;
 </script>
@@ -245,6 +253,7 @@
 							width={area.width}
 							height={area.height}
 							crop={area.crop}
+							mobileCrop={area.mobileCrop}
 							priority={index === 0}
 							class="features-detail__image"
 						/>
