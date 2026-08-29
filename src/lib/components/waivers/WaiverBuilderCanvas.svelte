@@ -885,6 +885,14 @@
 		padding-left: 1.25rem;
 	}
 
+	:global(.waiver-canvas-editor ul) {
+		list-style-type: disc;
+	}
+
+	:global(.waiver-canvas-editor ol) {
+		list-style-type: decimal;
+	}
+
 	:global(.waiver-canvas-editor li) {
 		display: list-item;
 		margin: 0.2rem 0;
