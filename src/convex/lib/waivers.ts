@@ -55,9 +55,12 @@ export const waiverFieldValidator = v.union(
 	})
 );
 
+export const waiverThemeValidator = v.union(v.literal('light'), v.literal('dark'));
+
 export const waiverDefinitionValidator = v.object({
 	title: v.string(),
 	introCopy: v.string(),
+	theme: v.optional(waiverThemeValidator),
 	fields: v.array(waiverFieldValidator)
 });
 
@@ -70,6 +73,7 @@ export const minorInputValidator = v.object({
 export type WaiverDefinition = {
 	title: string;
 	introCopy: string;
+	theme?: 'light' | 'dark';
 	fields: Array<
 		| {
 				id: string;
@@ -113,6 +117,7 @@ export function createDefaultWaiverDefinition(workspaceName: string): WaiverDefi
 	return normalizeWaiverDefinition({
 		title: `${workspaceName} Waiver`,
 		introCopy: '<p></p>',
+		theme: 'dark',
 		fields: []
 	});
 }
@@ -296,6 +301,7 @@ export function normalizeWaiverDefinition(definition: WaiverDefinition): WaiverD
 	return {
 		title,
 		introCopy,
+		theme: definition.theme ?? 'dark',
 		fields
 	};
 }
@@ -304,6 +310,7 @@ function normalizeWaiverDefinitionForCompare(definition: WaiverDefinition): Waiv
 	return {
 		title: definition.title.trim(),
 		introCopy: sanitizeRichTextHtml(definition.introCopy),
+		theme: definition.theme ?? 'dark',
 		fields: definition.fields.map((field) => {
 			if (field.type === 'select') {
 				return {

@@ -1,28 +1,82 @@
 <script lang="ts">
-	import { mode as themeMode, setMode } from 'mode-watcher';
 	import MoonStarIcon from '@lucide/svelte/icons/moon-star';
 	import SunIcon from '@lucide/svelte/icons/sun';
+	import type { WaiverTheme } from '$lib/domain/waivers';
 
-	const isDark = $derived(themeMode.current === 'dark');
-	const actionLabel = $derived(isDark ? 'Switch to light mode' : 'Switch to dark mode');
-
-	function toggleTheme() {
-		setMode(isDark ? 'light' : 'dark');
+	interface Props {
+		theme?: WaiverTheme;
 	}
+
+	let { theme = $bindable('dark') }: Props = $props();
 </script>
 
-<button
-	type="button"
-	class="fixed top-3 right-3 z-20 inline-flex size-9 cursor-pointer items-center justify-center rounded-full border border-border bg-card/90 text-xs font-semibold text-foreground shadow-sm backdrop-blur-sm transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:outline-none sm:top-4 sm:right-4 sm:w-auto sm:gap-2 sm:px-3"
-	onclick={toggleTheme}
-	aria-label={actionLabel}
-	title={actionLabel}
->
-	{#if isDark}
+<div class="theme-control" role="group" aria-label="Waiver appearance">
+	<button
+		type="button"
+		class="theme-option"
+		class:is-active={theme === 'light'}
+		aria-pressed={theme === 'light'}
+		aria-label="Preview waiver in light mode"
+		title="Light waiver"
+		onclick={() => (theme = 'light')}
+	>
 		<SunIcon class="size-3.5" aria-hidden="true" />
-		<span class="hidden sm:inline">Light</span>
-	{:else}
+	</button>
+	<button
+		type="button"
+		class="theme-option"
+		class:is-active={theme === 'dark'}
+		aria-pressed={theme === 'dark'}
+		aria-label="Preview waiver in dark mode"
+		title="Dark waiver"
+		onclick={() => (theme = 'dark')}
+	>
 		<MoonStarIcon class="size-3.5" aria-hidden="true" />
-		<span class="hidden sm:inline">Dark</span>
-	{/if}
-</button>
+	</button>
+</div>
+
+<style>
+	.theme-control {
+		display: inline-flex;
+		flex: 0 0 auto;
+		align-items: center;
+		gap: 0.125rem;
+		padding: 0.125rem;
+		border: 1px solid var(--border);
+		border-radius: var(--radius-md);
+		background: color-mix(in srgb, var(--muted) 35%, transparent);
+	}
+
+	.theme-option {
+		display: inline-flex;
+		height: 1.5rem;
+		width: 1.5rem;
+		align-items: center;
+		justify-content: center;
+		padding: 0;
+		border-radius: var(--radius-sm);
+		cursor: pointer;
+		font-size: 0.67rem;
+		font-weight: 600;
+		color: var(--muted-foreground);
+		transition:
+			background-color 150ms ease,
+			color 150ms ease,
+			box-shadow 150ms ease;
+	}
+
+	.theme-option:hover {
+		color: var(--foreground);
+	}
+
+	.theme-option.is-active {
+		background: var(--background);
+		color: var(--foreground);
+		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+	}
+
+	.theme-option:focus-visible {
+		outline: none;
+		box-shadow: 0 0 0 2px color-mix(in srgb, var(--ring) 45%, transparent);
+	}
+</style>

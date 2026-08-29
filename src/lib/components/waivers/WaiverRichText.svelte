@@ -80,7 +80,7 @@
 		text-underline-offset: 0.15em;
 	}
 
-	:global(.dark) .waiver-rich-text :global(a) {
+	:global(.waiver-theme-dark) .waiver-rich-text :global(a) {
 		color: color-mix(in oklch, var(--primary) 32%, var(--primary-foreground));
 	}
 

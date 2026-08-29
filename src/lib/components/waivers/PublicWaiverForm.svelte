@@ -9,14 +9,13 @@
 	import WaiverPublicAboutSignerCard from '$lib/components/waivers/WaiverPublicAboutSignerCard.svelte';
 	import WaiverPublicAdditionalInfoSection from '$lib/components/waivers/WaiverPublicAdditionalInfoSection.svelte';
 	import WaiverPublicMinorsBlock from '$lib/components/waivers/WaiverPublicMinorsBlock.svelte';
-	import WaiverThemeToggle from '$lib/components/waivers/WaiverThemeToggle.svelte';
 	import {
 		waiverAddMinorButtonClass,
 		waiverFieldLabelClass,
 		waiverUnderlineInputClass,
 		waiverUnderlineTextareaClass
 	} from '$lib/components/waivers/waiver-public-form-classes';
-	import type { WaiverField, WaiverMinor } from '$lib/domain/waivers';
+	import type { WaiverField, WaiverMinor, WaiverTheme } from '$lib/domain/waivers';
 	import { getConvexErrorMessage } from '$lib/utils/convex-errors';
 	import { formatBookingTimestamp } from '$lib/utils/date';
 
@@ -27,6 +26,7 @@
 		workspaceLogoUrl: string | null;
 		title: string;
 		introCopy: string;
+		theme: WaiverTheme;
 		fields: WaiverField[];
 		marketingOptIn: { provider: 'mailchimp'; label: string } | null;
 	};
@@ -136,8 +136,11 @@
 	}
 </script>
 
-<div class="min-h-screen bg-background">
-	<WaiverThemeToggle />
+<div
+	class="min-h-screen bg-background text-foreground"
+	class:waiver-theme-light={waiver.theme === 'light'}
+	class:waiver-theme-dark={waiver.theme === 'dark'}
+>
 	<WaiverDocumentShell
 		workspaceName={waiver.workspaceName}
 		workspaceLogoUrl={waiver.workspaceLogoUrl}

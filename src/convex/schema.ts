@@ -104,6 +104,7 @@ export default defineSchema({
 		publishedVersionId: v.optional(v.id('waiver_versions')),
 		title: v.string(),
 		introCopy: v.string(),
+		theme: v.optional(v.union(v.literal('light'), v.literal('dark'))),
 		fields: v.array(
 			v.union(
 				v.object({
@@ -149,6 +150,7 @@ export default defineSchema({
 		versionNumber: v.number(),
 		title: v.string(),
 		introCopy: v.string(),
+		theme: v.optional(v.union(v.literal('light'), v.literal('dark'))),
 		fields: v.array(
 			v.union(
 				v.object({

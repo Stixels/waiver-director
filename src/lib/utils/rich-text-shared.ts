@@ -109,8 +109,15 @@ export function normalizeRichTextSource(input: string): string {
 	const source = input.replace(/\r\n?/g, '\n').trim();
 	if (!source || hasSupportedHtmlTag(source)) return source;
 
-	const decoded = decodeHtml(source);
-	return hasSupportedHtmlTag(decoded) ? decoded : source;
+	let decoded = source;
+	for (let pass = 0; pass < 4; pass += 1) {
+		const next = decodeHtml(decoded);
+		if (next === decoded) break;
+		decoded = next;
+		if (hasSupportedHtmlTag(decoded)) return decoded;
+	}
+
+	return source;
 }
 
 export function sanitizeHref(value: string | null): string | null {

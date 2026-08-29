@@ -26,8 +26,9 @@
 	import type { Id } from '$convex/_generated/dataModel';
 	import { api } from '$convex/_generated/api';
 	import { useProtectedQuery } from '$lib/components/auth/convex-auth.svelte';
-	import type { WaiverField } from '$lib/domain/waivers';
+	import type { WaiverField, WaiverTheme } from '$lib/domain/waivers';
 	import WaiverDocumentShell from '$lib/components/waivers/WaiverDocumentShell.svelte';
+	import WaiverThemeToggle from '$lib/components/waivers/WaiverThemeToggle.svelte';
 	import WorkspaceLogoUploader from '$lib/components/workspaces/WorkspaceLogoUploader.svelte';
 	import WaiverPublicAboutSignerCard from '$lib/components/waivers/WaiverPublicAboutSignerCard.svelte';
 	import WaiverPublicAdditionalInfoSection from '$lib/components/waivers/WaiverPublicAdditionalInfoSection.svelte';
@@ -63,6 +64,7 @@
 	interface Props {
 		introCopy: string;
 		fields: WaiverField[];
+		theme?: WaiverTheme;
 		workspaceName?: string;
 		workspaceId?: Id<'workspaces'> | null;
 		canEditBranding?: boolean;
@@ -76,6 +78,7 @@
 	let {
 		introCopy = $bindable('<p></p>'),
 		fields,
+		theme = $bindable('dark'),
 		workspaceName,
 		workspaceId = null,
 		canEditBranding = false,
@@ -380,14 +383,20 @@
 <section class="flex min-h-0 min-w-0 flex-1 flex-col bg-muted/10">
 	<!-- Toolbar -->
 	<div
-		class="canvas-toolbar flex shrink-0 items-center gap-2 border-b border-border/80 bg-card/40 px-4 py-2 backdrop-blur-sm"
+		class="canvas-toolbar flex shrink-0 items-center gap-2 overflow-x-auto border-b border-border/80 bg-card/40 px-4 py-2 backdrop-blur-sm"
 		role="toolbar"
 		aria-label="Waiver copy formatting"
 		tabindex="-1"
 		onmousedown={keepToolbarFocus}
 	>
-		<div class="flex min-w-0 flex-1 items-center gap-2">
-			<span class="save-indicator" data-state={saveState}>
+		<div class="toolbar-status-cluster flex min-w-0 flex-1 items-center gap-2">
+			<span
+				class="save-indicator"
+				data-state={saveState}
+				role="status"
+				aria-label={savedLabel}
+				title={savedLabel}
+			>
 				{#if saveState === 'saving'}
 					<LoaderIcon class="size-3.5 animate-spin" />
 				{:else if saveState === 'error'}
@@ -399,9 +408,10 @@
 				{/if}
 				<span class="truncate">{savedLabel}</span>
 			</span>
+			<WaiverThemeToggle bind:theme />
 		</div>
 
-		<div class="flex items-center gap-1">
+		<div class="flex shrink-0 items-center gap-1">
 			<!-- Block style -->
 			<DropdownMenu>
 				<DropdownMenuTrigger class="toolbar-select" disabled={!editor} aria-label="Text style">
@@ -585,7 +595,12 @@
 	</div>
 
 	<!-- Scrollable document canvas -->
-	<div class="flex-1 overflow-y-auto overscroll-y-contain" data-canvas-scroll>
+	<div
+		class="flex-1 overflow-y-auto overscroll-y-contain bg-background text-foreground"
+		class:waiver-theme-light={theme === 'light'}
+		class:waiver-theme-dark={theme === 'dark'}
+		data-canvas-scroll
+	>
 		<WaiverDocumentShell {workspaceName} {workspaceLogoUrl}>
 			{#snippet headerActions()}
 				{#if workspaceId && canEditBranding}
@@ -673,6 +688,10 @@
 </section>
 
 <style>
+	.canvas-toolbar {
+		scrollbar-width: thin;
+	}
+
 	.save-indicator {
 		display: inline-flex;
 		align-items: center;
@@ -705,6 +724,20 @@
 
 	.save-indicator[data-state='dirty'] {
 		color: color-mix(in srgb, var(--primary) 70%, var(--foreground));
+	}
+
+	@media (max-width: 640px) {
+		.toolbar-status-cluster {
+			flex: 0 0 auto;
+		}
+
+		.save-indicator {
+			padding-inline: 0.4rem;
+		}
+
+		.save-indicator span {
+			display: none;
+		}
 	}
 
 	.toolbar-button {
@@ -861,7 +894,7 @@
 		text-underline-offset: 0.15em;
 	}
 
-	:global(.dark .waiver-canvas-editor a) {
+	:global(.waiver-theme-dark) :global(.waiver-canvas-editor a) {
 		color: color-mix(in oklch, var(--primary) 32%, var(--primary-foreground));
 	}
 

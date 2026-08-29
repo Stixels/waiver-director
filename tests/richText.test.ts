@@ -15,6 +15,12 @@ test('normalizes entity-encoded rich text before sanitization', () => {
 	);
 });
 
+test('normalizes repeatedly encoded legacy rich text before sanitization', () => {
+	const encoded = '&amp;lt;p&amp;gt;Please review this agreement.&amp;lt;/p&amp;gt;';
+
+	assert.equal(normalizeRichTextSource(encoded), '<p>Please review this agreement.</p>');
+});
+
 test('leaves ordinary entity-encoded plain text on the plain-text path', () => {
 	assert.equal(normalizeRichTextSource('Terms &amp; conditions'), 'Terms &amp; conditions');
 });
