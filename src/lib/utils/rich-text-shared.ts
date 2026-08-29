@@ -100,28 +100,6 @@ export function hasSupportedHtmlTag(input: string): boolean {
 	return /<\/?[a-z][^>]*>/i.test(input);
 }
 
-const ESCAPED_TAG_START_PATTERN = /&(?:lt|#0*60|#x0*3c);[/a-z]/i;
-
-/**
- * An earlier editor pass could load an entity-encoded document as plain text
- * and save it back wrapped in a paragraph, so the encoded tags render as
- * visible text. Recover the original markup only when the whole visible text
- * of the document is itself a block-level HTML document, which leaves prose
- * that merely mentions a tag name untouched.
- */
-function unwrapEncodedMarkupDocument(source: string): string | null {
-	if (!ESCAPED_TAG_START_PATTERN.test(source)) return null;
-
-	const text = source.replace(/<[^>]*>/g, '').trim();
-	if (!text) return null;
-
-	const decoded = decodeHtml(text).trim();
-	if (decoded === text || !decoded.startsWith('<') || !decoded.endsWith('>')) return null;
-	if (!BLOCK_TAG_REGEX.test(decoded)) return null;
-
-	return decoded;
-}
-
 /**
  * Older rich-text values can contain an entity-encoded HTML document. Decode
  * that wrapper before sanitizing so its tags render instead of appearing as
@@ -129,17 +107,7 @@ function unwrapEncodedMarkupDocument(source: string): string | null {
  */
 export function normalizeRichTextSource(input: string): string {
 	const source = input.replace(/\r\n?/g, '\n').trim();
-	if (!source) return source;
-
-	if (hasSupportedHtmlTag(source)) {
-		let unwrapped = source;
-		for (let pass = 0; pass < 4; pass += 1) {
-			const candidate = unwrapEncodedMarkupDocument(unwrapped);
-			if (!candidate) break;
-			unwrapped = candidate;
-		}
-		return unwrapped;
-	}
+	if (!source || hasSupportedHtmlTag(source)) return source;
 
 	let decoded = source;
 	for (let pass = 0; pass < 4; pass += 1) {

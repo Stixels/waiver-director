@@ -75,7 +75,7 @@
 	const DEFAULT_SIZE_LABEL = '14';
 	const DEFAULT_OPTION_LABEL = 'Default';
 	const DEFAULT_TOOLBAR_STATE = {
-		blockLabel: 'Paragraph',
+		blockShortLabel: 'Text',
 		alignment: 'left' as TextAlignValue,
 		bold: false,
 		italic: false,
@@ -473,10 +473,10 @@
 			return;
 		}
 
-		let blockLabel = 'Paragraph';
+		let blockShortLabel = 'Text';
 		for (let level = 1; level <= 6; level += 1) {
 			if (sourceEditor.isActive('heading', { level })) {
-				blockLabel = `Heading ${level}`;
+				blockShortLabel = `H${level}`;
 				break;
 			}
 		}
@@ -496,7 +496,7 @@
 		const computedStyle = getSelectionComputedStyle(sourceEditor);
 
 		toolbarState = {
-			blockLabel,
+			blockShortLabel,
 			alignment,
 			bold: sourceEditor.isActive('bold'),
 			italic: sourceEditor.isActive('italic'),
@@ -681,7 +681,7 @@
 						class="toolbar-select toolbar-select-block"
 						disabled={!editor || disabled}
 					>
-						<span class="toolbar-select-label">{toolbarState.blockLabel}</span>
+						<span class="toolbar-select-label">{toolbarState.blockShortLabel}</span>
 						<ChevronDownIcon class="size-3" />
 					</button>
 				</DropdownMenuTrigger>
@@ -689,16 +689,16 @@
 					<DropdownMenuItem
 						onclick={() => command((editor) => editor.chain().focus().setParagraph().run())}
 					>
-						<span>Paragraph</span>
+						Paragraph
 					</DropdownMenuItem>
 					<DropdownMenuSeparator />
 					{#each headingLevels as level (level)}
 						<DropdownMenuItem
-							class={toolbarState.blockLabel === `Heading ${level}` ? 'font-semibold' : undefined}
+							class={toolbarState.blockShortLabel === `H${level}` ? 'font-semibold' : undefined}
 							onclick={() =>
 								command((editor) => editor.chain().focus().toggleHeading({ level }).run())}
 						>
-							<span>Heading {level}</span>
+							Heading {level}
 						</DropdownMenuItem>
 					{/each}
 				</DropdownMenuContent>
@@ -1141,7 +1141,7 @@
 	}
 
 	.toolbar-select-block {
-		min-width: 4.75rem;
+		min-width: 0;
 	}
 
 	.toolbar-select-font {

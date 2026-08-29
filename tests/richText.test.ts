@@ -40,31 +40,3 @@ test('decodes numeric whitespace and named entities safely', () => {
 	assert.equal(decodeHtml('Waiver&#x20;Director &amp; Co.&#32;'), 'Waiver Director & Co. ');
 	assert.equal(decodeHtml('Invalid: &#99999999;'), 'Invalid: &#99999999;');
 });
-
-test('unwraps encoded markup that a previous editor pass wrapped in a paragraph', () => {
-	const wrapped =
-		'<p>&lt;p&gt;Please review this participation agreement before your activity.&lt;/p&gt;</p>';
-
-	assert.equal(
-		normalizeRichTextSource(wrapped),
-		'<p>Please review this participation agreement before your activity.</p>'
-	);
-});
-
-test('unwraps encoded markup spread across several wrapper blocks', () => {
-	const wrapped = '<p>&lt;p&gt;Line one.&lt;/p&gt;</p><p>&lt;p&gt;Line two.&lt;/p&gt;</p>';
-
-	assert.equal(normalizeRichTextSource(wrapped), '<p>Line one.</p><p>Line two.</p>');
-});
-
-test('keeps literal tag names that are part of the prose', () => {
-	const prose = '<p>Wrap each clause in a &lt;p&gt; tag before importing.</p>';
-
-	assert.equal(normalizeRichTextSource(prose), prose);
-});
-
-test('keeps encoded markup that is only part of a larger document', () => {
-	const mixed = '<p>Example:</p><p>&lt;p&gt;Signed copy&lt;/p&gt;</p><p>End of example.</p>';
-
-	assert.equal(normalizeRichTextSource(mixed), mixed);
-});
