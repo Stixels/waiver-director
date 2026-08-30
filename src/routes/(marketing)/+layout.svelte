@@ -7,15 +7,6 @@
 	let { children } = $props();
 </script>
 
-<svelte:head>
-	<link rel="preconnect" href="https://fonts.googleapis.com" />
-	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
-	<link
-		href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700;12..96,800;12..96,900&display=swap"
-		rel="stylesheet"
-	/>
-</svelte:head>
-
 <div class="mkt flex min-h-screen flex-col">
 	<a
 		href="#marketing-main"

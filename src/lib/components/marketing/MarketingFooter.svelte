@@ -5,9 +5,9 @@
 	type FooterEntry =
 		| {
 				label: string;
-				href: '/#features' | '/#how-it-works' | '/#pricing' | '/features' | '/privacy' | '/terms';
+				href: '/pricing' | '/features' | '/privacy' | '/terms';
 		  }
-		| { label: string; comingSoon: true };
+		| { label: string; roadmap: true };
 
 	const currentYear = new Date().getFullYear();
 
@@ -15,27 +15,22 @@
 		{
 			title: 'Product',
 			entries: [
-				{ label: 'Features', href: '/#features' },
-				{ label: 'How it Works', href: '/#how-it-works' },
-				{ label: 'Pricing', href: '/#pricing' },
-				{ label: 'Changelog', comingSoon: true }
+				{ label: 'Features', href: '/features' },
+				{ label: 'Pricing', href: '/pricing' }
 			] as const
 		},
 		{
 			title: 'Integrations',
 			entries: [
 				{ label: 'Bookeo', href: '/features' },
-				{ label: 'Xola', comingSoon: true },
-				{ label: 'Mailchimp', comingSoon: true },
-				{ label: 'Constant Contact', comingSoon: true },
-				{ label: 'API docs', comingSoon: true }
+				{ label: 'Mailchimp', href: '/features' },
+				{ label: 'Xola', roadmap: true },
+				{ label: 'Constant Contact', roadmap: true }
 			] as const
 		},
 		{
 			title: 'Company',
 			entries: [
-				{ label: 'About', comingSoon: true },
-				{ label: 'Blog', comingSoon: true },
 				{ label: 'Privacy Policy', href: '/privacy' },
 				{ label: 'Terms of Service', href: '/terms' }
 			] as const
@@ -63,7 +58,7 @@
 					>
 				</a>
 				<p class="text-[13px]" style="color: var(--m-text-3);">
-					Digital waivers for any booking experience.
+					Connected waiver operations for experience businesses.
 				</p>
 			</div>
 
@@ -78,12 +73,12 @@
 					<ul>
 						{#each column.entries as entry (entry.label)}
 							<li>
-								{#if 'comingSoon' in entry}
+								{#if 'roadmap' in entry}
 									<span class="mb-2 block text-[13px]" style="color: var(--m-text-3);">
 										{entry.label}
 										<span
 											class="ml-1 text-[11px] font-normal"
-											style="color: var(--m-text-3); opacity: 0.82;">(coming soon)</span
+											style="color: var(--m-text-3); opacity: 0.82;">(roadmap)</span
 										>
 									</span>
 								{:else}
