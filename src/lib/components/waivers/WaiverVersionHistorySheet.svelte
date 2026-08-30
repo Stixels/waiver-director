@@ -150,6 +150,7 @@
 					workspaceName={selected.workspaceName}
 					introCopy={selected.introCopy}
 					fields={selected.fields}
+					theme={selected.theme}
 					preview
 				/>
 			</div>

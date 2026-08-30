@@ -108,7 +108,7 @@
 				>
 				<Button
 					href={resolve('/sign-up')}
-					class="btn-mkt-accent h-8 rounded-lg px-4 text-xs font-semibold">Get early access</Button
+					class="btn-mkt-accent h-8 rounded-lg px-4 text-xs font-semibold">Start for free</Button
 				>
 			</div>
 
@@ -164,7 +164,7 @@
 						<Button
 							href={resolve('/sign-up')}
 							class="btn-mkt-accent h-11 w-full rounded-xl text-sm font-semibold"
-							onclick={closeMobileNav}>Get early access</Button
+							onclick={closeMobileNav}>Start for free</Button
 						>
 					</div>
 				</div>

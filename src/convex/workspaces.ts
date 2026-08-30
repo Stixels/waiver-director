@@ -128,6 +128,7 @@ export const createWorkspace = mutation({
 			publicSlug: createDefaultPublicWaiverSlug(slug),
 			title: waiverDefinition.title,
 			introCopy: waiverDefinition.introCopy,
+			theme: waiverDefinition.theme ?? 'dark',
 			fields: waiverDefinition.fields
 		});
 
