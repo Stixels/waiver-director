@@ -12,6 +12,7 @@ import {
 } from '$lib/domain/waiver-constraints';
 
 export type WaiverFieldType = 'text' | 'checkbox' | 'select' | 'date';
+export type WaiverTheme = 'light' | 'dark';
 
 export type WaiverField =
 	| {
@@ -48,6 +49,7 @@ export type WaiverDefinition = {
 	title: string;
 	introCopy: string;
 	fields: WaiverField[];
+	theme: WaiverTheme;
 };
 
 export type WorkspaceWaiverRecord = WaiverDefinition & {
@@ -64,6 +66,7 @@ export type PublicWaiverRecord = {
 	title: string;
 	introCopy: string;
 	fields: WaiverField[];
+	theme: WaiverTheme;
 };
 
 export type WaiverMinor = {
@@ -140,7 +143,8 @@ export function createBlankDefinition(title = 'New waiver'): WaiverDefinition {
 	return {
 		title,
 		introCopy: '<p></p>',
-		fields: []
+		fields: [],
+		theme: 'dark'
 	};
 }
 
@@ -148,6 +152,7 @@ export function cloneDefinition(definition: WaiverDefinition): WaiverDefinition 
 	return {
 		title: definition.title,
 		introCopy: sanitizeRichTextHtml(definition.introCopy),
+		theme: definition.theme ?? 'dark',
 		fields: definition.fields.map((field) => {
 			if (field.type === 'select') {
 				return {
@@ -207,6 +212,7 @@ export function normalizeDefinitionForCompare(definition: WaiverDefinition): Wai
 	return {
 		title: definition.title.trim(),
 		introCopy: sanitizeRichTextHtml(definition.introCopy),
+		theme: definition.theme ?? 'dark',
 		fields: definition.fields.map((field) => {
 			if (field.type === 'select') {
 				return {

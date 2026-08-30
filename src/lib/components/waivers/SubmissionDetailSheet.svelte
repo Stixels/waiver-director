@@ -277,6 +277,7 @@
 					workspaceName={submission.workspaceName}
 					introCopy={submission.waiver.introCopy}
 					fields={submission.waiver.fields}
+					theme={submission.waiver.theme ?? 'dark'}
 					signerName={submission.signerName}
 					signerEmail={submission.signerEmail}
 					signerDateOfBirth={submission.signerDateOfBirth}
