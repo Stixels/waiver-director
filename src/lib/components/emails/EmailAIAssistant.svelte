@@ -3,7 +3,7 @@
 	import type { Id } from '$convex/_generated/dataModel';
 	import { Button } from '$lib/components/ui/button';
 	import { Textarea } from '$lib/components/ui/textarea';
-	import type { EmailAIResult } from '$lib/domain/email-ai';
+	import type { EmailAIResult, EmailAIReviewSnapshot } from '$lib/domain/email-ai';
 	import AlertCircleIcon from '@lucide/svelte/icons/alert-circle';
 	import LoaderIcon from '@lucide/svelte/icons/loader';
 	import SparklesIcon from '@lucide/svelte/icons/sparkles';
@@ -18,7 +18,7 @@
 		sendAfterUnit: 'minutes' | 'hours' | 'days';
 		canReview: boolean;
 		result: EmailAIResult | null;
-		onResult: (result: EmailAIResult) => void;
+		onResult: (result: EmailAIResult, snapshot: EmailAIReviewSnapshot) => void;
 		onReopen: () => void;
 		onDiscard: () => void;
 	}
@@ -40,6 +40,8 @@
 	let goal = $state('');
 	let isReviewing = $state(false);
 	let errorMessage = $state<string | null>(null);
+	let activeReviewController: AbortController | null = null;
+	let reviewRequestVersion = 0;
 
 	const trimmedGoal = $derived(goal.trim());
 	const scoreTone = $derived.by(() => {
@@ -55,8 +57,38 @@
 		return '';
 	});
 
+	function cancelActiveReview() {
+		reviewRequestVersion += 1;
+		activeReviewController?.abort();
+		activeReviewController = null;
+		isReviewing = false;
+	}
+
+	$effect(() => {
+		void workspaceId;
+		void workspaceSlug;
+		void subject;
+		void body;
+		void sendAfterAmount;
+		void sendAfterUnit;
+		void canReview;
+
+		return cancelActiveReview;
+	});
+
 	async function reviewEmail() {
 		if (!canReview || isReviewing) return;
+		const snapshot: EmailAIReviewSnapshot = {
+			workspaceId,
+			workspaceSlug,
+			subject,
+			body,
+			sendAfterAmount,
+			sendAfterUnit
+		};
+		const requestVersion = ++reviewRequestVersion;
+		const controller = new AbortController();
+		activeReviewController = controller;
 		isReviewing = true;
 		errorMessage = null;
 		try {
@@ -70,7 +102,8 @@
 					sendAfterAmount,
 					sendAfterUnit,
 					goal: trimmedGoal
-				})
+				}),
+				signal: controller.signal
 			});
 			const payload = (await response.json().catch(() => null)) as
 				| (EmailAIResult & { message?: string })
@@ -81,11 +114,16 @@
 			if (!payload) {
 				throw new Error('AI response was empty.');
 			}
-			onResult(payload);
+			if (controller.signal.aborted || requestVersion !== reviewRequestVersion) return;
+			onResult(payload, snapshot);
 		} catch (error) {
+			if (controller.signal.aborted || requestVersion !== reviewRequestVersion) return;
 			errorMessage = error instanceof Error ? error.message : 'Unable to review this email.';
 		} finally {
-			isReviewing = false;
+			if (requestVersion === reviewRequestVersion) {
+				activeReviewController = null;
+				isReviewing = false;
+			}
 		}
 	}
 </script>
@@ -107,6 +145,7 @@
 		bind:value={goal}
 		rows={3}
 		maxlength={240}
+		disabled={isReviewing}
 		placeholder="Review ask, arrival reminder, thank-you..."
 		class="ai-goal-input"
 	/>

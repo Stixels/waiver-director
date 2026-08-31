@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+	emailAIReviewSnapshotsEqual,
+	type EmailAIReviewSnapshot
+} from '../src/lib/domain/email-ai.ts';
+import {
 	parseEmailAIModelJson,
 	validateEmailAIResult,
 	type RawEmailAIResult
@@ -38,6 +42,33 @@ const source = {
 	subject: 'A note from {{business_name}}',
 	body: '<p>Hello {{customer_name}}</p>'
 };
+
+const reviewSnapshot: EmailAIReviewSnapshot = {
+	workspaceId: 'workspace-1' as EmailAIReviewSnapshot['workspaceId'],
+	workspaceSlug: 'demo',
+	subject: source.subject,
+	body: source.body,
+	sendAfterAmount: 2,
+	sendAfterUnit: 'hours'
+};
+
+test('only treats an AI review as current for the same workspace and draft', () => {
+	assert.equal(emailAIReviewSnapshotsEqual(reviewSnapshot, { ...reviewSnapshot }), true);
+
+	for (const changed of [
+		{ workspaceId: 'workspace-2' as EmailAIReviewSnapshot['workspaceId'] },
+		{ workspaceSlug: 'other' },
+		{ subject: 'Updated subject' },
+		{ body: '<p>Updated body</p>' },
+		{ sendAfterAmount: 3 },
+		{ sendAfterUnit: 'days' as const }
+	]) {
+		assert.equal(
+			emailAIReviewSnapshotsEqual(reviewSnapshot, { ...reviewSnapshot, ...changed }),
+			false
+		);
+	}
+});
 
 test('parses strict and fenced model JSON', () => {
 	assert.deepEqual(parseEmailAIModelJson('{"score":82}'), { score: 82 });

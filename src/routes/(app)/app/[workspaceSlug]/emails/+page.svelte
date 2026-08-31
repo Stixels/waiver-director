@@ -39,13 +39,16 @@
 	import { RangeCalendar } from '$lib/components/ui/range-calendar';
 	import FollowUpPreviewDialog from '$lib/components/emails/FollowUpPreviewDialog.svelte';
 	import EmailAIAssistant from '$lib/components/emails/EmailAIAssistant.svelte';
-	import EmailAIReviewPanel from '$lib/components/emails/EmailAIReviewPanel.svelte';
 	import EmailLoadTemplateDialog from '$lib/components/emails/EmailLoadTemplateDialog.svelte';
 	import EmailSaveTemplateDialog from '$lib/components/emails/EmailSaveTemplateDialog.svelte';
 	import RichTextEditor from '$lib/components/emails/RichTextEditor.svelte';
 	import WaiverRichText from '$lib/components/waivers/WaiverRichText.svelte';
 	import WorkspaceLogoUploader from '$lib/components/workspaces/WorkspaceLogoUploader.svelte';
-	import type { EmailAIResult } from '$lib/domain/email-ai';
+	import {
+		emailAIReviewSnapshotsEqual,
+		type EmailAIResult,
+		type EmailAIReviewSnapshot
+	} from '$lib/domain/email-ai';
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
 	import CloudIcon from '@lucide/svelte/icons/cloud';
 	import CloudCheckIcon from '@lucide/svelte/icons/cloud-check';
@@ -293,7 +296,12 @@
 	let subjectSelectionEnd = $state(0);
 	let loadedEditorContentWorkspaceId = $state<Id<'workspaces'> | null>(null);
 	let aiReviewResult = $state<EmailAIResult | null>(null);
+	let aiReviewSnapshot = $state<EmailAIReviewSnapshot | null>(null);
 	let aiReviewOpen = $state(false);
+	type EmailAIReviewPanelComponent =
+		(typeof import('$lib/components/emails/EmailAIReviewPanel.svelte'))['default'];
+	let ReviewPanel = $state<EmailAIReviewPanelComponent | null>(null);
+	let reviewPanelLoadPromise: Promise<EmailAIReviewPanelComponent> | null = null;
 
 	const normalizedSendAfterAmount = $derived(clampSendAfterAmount(sendAfterAmount));
 	const isSendAfterValid = $derived(Number.isInteger(sendAfterAmount) && sendAfterAmount >= 1);
@@ -313,8 +321,62 @@
 		editorContentLoaded = false;
 		loadedEditorContentWorkspaceId = null;
 		aiReviewResult = null;
+		aiReviewSnapshot = null;
 		aiReviewOpen = false;
 	}
+
+	function currentAIReviewSnapshot(): EmailAIReviewSnapshot | null {
+		if (!currentWorkspace) return null;
+		return {
+			workspaceId: currentWorkspace.workspaceId,
+			workspaceSlug: currentWorkspace.slug,
+			subject,
+			body,
+			sendAfterAmount: normalizedSendAfterAmount,
+			sendAfterUnit
+		};
+	}
+
+	function isAIReviewSnapshotCurrent(snapshot: EmailAIReviewSnapshot) {
+		const currentSnapshot = currentAIReviewSnapshot();
+		return currentSnapshot !== null && emailAIReviewSnapshotsEqual(snapshot, currentSnapshot);
+	}
+
+	async function loadAIReviewPanel() {
+		if (ReviewPanel) return ReviewPanel;
+		reviewPanelLoadPromise ??= import('$lib/components/emails/EmailAIReviewPanel.svelte').then(
+			(module) => module.default
+		);
+		try {
+			ReviewPanel = await reviewPanelLoadPromise;
+			return ReviewPanel;
+		} catch (error) {
+			reviewPanelLoadPromise = null;
+			throw error;
+		}
+	}
+
+	async function openAIReview() {
+		if (!aiReviewResult || !aiReviewSnapshot || !isAIReviewSnapshotCurrent(aiReviewSnapshot)) {
+			discardAIResult();
+			return;
+		}
+		try {
+			await loadAIReviewPanel();
+			if (aiReviewSnapshot && isAIReviewSnapshotCurrent(aiReviewSnapshot)) {
+				aiReviewOpen = true;
+			}
+		} catch {
+			toast.error('Unable to open the AI review. Please try again.');
+		}
+	}
+
+	$effect(() => {
+		const snapshot = aiReviewSnapshot;
+		if (snapshot && !isAIReviewSnapshotCurrent(snapshot)) {
+			discardAIResult();
+		}
+	});
 
 	function currentEditorContentSnapshot(): EditorContentSnapshot {
 		return {
@@ -541,24 +603,33 @@
 		editorRef?.insertText(variable);
 	}
 
-	function handleAIResult(result: EmailAIResult) {
+	function handleAIResult(result: EmailAIResult, snapshot: EmailAIReviewSnapshot) {
+		if (!isAIReviewSnapshotCurrent(snapshot)) return;
 		aiReviewResult = result;
-		aiReviewOpen = true;
+		aiReviewSnapshot = snapshot;
+		void openAIReview();
 	}
 
 	function applyAIProposal(proposal: { subject: string; body: string }) {
+		if (!aiReviewSnapshot || !isAIReviewSnapshotCurrent(aiReviewSnapshot)) {
+			discardAIResult();
+			toast.error('This AI review is out of date. Review the current draft again.');
+			return;
+		}
+		aiReviewResult = null;
+		aiReviewSnapshot = null;
+		aiReviewOpen = false;
 		subject = proposal.subject;
 		body = proposal.body;
 		lastSavedAt = null;
 		lastSaveError = null;
 		emailPreviewMode = false;
-		aiReviewResult = null;
-		aiReviewOpen = false;
 		toast.message('AI proposal applied. Autosave will update the editor content.');
 	}
 
 	function discardAIResult() {
 		aiReviewResult = null;
+		aiReviewSnapshot = null;
 		aiReviewOpen = false;
 	}
 
@@ -1846,7 +1917,7 @@
 										canReview={isSendAfterValid && !isSavingEditorContent}
 										result={aiReviewResult}
 										onResult={handleAIResult}
-										onReopen={() => (aiReviewOpen = true)}
+										onReopen={() => void openAIReview()}
 										onDiscard={discardAIResult}
 									/>
 								{:else}
@@ -1898,8 +1969,8 @@
 						</div>
 					</div>
 
-					{#if aiReviewResult}
-						<EmailAIReviewPanel
+					{#if aiReviewResult && ReviewPanel}
+						<ReviewPanel
 							bind:open={aiReviewOpen}
 							result={aiReviewResult}
 							currentSubject={subject}

@@ -1,3 +1,5 @@
+import type { Id } from '$convex/_generated/dataModel';
+
 export const EMAIL_AI_ALLOWED_VARIABLES = [
 	'customer_name',
 	'booking_id',
@@ -31,6 +33,29 @@ export type EmailAIResult = {
 	proposedBody: string;
 	rationale: string;
 };
+
+export type EmailAIReviewSnapshot = {
+	workspaceId: Id<'workspaces'>;
+	workspaceSlug: string;
+	subject: string;
+	body: string;
+	sendAfterAmount: number;
+	sendAfterUnit: 'minutes' | 'hours' | 'days';
+};
+
+export function emailAIReviewSnapshotsEqual(
+	left: EmailAIReviewSnapshot,
+	right: EmailAIReviewSnapshot
+) {
+	return (
+		left.workspaceId === right.workspaceId &&
+		left.workspaceSlug === right.workspaceSlug &&
+		left.subject === right.subject &&
+		left.body === right.body &&
+		left.sendAfterAmount === right.sendAfterAmount &&
+		left.sendAfterUnit === right.sendAfterUnit
+	);
+}
 
 export const EMAIL_AI_RUBRIC_LABELS: Record<EmailAIRubricKey, string> = {
 	clarity: 'Clarity',
