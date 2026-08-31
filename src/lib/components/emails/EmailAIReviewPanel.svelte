@@ -43,7 +43,7 @@
 		return 'Needs work';
 	});
 
-	const diffLines = $derived(
+	const emailDiff = $derived(
 		buildEmailDiff({
 			currentSubject,
 			currentBody,
@@ -51,7 +51,7 @@
 			proposedBody: result.proposedBody
 		})
 	);
-	const changes = $derived(countDiffChanges(diffLines));
+	const changes = $derived(countDiffChanges(emailDiff));
 	const subjectChanged = $derived(currentSubject.trim() !== result.proposedSubject.trim());
 
 	function applyProposal() {
@@ -205,7 +205,7 @@
 			{/if}
 
 			{#if view === 'diff'}
-				<EmailLineDiff lines={diffLines} />
+				<EmailLineDiff diff={emailDiff} />
 			{:else}
 				<div class="preview-card">
 					<div class="preview-subject-row">

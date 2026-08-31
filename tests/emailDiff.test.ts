@@ -10,28 +10,31 @@ test('converts sanitized email HTML into readable lines', () => {
 });
 
 test('returns no additions or removals for identical emails', () => {
-	const lines = buildEmailDiff({
+	const diff = buildEmailDiff({
 		currentSubject: 'Reminder',
 		currentBody: '<p>Please sign your waiver.</p>',
 		proposedSubject: 'Reminder',
 		proposedBody: '<p>Please sign your waiver.</p>'
 	});
 
-	assert.deepEqual(countDiffChanges(lines), { additions: 0, removals: 0 });
-	assert.ok(lines.every((line) => line.type === 'same'));
+	assert.deepEqual(countDiffChanges(diff), { additions: 0, removals: 0 });
+	assert.equal(diff.hunks.length, 0);
 });
 
-test('highlights subject and body changes at line and word level', () => {
-	const lines = buildEmailDiff({
+test('builds Pierre diff metadata for subject and body changes', () => {
+	const diff = buildEmailDiff({
 		currentSubject: 'Waiver reminder',
 		currentBody: '<p>Please sign today.</p>',
 		proposedSubject: 'Friendly waiver reminder',
 		proposedBody: '<p>Please complete your waiver today.</p>'
 	});
-	const changes = countDiffChanges(lines);
+	const changes = countDiffChanges(diff);
 
 	assert.equal(changes.additions, 2);
 	assert.equal(changes.removals, 2);
-	assert.ok(lines.some((line) => line.segments.some((segment) => segment.type === 'add')));
-	assert.ok(lines.some((line) => line.segments.some((segment) => segment.type === 'remove')));
+	assert.ok(
+		diff.hunks.some((hunk) => hunk.hunkContent.some((content) => content.type === 'change'))
+	);
+	assert.equal(diff.deletionLines[0]?.trimEnd(), 'Subject: Waiver reminder');
+	assert.equal(diff.additionLines[0]?.trimEnd(), 'Subject: Friendly waiver reminder');
 });
