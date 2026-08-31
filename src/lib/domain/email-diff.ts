@@ -1,10 +1,23 @@
-import { parseDiffFromFile, type FileContents, type FileDiffMetadata } from '@pierre/diffs';
+import {
+	parseDiffFromFile,
+	processFile,
+	type FileContents,
+	type FileDiffMetadata
+} from '@pierre/diffs';
 
 export type EmailDiffInput = {
 	currentSubject: string;
 	currentBody: string;
 	proposedSubject: string;
 	proposedBody: string;
+};
+
+const MAX_LINE_DP_CELLS = 250_000;
+const BOUNDED_PARSE_OPTIONS: NonNullable<Parameters<typeof parseDiffFromFile>[2]> & {
+	maxEditLength: number;
+} = {
+	// jsdiff's Myers search is quadratic in the edit distance.
+	maxEditLength: Math.floor(Math.sqrt(MAX_LINE_DP_CELLS))
 };
 
 /** Convert sanitized email HTML into readable plain text with line breaks. */
@@ -40,12 +53,41 @@ function emailFile(subject: string, bodyHtml: string): FileContents {
 	};
 }
 
+function buildWholeDocumentReplacement(
+	currentFile: FileContents,
+	proposedFile: FileContents
+): FileDiffMetadata {
+	const currentLines = currentFile.contents.split('\n');
+	const proposedLines = proposedFile.contents.split('\n');
+	const patch = [
+		`--- ${currentFile.name}`,
+		`+++ ${proposedFile.name}`,
+		`@@ -1,${currentLines.length} +1,${proposedLines.length} @@`,
+		...currentLines.map((line) => `-${line}`),
+		...proposedLines.map((line) => `+${line}`)
+	].join('\n');
+	const diff = processFile(patch, {
+		cacheKey: `${currentFile.cacheKey ?? currentFile.name}:${proposedFile.cacheKey ?? proposedFile.name}`,
+		oldFile: currentFile,
+		newFile: proposedFile,
+		throwOnError: true
+	});
+
+	if (!diff) throw new Error('Unable to build bounded email diff metadata.');
+	diff.lang = proposedFile.lang;
+	return diff;
+}
+
 /** Parse the current and proposed email into Pierre's expandable diff metadata. */
 export function buildEmailDiff(input: EmailDiffInput): FileDiffMetadata {
-	return parseDiffFromFile(
-		emailFile(input.currentSubject, input.currentBody),
-		emailFile(input.proposedSubject, input.proposedBody)
-	);
+	const currentFile = emailFile(input.currentSubject, input.currentBody);
+	const proposedFile = emailFile(input.proposedSubject, input.proposedBody);
+
+	try {
+		return parseDiffFromFile(currentFile, proposedFile, BOUNDED_PARSE_OPTIONS);
+	} catch {
+		return buildWholeDocumentReplacement(currentFile, proposedFile);
+	}
 }
 
 export function countDiffChanges(diff: FileDiffMetadata): {

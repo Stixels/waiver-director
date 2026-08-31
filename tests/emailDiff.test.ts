@@ -38,3 +38,18 @@ test('builds Pierre diff metadata for subject and body changes', () => {
 	assert.equal(diff.deletionLines[0]?.trimEnd(), 'Subject: Waiver reminder');
 	assert.equal(diff.additionLines[0]?.trimEnd(), 'Subject: Friendly waiver reminder');
 });
+
+test('bounds large dissimilar email diffs with a whole-document replacement', () => {
+	const currentLines = Array.from({ length: 600 }, (_, index) => `Current line ${index}`);
+	const proposedLines = Array.from({ length: 600 }, (_, index) => `Proposed line ${index}`);
+	const diff = buildEmailDiff({
+		currentSubject: 'Current subject',
+		currentBody: currentLines.join('<br>'),
+		proposedSubject: 'Proposed subject',
+		proposedBody: proposedLines.join('<br>')
+	});
+
+	assert.deepEqual(countDiffChanges(diff), { additions: 602, removals: 602 });
+	assert.equal(diff.additionLines.length, 602);
+	assert.equal(diff.deletionLines.length, 602);
+});
