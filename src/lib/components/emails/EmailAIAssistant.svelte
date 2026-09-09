@@ -71,7 +71,8 @@
 		void body;
 		void sendAfterAmount;
 		void sendAfterUnit;
-		void canReview;
+		// Saving can temporarily disable starting a review without changing its
+		// source. Only draft/workspace changes (or unmount) cancel an active request.
 
 		return cancelActiveReview;
 	});

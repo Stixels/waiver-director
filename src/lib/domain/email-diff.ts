@@ -4,6 +4,7 @@ import {
 	type FileContents,
 	type FileDiffMetadata
 } from '@pierre/diffs';
+import sanitizeHtml from 'sanitize-html';
 
 export type EmailDiffInput = {
 	currentSubject: string;
@@ -42,7 +43,26 @@ export function htmlToPlainText(html: string): string {
 /** Build the readable email document that Pierre compares. */
 function emailToPlainText(subject: string, bodyHtml: string): string {
 	const bodyText = htmlToPlainText(bodyHtml) || '(empty body)';
-	return [`Subject: ${subject.trim() || '(no subject)'}`, '', bodyText].join('\n');
+	const links: string[] = [];
+	// Use the HTML parser so quote style, nested markup and encoded URL characters
+	// cannot hide destination changes from the plain-text comparison.
+	sanitizeHtml(bodyHtml, {
+		allowedTags: ['a'],
+		allowedAttributes: { a: ['href'] },
+		exclusiveFilter(frame) {
+			if (frame.tag === 'a' && frame.attribs.href) {
+				const label = frame.text.replace(/\s+/g, ' ').trim() || '(unlabeled link)';
+				links.push(`Link: ${label} → ${frame.attribs.href}`);
+			}
+			return false;
+		}
+	});
+	return [
+		`Subject: ${subject.trim() || '(no subject)'}`,
+		'',
+		bodyText,
+		...(links.length ? ['', ...links] : [])
+	].join('\n');
 }
 
 function emailFile(subject: string, bodyHtml: string): FileContents {

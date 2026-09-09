@@ -53,3 +53,36 @@ test('bounds large dissimilar email diffs with a whole-document replacement', ()
 	assert.equal(diff.additionLines.length, 602);
 	assert.equal(diff.deletionLines.length, 602);
 });
+
+test('shows destination-only link changes with unchanged visible text', () => {
+	const diff = buildEmailDiff({
+		currentSubject: 'Reminder',
+		proposedSubject: 'Reminder',
+		currentBody: '<p><a href="https://example.com/waiver">Sign your waiver</a></p>',
+		proposedBody: '<p><a href="https://example.com/other">Sign your waiver</a></p>'
+	});
+	assert.deepEqual(countDiffChanges(diff), { additions: 1, removals: 1 });
+	assert.ok(diff.deletionLines.some((line) => line.includes('https://example.com/waiver')));
+	assert.ok(diff.additionLines.some((line) => line.includes('https://example.com/other')));
+});
+
+test('normalizes equivalent link markup and decodes URL entities', () => {
+	const diff = buildEmailDiff({
+		currentSubject: 'Reminder',
+		proposedSubject: 'Reminder',
+		currentBody: '<a href="https://example.com/?a=1&amp;b=2"><strong>Sign</strong></a>',
+		proposedBody: "<a href='https://example.com/?a=1&#38;b=2'>Sign</a>"
+	});
+	assert.deepEqual(countDiffChanges(diff), { additions: 0, removals: 0 });
+});
+
+test('shows removed links even when their text remains', () => {
+	const diff = buildEmailDiff({
+		currentSubject: 'Reminder',
+		proposedSubject: 'Reminder',
+		currentBody: '<a href="https://example.com/waiver">Sign</a>',
+		proposedBody: '<p>Sign</p>'
+	});
+	assert.ok(countDiffChanges(diff).removals > 0);
+	assert.ok(diff.deletionLines.some((line) => line.includes('https://example.com/waiver')));
+});
