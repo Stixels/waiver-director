@@ -103,6 +103,12 @@ export function buildEmailDiff(input: EmailDiffInput): FileDiffMetadata {
 	const currentFile = emailFile(input.currentSubject, input.currentBody);
 	const proposedFile = emailFile(input.proposedSubject, input.proposedBody);
 
+	const linePairs =
+		currentFile.contents.split('\n').length * proposedFile.contents.split('\n').length;
+	if (currentFile.contents !== proposedFile.contents && linePairs > MAX_LINE_DP_CELLS) {
+		return buildWholeDocumentReplacement(currentFile, proposedFile);
+	}
+
 	try {
 		return parseDiffFromFile(currentFile, proposedFile, BOUNDED_PARSE_OPTIONS);
 	} catch {

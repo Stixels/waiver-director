@@ -86,3 +86,19 @@ test('shows removed links even when their text remains', () => {
 	assert.ok(countDiffChanges(diff).removals > 0);
 	assert.ok(diff.deletionLines.some((line) => line.includes('https://example.com/waiver')));
 });
+
+test('bounds large nearly identical emails while preserving identical-email results', () => {
+	const lines = Array.from({ length: 600 }, (_, index) => `Line ${index}`);
+	const body = lines.join('<br>');
+	const input = {
+		currentSubject: 'Reminder',
+		proposedSubject: 'Reminder',
+		currentBody: body,
+		proposedBody: body
+	};
+	assert.deepEqual(countDiffChanges(buildEmailDiff(input)), { additions: 0, removals: 0 });
+	lines[300] = 'Updated line';
+	const diff = buildEmailDiff({ ...input, proposedBody: lines.join('<br>') });
+	assert.deepEqual(countDiffChanges(diff), { additions: 602, removals: 602 });
+	assert.ok(diff.additionLines.some((line) => line.includes('Updated line')));
+});
