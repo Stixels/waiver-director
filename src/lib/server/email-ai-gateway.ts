@@ -1,5 +1,5 @@
 export const AI_GATEWAY_API_URL = 'https://ai-gateway.vercel.sh/v1/chat/completions';
-export const DEFAULT_AI_GATEWAY_MODEL = 'google/gemini-3-flash';
+export const DEFAULT_AI_GATEWAY_MODEL = 'zai/glm-5.3-flash';
 
 type AIGatewayContentPart = {
 	type?: string;
