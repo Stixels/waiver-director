@@ -1060,17 +1060,6 @@
 />
 
 <div class="relative w-full min-w-0 p-4 sm:p-5">
-	{#if !isLoading && currentWorkspace && !canUseEmailFollowups}
-		<UpgradeOverlay
-			title={workspacePausedOnPro ? 'Workspace paused on Pro' : 'Upgrade to send follow-ups'}
-			description={workspacePausedOnPro
-				? 'This workspace is not the primary workspace on your Pro plan. Make it primary to send follow-up emails here, or upgrade to Business for every workspace.'
-				: 'Free workspaces can draft email content, but Pro is required to queue, deliver, and manage waiver follow-up emails.'}
-			href={billingHref}
-			actionLabel={workspacePausedOnPro ? 'Manage primary workspace' : 'View billing'}
-		/>
-	{/if}
-
 	<div class="mx-auto w-full max-w-7xl min-w-0 space-y-4">
 		<div
 			class="-mx-4 flex flex-col gap-3 border-b border-border px-4 pb-3 sm:-mx-5 sm:flex-row sm:items-end sm:justify-between sm:px-5"
@@ -1158,8 +1147,18 @@
 			</div>
 		{/if}
 
-		<div class="min-h-[520px]">
+		<div class="relative min-h-[520px]">
 			{#if activeTab === 'queue'}
+				{#if !isLoading && currentWorkspace && !canUseEmailFollowups}
+					<UpgradeOverlay
+						title={workspacePausedOnPro ? 'Workspace paused on Pro' : 'Upgrade to send follow-ups'}
+						description={workspacePausedOnPro
+							? 'This workspace is not the primary workspace on your Pro plan. Make it primary to send follow-up emails here, or upgrade to Business for every workspace.'
+							: 'Free workspaces can draft email content, but Pro is required to queue, deliver, and manage waiver follow-up emails.'}
+						href={billingHref}
+						actionLabel={workspacePausedOnPro ? 'Manage primary workspace' : 'View billing'}
+					/>
+				{/if}
 				<!-- Stats cards -->
 				<div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
 					<div class="rounded-xl border border-border bg-card p-4">
@@ -1670,6 +1669,24 @@
 				</div>
 			{:else}
 				<!-- Email tab: sender context + editor -->
+				{#if !isLoading && currentWorkspace && !canUseEmailFollowups}
+					<div
+						class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-muted/30 px-4 py-3"
+					>
+						<p class="text-sm text-muted-foreground">
+							{workspacePausedOnPro
+								? 'You can draft and review emails here. Make this workspace primary or upgrade to Business to send follow-ups.'
+								: 'You can draft and review emails on Free. Upgrade to Pro when you’re ready to send follow-ups.'}
+						</p>
+						<Button
+							variant="link"
+							href={billingHref}
+							class="text-sm font-medium text-primary underline underline-offset-4"
+						>
+							{workspacePausedOnPro ? 'Manage primary workspace' : 'View billing'}
+						</Button>
+					</div>
+				{/if}
 				{#if !isLoading && currentWorkspace && canUseEmailFollowups && !workspaceCanSendEmail}
 					<div
 						class="sender-banner"
