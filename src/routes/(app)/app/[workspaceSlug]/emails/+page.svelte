@@ -38,11 +38,17 @@
 	import { Popover, PopoverContent, PopoverTrigger } from '$lib/components/ui/popover';
 	import { RangeCalendar } from '$lib/components/ui/range-calendar';
 	import FollowUpPreviewDialog from '$lib/components/emails/FollowUpPreviewDialog.svelte';
+	import EmailAIAssistant from '$lib/components/emails/EmailAIAssistant.svelte';
 	import EmailLoadTemplateDialog from '$lib/components/emails/EmailLoadTemplateDialog.svelte';
 	import EmailSaveTemplateDialog from '$lib/components/emails/EmailSaveTemplateDialog.svelte';
 	import RichTextEditor from '$lib/components/emails/RichTextEditor.svelte';
 	import WaiverRichText from '$lib/components/waivers/WaiverRichText.svelte';
 	import WorkspaceLogoUploader from '$lib/components/workspaces/WorkspaceLogoUploader.svelte';
+	import {
+		emailAIReviewSnapshotsEqual,
+		type EmailAIResult,
+		type EmailAIReviewSnapshot
+	} from '$lib/domain/email-ai';
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
 	import CloudIcon from '@lucide/svelte/icons/cloud';
 	import CloudCheckIcon from '@lucide/svelte/icons/cloud-check';
@@ -289,6 +295,13 @@
 	let subjectSelectionStart = $state(0);
 	let subjectSelectionEnd = $state(0);
 	let loadedEditorContentWorkspaceId = $state<Id<'workspaces'> | null>(null);
+	let aiReviewResult = $state<EmailAIResult | null>(null);
+	let aiReviewSnapshot = $state<EmailAIReviewSnapshot | null>(null);
+	let aiReviewOpen = $state(false);
+	type EmailAIReviewPanelComponent =
+		(typeof import('$lib/components/emails/EmailAIReviewPanel.svelte'))['default'];
+	let ReviewPanel = $state<EmailAIReviewPanelComponent | null>(null);
+	let reviewPanelLoadPromise: Promise<EmailAIReviewPanelComponent> | null = null;
 
 	const normalizedSendAfterAmount = $derived(clampSendAfterAmount(sendAfterAmount));
 	const isSendAfterValid = $derived(Number.isInteger(sendAfterAmount) && sendAfterAmount >= 1);
@@ -307,7 +320,63 @@
 		lastSaveError = null;
 		editorContentLoaded = false;
 		loadedEditorContentWorkspaceId = null;
+		aiReviewResult = null;
+		aiReviewSnapshot = null;
+		aiReviewOpen = false;
 	}
+
+	function currentAIReviewSnapshot(): EmailAIReviewSnapshot | null {
+		if (!currentWorkspace) return null;
+		return {
+			workspaceId: currentWorkspace.workspaceId,
+			workspaceSlug: currentWorkspace.slug,
+			subject,
+			body,
+			sendAfterAmount: normalizedSendAfterAmount,
+			sendAfterUnit
+		};
+	}
+
+	function isAIReviewSnapshotCurrent(snapshot: EmailAIReviewSnapshot) {
+		const currentSnapshot = currentAIReviewSnapshot();
+		return currentSnapshot !== null && emailAIReviewSnapshotsEqual(snapshot, currentSnapshot);
+	}
+
+	async function loadAIReviewPanel() {
+		if (ReviewPanel) return ReviewPanel;
+		reviewPanelLoadPromise ??= import('$lib/components/emails/EmailAIReviewPanel.svelte').then(
+			(module) => module.default
+		);
+		try {
+			ReviewPanel = await reviewPanelLoadPromise;
+			return ReviewPanel;
+		} catch (error) {
+			reviewPanelLoadPromise = null;
+			throw error;
+		}
+	}
+
+	async function openAIReview() {
+		if (!aiReviewResult || !aiReviewSnapshot || !isAIReviewSnapshotCurrent(aiReviewSnapshot)) {
+			discardAIResult();
+			return;
+		}
+		try {
+			await loadAIReviewPanel();
+			if (aiReviewSnapshot && isAIReviewSnapshotCurrent(aiReviewSnapshot)) {
+				aiReviewOpen = true;
+			}
+		} catch {
+			toast.error('Unable to open the AI review. Please try again.');
+		}
+	}
+
+	$effect(() => {
+		const snapshot = aiReviewSnapshot;
+		if (snapshot && !isAIReviewSnapshotCurrent(snapshot)) {
+			discardAIResult();
+		}
+	});
 
 	function currentEditorContentSnapshot(): EditorContentSnapshot {
 		return {
@@ -532,6 +601,36 @@
 			return;
 		}
 		editorRef?.insertText(variable);
+	}
+
+	function handleAIResult(result: EmailAIResult, snapshot: EmailAIReviewSnapshot) {
+		if (!isAIReviewSnapshotCurrent(snapshot)) return;
+		aiReviewResult = result;
+		aiReviewSnapshot = snapshot;
+		void openAIReview();
+	}
+
+	function applyAIProposal(proposal: { subject: string; body: string }) {
+		if (!aiReviewSnapshot || !isAIReviewSnapshotCurrent(aiReviewSnapshot)) {
+			discardAIResult();
+			toast.error('This AI review is out of date. Review the current draft again.');
+			return;
+		}
+		aiReviewResult = null;
+		aiReviewSnapshot = null;
+		aiReviewOpen = false;
+		subject = proposal.subject;
+		body = proposal.body;
+		lastSavedAt = null;
+		lastSaveError = null;
+		emailPreviewMode = false;
+		toast.message('AI proposal applied. Autosave will update the editor content.');
+	}
+
+	function discardAIResult() {
+		aiReviewResult = null;
+		aiReviewSnapshot = null;
+		aiReviewOpen = false;
 	}
 
 	async function persistEditorContent(options: { showToast?: boolean } = {}) {
@@ -961,17 +1060,6 @@
 />
 
 <div class="relative w-full min-w-0 p-4 sm:p-5">
-	{#if !isLoading && currentWorkspace && !canUseEmailFollowups}
-		<UpgradeOverlay
-			title={workspacePausedOnPro ? 'Workspace paused on Pro' : 'Upgrade to send follow-ups'}
-			description={workspacePausedOnPro
-				? 'This workspace is not the primary workspace on your Pro plan. Make it primary to send follow-up emails here, or upgrade to Business for every workspace.'
-				: 'Free workspaces can draft email content, but Pro is required to queue, deliver, and manage waiver follow-up emails.'}
-			href={billingHref}
-			actionLabel={workspacePausedOnPro ? 'Manage primary workspace' : 'View billing'}
-		/>
-	{/if}
-
 	<div class="mx-auto w-full max-w-7xl min-w-0 space-y-4">
 		<div
 			class="-mx-4 flex flex-col gap-3 border-b border-border px-4 pb-3 sm:-mx-5 sm:flex-row sm:items-end sm:justify-between sm:px-5"
@@ -1059,8 +1147,18 @@
 			</div>
 		{/if}
 
-		<div class="min-h-[520px]">
+		<div class="relative min-h-[520px]">
 			{#if activeTab === 'queue'}
+				{#if !isLoading && currentWorkspace && !canUseEmailFollowups}
+					<UpgradeOverlay
+						title={workspacePausedOnPro ? 'Workspace paused on Pro' : 'Upgrade to send follow-ups'}
+						description={workspacePausedOnPro
+							? 'This workspace is not the primary workspace on your Pro plan. Make it primary to send follow-up emails here, or upgrade to Business for every workspace.'
+							: 'Free workspaces can draft email content, but Pro is required to queue, deliver, and manage waiver follow-up emails.'}
+						href={billingHref}
+						actionLabel={workspacePausedOnPro ? 'Manage primary workspace' : 'View billing'}
+					/>
+				{/if}
 				<!-- Stats cards -->
 				<div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
 					<div class="rounded-xl border border-border bg-card p-4">
@@ -1571,6 +1669,24 @@
 				</div>
 			{:else}
 				<!-- Email tab: sender context + editor -->
+				{#if !isLoading && currentWorkspace && !canUseEmailFollowups}
+					<div
+						class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-muted/30 px-4 py-3"
+					>
+						<p class="text-sm text-muted-foreground">
+							{workspacePausedOnPro
+								? 'You can draft and review emails here. Make this workspace primary or upgrade to Business to send follow-ups.'
+								: 'You can draft and review emails on Free. Upgrade to Pro when you’re ready to send follow-ups.'}
+						</p>
+						<Button
+							variant="link"
+							href={billingHref}
+							class="text-sm font-medium text-primary underline underline-offset-4"
+						>
+							{workspacePausedOnPro ? 'Manage primary workspace' : 'View billing'}
+						</Button>
+					</div>
+				{/if}
 				{#if !isLoading && currentWorkspace && canUseEmailFollowups && !workspaceCanSendEmail}
 					<div
 						class="sender-banner"
@@ -1657,11 +1773,9 @@
 						</div>
 						<div class="email-rail">
 							<div class="rail-section">
-								<Skeleton class="mb-2 h-2 w-16" />
-								<Skeleton class="mb-3 h-3 w-32" />
-								{#each [0, 1, 2, 3] as i (i)}
-									<Skeleton class="mb-1.5 h-9 w-full rounded" />
-								{/each}
+								<Skeleton class="mb-3 h-5 w-28" />
+								<Skeleton class="mb-2 h-16 w-full rounded-md" />
+								<Skeleton class="h-7 w-full rounded-md" />
 							</div>
 							<div class="rail-section">
 								<Skeleton class="mb-3 h-2 w-20" />
@@ -1809,19 +1923,39 @@
 						<!-- Tool rail (right column) -->
 						<div class="email-rail">
 							<div class="rail-section">
+								{#if currentWorkspace && isOwner}
+									<EmailAIAssistant
+										workspaceId={currentWorkspace.workspaceId}
+										workspaceSlug={currentWorkspace.slug}
+										{subject}
+										{body}
+										sendAfterAmount={normalizedSendAfterAmount}
+										{sendAfterUnit}
+										canReview={isSendAfterValid && !isSavingEditorContent}
+										result={aiReviewResult}
+										onResult={handleAIResult}
+										onReopen={() => void openAIReview()}
+										onDiscard={discardAIResult}
+									/>
+								{:else}
+									<p class="rail-label">AI review</p>
+									<p class="rail-hint">
+										Only workspace owners can review and replace follow-up content.
+									</p>
+								{/if}
+							</div>
+
+							<div class="rail-section rail-section--compact">
 								<p class="rail-label">Variables</p>
-								<p class="rail-hint">Click to insert at cursor.</p>
-								<div class="var-list">
+								<div class="var-chip-grid">
 									{#each VARIABLES as variable (variable.value)}
 										<button
 											type="button"
 											onclick={() => insertVariable(variable.value)}
-											class="var-item"
+											class="var-chip"
+											title={variable.description}
 										>
-											<div class="var-item-text">
-												<span class="var-tag">{variable.label}</span>
-												<span class="var-desc">{variable.description}</span>
-											</div>
+											{variable.label}
 										</button>
 									{/each}
 								</div>
@@ -1834,7 +1968,7 @@
 										variant="outline"
 										size="sm"
 										onclick={() => (loadTemplateOpen = true)}
-										class="w-full justify-start text-xs"
+										class="template-action-btn w-full justify-start text-xs"
 									>
 										Load template
 									</Button>
@@ -1843,7 +1977,7 @@
 										size="sm"
 										onclick={openSaveTemplate}
 										disabled={isSavingEditorContent || !isSendAfterValid}
-										class="w-full justify-start text-xs"
+										class="template-action-btn w-full justify-start text-xs"
 									>
 										Save as template
 									</Button>
@@ -1851,6 +1985,16 @@
 							</div>
 						</div>
 					</div>
+
+					{#if aiReviewResult && ReviewPanel}
+						<ReviewPanel
+							bind:open={aiReviewOpen}
+							result={aiReviewResult}
+							currentSubject={subject}
+							currentBody={body}
+							onApply={applyAIProposal}
+						/>
+					{/if}
 				{/if}
 			{/if}
 		</div>
@@ -2042,7 +2186,7 @@
 
 	.email-layout {
 		display: grid;
-		grid-template-columns: 1fr 220px;
+		grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
 		gap: 1.25rem;
 		align-items: stretch;
 		min-height: calc(100svh - 14rem);
@@ -2243,6 +2387,10 @@
 		border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
 	}
 
+	.rail-section--compact {
+		padding-block: 0.75rem;
+	}
+
 	.rail-section:last-child {
 		border-bottom: none;
 	}
@@ -2267,6 +2415,40 @@
 		display: flex;
 		flex-direction: column;
 		gap: 0.2rem;
+	}
+
+	.var-chip-grid {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.35rem;
+		margin-top: 0.45rem;
+	}
+
+	.var-chip {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		max-width: 100%;
+		min-height: 1.55rem;
+		border: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
+		border-radius: var(--radius-sm);
+		background: color-mix(in srgb, var(--muted) 45%, transparent);
+		padding: 0.15rem 0.4rem;
+		font-family: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, monospace;
+		font-size: 0.66rem;
+		line-height: 1.15;
+		color: color-mix(in srgb, var(--foreground) 88%, var(--muted-foreground));
+		cursor: pointer;
+		transition:
+			background 130ms ease,
+			border-color 130ms ease,
+			color 130ms ease;
+	}
+
+	.var-chip:hover {
+		color: var(--foreground);
+		background: color-mix(in srgb, var(--muted) 70%, transparent);
+		border-color: color-mix(in srgb, var(--border) 140%, transparent);
 	}
 
 	.var-item {
@@ -2331,6 +2513,16 @@
 		display: flex;
 		flex-direction: column;
 		gap: 0.35rem;
+	}
+
+	:global(.template-action-btn) {
+		cursor: pointer;
+	}
+
+	:global(.template-action-btn:hover:not(:disabled)) {
+		color: var(--foreground);
+		border-color: color-mix(in srgb, var(--border) 150%, transparent);
+		background: color-mix(in srgb, var(--muted) 50%, transparent);
 	}
 
 	/* ─── Sender blocking banner (email tab) ─────────────────────────────────── */
