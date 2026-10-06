@@ -5,6 +5,7 @@ import {
 	type EmailAIReviewSnapshot
 } from '../src/lib/domain/email-ai.ts';
 import {
+	getUnsupportedDraftVariablesMessage,
 	parseEmailAIModelJson,
 	validateEmailAIResult,
 	type RawEmailAIResult
@@ -115,6 +116,24 @@ test('rejects proposals that remove original variables', () => {
 	assert.equal(validation.ok, false);
 	if (validation.ok) return;
 	assert.match(validation.message, /removed existing variables: customer_name/);
+});
+
+test('flags unsupported variables in the draft before review', () => {
+	assert.equal(
+		getUnsupportedDraftVariablesMessage({
+			subject: 'Thanks, {{customer_name}}',
+			body: '<p>See you on {{activity_date}}</p>'
+		}),
+		null
+	);
+
+	const message = getUnsupportedDraftVariablesMessage({
+		subject: 'Thanks, {{firstName}}',
+		body: '<p>Booking {{ booking_ref }} for {{firstName}}</p>'
+	});
+	assert.ok(message);
+	assert.match(message, /unsupported variables \{\{firstName\}\}, \{\{booking_ref\}\}/);
+	assert.match(message, /Supported variables: \{\{customer_name\}\}/);
 });
 
 test('rejects proposals that introduce unsupported variables', () => {

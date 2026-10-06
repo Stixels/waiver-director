@@ -52,6 +52,25 @@ function unsupportedVariables(value: string): string[] {
 	return [...extractVariables(value)].filter((variable) => !allowed.has(variable));
 }
 
+function formatVariables(variables: readonly string[]): string {
+	return variables.map((variable) => `{{${variable}}}`).join(', ');
+}
+
+/**
+ * Unsupported variables in the draft would make every AI proposal fail the
+ * preserve-variables check, so reject them before spending a review.
+ */
+export function getUnsupportedDraftVariablesMessage(source: {
+	subject: string;
+	body: string;
+}): string | null {
+	const unsupported = unsupportedVariables(`${source.subject}\n${source.body}`);
+	if (unsupported.length === 0) return null;
+
+	const noun = unsupported.length === 1 ? 'variable' : 'variables';
+	return `Replace the unsupported ${noun} ${formatVariables(unsupported)} before reviewing with AI. Supported variables: ${formatVariables(EMAIL_AI_ALLOWED_VARIABLES)}.`;
+}
+
 function missingOriginalVariables(source: string, proposed: string): string[] {
 	const original = extractVariables(source);
 	const next = extractVariables(proposed);
