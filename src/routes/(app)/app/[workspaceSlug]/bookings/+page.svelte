@@ -455,8 +455,8 @@
 {#if shareBooking && publicSlug}
 	<QrCodeDialog
 		bind:open={shareDialogOpen}
-		title="Booking QR code"
-		description="Scan to open the waiver for {shareBooking.activityName}."
+		title="Waiver QR code"
+		description="Scan to sign the waiver for {shareBooking.activityName}. Signatures land on this booking."
 		url={bookingPublicUrl(shareBooking)}
 		copySuccessMessage="Booking waiver link copied."
 		copyErrorMessage="Unable to copy booking link."
@@ -805,12 +805,12 @@
 								variant="outline"
 								onclick={(event) => openBookingQrCode(booking, event)}
 								disabled={!publicSlug || isCanceled}
-								aria-label="Show booking QR code"
+								aria-label="Show waiver QR code"
 								title={isCanceled
 									? 'Canceled bookings cannot be shared'
 									: !publicSlug
 										? 'Publish a waiver to share QR codes'
-										: 'Show booking QR code'}
+										: 'Show waiver QR code'}
 							>
 								<QrCodeIcon class="size-3" aria-hidden="true" />
 								Share
@@ -951,12 +951,12 @@
 											onclick={(event) => openBookingQrCode(booking, event)}
 											onkeydown={(event) => event.stopPropagation()}
 											disabled={!publicSlug || isCanceled}
-											aria-label="Show booking QR code"
+											aria-label="Show waiver QR code"
 											title={isCanceled
 												? 'Canceled bookings cannot be shared'
 												: !publicSlug
 													? 'Publish a waiver to share QR codes'
-													: 'Show booking QR code'}
+													: 'Show waiver QR code'}
 										>
 											<QrCodeIcon class="size-3" aria-hidden="true" />
 											Share

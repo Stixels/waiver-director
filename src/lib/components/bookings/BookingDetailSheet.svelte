@@ -298,7 +298,7 @@
 						? 'Canceled bookings cannot be shared'
 						: !publicSlug
 							? 'Publish a waiver to share QR codes'
-							: 'Show booking QR code'}
+							: 'Show waiver QR code'}
 				>
 					<QrCodeIcon class="size-[18px]" aria-hidden="true" />
 					<span class="text-[11px] font-medium">QR code</span>
@@ -433,8 +433,9 @@
 {#if detail && canShare}
 	<QrCodeDialog
 		bind:open={qrDialogOpen}
-		title="Booking QR code"
-		description="Scan to open the waiver for {detail.booking.activityName}."
+		title="Waiver QR code"
+		description="Scan to sign the waiver for {detail.booking
+			.activityName}. Signatures land on this booking."
 		url={bookingPublicUrl()}
 		copySuccessMessage="Booking waiver link copied."
 		copyErrorMessage="Unable to copy booking link."

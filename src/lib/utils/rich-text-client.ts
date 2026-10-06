@@ -6,6 +6,7 @@ import {
 	TAG_RENAMES,
 	finalizeSanitizedRichTextHtml,
 	hasSupportedHtmlTag,
+	normalizeRichTextSource,
 	plainTextToRichHtml,
 	sanitizeHref,
 	sanitizeStyle
@@ -110,7 +111,7 @@ function browserSanitizeHtml(source: string): string | null {
 }
 
 export function sanitizeRichTextHtml(input: string): string {
-	const source = input.replace(/\r\n?/g, '\n').trim();
+	const source = normalizeRichTextSource(input);
 	if (!source) return '';
 
 	if (!hasSupportedHtmlTag(source)) {

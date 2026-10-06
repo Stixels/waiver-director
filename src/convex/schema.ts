@@ -104,6 +104,7 @@ export default defineSchema({
 		publishedVersionId: v.optional(v.id('waiver_versions')),
 		title: v.string(),
 		introCopy: v.string(),
+		theme: v.optional(v.union(v.literal('light'), v.literal('dark'))),
 		fields: v.array(
 			v.union(
 				v.object({
@@ -149,6 +150,7 @@ export default defineSchema({
 		versionNumber: v.number(),
 		title: v.string(),
 		introCopy: v.string(),
+		theme: v.optional(v.union(v.literal('light'), v.literal('dark'))),
 		fields: v.array(
 			v.union(
 				v.object({
@@ -251,6 +253,16 @@ export default defineSchema({
 		sendAfterUnit: v.union(v.literal('minutes'), v.literal('hours'), v.literal('days')),
 		updatedAt: v.number()
 	}).index('by_workspaceId', ['workspaceId']),
+
+	email_ai_rate_limits: defineTable({
+		workspaceId: v.id('workspaces'),
+		scopeKey: v.string(),
+		windowStartedAt: v.number(),
+		requestCount: v.number(),
+		updatedAt: v.number()
+	})
+		.index('by_workspaceId', ['workspaceId'])
+		.index('by_workspaceId_and_scopeKey', ['workspaceId', 'scopeKey']),
 
 	email_templates: defineTable({
 		workspaceId: v.id('workspaces'),

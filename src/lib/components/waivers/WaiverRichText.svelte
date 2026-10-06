@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { browser } from '$app/environment';
 	import { sanitizeRichTextHtml } from '$lib/utils/rich-text-client';
 
 	interface Props {
@@ -8,7 +9,14 @@
 
 	let { html, class: className = '' }: Props = $props();
 
-	const sanitizedHtml = $derived(sanitizeRichTextHtml(html));
+	/**
+	 * The client sanitizer needs DOMParser, which does not exist during SSR. Running
+	 * it there falls back to the plain-text path and escapes the whole document, so
+	 * the markup renders as visible tags and hydration keeps that server output.
+	 * Server-rendered callers therefore pass HTML that was already sanitized on the
+	 * way out of Convex; the browser still re-sanitizes on hydration.
+	 */
+	const sanitizedHtml = $derived(browser ? sanitizeRichTextHtml(html) : html.trim());
 </script>
 
 {#if sanitizedHtml}
@@ -80,7 +88,7 @@
 		text-underline-offset: 0.15em;
 	}
 
-	:global(.dark) .waiver-rich-text :global(a) {
+	:global(.waiver-theme-dark) .waiver-rich-text :global(a) {
 		color: color-mix(in oklch, var(--primary) 32%, var(--primary-foreground));
 	}
 

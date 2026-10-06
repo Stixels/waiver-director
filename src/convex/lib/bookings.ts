@@ -1,11 +1,7 @@
 import { v } from 'convex/values';
 import type { Doc } from '../_generated/dataModel';
 
-export const bookingProviderValidator = v.union(
-	v.literal('bookeo'),
-	v.literal('resova'),
-	v.literal('xola')
-);
+export const bookingProviderValidator = v.union(v.literal('bookeo'), v.literal('xola'));
 
 export const bookingStatusValidator = v.union(v.literal('active'), v.literal('canceled'));
 
@@ -19,7 +15,7 @@ export const bookingSnapshotValidator = v.object({
 	leadCustomerEmail: v.optional(v.string())
 });
 
-export type BookingProvider = 'bookeo' | 'resova' | 'xola';
+export type BookingProvider = 'bookeo' | 'xola';
 
 export const BOOKEO_REQUIRED_PERMISSIONS = ['bookings_r_all', 'customers_r_all'] as const;
 export const UNKNOWN_ACTIVITY_NAME = 'Unknown activity';

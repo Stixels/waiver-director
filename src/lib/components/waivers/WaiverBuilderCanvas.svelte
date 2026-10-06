@@ -26,8 +26,9 @@
 	import type { Id } from '$convex/_generated/dataModel';
 	import { api } from '$convex/_generated/api';
 	import { useProtectedQuery } from '$lib/components/auth/convex-auth.svelte';
-	import type { WaiverField } from '$lib/domain/waivers';
+	import type { WaiverField, WaiverTheme } from '$lib/domain/waivers';
 	import WaiverDocumentShell from '$lib/components/waivers/WaiverDocumentShell.svelte';
+	import WaiverThemeToggle from '$lib/components/waivers/WaiverThemeToggle.svelte';
 	import WorkspaceLogoUploader from '$lib/components/workspaces/WorkspaceLogoUploader.svelte';
 	import WaiverPublicAboutSignerCard from '$lib/components/waivers/WaiverPublicAboutSignerCard.svelte';
 	import WaiverPublicAdditionalInfoSection from '$lib/components/waivers/WaiverPublicAdditionalInfoSection.svelte';
@@ -63,6 +64,7 @@
 	interface Props {
 		introCopy: string;
 		fields: WaiverField[];
+		theme?: WaiverTheme;
 		workspaceName?: string;
 		workspaceId?: Id<'workspaces'> | null;
 		canEditBranding?: boolean;
@@ -76,6 +78,7 @@
 	let {
 		introCopy = $bindable('<p></p>'),
 		fields,
+		theme = $bindable('dark'),
 		workspaceName,
 		workspaceId = null,
 		canEditBranding = false,
@@ -98,7 +101,7 @@
 	let linkError = $state<string | null>(null);
 	let linkInputEl = $state<HTMLInputElement | null>(null);
 	let toolbarState = $state({
-		blockShortLabel: 'Text',
+		blockLabel: 'Paragraph',
 		alignment: 'left' as TextAlignValue,
 		bold: false,
 		italic: false,
@@ -236,10 +239,10 @@
 	function syncToolbarState(sourceEditor: Editor | null) {
 		if (!sourceEditor) return;
 
-		let blockShortLabel = 'Text';
+		let blockLabel = 'Paragraph';
 		for (let level = 1; level <= 6; level += 1) {
 			if (sourceEditor.isActive('heading', { level })) {
-				blockShortLabel = `H${level}`;
+				blockLabel = `Heading ${level}`;
 				break;
 			}
 		}
@@ -249,7 +252,7 @@
 		) ?? 'left') as TextAlignValue;
 
 		toolbarState = {
-			blockShortLabel,
+			blockLabel,
 			alignment,
 			bold: sourceEditor.isActive('bold'),
 			italic: sourceEditor.isActive('italic'),
@@ -380,14 +383,20 @@
 <section class="flex min-h-0 min-w-0 flex-1 flex-col bg-muted/10">
 	<!-- Toolbar -->
 	<div
-		class="canvas-toolbar flex shrink-0 items-center gap-2 border-b border-border/80 bg-card/40 px-4 py-2 backdrop-blur-sm"
+		class="canvas-toolbar flex shrink-0 items-center gap-2 overflow-x-auto border-b border-border/80 bg-card/40 px-4 py-2 backdrop-blur-sm"
 		role="toolbar"
 		aria-label="Waiver copy formatting"
 		tabindex="-1"
 		onmousedown={keepToolbarFocus}
 	>
-		<div class="flex min-w-0 flex-1 items-center gap-2">
-			<span class="save-indicator" data-state={saveState}>
+		<div class="toolbar-status-cluster flex min-w-0 flex-1 items-center gap-2">
+			<span
+				class="save-indicator"
+				data-state={saveState}
+				role="status"
+				aria-label={savedLabel}
+				title={savedLabel}
+			>
 				{#if saveState === 'saving'}
 					<LoaderIcon class="size-3.5 animate-spin" />
 				{:else if saveState === 'error'}
@@ -401,28 +410,31 @@
 			</span>
 		</div>
 
-		<div class="flex items-center gap-1">
+		<div class="flex shrink-0 items-center gap-1">
 			<!-- Block style -->
 			<DropdownMenu>
 				<DropdownMenuTrigger class="toolbar-select" disabled={!editor} aria-label="Text style">
 					{#snippet child({ props })}
 						<button {...props}>
-							<span class="toolbar-select-label">{toolbarState.blockShortLabel}</span>
+							<span class="toolbar-select-label">{toolbarState.blockLabel}</span>
 							<ChevronDownIcon class="size-3" />
 						</button>
 					{/snippet}
 				</DropdownMenuTrigger>
 				<DropdownMenuContent align="end" class="w-40">
-					<DropdownMenuItem onclick={() => command((e) => e.chain().focus().setParagraph().run())}>
-						Paragraph
+					<DropdownMenuItem
+						class={toolbarState.blockLabel === 'Paragraph' ? 'font-semibold' : undefined}
+						onclick={() => command((e) => e.chain().focus().setParagraph().run())}
+					>
+						<span>Paragraph</span>
 					</DropdownMenuItem>
 					<DropdownMenuSeparator />
 					{#each headingLevels as level (level)}
 						<DropdownMenuItem
-							class={toolbarState.blockShortLabel === `H${level}` ? 'font-semibold' : undefined}
+							class={toolbarState.blockLabel === `Heading ${level}` ? 'font-semibold' : undefined}
 							onclick={() => command((e) => e.chain().focus().toggleHeading({ level }).run())}
 						>
-							Heading {level}
+							<span>Heading {level}</span>
 						</DropdownMenuItem>
 					{/each}
 				</DropdownMenuContent>
@@ -579,11 +591,20 @@
 			>
 				<RemoveFormattingIcon class="size-3.5" />
 			</button>
+
+			<span class="toolbar-divider"></span>
+
+			<WaiverThemeToggle bind:theme />
 		</div>
 	</div>
 
 	<!-- Scrollable document canvas -->
-	<div class="flex-1 overflow-y-auto overscroll-y-contain" data-canvas-scroll>
+	<div
+		class="flex-1 overflow-y-auto overscroll-y-contain bg-background text-foreground"
+		class:waiver-theme-light={theme === 'light'}
+		class:waiver-theme-dark={theme === 'dark'}
+		data-canvas-scroll
+	>
 		<WaiverDocumentShell {workspaceName} {workspaceLogoUrl}>
 			{#snippet headerActions()}
 				{#if workspaceId && canEditBranding}
@@ -671,6 +692,10 @@
 </section>
 
 <style>
+	.canvas-toolbar {
+		scrollbar-width: thin;
+	}
+
 	.save-indicator {
 		display: inline-flex;
 		align-items: center;
@@ -703,6 +728,20 @@
 
 	.save-indicator[data-state='dirty'] {
 		color: color-mix(in srgb, var(--primary) 70%, var(--foreground));
+	}
+
+	@media (max-width: 640px) {
+		.toolbar-status-cluster {
+			flex: 0 0 auto;
+		}
+
+		.save-indicator {
+			padding-inline: 0.4rem;
+		}
+
+		.save-indicator span {
+			display: none;
+		}
 	}
 
 	.toolbar-button {
@@ -740,7 +779,7 @@
 		align-items: center;
 		gap: 0.25rem;
 		border-radius: var(--radius-md);
-		padding: 0 0.55rem;
+		padding: 0 0.4rem;
 		font-size: 0.72rem;
 		font-weight: 500;
 		color: var(--foreground);
@@ -759,8 +798,6 @@
 	}
 
 	.toolbar-select-label {
-		min-width: 1.4rem;
-		text-align: left;
 		font-variant: all-small-caps;
 		letter-spacing: 0.03em;
 	}
@@ -815,28 +852,31 @@
 	:global(.waiver-canvas-editor h4),
 	:global(.waiver-canvas-editor h5),
 	:global(.waiver-canvas-editor h6) {
-		margin: 1.5rem 0 0.75rem;
+		margin: 1.25rem 0 0.75rem;
 		font-weight: 700;
 		line-height: 1.2;
 		color: var(--foreground);
 	}
 
 	:global(.waiver-canvas-editor h1) {
-		font-size: 1.75rem;
+		font-size: 1.875rem;
 	}
 
 	:global(.waiver-canvas-editor h2) {
-		font-size: 1.375rem;
+		font-size: 1.5rem;
 	}
 
 	:global(.waiver-canvas-editor h3) {
-		font-size: 1.2rem;
+		font-size: 1.25rem;
 	}
 
-	:global(.waiver-canvas-editor h4),
+	:global(.waiver-canvas-editor h4) {
+		font-size: 1.125rem;
+	}
+
 	:global(.waiver-canvas-editor h5),
 	:global(.waiver-canvas-editor h6) {
-		font-size: 1.05rem;
+		font-size: 1rem;
 	}
 
 	:global(.waiver-canvas-editor ul),
@@ -845,7 +885,16 @@
 		padding-left: 1.25rem;
 	}
 
+	:global(.waiver-canvas-editor ul) {
+		list-style-type: disc;
+	}
+
+	:global(.waiver-canvas-editor ol) {
+		list-style-type: decimal;
+	}
+
 	:global(.waiver-canvas-editor li) {
+		display: list-item;
 		margin: 0.2rem 0;
 	}
 
@@ -855,7 +904,7 @@
 		text-underline-offset: 0.15em;
 	}
 
-	:global(.dark .waiver-canvas-editor a) {
+	:global(.waiver-theme-dark) :global(.waiver-canvas-editor a) {
 		color: color-mix(in oklch, var(--primary) 32%, var(--primary-foreground));
 	}
 

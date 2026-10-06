@@ -2,6 +2,7 @@
 @import '@fontsource/geist-sans/500.css';
 @import '@fontsource/geist-sans/600.css';
 @import '@fontsource/geist-sans/700.css';
+@import '@fontsource-variable/outfit';
 
 :root {
 	--mkt-nav-offset: calc(env(safe-area-inset-top, 0px) + 3.5rem);
@@ -57,7 +58,7 @@ body:has(.mkt) {
 
 	/* Typography */
 	--m-font-sans: 'Geist Sans', ui-sans-serif, system-ui, sans-serif;
-	--m-font-display: 'Bricolage Grotesque', ui-sans-serif, sans-serif;
+	--m-font-display: 'Outfit Variable', 'Outfit', ui-sans-serif, sans-serif;
 
 	background: var(--m-bg);
 	color: oklch(0.97 0 0);
@@ -78,7 +79,7 @@ body:has(.mkt) {
 
 @media (min-width: 1024px) {
 	.mkt {
-		--mkt-hero-top: 7.5rem;
+		--mkt-hero-top: 6rem;
 	}
 }
 
@@ -166,9 +167,40 @@ body:has(.mkt) {
 	background: oklch(1 0 0 / 4%);
 }
 
-/* ── Scroll anchor offsets ─────────────────────────────────── */
-.mkt :is(#how-it-works, #email-pipeline) {
-	scroll-margin-top: calc(var(--mkt-nav-offset) + 0.5rem);
+.mkt .marketing-kicker {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.55rem;
+	font-size: 0.7rem;
+	font-weight: 700;
+	letter-spacing: 0.14em;
+	line-height: 1;
+	text-transform: uppercase;
+	color: var(--m-accent-text);
+}
+
+.mkt .marketing-kicker::before {
+	content: '';
+	width: 1.8rem;
+	height: 1px;
+	background: var(--m-accent-line);
+}
+
+.mkt .marketing-display {
+	font-family: var(--m-font-display);
+	font-weight: 700;
+	letter-spacing: -0.045em;
+	line-height: 0.98;
+}
+
+.mkt .marketing-copy {
+	color: var(--m-text-2);
+	font-size: clamp(0.95rem, 1.4vw, 1.08rem);
+	line-height: 1.75;
+}
+
+.mkt .marketing-chapter {
+	padding-block: clamp(7rem, 14vw, 12rem);
 }
 
 /* ── Nav shell ─────────────────────────────────────────────── */
@@ -229,6 +261,372 @@ body:has(.mkt) {
 		transform: none;
 	}
 	.mkt .sr-visible {
+		transition: none;
+	}
+}
+
+/* ── Landing preview primitives ─────────────────────────────
+   Shared by the homepage signing-line previews. These render
+   product surfaces as designed components rather than as
+   screenshots, so the homepage does not go stale every time the
+   app's own UI shifts.
+   ───────────────────────────────────────────────────────── */
+
+.mkt .mkt-vig {
+	min-width: 0;
+	border: 1px solid var(--m-border-strong);
+	border-radius: 14px;
+	background: var(--m-card);
+	box-shadow:
+		0 18px 44px oklch(0 0 0 / 42%),
+		0 2px 6px oklch(0 0 0 / 30%),
+		inset 0 1px 0 oklch(1 0 0 / 5%);
+}
+
+.mkt .mkt-vig__head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.75rem;
+	padding: 0.8rem 1rem;
+	border-bottom: 1px solid var(--m-border-soft);
+}
+
+.mkt .mkt-vig__head > * {
+	min-width: 0;
+}
+
+.mkt .mkt-vig__title {
+	font-size: 0.8rem;
+	font-weight: 600;
+	letter-spacing: -0.015em;
+	color: var(--m-text-1);
+	min-width: 0;
+}
+
+.mkt .mkt-vig__body {
+	padding: 1rem;
+	min-width: 0;
+}
+
+/* status pills */
+.mkt .mkt-pill {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.34rem;
+	padding: 0.22rem 0.5rem;
+	border-radius: 999px;
+	font-size: 0.66rem;
+	font-weight: 650;
+	letter-spacing: 0.02em;
+	line-height: 1.4;
+	border: 1px solid transparent;
+	white-space: nowrap;
+}
+
+.mkt .mkt-pill i {
+	width: 5px;
+	height: 5px;
+	border-radius: 999px;
+	background: currentcolor;
+	flex: 0 0 auto;
+}
+
+.mkt .mkt-pill--green {
+	color: var(--m-green);
+	background: var(--m-green-dim);
+	border-color: oklch(0.65 0.22 155 / 22%);
+}
+
+.mkt .mkt-pill--amber {
+	color: var(--m-amber);
+	background: var(--m-amber-dim);
+	border-color: oklch(0.78 0.18 75 / 24%);
+}
+
+.mkt .mkt-pill--accent {
+	color: var(--m-accent-text);
+	background: var(--m-accent-dim);
+	border-color: var(--m-accent-border-soft);
+}
+
+.mkt .mkt-pill--mute {
+	color: var(--m-text-3);
+	background: oklch(1 0 0 / 5%);
+	border-color: var(--m-border-soft);
+}
+
+/* participant roster */
+.mkt .mkt-roster li {
+	display: flex;
+	align-items: center;
+	gap: 0.7rem;
+	padding: 0.55rem 0.2rem;
+	border-bottom: 1px solid var(--m-border-soft);
+}
+
+.mkt .mkt-roster li:last-child {
+	border-bottom: none;
+}
+
+.mkt .mkt-roster__av {
+	width: 1.65rem;
+	height: 1.65rem;
+	border-radius: 999px;
+	display: grid;
+	place-items: center;
+	flex: 0 0 auto;
+	font-size: 0.6rem;
+	font-weight: 700;
+	color: var(--m-text-2);
+	background: oklch(1 0 0 / 6%);
+	border: 1px solid var(--m-border-soft);
+}
+
+.mkt .mkt-roster__name {
+	font-size: 0.8rem;
+	font-weight: 500;
+	letter-spacing: -0.015em;
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.mkt .mkt-roster__minor {
+	/* Spacing lives here rather than in markup: whitespace between adjacent
+	   inline elements does not survive Svelte's template formatting. */
+	margin-left: 0.35rem;
+	color: var(--m-text-3);
+	font-weight: 400;
+}
+
+.mkt .mkt-roster li.is-pending .mkt-roster__name {
+	color: var(--m-text-3);
+}
+
+.mkt .mkt-roster li.is-pending .mkt-roster__av {
+	border-style: dashed;
+	border-color: oklch(0.78 0.18 75 / 24%);
+	color: var(--m-amber);
+	background: var(--m-amber-dim);
+}
+
+/* signed-versus-expected meter */
+.mkt .mkt-meter {
+	display: flex;
+	gap: 0.28rem;
+}
+
+.mkt .mkt-meter i {
+	height: 0.42rem;
+	flex: 1;
+	border-radius: 999px;
+	background: var(--m-green);
+	box-shadow: 0 0 10px oklch(0.65 0.22 155 / 35%);
+}
+
+.mkt .mkt-meter i.is-warn {
+	background: var(--m-amber);
+	box-shadow: 0 0 10px oklch(0.78 0.18 75 / 32%);
+}
+
+/* booking-number chip — height matched to the h-9 button beside it */
+.mkt .mkt-idchip {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.5rem;
+	height: 2.25rem;
+	box-sizing: border-box;
+	padding: 0 0.35rem 0 0.68rem;
+	border-radius: 9px;
+	border: 1px solid var(--m-border-strong);
+	background: var(--m-surface);
+	font-family: var(--m-font-mono);
+	font-size: 0.76rem;
+	font-weight: 500;
+	color: var(--m-text-1);
+	font-variant-numeric: tabular-nums;
+}
+
+.mkt .mkt-idchip__btn {
+	display: grid;
+	place-items: center;
+	width: 1.55rem;
+	height: 1.55rem;
+	border-radius: 6px;
+	cursor: pointer;
+	border: 1px solid transparent;
+	background: transparent;
+	color: var(--m-text-3);
+	transition:
+		background 0.15s ease,
+		color 0.15s ease,
+		border-color 0.15s ease;
+}
+
+.mkt .mkt-idchip__btn:hover {
+	background: oklch(1 0 0 / 8%);
+	color: var(--m-text-1);
+	border-color: var(--m-border-soft);
+}
+
+.mkt .mkt-idchip__btn.is-done {
+	color: var(--m-green);
+	background: var(--m-green-dim);
+	border-color: oklch(0.65 0.22 155 / 22%);
+}
+
+.mkt .mkt-idchip__flash {
+	font-size: 0.66rem;
+	font-weight: 650;
+	color: var(--m-green);
+	font-family: var(--m-font-sans);
+}
+
+/* the row the chip and its button share — keeps both on one baseline */
+.mkt .mkt-covrow {
+	display: flex;
+	align-items: center;
+	justify-content: flex-start;
+	gap: 0.6rem;
+	flex-wrap: wrap;
+	padding-top: 0.9rem;
+	margin-top: 0.9rem;
+	border-top: 1px solid var(--m-border-soft);
+}
+
+/* follow-up queue */
+.mkt .mkt-queue li {
+	display: grid;
+	grid-template-columns: 1.9rem minmax(0, 1fr) auto;
+	gap: 0.65rem;
+	align-items: center;
+	padding: 0.6rem 0.2rem;
+	border-bottom: 1px solid var(--m-border-soft);
+}
+
+.mkt .mkt-queue li:last-child {
+	border-bottom: none;
+}
+
+.mkt .mkt-queue li > * {
+	min-width: 0;
+}
+
+.mkt .mkt-queue__ic {
+	width: 1.9rem;
+	height: 1.9rem;
+	border-radius: 8px;
+	display: grid;
+	place-items: center;
+	border: 1px solid var(--m-border-soft);
+	background: oklch(1 0 0 / 4%);
+	color: var(--m-text-3);
+}
+
+.mkt .mkt-queue__t {
+	display: block;
+	font-size: 0.79rem;
+	font-weight: 500;
+	letter-spacing: -0.015em;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.mkt .mkt-queue__sub {
+	display: block;
+	font-size: 0.7rem;
+	color: var(--m-text-3);
+	margin-top: 0.1rem;
+	font-variant-numeric: tabular-nums;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* waiver-builder fields */
+.mkt .mkt-field {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.75rem;
+	padding: 0.55rem 0.7rem;
+	border-radius: 9px;
+	border: 1px solid var(--m-border-soft);
+	background: oklch(1 0 0 / 3%);
+}
+
+.mkt .mkt-field__label {
+	font-size: 0.78rem;
+	font-weight: 500;
+	letter-spacing: -0.015em;
+	color: var(--m-text-2);
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.mkt .mkt-field__type {
+	font-family: var(--m-font-mono);
+	font-size: 0.65rem;
+	font-weight: 500;
+	letter-spacing: 0.02em;
+	color: var(--m-text-3);
+	padding: 0.14rem 0.38rem;
+	border-radius: 5px;
+	background: oklch(1 0 0 / 5%);
+	flex: 0 0 auto;
+}
+
+.mkt .mkt-field--live {
+	border-color: var(--m-accent-border-soft);
+	background: var(--m-accent-dim);
+}
+
+.mkt .mkt-field--live .mkt-field__label {
+	color: var(--m-text-1);
+}
+
+/* share routes */
+.mkt .mkt-way {
+	display: flex;
+	align-items: center;
+	gap: 0.6rem;
+	padding: 0.6rem 0.75rem;
+	border-radius: 10px;
+	border: 1px solid var(--m-border-soft);
+	background: oklch(1 0 0 / 3%);
+	font-size: 0.79rem;
+	font-weight: 500;
+	letter-spacing: -0.015em;
+	color: var(--m-text-2);
+	min-width: 0;
+}
+
+.mkt .mkt-way > svg {
+	color: var(--m-accent-text);
+	flex: 0 0 auto;
+}
+
+.mkt .mkt-way span {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.mkt .mkt-way code {
+	font-family: var(--m-font-mono);
+	font-size: 0.72rem;
+	color: var(--m-text-3);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.mkt .mkt-idchip__btn {
 		transition: none;
 	}
 }

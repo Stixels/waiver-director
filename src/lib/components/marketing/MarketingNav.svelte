@@ -4,6 +4,7 @@
 	import { onMount } from 'svelte';
 	import { fade, fly } from 'svelte/transition';
 	import { Button } from '$lib/components/ui/button';
+	import waiverDirectorIcon from '$lib/assets/waiver-director-icon.svg';
 	import { Menu, X } from '@lucide/svelte';
 
 	const DESKTOP_BREAKPOINT_QUERY = '(min-width: 768px)';
@@ -76,13 +77,12 @@
 					aria-label="Waiver Director home"
 					class="mkt-brand-link flex min-w-0 items-center gap-2.5 no-underline"
 				>
-					<div
-						class="mkt-brand-mark flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[11px] font-black"
-						style="background: var(--primary); color: var(--primary-foreground); font-family: var(--m-font-display);"
+					<img
+						src={waiverDirectorIcon}
+						alt=""
+						class="mkt-brand-mark h-7 w-7 shrink-0"
 						aria-hidden="true"
-					>
-						WD
-					</div>
+					/>
 					<span class="sr-only">Waiver Director</span>
 					<span class="mkt-brand-wordmark hidden font-bold sm:block">Waiver Director</span>
 				</a>
@@ -108,7 +108,7 @@
 				>
 				<Button
 					href={resolve('/sign-up')}
-					class="btn-mkt-accent h-8 rounded-lg px-4 text-xs font-semibold">Get early access</Button
+					class="btn-mkt-accent h-8 rounded-lg px-4 text-xs font-semibold">Start for free</Button
 				>
 			</div>
 
@@ -164,7 +164,7 @@
 						<Button
 							href={resolve('/sign-up')}
 							class="btn-mkt-accent h-11 w-full rounded-xl text-sm font-semibold"
-							onclick={closeMobileNav}>Get early access</Button
+							onclick={closeMobileNav}>Start for free</Button
 						>
 					</div>
 				</div>

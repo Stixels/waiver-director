@@ -1,18 +1,15 @@
 <script lang="ts">
 	import { PUBLIC_APP_URL } from '$env/static/public';
 
-	import LandingPageAnalyticsPreview from '$lib/components/marketing/landing-page/LandingPageAnalyticsPreview.svelte';
 	import LandingPageCta from '$lib/components/marketing/landing-page/LandingPageCta.svelte';
-	import LandingPageDifferentiator from '$lib/components/marketing/landing-page/LandingPageDifferentiator.svelte';
-	import LandingPageEmailPipeline from '$lib/components/marketing/landing-page/LandingPageEmailPipeline.svelte';
-	import LandingPageFeatureTeaser from '$lib/components/marketing/landing-page/LandingPageFeatureTeaser.svelte';
+	import LandingPageFaq from '$lib/components/marketing/landing-page/LandingPageFaq.svelte';
 	import LandingPageHero from '$lib/components/marketing/landing-page/LandingPageHero.svelte';
-	import LandingPageHowItWorks from '$lib/components/marketing/landing-page/LandingPageHowItWorks.svelte';
-	import LandingPageTestimonials from '$lib/components/marketing/landing-page/LandingPageTestimonials.svelte';
+	import LandingPageSigningLine from '$lib/components/marketing/landing-page/LandingPageSigningLine.svelte';
+	import MarketingMotion from '$lib/components/marketing/MarketingMotion.svelte';
 
-	const pageTitle = 'Waiver Director — Digital Waivers for Any Booking Experience';
+	const pageTitle = 'Waiver Director - Every guest signed before they arrive';
 	const pageDescription =
-		"Digital waivers for tours & activities: capture every guest's email, sync Bookeo bookings, and automate on-demand or delayed follow-up emails. More integrations are coming soon.";
+		'Build a digital waiver, share it by link, QR code, or embed, and see which guests still have not signed. Bookeo booking coverage, signed records, follow-up emails, and Mailchimp sync.';
 
 	const siteBase = (PUBLIC_APP_URL ?? '').replace(/\/$/, '');
 	const canonicalUrl = siteBase ? `${siteBase}/` : '';
@@ -34,10 +31,7 @@
 </svelte:head>
 
 <LandingPageHero />
-<LandingPageDifferentiator />
-<LandingPageHowItWorks />
-<LandingPageFeatureTeaser />
-<LandingPageEmailPipeline />
-<LandingPageAnalyticsPreview />
-<LandingPageTestimonials />
+<LandingPageSigningLine />
+<LandingPageFaq />
 <LandingPageCta />
+<MarketingMotion />

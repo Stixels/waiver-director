@@ -9,6 +9,7 @@ import {
 	TEXT_ALIGN_PATTERNS,
 	finalizeSanitizedRichTextHtml,
 	hasSupportedHtmlTag,
+	normalizeRichTextSource,
 	plainTextToRichHtml,
 	sanitizeHref
 } from './rich-text-shared';
@@ -92,7 +93,7 @@ const SANITIZE_OPTIONS: import('sanitize-html').IOptions = {
 };
 
 export function sanitizeRichTextHtml(input: string): string {
-	const source = input.replace(/\r\n?/g, '\n').trim();
+	const source = normalizeRichTextSource(input);
 	if (!source) {
 		return '';
 	}

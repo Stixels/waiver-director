@@ -7,9 +7,7 @@
 	import { api } from '$convex/_generated/api';
 	import bookeoIcon from '$lib/assets/providers/bookeo-icon.webp';
 	import constantContactIcon from '$lib/assets/providers/constant-contact-icon.webp';
-	import fareharborIcon from '$lib/assets/providers/fareharbor-icon.webp';
 	import mailchimpIcon from '$lib/assets/providers/mailchimp-icon.webp';
-	import resovaIcon from '$lib/assets/providers/resova-icon.webp';
 	import xolaIcon from '$lib/assets/providers/xola-icon.webp';
 	import { useAppContext } from '$lib/components/app/app-context.svelte';
 	import UpgradeOverlay from '$lib/components/app/UpgradeOverlay.svelte';
@@ -80,17 +78,6 @@
 			logo: bookeoIcon
 		},
 		{
-			key: 'resova',
-			name: 'Resova',
-			category: 'booking',
-			availability: 'coming_soon',
-			status: 'Coming soon',
-			description: 'Booking sync support coming soon.',
-			detailDescription:
-				'Resova support will use the same booking and waiver matching workflow once available.',
-			logo: resovaIcon
-		},
-		{
 			key: 'xola',
 			name: 'Xola',
 			category: 'booking',
@@ -100,17 +87,6 @@
 			detailDescription:
 				'Xola support will connect future booking data to waiver signing once available.',
 			logo: xolaIcon
-		},
-		{
-			key: 'fareharbor',
-			name: 'FareHarbor',
-			category: 'booking',
-			availability: 'coming_soon',
-			status: 'Coming soon',
-			description: 'Booking sync support coming soon.',
-			detailDescription:
-				'FareHarbor support is planned for booking imports and booking-linked waiver signing.',
-			logo: fareharborIcon
 		}
 	];
 

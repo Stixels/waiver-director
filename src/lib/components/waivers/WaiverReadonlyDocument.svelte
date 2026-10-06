@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { WaiverField } from '$lib/domain/waivers';
+	import type { WaiverField, WaiverTheme } from '$lib/domain/waivers';
 	import WaiverCopySection from '$lib/components/waivers/WaiverCopySection.svelte';
 	import WaiverDocumentShell from '$lib/components/waivers/WaiverDocumentShell.svelte';
 	import WaiverFieldDisplay from '$lib/components/waivers/WaiverFieldDisplay.svelte';
@@ -17,6 +17,7 @@
 		workspaceName?: string;
 		introCopy: string;
 		fields: WaiverField[];
+		theme?: WaiverTheme;
 		preview?: boolean;
 		signerName?: string;
 		signerEmail?: string;
@@ -33,6 +34,7 @@
 		workspaceName,
 		introCopy,
 		fields,
+		theme = 'dark',
 		preview = false,
 		signerName = '',
 		signerEmail = '',
@@ -57,7 +59,11 @@
 	}
 </script>
 
-<div class="bg-background">
+<div
+	class="bg-background text-foreground"
+	class:waiver-theme-light={theme === 'light'}
+	class:waiver-theme-dark={theme === 'dark'}
+>
 	<WaiverDocumentShell {workspaceName}>
 		<WaiverCopySection {introCopy} />
 

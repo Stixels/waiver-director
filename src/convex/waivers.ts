@@ -10,6 +10,7 @@ import { upsertSignerCustomer } from './lib/customers';
 import { submissionSearchText } from './lib/submissions';
 import { getOwnedWorkspaceLogoUrl } from './lib/workspaces';
 import { marketingConsentLabel } from './lib/marketing';
+import { sanitizeRichTextHtml } from '../lib/utils/rich-text';
 import {
 	assertWorkspaceRecord,
 	minorInputValidator,
@@ -20,7 +21,8 @@ import {
 	waiverDefinitionsEqual,
 	waiverAnswerValueValidator,
 	waiverFieldValidator,
-	waiverDefinitionValidator
+	waiverDefinitionValidator,
+	waiverThemeValidator
 } from './lib/waivers';
 
 type FunctionCtx = QueryCtx | MutationCtx;
@@ -30,6 +32,7 @@ const workspaceWaiverValue = v.object({
 	publicSlug: v.string(),
 	title: v.string(),
 	introCopy: v.string(),
+	theme: waiverThemeValidator,
 	fields: v.array(waiverFieldValidator),
 	publishedVersionId: v.union(v.id('waiver_versions'), v.null()),
 	hasUnpublishedChanges: v.boolean()
@@ -40,6 +43,7 @@ const waiverVersionPreviewValue = v.object({
 	versionNumber: v.number(),
 	title: v.string(),
 	introCopy: v.string(),
+	theme: waiverThemeValidator,
 	fields: v.array(waiverFieldValidator),
 	workspaceName: v.string(),
 	publishedAt: v.number(),
@@ -53,6 +57,7 @@ const publicWaiverValue = v.object({
 	workspaceLogoUrl: v.union(v.string(), v.null()),
 	title: v.string(),
 	introCopy: v.string(),
+	theme: waiverThemeValidator,
 	fields: v.array(waiverFieldValidator),
 	marketingOptIn: v.union(
 		v.null(),
@@ -67,6 +72,7 @@ const publicBookingWaiverValue = v.object({
 	workspaceLogoUrl: v.union(v.string(), v.null()),
 	title: v.string(),
 	introCopy: v.string(),
+	theme: waiverThemeValidator,
 	fields: v.array(waiverFieldValidator),
 	marketingOptIn: v.union(
 		v.null(),
@@ -115,11 +121,13 @@ async function waiverHasUnpublishedChanges(ctx: FunctionCtx, waiver: Doc<'worksp
 		{
 			title: waiver.title,
 			introCopy: waiver.introCopy,
+			theme: waiver.theme,
 			fields: waiver.fields
 		},
 		{
 			title: version.title,
 			introCopy: version.introCopy,
+			theme: version.theme,
 			fields: version.fields
 		}
 	);
@@ -133,6 +141,7 @@ async function workspaceWaiverSummary(ctx: FunctionCtx, waiver: Doc<'workspace_w
 		publicSlug: waiver.publicSlug,
 		title: waiver.title,
 		introCopy: waiver.introCopy,
+		theme: waiver.theme ?? 'dark',
 		fields: waiver.fields,
 		publishedVersionId: waiver.publishedVersionId ?? null,
 		hasUnpublishedChanges
@@ -182,6 +191,7 @@ export const updateWorkspaceWaiver = mutation({
 		await ctx.db.patch(waiver._id, {
 			title: definition.title,
 			introCopy: definition.introCopy,
+			theme: definition.theme ?? 'dark',
 			fields: definition.fields
 		});
 
@@ -210,6 +220,7 @@ export const publishWorkspaceWaiver = mutation({
 		const definition = normalizeWaiverDefinition({
 			title: waiver.title,
 			introCopy: waiver.introCopy,
+			theme: waiver.theme,
 			fields: waiver.fields
 		});
 		const publishedVersionId = waiver.publishedVersionId ?? null;
@@ -225,6 +236,7 @@ export const publishWorkspaceWaiver = mutation({
 			versionNumber: await getNextVersionNumber(ctx, waiver._id),
 			title: definition.title,
 			introCopy: definition.introCopy,
+			theme: definition.theme ?? 'dark',
 			fields: definition.fields,
 			publishedAt: Date.now()
 		});
@@ -274,6 +286,7 @@ export const listWaiverVersions = query({
 			versionNumber: version.versionNumber,
 			title: version.title,
 			introCopy: version.introCopy,
+			theme: version.theme ?? 'dark',
 			fields: version.fields,
 			workspaceName: workspace.name,
 			publishedAt: version.publishedAt,
@@ -357,6 +370,7 @@ export const getSubmission = query({
 			waiver: {
 				title: version.title,
 				introCopy: version.introCopy,
+				theme: version.theme ?? 'dark',
 				fields: version.fields
 			},
 			minors: submission.minors.map((participant) => participant.fullName),
@@ -469,7 +483,8 @@ export const getPublicWaiverBySlug = query({
 			workspaceName: workspace.name,
 			workspaceLogoUrl: workspaceLogoUrl ?? null,
 			title: version.title,
-			introCopy: version.introCopy,
+			introCopy: sanitizeRichTextHtml(version.introCopy),
+			theme: version.theme ?? 'dark',
 			fields: version.fields,
 			marketingOptIn:
 				marketingIntegration?.status === 'connected' && marketingIntegration.audienceId
@@ -531,7 +546,8 @@ export const getPublicWaiverForBooking = query({
 			workspaceName: workspace.name,
 			workspaceLogoUrl: workspaceLogoUrl ?? null,
 			title: version.title,
-			introCopy: version.introCopy,
+			introCopy: sanitizeRichTextHtml(version.introCopy),
+			theme: version.theme ?? 'dark',
 			fields: version.fields,
 			marketingOptIn:
 				marketingIntegration?.status === 'connected' && marketingIntegration.audienceId
