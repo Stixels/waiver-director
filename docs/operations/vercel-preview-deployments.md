@@ -11,22 +11,25 @@ because it generated a waiver, booking, or canonical URL.
 Keep Vercel's **Automatically expose System Environment Variables** setting enabled. It supplies
 `VERCEL_URL` for each deployment.
 
-Use this Vercel build command:
+The build command is checked in as `buildCommand` in [`vercel.json`](../../vercel.json), which
+overrides the command in the Vercel dashboard:
 
 ```sh
-npx convex deploy --cmd-url-env-var-name PUBLIC_CONVEX_URL --cmd 'PUBLIC_APP_URL="https://$VERCEL_URL" vite build'
+npx convex deploy --cmd-url-env-var-name PUBLIC_CONVEX_URL --cmd 'if [ "$VERCEL_ENV" != production ] || [ -z "$PUBLIC_APP_URL" ]; then export PUBLIC_APP_URL="https://$VERCEL_URL"; fi; vite build'
 ```
 
 The command has two responsibilities:
 
-1. With the Preview-scoped `CONVEX_DEPLOY_KEY`, `convex deploy` creates or updates the Convex
-   preview deployment associated with the Git branch.
-2. It passes that deployment's URL to `vite build` as `PUBLIC_CONVEX_URL` and derives
-   `PUBLIC_APP_URL` from Vercel's deployment-specific URL.
+1. With the environment's `CONVEX_DEPLOY_KEY`, `convex deploy` deploys Convex functions. In
+   **Preview** it creates or updates the Convex preview deployment associated with the Git branch.
+2. It passes that deployment's URL to `vite build` as `PUBLIC_CONVEX_URL`. Outside production it
+   derives `PUBLIC_APP_URL` from Vercel's deployment-specific URL; production builds keep the
+   Production-scoped `PUBLIC_APP_URL` so canonical and copied links use the real domain.
 
 Do not set a shared `PUBLIC_APP_URL` for the Vercel **Preview** environment. That value is
 compiled into the client bundle and would make every preview generate links to the same URL.
-Keep the production `PUBLIC_APP_URL` scoped to **Production** only.
+Keep the production `PUBLIC_APP_URL` scoped to **Production** only. If it is missing, production
+falls back to `VERCEL_URL`, which is the per-deployment `*.vercel.app` address.
 
 ## Environment Boundaries
 
@@ -34,8 +37,9 @@ Vercel build variables and Convex runtime variables are separate.
 
 - `PUBLIC_CONVEX_URL` is set for the Vite build by `convex deploy`; the built preview client uses
   its matching Convex preview backend.
-- `PUBLIC_APP_URL` is set for the Vite build from `VERCEL_URL`; client-side copied links and
-  marketing canonical URLs remain inside the preview.
+- `PUBLIC_APP_URL` is set for preview builds from `VERCEL_URL`; client-side copied links and
+  marketing canonical URLs remain inside the preview. Production builds use the
+  Production-scoped value.
 - `APP_URL`, `PUBLIC_APP_URL`, and `SITE_URL` used by Convex actions are runtime values on the
   Convex deployment. They do not inherit Vercel variables.
 

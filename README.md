@@ -64,8 +64,9 @@ Local service configuration, credentials, and deployment procedures are intentio
 ## Preview Deployments
 
 Vercel preview builds deploy an isolated Convex preview backend and compile its URL into the app.
-The Vercel build command also derives `PUBLIC_APP_URL` from that deployment's `VERCEL_URL`, so
-copied links in a preview stay on that preview rather than pointing at production. See
+The build command in `vercel.json` also derives `PUBLIC_APP_URL` from a preview's `VERCEL_URL`, so
+copied links in a preview stay on that preview rather than pointing at production, while production
+builds keep the Production-scoped `PUBLIC_APP_URL`. See
 [Vercel preview deployments](docs/operations/vercel-preview-deployments.md) for the deployment
 contract and validation steps.
 

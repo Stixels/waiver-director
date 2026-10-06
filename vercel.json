@@ -1,0 +1,4 @@
+{
+	"$schema": "https://openapi.vercel.sh/vercel.json",
+	"buildCommand": "npx convex deploy --cmd-url-env-var-name PUBLIC_CONVEX_URL --cmd 'if [ \"$VERCEL_ENV\" != production ] || [ -z \"$PUBLIC_APP_URL\" ]; then export PUBLIC_APP_URL=\"https://$VERCEL_URL\"; fi; vite build'"
+}
