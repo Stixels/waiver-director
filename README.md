@@ -61,6 +61,14 @@ pnpm run dev
 
 Local service configuration, credentials, and deployment procedures are intentionally not documented in this public repository. Authorized maintainers receive that information through private operational channels. Never commit configuration values, credentials, customer data, or provider account details.
 
+## Preview Deployments
+
+Vercel preview builds deploy an isolated Convex preview backend and compile its URL into the app.
+The Vercel build command also derives `PUBLIC_APP_URL` from that deployment's `VERCEL_URL`, so
+copied links in a preview stay on that preview rather than pointing at production. See
+[Vercel preview deployments](docs/operations/vercel-preview-deployments.md) for the deployment
+contract and validation steps.
+
 ## Development Scripts
 
 ```sh
