@@ -12,6 +12,7 @@ import {
 	EMAIL_AI_MAX_BODY_LENGTH,
 	EMAIL_AI_MAX_LIST_ITEMS,
 	EMAIL_AI_MAX_SUBJECT_LENGTH,
+	getUnsupportedDraftVariablesMessage,
 	parseEmailAIModelJson,
 	validateEmailAIResult
 } from '$lib/domain/email-ai-validation';
@@ -170,6 +171,14 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	}
 	if (!Number.isInteger(body.sendAfterAmount) || body.sendAfterAmount < 1) {
 		return errorResponse('Send delay must be a positive whole number.');
+	}
+
+	const unsupportedVariablesMessage = getUnsupportedDraftVariablesMessage({
+		subject,
+		body: sanitizedBody
+	});
+	if (unsupportedVariablesMessage) {
+		return errorResponse(unsupportedVariablesMessage);
 	}
 
 	let quota: { allowed: boolean; retryAfterSeconds: number; workspaceName: string };
