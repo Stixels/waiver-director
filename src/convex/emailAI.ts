@@ -1,6 +1,7 @@
 import { ConvexError, v } from 'convex/values';
 import type { Doc, Id } from './_generated/dataModel';
 import { mutation, type MutationCtx } from './_generated/server';
+import { requireWorkspaceFeature } from './lib/billing';
 import { nextFixedWindowUsage, type FixedWindowDecision } from './lib/emailAIRateLimit';
 import { requireWorkspaceOwner } from './lib/waivers';
 
@@ -62,6 +63,7 @@ export const consumeReviewQuota = mutation({
 			args.workspaceId,
 			'review and replace follow-up content with AI'
 		);
+		await requireWorkspaceFeature(ctx, args.workspaceId, 'email_followups');
 		const workspace = await ctx.db.get(args.workspaceId);
 		if (!workspace) {
 			throw new ConvexError({ code: 'not_found', message: 'Workspace not found.' });

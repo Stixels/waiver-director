@@ -1675,8 +1675,8 @@
 					>
 						<p class="text-sm text-muted-foreground">
 							{workspacePausedOnPro
-								? 'You can draft and review emails here. Make this workspace primary or upgrade to Business to send follow-ups.'
-								: 'You can draft and review emails on Free. Upgrade to Pro when you’re ready to send follow-ups.'}
+								? 'You can draft emails here. Make this workspace primary or upgrade to Business to review them with AI and send follow-ups.'
+								: 'You can draft emails on Free. Upgrade to Pro to review them with AI and send follow-ups.'}
 						</p>
 						<Button
 							variant="link"
@@ -1923,7 +1923,21 @@
 						<!-- Tool rail (right column) -->
 						<div class="email-rail">
 							<div class="rail-section">
-								{#if currentWorkspace && isOwner}
+								{#if currentWorkspace && isOwner && !canUseEmailFollowups}
+									<p class="rail-label">AI review</p>
+									<p class="rail-hint">
+										{workspacePausedOnPro
+											? 'Make this workspace primary on your Pro plan to review follow-ups with AI.'
+											: 'Upgrade to Pro to review follow-ups with AI.'}
+									</p>
+									<Button
+										variant="link"
+										href={billingHref}
+										class="h-auto p-0 text-sm font-medium text-primary underline underline-offset-4"
+									>
+										{workspacePausedOnPro ? 'Manage primary workspace' : 'View billing'}
+									</Button>
+								{:else if currentWorkspace && isOwner}
 									<EmailAIAssistant
 										workspaceId={currentWorkspace.workspaceId}
 										workspaceSlug={currentWorkspace.slug}
