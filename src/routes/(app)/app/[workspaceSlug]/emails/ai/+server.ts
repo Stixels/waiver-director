@@ -90,6 +90,13 @@ function isConvexAccessError(error: unknown) {
 	return error.data.code === 'unauthenticated' || error.data.code === 'forbidden';
 }
 
+function isConvexBillingError(error: unknown) {
+	if (!(error instanceof ConvexError) || !error.data || typeof error.data !== 'object') {
+		return false;
+	}
+	return 'code' in error.data && error.data.code === 'billing_required';
+}
+
 function isRequestBody(value: unknown): value is EmailAIRequest {
 	if (!value || typeof value !== 'object') return false;
 	const body = value as Partial<EmailAIRequest>;
@@ -189,6 +196,12 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	} catch (error) {
 		if (isConvexAccessError(error)) {
 			return errorResponse('Only workspace owners may review follow-up content with AI.', 403);
+		}
+		if (isConvexBillingError(error)) {
+			return errorResponse(
+				'AI review is included with Pro. Upgrade, or make this workspace primary on your Pro plan.',
+				402
+			);
 		}
 		return errorResponse('Unable to verify AI review access.', 503);
 	}
