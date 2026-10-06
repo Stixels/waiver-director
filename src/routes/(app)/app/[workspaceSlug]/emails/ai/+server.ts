@@ -12,6 +12,7 @@ import {
 	EMAIL_AI_MAX_BODY_LENGTH,
 	EMAIL_AI_MAX_LIST_ITEMS,
 	EMAIL_AI_MAX_SUBJECT_LENGTH,
+	getUnsupportedDraftVariablesMessage,
 	parseEmailAIModelJson,
 	validateEmailAIResult
 } from '$lib/domain/email-ai-validation';
@@ -87,6 +88,13 @@ function isConvexAccessError(error: unknown) {
 	}
 	if (!('code' in error.data)) return false;
 	return error.data.code === 'unauthenticated' || error.data.code === 'forbidden';
+}
+
+function isConvexBillingError(error: unknown) {
+	if (!(error instanceof ConvexError) || !error.data || typeof error.data !== 'object') {
+		return false;
+	}
+	return 'code' in error.data && error.data.code === 'billing_required';
 }
 
 function isRequestBody(value: unknown): value is EmailAIRequest {
@@ -172,6 +180,14 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		return errorResponse('Send delay must be a positive whole number.');
 	}
 
+	const unsupportedVariablesMessage = getUnsupportedDraftVariablesMessage({
+		subject,
+		body: sanitizedBody
+	});
+	if (unsupportedVariablesMessage) {
+		return errorResponse(unsupportedVariablesMessage);
+	}
+
 	let quota: { allowed: boolean; retryAfterSeconds: number; workspaceName: string };
 	try {
 		quota = await locals.convex.mutation(api.emailAI.consumeReviewQuota, {
@@ -180,6 +196,12 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	} catch (error) {
 		if (isConvexAccessError(error)) {
 			return errorResponse('Only workspace owners may review follow-up content with AI.', 403);
+		}
+		if (isConvexBillingError(error)) {
+			return errorResponse(
+				'AI review is included with Pro. Upgrade, or make this workspace primary on your Pro plan.',
+				402
+			);
 		}
 		return errorResponse('Unable to verify AI review access.', 503);
 	}
