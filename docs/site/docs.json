@@ -1,0 +1,84 @@
+{
+	"$schema": "https://mintlify.com/docs.json",
+	"theme": "mint",
+	"name": "Waiver Director",
+	"description": "Collect, track, and follow up on signed waivers for every booking.",
+	"colors": {
+		"primary": "#4F39F6",
+		"light": "#756FFF",
+		"dark": "#4F39F6"
+	},
+	"icons": {
+		"library": "lucide"
+	},
+	"favicon": "/favicon.svg",
+	"logo": {
+		"light": "/images/waiver-director-icon.svg",
+		"dark": "/images/waiver-director-icon.svg"
+	},
+	"navigation": {
+		"tabs": [
+			{
+				"tab": "Guides",
+				"groups": [
+					{
+						"group": "Get started",
+						"pages": ["index", "quickstart", "concepts"]
+					},
+					{
+						"group": "Waivers",
+						"pages": ["guides/build-and-publish", "guides/share-and-collect"]
+					},
+					{
+						"group": "Daily operations",
+						"pages": [
+							"guides/dashboard",
+							"guides/bookings",
+							"guides/submissions-and-customers",
+							"guides/follow-up-emails",
+							"guides/analytics"
+						]
+					},
+					{
+						"group": "Integrations",
+						"pages": ["integrations/overview", "integrations/bookeo", "integrations/mailchimp"]
+					},
+					{
+						"group": "Workspace and account",
+						"pages": ["account/settings", "account/team-and-roles", "account/plans-and-billing"]
+					}
+				]
+			},
+			{
+				"tab": "Developers",
+				"groups": [
+					{
+						"group": "Codebase",
+						"pages": [
+							"developers/overview",
+							"developers/local-development",
+							"developers/architecture"
+						]
+					},
+					{
+						"group": "Contributing",
+						"pages": ["developers/updating-docs"]
+					}
+				]
+			}
+		]
+	},
+	"navbar": {
+		"links": [
+			{
+				"label": "GitHub",
+				"href": "https://github.com/Stixels/waiver-director"
+			}
+		]
+	},
+	"footer": {
+		"socials": {
+			"github": "https://github.com/Stixels/waiver-director"
+		}
+	}
+}

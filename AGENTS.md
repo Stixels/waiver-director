@@ -6,6 +6,7 @@ Waiver Director is a multi-tenant SaaS for waiver operations; preserve strict wo
 - Package manager: `pnpm`
 - Common validation: `pnpm run check`, `pnpm run lint`
 - For tracked delivery work, follow the Linear-to-GitHub workflow in `docs/agents/workflow-and-validation.md`; use the Linear issue for scope, its intended base branch, and its branch name when provided.
+- When a change affects what users see or do (pages, settings, roles, plan limits, integrations, email variables), update the matching page in `docs/site/` in the same change; see `docs/site/developers/updating-docs.mdx` for the code-to-page map.
 - Do not change hosted-service configuration, credentials, environment variables, or deployments unless the task explicitly authorizes it.
 
 Relevant docs:

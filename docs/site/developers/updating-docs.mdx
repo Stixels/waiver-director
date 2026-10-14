@@ -1,0 +1,56 @@
+---
+title: 'Updating these docs'
+description: 'How the documentation stays in sync with the code.'
+---
+
+This site is built with [Mintlify](https://mintlify.com) from the `docs/site` folder of the repository. The docs live next to the code, so a change to the app and the change to its documentation can ship in the same pull request.
+
+## How publishing works
+
+- Mintlify's GitHub app watches the repository. When a change to `docs/site` is merged into `main`, the live site redeploys automatically.
+- Every pull request that touches `docs/site` runs the **Docs** check in GitHub Actions, which fails on broken links.
+- When the Mintlify GitHub app is installed, pull requests also get a Mintlify preview deployment.
+
+## When to update docs
+
+Update the matching page in the same pull request whenever a change affects what users see or do, for example:
+
+- A new page, setting, or workflow in the app
+- A change to plan limits or which role can do something
+- A new or changed integration
+- A change to email variables, follow-up statuses, or waiver field types
+
+The table below maps app areas to their pages.
+
+| Code                                                                  | Docs page                                                      |
+| --------------------------------------------------------------------- | -------------------------------------------------------------- |
+| `src/routes/(app)/app/[workspaceSlug]/waiver`                         | `guides/build-and-publish.mdx`, `guides/share-and-collect.mdx` |
+| `src/routes/w/`                                                       | `guides/share-and-collect.mdx`                                 |
+| `src/routes/(app)/app/[workspaceSlug]/bookings`                       | `guides/bookings.mdx`                                          |
+| `src/routes/(app)/app/[workspaceSlug]/submissions`, `customers`       | `guides/submissions-and-customers.mdx`                         |
+| `src/routes/(app)/app/[workspaceSlug]/emails`, `src/convex/emails.ts` | `guides/follow-up-emails.mdx`                                  |
+| `src/routes/(app)/app/[workspaceSlug]/analytics`                      | `guides/analytics.mdx`                                         |
+| `src/routes/(app)/app/[workspaceSlug]/integrations`                   | `integrations/*.mdx`                                           |
+| `src/routes/(app)/app/[workspaceSlug]/settings`                       | `account/settings.mdx`                                         |
+| `src/convex/lib/billing.ts`                                           | `account/plans-and-billing.mdx`                                |
+| `src/convex/schema.ts`, `src/convex/http.ts`                          | `developers/architecture.mdx`                                  |
+
+## Preview locally
+
+```sh
+cd docs/site
+npx mint dev
+```
+
+The preview runs at `http://localhost:3000`. Before pushing, check for broken links:
+
+```sh
+npx mint broken-links
+```
+
+## Writing pages
+
+- Pages are MDX files with `title` and `description` frontmatter.
+- Add every new page to `navigation` in `docs/site/docs.json`.
+- Use the product terms defined in [Key concepts](/concepts), such as workspace, signed submission, and waiver gap.
+- Never include credentials, environment values, or customer data.

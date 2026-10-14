@@ -1,0 +1,51 @@
+---
+title: 'Follow-up emails'
+description: 'Send thank-you, feedback, and review-request emails after each experience.'
+---
+
+Waiver Director creates a follow-up email for each signed submission and sends it after the customer's experience. Manage everything from **Emails** in the sidebar.
+
+<Note>Sending follow-ups requires a Pro plan or trial.</Note>
+
+## 1. Set your email identity
+
+Before any follow-up can send, a workspace member must verify a **reply-to address** under **Settings → Email**. Waiver Director sends a code to that address to confirm you own it. Customers see your workspace name as the sender, and their replies go to your reply-to address.
+
+Until a reply-to address is verified, follow-ups are created as **blocked**.
+
+## 2. Write the email
+
+Open the **email editor** to write the subject and body. Use variables to personalize each message:
+
+| Variable            | Replaced with                     |
+| ------------------- | --------------------------------- |
+| `{{customer_name}}` | The signer's name                 |
+| `{{booking_id}}`    | The booking number                |
+| `{{business_name}}` | Your workspace name               |
+| `{{activity_date}}` | The date of the booked experience |
+
+The body supports rich text and ordinary links, so you can point customers to a review site or feedback form.
+
+Save the email as a reusable template, or load a saved template, from the editor.
+
+### AI review
+
+On paid plans you can ask AI to review your draft. It scores the email on clarity, tone, personalization, usefulness, variable use, call to action, and deliverability, and proposes an improved version you can compare line by line and accept or discard. Remove any unsupported variables before running a review.
+
+## 3. Choose when it sends
+
+Set **send after** to a number of minutes, hours, or days after the booking's start time. The default is 2 hours.
+
+## The follow-up queue
+
+The queue lists every follow-up with its status:
+
+| Status      | Meaning                                                                       |
+| ----------- | ----------------------------------------------------------------------------- |
+| Queued      | Scheduled to send automatically at its send time                              |
+| Sent        | Delivered                                                                     |
+| Unscheduled | The submission had no booking start time, so there is nothing to time it from |
+| Blocked     | Cannot send yet, usually because no verified reply-to address exists          |
+| Failed      | Delivery was attempted and failed                                             |
+
+From the queue you can **send now**, **unschedule** a follow-up, or select several and act on them together. Search by name, email, or booking number.
