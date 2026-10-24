@@ -21,6 +21,7 @@
 	const convexAuth = $state<ConvexAuthState>({
 		status: 'loading',
 		sessionId: null,
+		isSigningOut: false,
 		signOut
 	});
 	setConvexAuthContext(convexAuth);
@@ -49,6 +50,8 @@
 
 		const previousStatus = convexAuth.status;
 		const previousSessionId = convexAuth.sessionId;
+		// Let Clerk own the post-sign-out navigation; AppBootstrap skips its sign-in redirect while this is set.
+		convexAuth.isSigningOut = true;
 		convexAuth.status = 'unauthenticated';
 		convexAuth.sessionId = null;
 		clearProtectedQueryCache();
@@ -57,6 +60,7 @@
 		try {
 			await clerk.clerk.signOut({ redirectUrl });
 		} catch (error) {
+			convexAuth.isSigningOut = false;
 			if (
 				previousSessionId &&
 				getCurrentSessionId() === previousSessionId &&

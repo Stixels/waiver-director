@@ -190,7 +190,8 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
 	let quota: { allowed: boolean; retryAfterSeconds: number; workspaceName: string };
 	try {
-		quota = await locals.convex.mutation(api.emailAI.consumeReviewQuota, {
+		const convex = await locals.getAuthenticatedConvex();
+		quota = await convex.mutation(api.emailAI.consumeReviewQuota, {
 			workspaceId: body.workspaceId
 		});
 	} catch (error) {
