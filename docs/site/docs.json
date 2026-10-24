@@ -79,10 +79,19 @@
 	"navbar": {
 		"links": [
 			{
+				"label": "Sign up",
+				"href": "https://www.waiverdirector.com/sign-up"
+			},
+			{
 				"label": "GitHub",
 				"href": "https://github.com/Stixels/waiver-director"
 			}
-		]
+		],
+		"primary": {
+			"type": "button",
+			"label": "Open the app",
+			"href": "https://www.waiverdirector.com/app"
+		}
 	},
 	"footer": {
 		"socials": {
