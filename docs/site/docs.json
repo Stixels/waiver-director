@@ -20,11 +20,11 @@
 		"tabs": [
 			{
 				"tab": "Guides",
-				"groups": [
+				"pages": [
+					"index",
 					{
 						"group": "Get started",
 						"pages": [
-							"index",
 							"get-started/create-your-account",
 							"get-started/create-your-workspace",
 							"get-started/choose-your-plan",
