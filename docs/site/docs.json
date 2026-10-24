@@ -23,7 +23,15 @@
 				"groups": [
 					{
 						"group": "Get started",
-						"pages": ["index", "quickstart", "concepts"]
+						"pages": [
+							"index",
+							"get-started/create-your-account",
+							"get-started/create-your-workspace",
+							"get-started/choose-your-plan",
+							"get-started/publish-your-first-waiver",
+							"get-started/collect-your-first-signature",
+							"concepts"
+						]
 					},
 					{
 						"group": "Waivers",
@@ -80,5 +88,11 @@
 		"socials": {
 			"github": "https://github.com/Stixels/waiver-director"
 		}
-	}
+	},
+	"redirects": [
+		{
+			"source": "/quickstart",
+			"destination": "/get-started/create-your-account"
+		}
+	]
 }
