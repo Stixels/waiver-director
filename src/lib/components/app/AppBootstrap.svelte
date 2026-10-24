@@ -64,7 +64,7 @@
 	});
 
 	$effect(() => {
-		if (!browser || convexAuth.status !== 'unauthenticated') return;
+		if (!browser || convexAuth.status !== 'unauthenticated' || convexAuth.isSigningOut) return;
 
 		void goto(
 			resolve(`/sign-in?redirectTo=${postSignInRedirectTo}` as `/sign-in?redirectTo=${string}`),
@@ -140,7 +140,7 @@
 	<div
 		class="flex min-h-screen items-center justify-center bg-background text-sm text-muted-foreground"
 	>
-		Redirecting to sign in...
+		{convexAuth.isSigningOut ? 'Signing out...' : 'Redirecting to sign in...'}
 	</div>
 {:else if appState.error}
 	<div class="flex min-h-screen items-center justify-center bg-background px-4">

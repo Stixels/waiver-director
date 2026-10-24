@@ -3,7 +3,11 @@
 	import { page } from '$app/state';
 	import { RefreshCw } from '@lucide/svelte';
 	import { useClerkContext } from 'svelte-clerk';
-	import { getClerkErrorMessage, getSafePostAuthRedirectHref } from '$lib/auth/clerk-helpers';
+	import {
+		getClerkErrorMessage,
+		getSafePostAuthRedirectHref,
+		getSsoCallbackHref
+	} from '$lib/auth/clerk-helpers';
 	import AuthPageShell from '$lib/components/marketing/auth/AuthPageShell.svelte';
 	import { REGEXP_ONLY_DIGITS } from 'bits-ui';
 	import { Button } from '$lib/components/ui/button';
@@ -187,7 +191,7 @@
 		try {
 			await signIn.authenticateWithRedirect({
 				strategy: 'oauth_google',
-				redirectUrl: absoluteUrl(resolve('/sso-callback')),
+				redirectUrl: absoluteUrl(getSsoCallbackHref(redirectTo)),
 				redirectUrlComplete: absoluteUrl(postAuthRedirectUrl)
 			});
 		} catch (error) {

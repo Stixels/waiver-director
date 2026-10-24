@@ -5,7 +5,12 @@
 	import { REGEXP_ONLY_DIGITS } from 'bits-ui';
 	import { useClerkContext } from 'svelte-clerk';
 
-	import { getClerkErrorMessage, getSafePostAuthRedirectHref } from '$lib/auth/clerk-helpers';
+	import {
+		getClerkErrorMessage,
+		getMissingSignUpFieldsMessage,
+		getSafePostAuthRedirectHref,
+		getSsoCallbackHref
+	} from '$lib/auth/clerk-helpers';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 	import { InputOTP, InputOTPGroup, InputOTPSlot } from '$lib/components/ui/input-otp';
@@ -63,6 +68,15 @@
 		return new URL(path, window.location.origin).toString();
 	}
 
+	// Google sign-ups that Clerk can't complete are sent back here via `continueSignUpUrl`.
+	$effect(() => {
+		const signUp = getSignUpResource();
+		if (!clerk.isLoaded || signUp?.status !== 'missing_requirements') return;
+		if (signUp.missingFields.length === 0) return;
+
+		submitError = getMissingSignUpFieldsMessage(signUp.missingFields);
+	});
+
 	async function activateCreatedSession(sessionId: string | null) {
 		if (!sessionId || !clerk.clerk) {
 			throw new Error('Your account was created, but no session was returned.');
@@ -99,7 +113,7 @@
 		try {
 			await signUp.authenticateWithRedirect({
 				strategy: 'oauth_google',
-				redirectUrl: absoluteUrl(resolve('/sso-callback')),
+				redirectUrl: absoluteUrl(getSsoCallbackHref(redirectTo)),
 				redirectUrlComplete: absoluteUrl(postAuthRedirectUrl)
 			});
 		} catch (error) {
@@ -135,10 +149,20 @@
 		submitMessage = null;
 
 		try {
-			await signUp.create({
+			const signUpAttempt = await signUp.create({
 				emailAddress: email.trim(),
 				password
 			});
+
+			if (signUpAttempt.status === 'complete') {
+				await activateCreatedSession(signUpAttempt.createdSessionId);
+				return;
+			}
+
+			if (!signUpAttempt.unverifiedFields.includes('email_address')) {
+				submitError = getMissingSignUpFieldsMessage(signUpAttempt.missingFields);
+				return;
+			}
 
 			await signUp.prepareEmailAddressVerification({
 				strategy: 'email_code'
@@ -174,6 +198,14 @@
 
 			if (signUpAttempt.status === 'complete') {
 				await activateCreatedSession(signUpAttempt.createdSessionId);
+				return;
+			}
+
+			if (
+				signUpAttempt.verifications.emailAddress.status === 'verified' &&
+				signUpAttempt.missingFields.length > 0
+			) {
+				submitError = getMissingSignUpFieldsMessage(signUpAttempt.missingFields);
 				return;
 			}
 

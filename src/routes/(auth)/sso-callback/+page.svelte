@@ -1,12 +1,15 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
+	import { page } from '$app/state';
 	import { useClerkContext } from 'svelte-clerk';
 
-	import { getClerkErrorMessage } from '$lib/auth/clerk-helpers';
+	import { getClerkErrorMessage, getSafePostAuthRedirectHref } from '$lib/auth/clerk-helpers';
 	import AuthPageShell from '$lib/components/marketing/auth/AuthPageShell.svelte';
 
 	const clerk = useClerkContext();
-	const postAuthRedirectUrl = resolve('/app');
+	const postAuthRedirectUrl = $derived(
+		getSafePostAuthRedirectHref(page.url.searchParams.get('redirectTo'))
+	);
 	let hasStartedCallback = false;
 	let callbackError = $state<string | null>(null);
 
