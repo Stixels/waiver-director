@@ -23,8 +23,20 @@
 		window.location.replace(url);
 	}
 
-	async function handleSsoCallback(timeoutId: number) {
+	async function handleSsoCallback() {
+		// Already signed in (e.g. back button to this page): skip the callback.
+		if (hasActiveSession()) {
+			await replaceWith(postAuthRedirectUrl);
+			return;
+		}
+
+		const timeoutId = window.setTimeout(() => {
+			callbackError =
+				'Google authentication did not finish. Check that this exact URL is allowed in Clerk and Google OAuth redirect settings, then try again.';
+		}, 8000);
+
 		try {
+			// Clerk navigates with `replaceWith` when the flow is done, transfers, or needs more steps.
 			await clerk.clerk?.handleRedirectCallback(
 				{
 					signInUrl: resolve('/sign-in'),
@@ -38,8 +50,9 @@
 				replaceWith
 			);
 
+			// Fallback in case the callback activated a session without navigating.
 			if (hasActiveSession()) {
-				void replaceWith(postAuthRedirectUrl);
+				await replaceWith(postAuthRedirectUrl);
 			}
 		} catch (error) {
 			console.error('[auth/sso-callback] Clerk redirect callback failed', error);
@@ -53,27 +66,12 @@
 	}
 
 	$effect(() => {
-		if (!hasActiveSession()) return;
-		void replaceWith(postAuthRedirectUrl);
-	});
-
-	$effect(() => {
 		if (!clerk.isLoaded || !clerk.clerk || !clerk.client || hasStartedCallback) {
 			return;
 		}
 
 		hasStartedCallback = true;
-		const timeoutId = window.setTimeout(() => {
-			if (hasActiveSession()) {
-				void replaceWith(postAuthRedirectUrl);
-				return;
-			}
-
-			callbackError =
-				'Google authentication did not finish. Check that this exact URL is allowed in Clerk and Google OAuth redirect settings, then try again.';
-		}, 8000);
-
-		void handleSsoCallback(timeoutId);
+		void handleSsoCallback();
 	});
 </script>
 

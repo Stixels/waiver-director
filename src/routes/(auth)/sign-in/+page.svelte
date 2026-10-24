@@ -4,22 +4,22 @@
 	import { RefreshCw } from '@lucide/svelte';
 	import { useClerkContext } from 'svelte-clerk';
 	import {
+		absoluteUrl,
+		activateSessionAndRedirect,
 		getClerkErrorMessage,
 		getSafePostAuthRedirectHref,
 		getSsoCallbackHref
 	} from '$lib/auth/clerk-helpers';
+	import AuthCodeInput from '$lib/components/marketing/auth/AuthCodeInput.svelte';
 	import AuthPageShell from '$lib/components/marketing/auth/AuthPageShell.svelte';
-	import { REGEXP_ONLY_DIGITS } from 'bits-ui';
+	import GoogleAuthButton from '$lib/components/marketing/auth/GoogleAuthButton.svelte';
+	import {
+		authInputClass as inputClass,
+		authSecondaryButtonClass as secondaryButtonClass,
+		authSubmitButtonClass as submitButtonClass
+	} from '$lib/components/marketing/auth/auth-form-classes';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
-	import { InputOTP, InputOTPGroup, InputOTPSlot } from '$lib/components/ui/input-otp';
-
-	const inputClass =
-		'h-14 rounded-xl border-(--m-border-strong) bg-(--m-elevated) px-4 text-sm text-foreground shadow-none transition-[border-color,box-shadow] placeholder:text-(--m-text-3) focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/25 sm:px-5 md:text-sm';
-	const submitButtonClass =
-		'btn-mkt-accent h-14 w-full rounded-xl text-base font-semibold shadow-none';
-	const secondaryButtonClass =
-		'h-14 w-full rounded-xl border-(--m-border-strong) bg-(--m-elevated) text-base font-semibold shadow-none transition-colors hover:bg-(--m-card)';
 
 	type SecondFactorStrategy = 'email_code' | 'phone_code' | 'totp' | 'backup_code';
 	type SupportedSecondFactor = {
@@ -45,7 +45,7 @@
 	let secondFactorPhoneNumberId = $state<string | null>(null);
 	let backupCodeAvailable = $state(false);
 	const redirectTo = $derived(page.url.searchParams.get('redirectTo'));
-	const postAuthRedirectUrl = $derived(getSafePostAuthRedirectHref(redirectTo, '/app'));
+	const postAuthRedirectUrl = $derived(getSafePostAuthRedirectHref(redirectTo));
 
 	const authPageTitle = $derived(
 		isAwaitingSecondFactor && secondFactorStrategy
@@ -64,10 +64,6 @@
 
 	function getSignInResource() {
 		return clerk.client?.signIn ?? null;
-	}
-
-	function absoluteUrl(path: string) {
-		return new URL(path, window.location.origin).toString();
 	}
 
 	function getSupportedSecondFactors(
@@ -156,28 +152,15 @@
 	}
 
 	async function activateCreatedSession(sessionId: string | null) {
-		if (!sessionId || !clerk.clerk) {
-			throw new Error('Your session was created, but no active session could be set.');
-		}
-
-		await clerk.clerk.setActive({
-			session: sessionId,
-			navigate: async ({ session, decorateUrl }) => {
-				if (session?.currentTask) {
-					return;
-				}
-
-				window.location.replace(decorateUrl(postAuthRedirectUrl));
-			}
-		});
+		await activateSessionAndRedirect(
+			clerk.clerk,
+			sessionId,
+			postAuthRedirectUrl,
+			'Your session was created, but no active session could be set.'
+		);
 	}
 
 	async function handleGoogleSignIn() {
-		if (clerk.auth.userId) {
-			window.location.replace(postAuthRedirectUrl);
-			return;
-		}
-
 		const signIn = getSignInResource();
 		if (!clerk.isLoaded || !signIn) {
 			submitError = 'Authentication is still loading. Please try again.';
@@ -400,24 +383,11 @@
 				</div>
 
 				{#if secondFactorStrategy !== 'backup_code'}
-					<InputOTP
-						maxlength={6}
-						inputId="sign-in-verification-code"
+					<AuthCodeInput
+						id="sign-in-verification-code"
 						bind:value={verificationCode}
-						pattern={REGEXP_ONLY_DIGITS}
 						onComplete={attemptSecondFactor}
-						class="w-full"
-					>
-						{#snippet children({ cells })}
-							<InputOTPGroup
-								class="w-full *:data-[slot=input-otp-slot]:h-14 *:data-[slot=input-otp-slot]:flex-1 *:data-[slot=input-otp-slot]:text-xl"
-							>
-								{#each cells as cell, i (i)}
-									<InputOTPSlot {cell} />
-								{/each}
-							</InputOTPGroup>
-						{/snippet}
-					</InputOTP>
+					/>
 				{:else}
 					<Input
 						id="sign-in-verification-code"
@@ -531,33 +501,7 @@
 					</div>
 				</div>
 
-				<Button
-					type="button"
-					variant="outline"
-					class={`${secondaryButtonClass} cursor-pointer`}
-					disabled={isSubmitting}
-					onclick={handleGoogleSignIn}
-				>
-					<svg viewBox="0 0 24 24" aria-hidden="true" class="h-5 w-5">
-						<path
-							fill="#4285F4"
-							d="M21.6 12.227c0-.818-.073-1.604-.209-2.364H12v4.473h5.382a4.602 4.602 0 0 1-1.995 3.018v2.507h3.236c1.894-1.744 2.977-4.314 2.977-7.634Z"
-						/>
-						<path
-							fill="#34A853"
-							d="M12 22c2.7 0 4.964-.895 6.618-2.427l-3.236-2.507c-.895.6-2.041.954-3.382.954-2.597 0-4.796-1.754-5.582-4.11H3.073v2.586A9.997 9.997 0 0 0 12 22Z"
-						/>
-						<path
-							fill="#FBBC04"
-							d="M6.418 13.91A5.997 5.997 0 0 1 6.105 12c0-.663.114-1.304.313-1.91V7.504H3.073A9.997 9.997 0 0 0 2 12c0 1.61.386 3.135 1.073 4.496l3.345-2.586Z"
-						/>
-						<path
-							fill="#EA4335"
-							d="M12 5.98c1.468 0 2.786.505 3.823 1.496l2.868-2.868C16.959 2.997 14.695 2 12 2A9.997 9.997 0 0 0 3.073 7.504L6.418 10.09C7.204 7.734 9.403 5.98 12 5.98Z"
-						/>
-					</svg>
-					Continue with Google
-				</Button>
+				<GoogleAuthButton disabled={isSubmitting} onclick={handleGoogleSignIn} />
 
 				{#if submitError}
 					<p class="text-center text-sm text-destructive" role="status">{submitError}</p>

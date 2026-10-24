@@ -1,4 +1,7 @@
 import { resolve } from '$app/paths';
+import type { useClerkContext } from 'svelte-clerk';
+
+type ClerkInstance = ReturnType<typeof useClerkContext>['clerk'];
 
 const resolvePathname = resolve as unknown as (path: string) => string;
 
@@ -60,4 +63,32 @@ export function getMissingSignUpFieldsMessage(missingFields: readonly string[]) 
 		(field) => SIGN_UP_FIELD_LABELS[field] ?? field.replace(/_/g, ' ')
 	);
 	return `Your account still needs ${labels.join(', ')} before it can be finished, and this form can't collect that yet. Please contact support.`;
+}
+
+export function absoluteUrl(path: string) {
+	return new URL(path, window.location.origin).toString();
+}
+
+// Activates a session created by a custom sign-in, sign-up, or reset flow and does a full
+// page load of the destination so the server and the app shell both see the new session.
+export async function activateSessionAndRedirect(
+	clerk: ClerkInstance,
+	sessionId: string | null,
+	redirectHref: string,
+	missingSessionMessage: string
+) {
+	if (!sessionId || !clerk) {
+		throw new Error(missingSessionMessage);
+	}
+
+	await clerk.setActive({
+		session: sessionId,
+		navigate: async ({ session, decorateUrl }) => {
+			if (session?.currentTask) {
+				return;
+			}
+
+			window.location.replace(decorateUrl(redirectHref));
+		}
+	});
 }
