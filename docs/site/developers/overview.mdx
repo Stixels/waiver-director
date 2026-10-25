@@ -1,0 +1,40 @@
+---
+title: 'Developer overview'
+description: 'How the Waiver Director codebase is organized.'
+---
+
+Waiver Director is a SvelteKit app backed by Convex. The source lives in [Stixels/waiver-director](https://github.com/Stixels/waiver-director).
+
+## Tech stack
+
+- [SvelteKit](https://svelte.dev/docs/kit) and Svelte 5 (runes mode)
+- [Convex](https://convex.dev) for the database, backend functions, scheduled work, and HTTP endpoints
+- [Clerk](https://clerk.com) for identity and billing
+- [Resend](https://resend.com) for transactional email
+- Tailwind CSS, shadcn-svelte, Bits UI, and Lucide icons
+- pnpm for package management, deployed on Vercel
+
+## Repository layout
+
+```text
+src/routes/(app)/app/     Protected workspace app
+src/routes/(auth)/        Sign in, sign up, and auth callbacks
+src/routes/(marketing)/   Public marketing, pricing, privacy, and terms pages
+src/routes/w/[slug]/      Public waiver signing flow (and /b/[token] booking links)
+src/convex/               Convex schema, queries, mutations, actions, crons, and HTTP routes
+src/lib/                  Shared components, domain logic, config, and utilities
+docs/agents/              Engineering guidance for contributors and coding agents
+docs/adr/                 Architecture decision records
+docs/site/                This documentation site (Mintlify)
+```
+
+## Engineering guidance
+
+The repository keeps detailed guidance next to the code. Read these before making changes:
+
+- [Project invariants](https://github.com/Stixels/waiver-director/blob/main/docs/agents/project-invariants.md)
+- [Convex backend](https://github.com/Stixels/waiver-director/blob/main/docs/agents/convex-backend.md)
+- [Authentication and authorization](https://github.com/Stixels/waiver-director/blob/main/docs/agents/auth-and-authorization.md)
+- [Svelte and route boundaries](https://github.com/Stixels/waiver-director/blob/main/docs/agents/sveltekit-frontend.md)
+- [Change scope and validation](https://github.com/Stixels/waiver-director/blob/main/docs/agents/workflow-and-validation.md)
+- [Domain language (CONTEXT.md)](https://github.com/Stixels/waiver-director/blob/main/CONTEXT.md)

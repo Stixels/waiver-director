@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 112" fill="none">
+	<defs>
+		<linearGradient id="waiver-director-gradient" x1="14" y1="8" x2="90" y2="105" gradientUnits="userSpaceOnUse">
+			<stop stop-color="#756FFF" />
+			<stop offset="0.52" stop-color="#524CE3" />
+			<stop offset="1" stop-color="#4F39F6" />
+		</linearGradient>
+	</defs>
+	<path
+		d="M61.8 7H21.6C18 7 15.1 10.582 15.1 15V105L38.9 80L54.4 105L80.7 80"
+		stroke="url(#waiver-director-gradient)"
+		stroke-width="11"
+		stroke-linecap="round"
+		stroke-linejoin="round"
+	/>
+	<path
+		d="M60.2 1.5H61.8C63.6 1.5 65.2 2.343 66.5 3.843L84.5 24.186C86.7 26.406 85.1 29.2 82 29.2H68.5C63.8 29.2 60 25.4 60 20.7V3.5C60 2.395 59.2 1.5 60.2 1.5Z"
+		fill="url(#waiver-director-gradient)"
+	/>
+</svg>
