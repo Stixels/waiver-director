@@ -1,0 +1,38 @@
+---
+title: 'Local development'
+description: 'Run the app and the validation checks locally.'
+---
+
+## Prerequisites
+
+- Node.js compatible with the installed SvelteKit and Vite toolchain
+- pnpm
+
+Local service configuration and credentials are shared with authorized maintainers privately. Never commit configuration values, credentials, customer data, or provider account details.
+
+## Run the app
+
+```sh
+pnpm install
+pnpm run dev
+```
+
+The app runs at `http://localhost:5173`.
+
+## Scripts
+
+| Command            | What it does                           |
+| ------------------ | -------------------------------------- |
+| `pnpm run dev`     | Start the SvelteKit development server |
+| `pnpm run build`   | Build the app                          |
+| `pnpm run preview` | Preview the production build           |
+| `pnpm run check`   | Run SvelteKit sync and svelte-check    |
+| `pnpm run lint`    | Run Prettier check and ESLint          |
+| `pnpm run format`  | Format the repository                  |
+| `pnpm run test`    | Run the Node test suite                |
+
+Run `pnpm run check` and `pnpm run lint` before opening a pull request.
+
+## Preview deployments
+
+Vercel builds every pull request with its own isolated Convex preview backend. See [Vercel preview deployments](https://github.com/Stixels/waiver-director/blob/main/docs/operations/vercel-preview-deployments.md) for details.
