@@ -12,14 +12,16 @@
 	let { audit }: Props = $props();
 
 	const rowLabelClass = 'text-[11px] font-semibold tracking-wide text-muted-foreground uppercase';
-	const rowValueClass = 'min-w-0 text-xs break-all text-foreground';
+	const rowValueClass = 'min-w-0 text-xs break-words text-foreground';
+	// Hashes and user agents are long unbroken strings; let them wrap anywhere.
+	const rowCodeClass = `${rowValueClass} [overflow-wrap:anywhere]`;
 
 	function formatTimestamp(ts: number | null) {
 		if (ts === null) return 'Not recorded';
 		return new Intl.DateTimeFormat('en-US', {
 			dateStyle: 'medium',
-			timeStyle: 'medium',
-			timeZoneName: 'short'
+			// 'long' includes seconds and the time zone; dateStyle cannot be combined with timeZoneName.
+			timeStyle: 'long'
 		}).format(new Date(ts));
 	}
 </script>
@@ -48,19 +50,19 @@
 
 				{#if audit.forwardedFor && audit.forwardedFor !== audit.ipAddress}
 					<dt class={rowLabelClass}>Forwarded for</dt>
-					<dd class={rowValueClass}>{audit.forwardedFor}</dd>
+					<dd class={rowCodeClass}>{audit.forwardedFor}</dd>
 				{/if}
 
 				<dt class={rowLabelClass}>Device / browser</dt>
-				<dd class={rowValueClass}>{audit.userAgent ?? 'Not recorded'}</dd>
+				<dd class={rowCodeClass}>{audit.userAgent ?? 'Not recorded'}</dd>
 
 				<dt class={rowLabelClass}>Document hash</dt>
-				<dd class={`${rowValueClass} font-mono`}>
+				<dd class={`${rowCodeClass} font-mono`}>
 					{audit.hashAlgorithm}: {audit.documentHash}
 				</dd>
 
 				<dt class={rowLabelClass}>Record hash</dt>
-				<dd class={`${rowValueClass} font-mono`}>
+				<dd class={`${rowCodeClass} font-mono`}>
 					{audit.hashAlgorithm}: {audit.submissionHash}
 				</dd>
 
