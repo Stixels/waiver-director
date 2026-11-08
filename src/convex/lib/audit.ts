@@ -103,27 +103,23 @@ export function normalizeForwardedFor(value: string | null | undefined): string 
 }
 
 /**
- * Best-effort client IP from request headers.
+ * Best-effort client IP from request headers: the last `x-forwarded-for` hop,
+ * which is the address appended by the nearest proxy. Earlier hops, and headers
+ * such as `x-real-ip`, can be set by the client and are ignored.
  *
- * Prefers `x-real-ip` (set by the edge, not the client). Falls back to the
- * last `x-forwarded-for` hop, which is the address the nearest trusted proxy
- * observed; earlier hops are client-supplied and can be spoofed. The raw
- * `x-forwarded-for` chain is stored separately for review.
+ * Convex does not document whether its HTTP edge sets or overwrites
+ * `x-forwarded-for`, so this value is stored and shown as reported by request
+ * headers, not as independently verified. The raw chain is stored separately.
  */
 export function clientIpFromHeaders(headers: { get(name: string): string | null }): string | null {
-	const realIp = headers.get('x-real-ip')?.trim();
-	if (realIp) return truncate(realIp, MAX_IP_LENGTH);
-
 	const forwardedFor = headers.get('x-forwarded-for');
-	if (forwardedFor) {
-		const hops = forwardedFor
-			.split(',')
-			.map((hop) => hop.trim())
-			.filter(Boolean);
-		const last = hops.at(-1);
-		if (last) return truncate(last, MAX_IP_LENGTH);
-	}
-	return null;
+	if (!forwardedFor) return null;
+	const last = forwardedFor
+		.split(',')
+		.map((hop) => hop.trim())
+		.filter(Boolean)
+		.at(-1);
+	return last ? truncate(last, MAX_IP_LENGTH) : null;
 }
 
 /**

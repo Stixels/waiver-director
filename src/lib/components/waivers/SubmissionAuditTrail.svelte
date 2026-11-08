@@ -45,7 +45,7 @@
 				<dt class={rowLabelClass}>Received by server</dt>
 				<dd class={rowValueClass}>{formatTimestamp(audit.receivedAt)}</dd>
 
-				<dt class={rowLabelClass}>IP address</dt>
+				<dt class={rowLabelClass}>IP address (reported)</dt>
 				<dd class={rowValueClass}>{audit.ipAddress ?? 'Not recorded'}</dd>
 
 				{#if audit.forwardedFor && audit.forwardedFor !== audit.ipAddress}
@@ -79,8 +79,9 @@
 				<dd class={rowValueClass}>{formatTimestamp(audit.clientSignatureCompletedAt)}</dd>
 			</dl>
 			<p class="mt-4 text-[11px] leading-relaxed text-muted-foreground">
-				IP address, device, hashes and the server time are recorded by Waiver Director. Form opened,
-				consent and signature times are reported by the signer's browser.
+				Waiver Director computes the hashes and the server time itself. IP address and device are
+				read from the request headers and are not independently verified. Form opened, consent and
+				signature times are reported by the signer's browser.
 			</p>
 		{/if}
 	</div>

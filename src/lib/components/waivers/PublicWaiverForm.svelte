@@ -16,6 +16,7 @@
 		waiverUnderlineTextareaClass
 	} from '$lib/components/waivers/waiver-public-form-classes';
 	import type { WaiverField, WaiverMinor, WaiverTheme } from '$lib/domain/waivers';
+	import { minorBirthDateBounds } from '$lib/domain/waiver-constraints';
 	import { formatBookingTimestamp } from '$lib/utils/date';
 
 	type PublicWaiver = {
@@ -333,7 +334,9 @@
 													type="date"
 													class={waiverUnderlineInputClass}
 													bind:value={minor.dateOfBirth}
+													min={minorBirthDateBounds(todayIsoDate()).min}
 													max={todayIsoDate()}
+													title="Minors must be under 18"
 													required
 												/>
 											</div>

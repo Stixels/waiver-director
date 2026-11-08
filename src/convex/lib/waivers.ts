@@ -18,6 +18,7 @@ import {
 	MIN_WAIVER_FIELD_LABEL_LENGTH,
 	MIN_WAIVER_TITLE_LENGTH
 } from '../../lib/domain/waiver-constraints';
+import { isMinorBirthDate, isValidIsoDate } from '../../lib/domain/waiver-constraints';
 
 type FunctionCtx = QueryCtx | MutationCtx;
 
@@ -412,25 +413,28 @@ export function validateMinors(minors: MinorInput[]): MinorInput[] {
 				message: 'Enter a date of birth for each minor.'
 			});
 		}
-		if (!isValidIsoDate(dateOfBirth) || dateOfBirth > todayIsoDate()) {
+		if (!isValidIsoDate(dateOfBirth)) {
 			throw new ConvexError({
 				code: 'invalid_argument',
 				message: 'Enter a valid date of birth for each minor.'
+			});
+		}
+		// The signer's calendar day may be a day either side of UTC, so accept the
+		// date if it is a minor's birth date on any of those days.
+		if (!signingDaysAroundUtc().some((today) => isMinorBirthDate(dateOfBirth, today))) {
+			throw new ConvexError({
+				code: 'invalid_argument',
+				message: `Each minor must be under 18. Check ${fullName}'s date of birth.`
 			});
 		}
 		return { fullName, dateOfBirth };
 	});
 }
 
-function isValidIsoDate(value: string) {
-	if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
-	const parsed = new Date(`${value}T00:00:00Z`);
-	return !isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
-}
-
-function todayIsoDate() {
-	// Allow one day of slack so signers ahead of UTC are not rejected.
-	return new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+function signingDaysAroundUtc() {
+	const dayMs = 24 * 60 * 60 * 1000;
+	const now = Date.now();
+	return [now - dayMs, now, now + dayMs].map((ms) => new Date(ms).toISOString().slice(0, 10));
 }
 
 export function normalizePublicSlug(value: string): string {

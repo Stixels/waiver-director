@@ -9,6 +9,7 @@ import {
 	waiverDocumentHash,
 	waiverSubmissionHash
 } from '../src/convex/lib/audit.ts';
+import { isMinorBirthDate, minorBirthDateBounds } from '../src/lib/domain/waiver-constraints.ts';
 
 function headers(values: Record<string, string>) {
 	return new Headers(values);
@@ -64,10 +65,12 @@ test('submission hash covers signer data, minors and signature', async () => {
 	);
 });
 
-test('client IP prefers x-real-ip, then the last forwarded hop', () => {
-	assert.equal(clientIpFromHeaders(headers({ 'x-real-ip': '203.0.113.9' })), '203.0.113.9');
+test('client IP uses only the last forwarded hop and ignores x-real-ip', () => {
+	assert.equal(clientIpFromHeaders(headers({ 'x-real-ip': '203.0.113.9' })), null);
 	assert.equal(
-		clientIpFromHeaders(headers({ 'x-forwarded-for': '10.0.0.1, 198.51.100.7 ' })),
+		clientIpFromHeaders(
+			headers({ 'x-real-ip': '203.0.113.9', 'x-forwarded-for': '10.0.0.1, 198.51.100.7 ' })
+		),
 		'198.51.100.7'
 	);
 	assert.equal(clientIpFromHeaders(headers({})), null);
@@ -86,4 +89,19 @@ test('client timestamps outside a plausible window are dropped', () => {
 	assert.equal(sanitizeClientTimestamp(now - 2 * 24 * 60 * 60 * 1000, now), null);
 	assert.equal(sanitizeClientTimestamp(Number.NaN, now), null);
 	assert.equal(sanitizeClientTimestamp(undefined, now), null);
+});
+
+test('minor birth dates must be under 18 on the signing day and not before 1900', () => {
+	const today = '2026-11-08';
+	assert.deepEqual(minorBirthDateBounds(today), { min: '2008-11-09', max: '2026-11-08' });
+	assert.equal(isMinorBirthDate('2015-06-03', today), true);
+	assert.equal(isMinorBirthDate('2008-11-09', today), true);
+	assert.equal(isMinorBirthDate('2008-11-08', today), false, 'turns 18 today');
+	assert.equal(isMinorBirthDate('1975-01-01', today), false);
+	assert.equal(isMinorBirthDate('2026-11-09', today), false, 'future');
+	assert.equal(isMinorBirthDate('2015-02-30', today), false, 'invalid date');
+	assert.equal(minorBirthDateBounds('1910-03-01').min, '1900-01-01');
+	// Leap-day birthdays: born 2008-02-29 is still a minor on 2026-02-28.
+	assert.equal(isMinorBirthDate('2008-02-29', '2026-02-28'), true);
+	assert.equal(isMinorBirthDate('2008-02-29', '2026-03-01'), false);
 });
