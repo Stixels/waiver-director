@@ -9,6 +9,7 @@
 	import WaiverPublicAboutSignerCard from '$lib/components/waivers/WaiverPublicAboutSignerCard.svelte';
 	import WaiverPublicAdditionalInfoSection from '$lib/components/waivers/WaiverPublicAdditionalInfoSection.svelte';
 	import WaiverPublicMinorsBlock from '$lib/components/waivers/WaiverPublicMinorsBlock.svelte';
+	import WaiverPublicPhotoField from '$lib/components/waivers/WaiverPublicPhotoField.svelte';
 	import {
 		waiverAddMinorButtonClass,
 		waiverFieldLabelClass,
@@ -18,6 +19,7 @@
 	import type { WaiverField, WaiverMinor, WaiverTheme } from '$lib/domain/waivers';
 	import { getConvexErrorMessage } from '$lib/utils/convex-errors';
 	import { formatBookingTimestamp } from '$lib/utils/date';
+	import { resizePhotoForUpload } from '$lib/utils/photo-resize';
 
 	type PublicWaiver = {
 		slug: string;
@@ -29,7 +31,10 @@
 		theme: WaiverTheme;
 		fields: WaiverField[];
 		marketingOptIn: { provider: 'mailchimp'; label: string } | null;
+		photoCapture: { participantPhoto: PhotoCaptureMode; idPhoto: PhotoCaptureMode };
 	};
+	type PhotoCaptureMode = 'off' | 'optional' | 'required';
+	type PhotoKind = 'participant' | 'id';
 
 	type BookingContext = {
 		lookupToken: string;
@@ -58,6 +63,8 @@
 	let answers = $state<Record<string, string | boolean | null>>({});
 	let marketingConsent = $state(false);
 	let minors = $state<MinorFormState[]>([]);
+	let participantPhoto = $state<File | null>(null);
+	let idPhoto = $state<File | null>(null);
 	let isSubmitting = $state(false);
 	let submitError = $state<string | null>(null);
 	let isSubmitted = $state(false);
@@ -83,6 +90,42 @@
 		return answers[fieldId] === true;
 	}
 
+	const PHOTO_MAX_BYTES = 5 * 1024 * 1024;
+
+	// Reuse an attached upload when a submit is retried with the same photo.
+	const uploadedPhotoTokens = new WeakMap<File, string>();
+
+	async function uploadPhoto(kind: PhotoKind, file: File): Promise<string> {
+		const cachedToken = uploadedPhotoTokens.get(file);
+		if (cachedToken) return cachedToken;
+		const body = await resizePhotoForUpload(file);
+		if (body.size > PHOTO_MAX_BYTES) {
+			throw new Error('Photos must be 5MB or smaller.');
+		}
+		const upload = await convex.mutation(api.photoUploads.generatePublicPhotoUploadUrl, {
+			slug: waiver.slug,
+			kind
+		});
+		const response = await fetch(upload.uploadUrl, {
+			method: 'POST',
+			headers: { 'Content-Type': body.type || 'image/jpeg' },
+			body
+		});
+		if (!response.ok) {
+			throw new Error('Photo upload failed. Please try again.');
+		}
+		const { storageId } = (await response.json()) as { storageId: Id<'_storage'> };
+		const attached = await convex.mutation(api.photoUploads.attachPublicPhotoUpload, {
+			uploadToken: upload.uploadToken,
+			storageId
+		});
+		if (!attached.ok) {
+			throw new Error(attached.message);
+		}
+		uploadedPhotoTokens.set(file, upload.uploadToken);
+		return upload.uploadToken;
+	}
+
 	async function handleSubmit(event: SubmitEvent) {
 		event.preventDefault();
 
@@ -96,11 +139,29 @@
 			return;
 		}
 
+		if (waiver.photoCapture.participantPhoto === 'required' && !participantPhoto) {
+			submitError = 'Please add a photo of yourself.';
+			return;
+		}
+		if (waiver.photoCapture.idPhoto === 'required' && !idPhoto) {
+			submitError = 'Please add a photo of your ID.';
+			return;
+		}
+
 		isSubmitting = true;
 		submitError = null;
 		const minorsPayload = minors.map((minor) => ({ fullName: minor.fullName }));
 
 		try {
+			const participantPhotoUploadToken =
+				participantPhoto && waiver.photoCapture.participantPhoto !== 'off'
+					? await uploadPhoto('participant', participantPhoto)
+					: undefined;
+			const idPhotoUploadToken =
+				idPhoto && waiver.photoCapture.idPhoto !== 'off'
+					? await uploadPhoto('id', idPhoto)
+					: undefined;
+
 			await convex.mutation(api.waivers.submitPublicWaiver, {
 				slug: waiver.slug,
 				versionId: waiver.versionId,
@@ -111,7 +172,9 @@
 				signatureDataUrl,
 				marketingConsent,
 				answers,
-				minors: minorsPayload
+				minors: minorsPayload,
+				...(participantPhotoUploadToken ? { participantPhotoUploadToken } : {}),
+				...(idPhotoUploadToken ? { idPhotoUploadToken } : {})
 			});
 
 			isSubmitted = true;
@@ -131,6 +194,8 @@
 		answers = {};
 		marketingConsent = false;
 		minors = [];
+		participantPhoto = null;
+		idPhoto = null;
 		submitError = null;
 		isSubmitted = false;
 	}
@@ -390,6 +455,39 @@
 									</div>
 								{/each}
 							</WaiverPublicAdditionalInfoSection>
+						{/if}
+
+						{#if waiver.photoCapture.participantPhoto !== 'off' || waiver.photoCapture.idPhoto !== 'off'}
+							<div class="mt-8 space-y-6 border-t border-border pt-8">
+								<div>
+									<h3 class="text-lg font-semibold tracking-tight">Photos</h3>
+									<p class="mt-1 text-xs leading-relaxed text-muted-foreground">
+										Kept with your signed waiver and only visible to {waiver.workspaceName} staff.
+									</p>
+								</div>
+								{#if waiver.photoCapture.participantPhoto !== 'off'}
+									<WaiverPublicPhotoField
+										id="participant-photo"
+										label="Your photo"
+										description="A clear photo of your face so staff can match you at check-in."
+										required={waiver.photoCapture.participantPhoto === 'required'}
+										capture="user"
+										bind:file={participantPhoto}
+										disabled={isSubmitting}
+									/>
+								{/if}
+								{#if waiver.photoCapture.idPhoto !== 'off'}
+									<WaiverPublicPhotoField
+										id="id-photo"
+										label="Photo ID"
+										description="The front of a driver's license, passport, or other government ID."
+										required={waiver.photoCapture.idPhoto === 'required'}
+										capture="environment"
+										bind:file={idPhoto}
+										disabled={isSubmitting}
+									/>
+								{/if}
+							</div>
 						{/if}
 
 						{#if waiver.marketingOptIn}

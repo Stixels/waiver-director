@@ -17,6 +17,7 @@
 	import { queryString } from '$lib/utils/url';
 	import ArrowRightIcon from '@lucide/svelte/icons/arrow-right';
 	import CalendarClockIcon from '@lucide/svelte/icons/calendar-clock';
+	import CameraIcon from '@lucide/svelte/icons/camera';
 	import FileTextIcon from '@lucide/svelte/icons/file-text';
 	import MailIcon from '@lucide/svelte/icons/mail';
 	import TicketIcon from '@lucide/svelte/icons/ticket';
@@ -48,6 +49,10 @@
 
 	const submission = $derived(submissionQuery.data as Submission | null);
 	const isLoadingSubmission = $derived(submissionQuery.isLoading);
+
+	function openPhoto(url: string | null) {
+		if (url) window.open(url, '_blank', 'noopener,noreferrer');
+	}
 
 	function formatTimestamp(ts: number) {
 		return new Intl.DateTimeFormat('en-US', { dateStyle: 'long', timeStyle: 'short' }).format(
@@ -273,6 +278,57 @@
 			</DialogHeader>
 
 			<div class="min-h-0 flex-1 overflow-y-auto bg-muted/20">
+				{#if submission.participantPhotoUrl || submission.idPhotoUrl}
+					<section
+						class="mx-auto max-w-5xl px-4 pt-4 sm:px-6 sm:pt-6"
+						aria-label="Photos captured at signing"
+					>
+						<div class="rounded-xl border border-border bg-background p-4 shadow-xs">
+							<div class={metaLabelClass}>
+								<CameraIcon class="size-3" aria-hidden="true" />
+								Photos captured at signing
+							</div>
+							<div class="mt-2 flex flex-wrap gap-4">
+								{#if submission.participantPhotoUrl}
+									<figure class="space-y-1.5">
+										<button
+											type="button"
+											class="block cursor-zoom-in"
+											aria-label="Open full-size participant photo"
+											onclick={() => openPhoto(submission.participantPhotoUrl)}
+										>
+											<img
+												src={submission.participantPhotoUrl}
+												alt={`Photo of ${submission.signerName}`}
+												class="h-40 w-40 rounded-md border border-border object-cover"
+												loading="lazy"
+											/>
+										</button>
+										<figcaption class="text-[11px] text-muted-foreground">Participant</figcaption>
+									</figure>
+								{/if}
+								{#if submission.idPhotoUrl}
+									<figure class="space-y-1.5">
+										<button
+											type="button"
+											class="block cursor-zoom-in"
+											aria-label="Open full-size photo ID"
+											onclick={() => openPhoto(submission.idPhotoUrl)}
+										>
+											<img
+												src={submission.idPhotoUrl}
+												alt={`Photo ID for ${submission.signerName}`}
+												class="h-40 w-64 rounded-md border border-border object-contain"
+												loading="lazy"
+											/>
+										</button>
+										<figcaption class="text-[11px] text-muted-foreground">Photo ID</figcaption>
+									</figure>
+								{/if}
+							</div>
+						</div>
+					</section>
+				{/if}
 				<WaiverReadonlyDocument
 					workspaceName={submission.workspaceName}
 					introCopy={submission.waiver.introCopy}

@@ -38,6 +38,7 @@ const WORKSPACE_SCOPED_TABLES = {
 	email_ai_rate_limits: true,
 	email_templates: true,
 	workspace_logo_uploads: true,
+	waiver_photo_uploads: true,
 	workspace_email_settings: true,
 	email_follow_ups: true,
 	booking_integrations: true,
@@ -52,8 +53,9 @@ type WorkspaceCleanupTableName = keyof typeof WORKSPACE_SCOPED_TABLES;
 const WORKSPACE_CLEANUP_TABLE_NAMES = Object.keys(
 	WORKSPACE_SCOPED_TABLES
 ) as WorkspaceCleanupTableName[];
+// Upload tables own storage files, so they are cleaned up separately.
 const WORKSPACE_PRIMARY_CLEANUP_TABLE_NAMES = WORKSPACE_CLEANUP_TABLE_NAMES.filter(
-	(tableName) => tableName !== 'workspace_logo_uploads'
+	(tableName) => tableName !== 'workspace_logo_uploads' && tableName !== 'waiver_photo_uploads'
 );
 const CLEANUP_BATCH_PER_TABLE = 50;
 const USER_DEFAULT_WORKSPACE_CLEANUP_BATCH = 50;
@@ -327,11 +329,17 @@ export const setWorkspaceLogo = mutation({
 			});
 		}
 
-		const existingUpload = await ctx.db
-			.query('workspace_logo_uploads')
-			.withIndex('by_storageId', (query) => query.eq('storageId', args.storageId))
-			.first();
-		if (existingUpload && existingUpload._id !== issuedUpload._id) {
+		const [existingUpload, existingPhotoUpload] = await Promise.all([
+			ctx.db
+				.query('workspace_logo_uploads')
+				.withIndex('by_storageId', (query) => query.eq('storageId', args.storageId))
+				.first(),
+			ctx.db
+				.query('waiver_photo_uploads')
+				.withIndex('by_storageId', (query) => query.eq('storageId', args.storageId))
+				.first()
+		]);
+		if ((existingUpload && existingUpload._id !== issuedUpload._id) || existingPhotoUpload) {
 			throw new ConvexError({
 				code: 'invalid_argument',
 				message: 'Logo file is already assigned.'
@@ -586,6 +594,31 @@ export const cleanupArchivedWorkspace = internalMutation({
 					error
 				});
 			}
+		}
+
+		const photoUploads = await ctx.db
+			.query('waiver_photo_uploads')
+			.withIndex('by_workspaceId', (q) => q.eq('workspaceId', args.workspaceId))
+			.take(CLEANUP_BATCH_PER_TABLE);
+		for (const upload of photoUploads) {
+			if (upload.storageId) {
+				try {
+					await ctx.storage.delete(upload.storageId);
+				} catch (error) {
+					console.warn('[cleanupArchivedWorkspace] failed to delete photo storage', {
+						workspaceId: args.workspaceId,
+						storageId: upload.storageId,
+						error
+					});
+				}
+			}
+			await ctx.db.delete(upload._id);
+		}
+		if (photoUploads.length === CLEANUP_BATCH_PER_TABLE) {
+			await ctx.scheduler.runAfter(0, internal.workspaces.cleanupArchivedWorkspace, {
+				workspaceId: args.workspaceId
+			});
+			return null;
 		}
 
 		const logoUploadCleanup = await deleteWorkspaceTableBatch(

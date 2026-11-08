@@ -4,6 +4,7 @@
 	import { useAppContext } from '$lib/components/app/app-context.svelte';
 	import { cn } from '$lib/utils';
 	import Building2Icon from '@lucide/svelte/icons/building-2';
+	import CameraIcon from '@lucide/svelte/icons/camera';
 	import MailIcon from '@lucide/svelte/icons/mail';
 	import PaletteIcon from '@lucide/svelte/icons/palette';
 	import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
@@ -30,6 +31,14 @@
 			description: 'Logo and visual identity',
 			icon: PaletteIcon,
 			match: 'branding',
+			tone: 'default' as const
+		},
+		{
+			href: `/app/${page.params.workspaceSlug}/settings/photos` as const,
+			label: 'Photo capture',
+			description: 'Signer photo and ID',
+			icon: CameraIcon,
+			match: 'photos',
 			tone: 'default' as const
 		},
 		{

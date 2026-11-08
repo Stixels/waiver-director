@@ -10,6 +10,8 @@ import { upsertSignerCustomer } from './lib/customers';
 import { submissionSearchText } from './lib/submissions';
 import { getOwnedWorkspaceLogoUrl } from './lib/workspaces';
 import { marketingConsentLabel } from './lib/marketing';
+import { photoCaptureSettings, photoCaptureSettingsValidator } from './lib/photoCapture';
+import { consumeSubmissionPhotoUploads, resolveSubmissionPhotoUploads } from './lib/photoUploads';
 import { sanitizeRichTextHtml } from '../lib/utils/rich-text';
 import {
 	assertWorkspaceRecord,
@@ -62,7 +64,8 @@ const publicWaiverValue = v.object({
 	marketingOptIn: v.union(
 		v.null(),
 		v.object({ provider: v.literal('mailchimp'), label: v.string() })
-	)
+	),
+	photoCapture: photoCaptureSettingsValidator
 });
 
 const publicBookingWaiverValue = v.object({
@@ -78,6 +81,7 @@ const publicBookingWaiverValue = v.object({
 		v.null(),
 		v.object({ provider: v.literal('mailchimp'), label: v.string() })
 	),
+	photoCapture: photoCaptureSettingsValidator,
 	booking: v.object({
 		lookupToken: v.string(),
 		activityName: v.string(),
@@ -318,7 +322,9 @@ export const getSubmission = query({
 			minors: v.array(v.string()),
 			booking: v.union(v.null(), bookingSnapshotValidator),
 			marketingConsent: v.boolean(),
-			marketingConsentLabel: v.union(v.string(), v.null())
+			marketingConsentLabel: v.union(v.string(), v.null()),
+			participantPhotoUrl: v.union(v.string(), v.null()),
+			idPhotoUrl: v.union(v.string(), v.null())
 		})
 	),
 	handler: async (ctx, args) => {
@@ -355,6 +361,13 @@ export const getSubmission = query({
 			});
 		}
 
+		const [participantPhotoUrl, idPhotoUrl] = await Promise.all([
+			submission.participantPhotoStorageId
+				? ctx.storage.getUrl(submission.participantPhotoStorageId)
+				: null,
+			submission.idPhotoStorageId ? ctx.storage.getUrl(submission.idPhotoStorageId) : null
+		]);
+
 		return {
 			submissionId: submission._id,
 			customerId: submission.customerId ?? null,
@@ -376,7 +389,9 @@ export const getSubmission = query({
 			minors: submission.minors.map((participant) => participant.fullName),
 			booking: submission.bookingSnapshot ?? null,
 			marketingConsent: submission.marketingConsent ?? false,
-			marketingConsentLabel: submission.marketingConsentLabel ?? null
+			marketingConsentLabel: submission.marketingConsentLabel ?? null,
+			participantPhotoUrl: participantPhotoUrl ?? null,
+			idPhotoUrl: idPhotoUrl ?? null
 		};
 	}
 });
@@ -489,7 +504,8 @@ export const getPublicWaiverBySlug = query({
 			marketingOptIn:
 				marketingIntegration?.status === 'connected' && marketingIntegration.audienceId
 					? { provider: 'mailchimp' as const, label: marketingConsentLabel(workspace.name) }
-					: null
+					: null,
+			photoCapture: photoCaptureSettings(workspace)
 		};
 	}
 });
@@ -553,6 +569,7 @@ export const getPublicWaiverForBooking = query({
 				marketingIntegration?.status === 'connected' && marketingIntegration.audienceId
 					? { provider: 'mailchimp' as const, label: marketingConsentLabel(workspace.name) }
 					: null,
+			photoCapture: photoCaptureSettings(workspace),
 			booking: {
 				lookupToken: booking.lookupToken,
 				activityName: booking.activityName,
@@ -577,7 +594,9 @@ export const submitPublicWaiver = mutation({
 		signatureDataUrl: v.string(),
 		marketingConsent: v.optional(v.boolean()),
 		answers: v.record(v.string(), waiverAnswerValueValidator),
-		minors: v.array(minorInputValidator)
+		minors: v.array(minorInputValidator),
+		participantPhotoUploadToken: v.optional(v.string()),
+		idPhotoUploadToken: v.optional(v.string())
 	},
 	returns: v.object({
 		submissionId: v.id('waiver_submissions')
@@ -681,6 +700,12 @@ export const submitPublicWaiver = mutation({
 		}
 
 		const submittedAt = Date.now();
+		const photoUploads = await resolveSubmissionPhotoUploads(ctx, {
+			waiver,
+			workspace,
+			tokens: { participant: args.participantPhotoUploadToken, id: args.idPhotoUploadToken },
+			now: submittedAt
+		});
 		const submissionId = await ctx.db.insert('waiver_submissions', {
 			workspaceId: waiver.workspaceId,
 			versionId: waiver.publishedVersionId,
@@ -704,8 +729,13 @@ export const submitPublicWaiver = mutation({
 			status: 'submitted',
 			marketingConsent,
 			...(consentLabel ? { marketingConsentLabel: consentLabel } : {}),
+			...(photoUploads.participant?.storageId
+				? { participantPhotoStorageId: photoUploads.participant.storageId }
+				: {}),
+			...(photoUploads.id?.storageId ? { idPhotoStorageId: photoUploads.id.storageId } : {}),
 			submittedAt
 		});
+		await consumeSubmissionPhotoUploads(ctx, photoUploads, submissionId, submittedAt);
 		const customerId = await upsertSignerCustomer(ctx, {
 			workspaceId: waiver.workspaceId,
 			signerName,

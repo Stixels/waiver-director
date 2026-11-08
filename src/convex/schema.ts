@@ -3,6 +3,7 @@ import { v } from 'convex/values';
 import { billingFeatureValidator } from './lib/billing';
 import { bookingProviderValidator, bookingSnapshotValidator } from './lib/bookings';
 import { marketingIntegrationStatusValidator, marketingProviderValidator } from './lib/marketing';
+import { photoCaptureKindValidator, photoCaptureModeValidator } from './lib/photoCapture';
 
 export default defineSchema({
 	users: defineTable({
@@ -61,6 +62,8 @@ export default defineSchema({
 		createdByUserId: v.optional(v.id('users')),
 		customerCount: v.number(),
 		logoStorageId: v.optional(v.id('_storage')),
+		participantPhotoCapture: v.optional(photoCaptureModeValidator),
+		idPhotoCapture: v.optional(photoCaptureModeValidator),
 		archivedAt: v.optional(v.number())
 	})
 		.index('by_slug', ['slug'])
@@ -86,6 +89,27 @@ export default defineSchema({
 		.index('by_uploadToken', ['uploadToken'])
 		.index('by_storageId', ['storageId'])
 		.index('by_workspaceId_and_storageId', ['workspaceId', 'storageId']),
+
+	// Photos a public signer uploads while signing (participant photo, photo ID).
+	// Rows are issued before upload, attached once the file lands in storage, and
+	// consumed when a submission takes ownership of the file.
+	waiver_photo_uploads: defineTable({
+		workspaceId: v.id('workspaces'),
+		waiverId: v.id('workspace_waivers'),
+		kind: photoCaptureKindValidator,
+		uploadToken: v.string(),
+		status: v.union(v.literal('issued'), v.literal('attached'), v.literal('consumed')),
+		storageId: v.optional(v.id('_storage')),
+		submissionId: v.optional(v.id('waiver_submissions')),
+		createdAt: v.number(),
+		expiresAt: v.number(),
+		consumedAt: v.optional(v.number())
+	})
+		.index('by_workspaceId', ['workspaceId'])
+		.index('by_uploadToken', ['uploadToken'])
+		.index('by_storageId', ['storageId'])
+		.index('by_waiverId_and_createdAt', ['waiverId', 'createdAt'])
+		.index('by_status_and_expiresAt', ['status', 'expiresAt']),
 
 	workspace_memberships: defineTable({
 		workspaceId: v.id('workspaces'),
@@ -233,6 +257,8 @@ export default defineSchema({
 		status: v.union(v.literal('submitted')),
 		marketingConsent: v.optional(v.boolean()),
 		marketingConsentLabel: v.optional(v.string()),
+		participantPhotoStorageId: v.optional(v.id('_storage')),
+		idPhotoStorageId: v.optional(v.id('_storage')),
 		submittedAt: v.number()
 	})
 		.index('by_workspaceId', ['workspaceId'])

@@ -31,4 +31,11 @@ crons.interval(
 	{}
 );
 
+crons.interval(
+	'prune expired waiver photo uploads',
+	{ hours: 1 },
+	internal.photoUploads.pruneExpiredPhotoUploadsCron,
+	{}
+);
+
 export default crons;
