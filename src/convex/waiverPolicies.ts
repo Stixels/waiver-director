@@ -155,7 +155,8 @@ export const claimExistingWaiverForBooking = mutation({
 			status: v.literal('covered'),
 			signerName: v.string(),
 			signedAt: v.number(),
-			expiresAt: v.union(v.number(), v.null())
+			expiresAt: v.union(v.number(), v.null()),
+			minorNames: v.array(v.string())
 		}),
 		v.object({ status: v.literal('already_covered'), signerName: v.string() }),
 		v.object({
@@ -248,6 +249,7 @@ export const claimExistingWaiverForBooking = mutation({
 			};
 		}
 
+		const minorNames = submission.minors.map((minor) => minor.fullName);
 		await ctx.db.insert('booking_waiver_reuses', {
 			workspaceId: booking.workspaceId,
 			bookingId: booking._id,
@@ -255,9 +257,14 @@ export const claimExistingWaiverForBooking = mutation({
 			submissionId: submission._id,
 			signerName: submission.signerName,
 			signerEmail: submission.signerEmail,
+			minorNames,
 			reusedAt: now
 		});
-		await ctx.db.patch(booking._id, { signedCount: booking.signedCount + 1 });
+		// The reused waiver covers the signer and every minor listed on it, matching how a
+		// fresh signature is counted.
+		await ctx.db.patch(booking._id, {
+			signedCount: booking.signedCount + 1 + minorNames.length
+		});
 		await ctx.db.patch(customer._id, {
 			lastSeenAt: Math.max(customer.lastSeenAt, now),
 			visitCount: customer.visitCount + 1,
@@ -268,7 +275,8 @@ export const claimExistingWaiverForBooking = mutation({
 			status: 'covered' as const,
 			signerName: submission.signerName,
 			signedAt: submission.submittedAt,
-			expiresAt: eligibility.expiresAt
+			expiresAt: eligibility.expiresAt,
+			minorNames
 		};
 	}
 });

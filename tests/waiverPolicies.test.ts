@@ -7,6 +7,8 @@ import {
 	REUSE_LOOKUP_WINDOW_MS,
 	bookingNeedsGuestReminder,
 	formatBookingWallClock,
+	isRetryableEmailError,
+	reminderRetryDelayMs,
 	nextReuseLookupAttempts,
 	normalizeReminderLeadHours,
 	normalizeValidityDays,
@@ -150,4 +152,22 @@ test('builds an escaped reminder email', () => {
 	assert.doesNotMatch(email.html, /<VR>/);
 	assert.match(email.text, /3 of 4 guests have signed/);
 	assert.match(email.text, /confirm it instead of signing again/);
+});
+
+test('retries rate limits, server errors and network failures, not permanent errors', () => {
+	assert.equal(isRetryableEmailError({ statusCode: 429, name: 'rate_limit_exceeded' }), true);
+	assert.equal(isRetryableEmailError({ statusCode: 500, name: 'internal_server_error' }), true);
+	assert.equal(isRetryableEmailError({ statusCode: 503 }), true);
+	assert.equal(isRetryableEmailError({ statusCode: null }), true);
+	assert.equal(isRetryableEmailError(null), true);
+	assert.equal(isRetryableEmailError({ statusCode: 422, name: 'validation_error' }), false);
+	assert.equal(isRetryableEmailError({ statusCode: 403, name: 'invalid_from_address' }), false);
+});
+
+test('backs off exponentially with a cap', () => {
+	assert.equal(reminderRetryDelayMs(1, 0), 30_000);
+	assert.equal(reminderRetryDelayMs(2, 0), 60_000);
+	assert.equal(reminderRetryDelayMs(4, 0), 240_000);
+	assert.equal(reminderRetryDelayMs(20, 0), 30 * 60 * 1000);
+	assert.equal(reminderRetryDelayMs(1, 1), 35_000);
 });

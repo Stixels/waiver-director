@@ -6,9 +6,18 @@ import { workspaceHasBillingFeature } from './lib/billing';
 import { configuredFromEmail, friendlyFromAddress } from './lib/emailAddress';
 import { buildGuestReminderEmail } from './lib/guestReminderEmail';
 import { getWorkspacePolicyRecord, policyFromRecord } from './lib/waiverPolicyRecords';
-import { bookingNeedsGuestReminder, formatBookingWallClock, HOUR_MS } from './lib/waiverPolicies';
+import {
+	bookingNeedsGuestReminder,
+	formatBookingWallClock,
+	HOUR_MS,
+	isRetryableEmailError,
+	MAX_REMINDER_DELIVERY_ATTEMPTS,
+	REMINDER_SEND_SPACING_MS,
+	REMINDER_WORKSPACE_SPACING_MS,
+	reminderRetryDelayMs
+} from './lib/waiverPolicies';
 
-const MAX_WORKSPACES_PER_SWEEP = 500;
+const WORKSPACES_PER_SWEEP_PAGE = 100;
 const MAX_BOOKINGS_PER_WORKSPACE_SWEEP = 200;
 const MAX_REMINDERS_PER_WORKSPACE_SWEEP = 50;
 
@@ -26,19 +35,32 @@ function appOrigin(): string | null {
 	}
 }
 
-/** Cron entry point: fans out one sweep per workspace that has guest reminders turned on. */
+/**
+ * Cron entry point: fans out one sweep per workspace that has guest reminders turned on.
+ * Walks the policy index a page at a time and reschedules itself with the cursor, so every
+ * workspace is reached no matter how many have reminders enabled.
+ */
 export const sweepGuestRemindersCron = internalMutation({
-	args: {},
+	args: { cursor: v.optional(v.union(v.string(), v.null())) },
 	returns: v.null(),
-	handler: async (ctx) => {
-		const policies = await ctx.db
+	handler: async (ctx, args) => {
+		const page = await ctx.db
 			.query('workspace_waiver_policies')
 			.withIndex('by_guestRemindersEnabled', (q) => q.eq('guestRemindersEnabled', true))
-			.take(MAX_WORKSPACES_PER_SWEEP);
-		for (const policy of policies) {
-			await ctx.scheduler.runAfter(0, internal.guestReminders.queueWorkspaceGuestReminders, {
-				workspaceId: policy.workspaceId
-			});
+			.paginate({ cursor: args.cursor ?? null, numItems: WORKSPACES_PER_SWEEP_PAGE });
+		for (const [index, policy] of page.page.entries()) {
+			await ctx.scheduler.runAfter(
+				index * REMINDER_WORKSPACE_SPACING_MS,
+				internal.guestReminders.queueWorkspaceGuestReminders,
+				{ workspaceId: policy.workspaceId }
+			);
+		}
+		if (!page.isDone) {
+			await ctx.scheduler.runAfter(
+				page.page.length * REMINDER_WORKSPACE_SPACING_MS,
+				internal.guestReminders.sweepGuestRemindersCron,
+				{ cursor: page.continueCursor }
+			);
 		}
 		return null;
 	}
@@ -100,11 +122,14 @@ export const queueWorkspaceGuestReminders = internalMutation({
 				status: 'queued',
 				signedCountAtQueue: booking.signedCount,
 				participantCount: booking.participantCount,
-				createdAt: now
+				createdAt: now,
+				deliveryAttempts: 0
 			});
-			await ctx.scheduler.runAfter(0, internal.guestReminders.deliverGuestReminder, {
-				reminderId
-			});
+			await ctx.scheduler.runAfter(
+				queued * REMINDER_SEND_SPACING_MS,
+				internal.guestReminders.deliverGuestReminder,
+				{ reminderId }
+			);
 			queued++;
 		}
 		return null;
@@ -166,6 +191,35 @@ export const finishGuestReminder = internalMutation({
 			...(args.reason ? { failureReason: args.reason } : {}),
 			...(args.resendMessageId ? { resendMessageId: args.resendMessageId } : {})
 		});
+		return null;
+	}
+});
+
+/** Records a retryable send failure and schedules another attempt, or gives up after the limit. */
+export const retryGuestReminderLater = internalMutation({
+	args: { reminderId: v.id('booking_guest_reminders'), reason: v.string() },
+	returns: v.null(),
+	handler: async (ctx, args) => {
+		const reminder = await ctx.db.get(args.reminderId);
+		if (!reminder || reminder.status !== 'queued') return null;
+		const attempts = (reminder.deliveryAttempts ?? 0) + 1;
+		if (attempts >= MAX_REMINDER_DELIVERY_ATTEMPTS) {
+			await ctx.db.patch(args.reminderId, {
+				status: 'failed',
+				deliveryAttempts: attempts,
+				failureReason: `${args.reason} (gave up after ${attempts} attempts)`
+			});
+			return null;
+		}
+		await ctx.db.patch(args.reminderId, {
+			deliveryAttempts: attempts,
+			failureReason: args.reason
+		});
+		await ctx.scheduler.runAfter(
+			reminderRetryDelayMs(attempts),
+			internal.guestReminders.deliverGuestReminder,
+			{ reminderId: args.reminderId }
+		);
 		return null;
 	}
 });
@@ -260,22 +314,45 @@ export const deliverGuestReminder = internalAction({
 			returningGuestsCanSkip: context.policy.reuseEnabled
 		});
 
+		let result: Awaited<ReturnType<Resend['emails']['send']>>;
 		try {
 			const resend = new Resend(apiKey);
-			const { data, error } = await resend.emails.send({
-				from: friendlyFromAddress(context.workspaceName, fromAddress),
-				to: booking.leadCustomerEmail,
-				replyTo: context.replyToEmail,
-				subject: email.subject,
-				html: email.html,
-				text: email.text
-			});
-			if (error) throw new Error(error.message);
-			await finish('sent', undefined, data?.id);
+			result = await resend.emails.send(
+				{
+					from: friendlyFromAddress(context.workspaceName, fromAddress),
+					to: booking.leadCustomerEmail,
+					replyTo: context.replyToEmail,
+					subject: email.subject,
+					html: email.html,
+					text: email.text
+				},
+				// A retry after an ambiguous failure must not send a second email.
+				{ idempotencyKey: `guest-reminder/${args.reminderId}` }
+			);
 		} catch (err) {
-			console.error(`[EMAIL] Failed to deliver guest reminder ${args.reminderId}:`, err);
-			await finish('failed', err instanceof Error ? err.message : 'Email delivery failed.');
+			// Network-level failure: no response from the provider, so try again later.
+			console.error(`[EMAIL] Guest reminder ${args.reminderId} send threw:`, err);
+			await ctx.runMutation(internal.guestReminders.retryGuestReminderLater, {
+				reminderId: args.reminderId,
+				reason: err instanceof Error ? err.message : 'Email delivery failed.'
+			});
+			return null;
 		}
+
+		if (result.error) {
+			console.error(`[EMAIL] Guest reminder ${args.reminderId} failed:`, result.error);
+			if (isRetryableEmailError(result.error)) {
+				await ctx.runMutation(internal.guestReminders.retryGuestReminderLater, {
+					reminderId: args.reminderId,
+					reason: result.error.message
+				});
+			} else {
+				await finish('failed', result.error.message);
+			}
+			return null;
+		}
+
+		await finish('sent', undefined, result.data?.id);
 		return null;
 	}
 });

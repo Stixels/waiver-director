@@ -482,6 +482,7 @@ export default defineSchema({
 		submissionId: v.id('waiver_submissions'),
 		signerName: v.string(),
 		signerEmail: v.string(),
+		minorNames: v.optional(v.array(v.string())),
 		reusedAt: v.number()
 	})
 		.index('by_bookingId', ['bookingId'])
@@ -510,6 +511,7 @@ export default defineSchema({
 		signedCountAtQueue: v.number(),
 		participantCount: v.number(),
 		createdAt: v.number(),
+		deliveryAttempts: v.optional(v.number()),
 		sentAt: v.optional(v.number()),
 		resendMessageId: v.optional(v.string()),
 		failureReason: v.optional(v.string())

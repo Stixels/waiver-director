@@ -170,3 +170,36 @@ export function formatBookingWallClock(startTime: string | undefined): string | 
 	const displayHour = hourNumber % 12 === 0 ? 12 : hourNumber % 12;
 	return `${date} at ${displayHour}:${minute} ${suffix}`;
 }
+
+/** Gap between reminder sends inside one workspace sweep, to stay under the email provider's rate limit. */
+export const REMINDER_SEND_SPACING_MS = 600;
+/** Gap between workspace sweeps started from one page of the cron fan-out. */
+export const REMINDER_WORKSPACE_SPACING_MS = 1000;
+export const MAX_REMINDER_DELIVERY_ATTEMPTS = 5;
+
+/**
+ * Whether a failed send is worth retrying: rate limits, provider server errors, and
+ * network failures (no status code). Validation and auth errors are permanent.
+ */
+export function isRetryableEmailError(
+	error: { statusCode?: number | null; name?: string } | null | undefined
+): boolean {
+	if (!error) return true;
+	if (
+		error.name === 'rate_limit_exceeded' ||
+		error.name === 'application_error' ||
+		error.name === 'internal_server_error' ||
+		error.name === 'concurrent_idempotent_requests'
+	) {
+		return true;
+	}
+	const status = error.statusCode;
+	if (status === null || status === undefined) return true;
+	return status === 429 || status >= 500;
+}
+
+/** Backoff before retry number `attempt` (1-based): 30s, 60s, 2m, 4m, capped at 30m, plus jitter. */
+export function reminderRetryDelayMs(attempt: number, jitter = Math.random()): number {
+	const base = Math.min(30_000 * 2 ** Math.max(0, attempt - 1), 30 * 60 * 1000);
+	return Math.round(base + jitter * 5_000);
+}

@@ -291,14 +291,24 @@ export const getWorkspaceBookingDetail = query({
 		]);
 		const reusedUsers = reuses
 			.filter((reuse) => reuse.workspaceId === args.workspaceId)
-			.map((reuse) => ({
-				submissionId: reuse.submissionId,
-				name: reuse.signerName,
-				email: reuse.signerEmail,
-				kind: 'signer' as const,
-				submittedAt: reuse.reusedAt,
-				reusedAt: reuse.reusedAt
-			}));
+			.flatMap((reuse) => [
+				{
+					submissionId: reuse.submissionId,
+					name: reuse.signerName,
+					email: reuse.signerEmail,
+					kind: 'signer' as const,
+					submittedAt: reuse.reusedAt,
+					reusedAt: reuse.reusedAt
+				},
+				...(reuse.minorNames ?? []).map((name) => ({
+					submissionId: reuse.submissionId,
+					name,
+					email: null,
+					kind: 'minor' as const,
+					submittedAt: reuse.reusedAt,
+					reusedAt: reuse.reusedAt
+				}))
+			]);
 		const signedUsers = [...signedUsersFromSubmissions(submissions), ...reusedUsers].sort(
 			(a, b) => b.submittedAt - a.submittedAt
 		);

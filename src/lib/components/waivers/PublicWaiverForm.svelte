@@ -73,6 +73,7 @@
 		signerName: string;
 		signedAt: number | null;
 		expiresAt: number | null;
+		minorNames: string[];
 		alreadyCovered: boolean;
 	} | null>(null);
 
@@ -89,7 +90,12 @@
 			reuseResult.expiresAt !== null
 				? ` and stays valid until ${formatReuseDate(reuseResult.expiresAt)}`
 				: '';
-		return `Thanks, ${reuseResult.signerName}. The waiver you signed on ${formatReuseDate(reuseResult.signedAt)} covers this booking${validUntil}.`;
+		const minors = reuseResult.minorNames;
+		const covered =
+			minors.length === 0
+				? 'covers this booking'
+				: `covers you and ${minors.length === 1 ? minors[0] : `${minors.slice(0, -1).join(', ')} and ${minors[minors.length - 1]}`} for this booking`;
+		return `Thanks, ${reuseResult.signerName}. The waiver you signed on ${formatReuseDate(reuseResult.signedAt)} ${covered}${validUntil}.`;
 	});
 
 	async function handleReuse(event: SubmitEvent) {
@@ -114,6 +120,7 @@
 					signerName: result.signerName,
 					signedAt: result.signedAt,
 					expiresAt: result.expiresAt,
+					minorNames: result.minorNames,
 					alreadyCovered: false
 				};
 				toast.success('Your waiver on file covers this booking.');
@@ -122,6 +129,7 @@
 					signerName: result.signerName,
 					signedAt: null,
 					expiresAt: null,
+					minorNames: [],
 					alreadyCovered: true
 				};
 			} else if (result.status === 'needs_new_signature') {
