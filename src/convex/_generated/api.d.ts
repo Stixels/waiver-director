@@ -18,6 +18,7 @@ import type * as emailAI from "../emailAI.js";
 import type * as emails from "../emails.js";
 import type * as http from "../http.js";
 import type * as integrations from "../integrations.js";
+import type * as kiosk from "../kiosk.js";
 import type * as lib_auth from "../lib/auth.js";
 import type * as lib_billing from "../lib/billing.js";
 import type * as lib_bookingSignatures from "../lib/bookingSignatures.js";
@@ -53,6 +54,7 @@ declare const fullApi: ApiFromModules<{
   emails: typeof emails;
   http: typeof http;
   integrations: typeof integrations;
+  kiosk: typeof kiosk;
   "lib/auth": typeof lib_auth;
   "lib/billing": typeof lib_billing;
   "lib/bookingSignatures": typeof lib_bookingSignatures;

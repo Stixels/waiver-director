@@ -31,4 +31,11 @@ crons.interval(
 	{}
 );
 
+crons.interval(
+	'prune old kiosk lookup rate limits',
+	{ hours: 24 },
+	internal.kiosk.pruneOldLookupRateLimitsCron,
+	{}
+);
+
 export default crons;

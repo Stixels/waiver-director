@@ -47,6 +47,7 @@
 	import ExternalLinkIcon from '@lucide/svelte/icons/external-link';
 	import CheckIcon from '@lucide/svelte/icons/check';
 	import QrCodeIcon from '@lucide/svelte/icons/qr-code';
+	import TabletSmartphoneIcon from '@lucide/svelte/icons/tablet-smartphone';
 	import UploadCloudIcon from '@lucide/svelte/icons/cloud-upload';
 	import Pencil from '@lucide/svelte/icons/pencil';
 	import XIcon from '@lucide/svelte/icons/x';
@@ -605,6 +606,22 @@
 								{/snippet}
 							</TooltipTrigger>
 							<TooltipContent side="bottom" sideOffset={4}>Show QR code</TooltipContent>
+						</Tooltip>
+
+						<Tooltip>
+							<TooltipTrigger class="topbar-icon-btn" aria-label="Open kiosk mode">
+								{#snippet child({ props })}
+									<a
+										href={resolve(`/w/${workspaceWaiver.publicSlug}/kiosk` as `/w/${string}/kiosk`)}
+										target="_blank"
+										rel="noopener noreferrer"
+										{...props}
+									>
+										<TabletSmartphoneIcon class="size-3.5" />
+									</a>
+								{/snippet}
+							</TooltipTrigger>
+							<TooltipContent side="bottom" sideOffset={4}>Open kiosk mode</TooltipContent>
 						</Tooltip>
 					</div>
 				</div>

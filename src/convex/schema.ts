@@ -481,5 +481,17 @@ export default defineSchema({
 		.index('by_workspaceId', ['workspaceId'])
 		.index('by_integrationId', ['integrationId'])
 		.index('by_integrationId_and_messageId', ['integrationId', 'messageId'])
-		.index('by_status_and_receivedAt', ['status', 'receivedAt'])
+		.index('by_status_and_receivedAt', ['status', 'receivedAt']),
+
+	// Fixed-window counters for the public kiosk booking lookup. Identifier scopes are hashed.
+	kiosk_lookup_rate_limits: defineTable({
+		workspaceId: v.id('workspaces'),
+		scopeKey: v.string(),
+		windowStartedAt: v.number(),
+		requestCount: v.number(),
+		updatedAt: v.number()
+	})
+		.index('by_workspaceId', ['workspaceId'])
+		.index('by_workspaceId_and_scopeKey', ['workspaceId', 'scopeKey'])
+		.index('by_updatedAt', ['updatedAt'])
 });
