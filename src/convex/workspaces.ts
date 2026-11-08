@@ -39,6 +39,7 @@ const WORKSPACE_SCOPED_TABLES = {
 	email_templates: true,
 	workspace_logo_uploads: true,
 	waiver_photo_uploads: true,
+	submission_photo_view_tokens: true,
 	workspace_email_settings: true,
 	email_follow_ups: true,
 	booking_integrations: true,

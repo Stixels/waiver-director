@@ -34,21 +34,6 @@ export async function requireLivePublicWaiver(
 	return { waiver, workspace };
 }
 
-/** True when any app table already owns this storage file. */
-export async function storageIdIsAssigned(ctx: MutationCtx, storageId: Id<'_storage'>) {
-	const [photoUpload, logoUpload] = await Promise.all([
-		ctx.db
-			.query('waiver_photo_uploads')
-			.withIndex('by_storageId', (q) => q.eq('storageId', storageId))
-			.first(),
-		ctx.db
-			.query('workspace_logo_uploads')
-			.withIndex('by_storageId', (q) => q.eq('storageId', storageId))
-			.first()
-	]);
-	return { photoUpload, logoUpload };
-}
-
 type PhotoTokens = { participant?: string; id?: string };
 
 /**

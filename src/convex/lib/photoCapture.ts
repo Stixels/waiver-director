@@ -32,10 +32,17 @@ export const PHOTO_UPLOAD_ALLOWED_CONTENT_TYPES = new Set([
 	'image/webp'
 ]);
 export const PHOTO_UPLOAD_MAX_BYTES = 5 * 1024 * 1024;
+/** How long an uploaded photo waits for its submission before it is pruned. */
 export const PHOTO_UPLOAD_TTL_MS = 60 * 60 * 1000;
-/** Upload URLs one public waiver may issue per rate-limit window. */
-export const PHOTO_UPLOAD_RATE_LIMIT = 200;
+/** How long a reserved upload may take to reach storage before it is pruned. */
+export const PHOTO_UPLOAD_RESERVATION_TTL_MS = 5 * 60 * 1000;
 export const PHOTO_UPLOAD_RATE_WINDOW_MS = 10 * 60 * 1000;
+/** Uploads one client (hashed IP) may make to one waiver per window. */
+export const PHOTO_UPLOAD_CLIENT_RATE_LIMIT = 20;
+/** Safety cap on uploads to one waiver per window, across all clients. */
+export const PHOTO_UPLOAD_WAIVER_RATE_LIMIT = 1000;
+/** How long a staff member's photo view link works. */
+export const PHOTO_VIEW_TOKEN_TTL_MS = 10 * 60 * 1000;
 
 export function photoCaptureSettings(workspace: {
 	participantPhotoCapture?: PhotoCaptureMode;
@@ -56,6 +63,35 @@ export function photoCaptureModeForKind(
 
 export function photoCaptureKindLabel(kind: PhotoCaptureKind): string {
 	return kind === 'participant' ? 'participant photo' : 'photo ID';
+}
+
+/** Returns an error message when a declared upload is not an acceptable photo. */
+export function photoUploadRequestError(contentType: string | null, size: number | null) {
+	const baseType = contentType?.split(';')[0]?.trim().toLowerCase() ?? '';
+	if (!PHOTO_UPLOAD_ALLOWED_CONTENT_TYPES.has(baseType)) {
+		return 'Photos must be JPEG, PNG, or WebP images.';
+	}
+	if (size !== null && size > PHOTO_UPLOAD_MAX_BYTES) {
+		return 'Photos must be 5MB or smaller.';
+	}
+	if (size !== null && size <= 0) {
+		return 'Uploaded photo is empty. Please try again.';
+	}
+	return null;
+}
+
+/**
+ * Picks the client address for rate limiting from X-Forwarded-For. Uses the
+ * last entry, the one added by the proxy in front of Convex, because earlier
+ * entries can be set by the caller.
+ */
+export function clientAddressFromForwardedFor(header: string | null): string | null {
+	if (!header) return null;
+	const parts = header
+		.split(',')
+		.map((part) => part.trim())
+		.filter(Boolean);
+	return parts.at(-1) ?? null;
 }
 
 /** Returns an error message when the uploaded file is not an acceptable photo. */

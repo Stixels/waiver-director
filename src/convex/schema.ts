@@ -91,13 +91,15 @@ export default defineSchema({
 		.index('by_workspaceId_and_storageId', ['workspaceId', 'storageId']),
 
 	// Photos a public signer uploads while signing (participant photo, photo ID).
-	// Rows are issued before upload, attached once the file lands in storage, and
-	// consumed when a submission takes ownership of the file.
+	// The upload HTTP endpoint reserves a row ('issued'), stores the checked file
+	// ('attached'), and a submission takes ownership of it ('consumed').
 	waiver_photo_uploads: defineTable({
 		workspaceId: v.id('workspaces'),
 		waiverId: v.id('workspace_waivers'),
 		kind: photoCaptureKindValidator,
 		uploadToken: v.string(),
+		// Hashed client address used for per-signer rate limiting.
+		clientKey: v.string(),
 		status: v.union(v.literal('issued'), v.literal('attached'), v.literal('consumed')),
 		storageId: v.optional(v.id('_storage')),
 		submissionId: v.optional(v.id('waiver_submissions')),
@@ -109,7 +111,21 @@ export default defineSchema({
 		.index('by_uploadToken', ['uploadToken'])
 		.index('by_storageId', ['storageId'])
 		.index('by_waiverId_and_createdAt', ['waiverId', 'createdAt'])
+		.index('by_waiverId_and_clientKey_and_createdAt', ['waiverId', 'clientKey', 'createdAt'])
 		.index('by_status_and_expiresAt', ['status', 'expiresAt']),
+
+	// Short-lived links that let a workspace member view a submission photo.
+	// Photos are never served from public storage URLs.
+	submission_photo_view_tokens: defineTable({
+		workspaceId: v.id('workspaces'),
+		userId: v.id('users'),
+		storageId: v.id('_storage'),
+		token: v.string(),
+		expiresAt: v.number()
+	})
+		.index('by_workspaceId', ['workspaceId'])
+		.index('by_token', ['token'])
+		.index('by_expiresAt', ['expiresAt']),
 
 	workspace_memberships: defineTable({
 		workspaceId: v.id('workspaces'),

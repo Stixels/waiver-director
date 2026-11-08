@@ -3,7 +3,10 @@
 	import type { FunctionReturnType } from 'convex/server';
 	import { api } from '$convex/_generated/api';
 	import type { Id } from '$convex/_generated/dataModel';
+	import { useConvexClient } from 'convex-svelte';
+	import { toast } from 'svelte-sonner';
 	import { useProtectedQuery } from '$lib/components/auth/convex-auth.svelte';
+	import { getConvexErrorMessage } from '$lib/utils/convex-errors';
 	import {
 		Dialog,
 		DialogContent,
@@ -50,8 +53,55 @@
 	const submission = $derived(submissionQuery.data as Submission | null);
 	const isLoadingSubmission = $derived(submissionQuery.isLoading);
 
-	function openPhoto(url: string | null) {
-		if (url) window.open(url, '_blank', 'noopener,noreferrer');
+	const convex = useConvexClient();
+	type PhotoViewUrls = { participantPhotoUrl: string | null; idPhotoUrl: string | null };
+	let photoUrls = $state<PhotoViewUrls | null>(null);
+	let photoUrlsFor = $state<string | null>(null);
+	const hasPhotos = $derived(Boolean(submission?.hasParticipantPhoto || submission?.hasIdPhoto));
+
+	// Photos are served through short-lived, membership-checked links, never
+	// public storage URLs, so links are fetched when a submission opens.
+	async function issuePhotoUrls(): Promise<PhotoViewUrls | null> {
+		try {
+			return await convex.mutation(api.photoUploads.issueSubmissionPhotoViewUrls, {
+				workspaceId,
+				submissionId
+			});
+		} catch (err) {
+			toast.error(getConvexErrorMessage(err, 'Unable to load photos.'));
+			return null;
+		}
+	}
+
+	$effect(() => {
+		if (!open) {
+			// Links expire, so fetch fresh ones the next time the dialog opens.
+			photoUrlsFor = null;
+			photoUrls = null;
+			return;
+		}
+		if (!hasPhotos || photoUrlsFor === submissionId) return;
+		const requestedFor = submissionId;
+		photoUrlsFor = requestedFor;
+		photoUrls = null;
+		void issuePhotoUrls().then((urls) => {
+			if (photoUrlsFor === requestedFor) photoUrls = urls;
+		});
+	});
+
+	async function openPhoto(kind: 'participant' | 'id') {
+		// Open the tab synchronously so it is not treated as a popup, then point
+		// it at a fresh link once one is issued.
+		const tab = window.open('', '_blank');
+		const urls = await issuePhotoUrls();
+		const url = kind === 'participant' ? urls?.participantPhotoUrl : urls?.idPhotoUrl;
+		if (!tab) return;
+		if (!url) {
+			tab.close();
+			return;
+		}
+		tab.opener = null;
+		tab.location.href = url;
 	}
 
 	function formatTimestamp(ts: number) {
@@ -278,7 +328,7 @@
 			</DialogHeader>
 
 			<div class="min-h-0 flex-1 overflow-y-auto bg-muted/20">
-				{#if submission.participantPhotoUrl || submission.idPhotoUrl}
+				{#if hasPhotos}
 					<section
 						class="mx-auto max-w-5xl px-4 pt-4 sm:px-6 sm:pt-6"
 						aria-label="Photos captured at signing"
@@ -289,16 +339,16 @@
 								Photos captured at signing
 							</div>
 							<div class="mt-2 flex flex-wrap gap-4">
-								{#if submission.participantPhotoUrl}
+								{#if submission.hasParticipantPhoto}
 									<figure class="space-y-1.5">
 										<button
 											type="button"
 											class="block cursor-zoom-in"
 											aria-label="Open full-size participant photo"
-											onclick={() => openPhoto(submission.participantPhotoUrl)}
+											onclick={() => openPhoto('participant')}
 										>
 											<img
-												src={submission.participantPhotoUrl}
+												src={photoUrls?.participantPhotoUrl ?? undefined}
 												alt={`Photo of ${submission.signerName}`}
 												class="h-40 w-40 rounded-md border border-border object-cover"
 												loading="lazy"
@@ -307,16 +357,16 @@
 										<figcaption class="text-[11px] text-muted-foreground">Participant</figcaption>
 									</figure>
 								{/if}
-								{#if submission.idPhotoUrl}
+								{#if submission.hasIdPhoto}
 									<figure class="space-y-1.5">
 										<button
 											type="button"
 											class="block cursor-zoom-in"
 											aria-label="Open full-size photo ID"
-											onclick={() => openPhoto(submission.idPhotoUrl)}
+											onclick={() => openPhoto('id')}
 										>
 											<img
-												src={submission.idPhotoUrl}
+												src={photoUrls?.idPhotoUrl ?? undefined}
 												alt={`Photo ID for ${submission.signerName}`}
 												class="h-40 w-64 rounded-md border border-border object-contain"
 												loading="lazy"

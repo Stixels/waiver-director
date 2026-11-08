@@ -323,8 +323,8 @@ export const getSubmission = query({
 			booking: v.union(v.null(), bookingSnapshotValidator),
 			marketingConsent: v.boolean(),
 			marketingConsentLabel: v.union(v.string(), v.null()),
-			participantPhotoUrl: v.union(v.string(), v.null()),
-			idPhotoUrl: v.union(v.string(), v.null())
+			hasParticipantPhoto: v.boolean(),
+			hasIdPhoto: v.boolean()
 		})
 	),
 	handler: async (ctx, args) => {
@@ -361,13 +361,6 @@ export const getSubmission = query({
 			});
 		}
 
-		const [participantPhotoUrl, idPhotoUrl] = await Promise.all([
-			submission.participantPhotoStorageId
-				? ctx.storage.getUrl(submission.participantPhotoStorageId)
-				: null,
-			submission.idPhotoStorageId ? ctx.storage.getUrl(submission.idPhotoStorageId) : null
-		]);
-
 		return {
 			submissionId: submission._id,
 			customerId: submission.customerId ?? null,
@@ -390,8 +383,8 @@ export const getSubmission = query({
 			booking: submission.bookingSnapshot ?? null,
 			marketingConsent: submission.marketingConsent ?? false,
 			marketingConsentLabel: submission.marketingConsentLabel ?? null,
-			participantPhotoUrl: participantPhotoUrl ?? null,
-			idPhotoUrl: idPhotoUrl ?? null
+			hasParticipantPhoto: Boolean(submission.participantPhotoStorageId),
+			hasIdPhoto: Boolean(submission.idPhotoStorageId)
 		};
 	}
 });

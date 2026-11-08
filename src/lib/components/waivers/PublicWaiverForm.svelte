@@ -20,6 +20,7 @@
 	import { getConvexErrorMessage } from '$lib/utils/convex-errors';
 	import { formatBookingTimestamp } from '$lib/utils/date';
 	import { resizePhotoForUpload } from '$lib/utils/photo-resize';
+	import { publicEnv } from '$lib/config/public';
 
 	type PublicWaiver = {
 		slug: string;
@@ -102,28 +103,23 @@
 		if (body.size > PHOTO_MAX_BYTES) {
 			throw new Error('Photos must be 5MB or smaller.');
 		}
-		const upload = await convex.mutation(api.photoUploads.generatePublicPhotoUploadUrl, {
-			slug: waiver.slug,
-			kind
-		});
-		const response = await fetch(upload.uploadUrl, {
+		const url = new URL('/photo-uploads', publicEnv.convexSiteUrl);
+		url.searchParams.set('slug', waiver.slug);
+		url.searchParams.set('kind', kind);
+		const response = await fetch(url, {
 			method: 'POST',
 			headers: { 'Content-Type': body.type || 'image/jpeg' },
 			body
 		});
-		if (!response.ok) {
-			throw new Error('Photo upload failed. Please try again.');
+		const result = (await response.json().catch(() => ({}))) as {
+			uploadToken?: string;
+			message?: string;
+		};
+		if (!response.ok || !result.uploadToken) {
+			throw new Error(result.message ?? 'Photo upload failed. Please try again.');
 		}
-		const { storageId } = (await response.json()) as { storageId: Id<'_storage'> };
-		const attached = await convex.mutation(api.photoUploads.attachPublicPhotoUpload, {
-			uploadToken: upload.uploadToken,
-			storageId
-		});
-		if (!attached.ok) {
-			throw new Error(attached.message);
-		}
-		uploadedPhotoTokens.set(file, upload.uploadToken);
-		return upload.uploadToken;
+		uploadedPhotoTokens.set(file, result.uploadToken);
+		return result.uploadToken;
 	}
 
 	async function handleSubmit(event: SubmitEvent) {

@@ -2,7 +2,9 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
 	PHOTO_UPLOAD_MAX_BYTES,
+	clientAddressFromForwardedFor,
 	photoCaptureSettings,
+	photoUploadRequestError,
 	photoSubmissionError,
 	photoUploadMetadataError
 } from '../src/convex/lib/photoCapture.ts';
@@ -46,4 +48,21 @@ test('upload metadata must be a small image', () => {
 		photoUploadMetadataError({ contentType: 'image/webp', size: PHOTO_UPLOAD_MAX_BYTES + 1 }) ?? '',
 		/5MB/
 	);
+});
+
+test('upload requests are checked before the body is read', () => {
+	assert.equal(photoUploadRequestError('image/jpeg', 1024), null);
+	assert.equal(photoUploadRequestError('image/png; charset=binary', null), null);
+	assert.match(photoUploadRequestError('text/html', 10) ?? '', /JPEG, PNG, or WebP/);
+	assert.match(photoUploadRequestError(null, 10) ?? '', /JPEG, PNG, or WebP/);
+	assert.match(photoUploadRequestError('image/webp', PHOTO_UPLOAD_MAX_BYTES + 1) ?? '', /5MB/);
+	assert.match(photoUploadRequestError('image/webp', 0) ?? '', /empty/);
+});
+
+test('rate limiting uses the proxy-added client address', () => {
+	assert.equal(clientAddressFromForwardedFor(null), null);
+	assert.equal(clientAddressFromForwardedFor(''), null);
+	assert.equal(clientAddressFromForwardedFor('203.0.113.7'), '203.0.113.7');
+	// A caller can prepend fake entries; the last one is the proxy's.
+	assert.equal(clientAddressFromForwardedFor('1.1.1.1, 203.0.113.7'), '203.0.113.7');
 });
