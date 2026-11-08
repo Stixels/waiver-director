@@ -282,6 +282,9 @@ export default defineSchema({
 		verificationCodeHash: v.optional(v.string()),
 		verificationCodeExpiresAt: v.optional(v.number()),
 		verificationCodeSentAt: v.optional(v.number()),
+		// When the last verification email send was reserved. Cancel does not
+		// clear it, so it rate-limits sends even across cancel-then-resend.
+		verificationSendReservedAt: v.optional(v.number()),
 		verificationAttempts: v.number(),
 		updatedAt: v.number()
 	}).index('by_workspaceId', ['workspaceId']),
@@ -340,6 +343,9 @@ export default defineSchema({
 		permissions: v.array(v.string()),
 		lastSyncError: v.optional(v.string()),
 		syncStartedAt: v.optional(v.number()),
+		// Set when a sync was requested while another was running, so one more
+		// sync runs after it finishes instead of the request being dropped.
+		resyncRequested: v.optional(v.boolean()),
 		connectedAt: v.optional(v.number()),
 		disconnectedAt: v.optional(v.number()),
 		updatedAt: v.number()

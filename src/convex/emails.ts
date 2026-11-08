@@ -314,21 +314,15 @@ export const startReplyToVerification = action({
 	},
 	handler: async (ctx, args) => {
 		const email = normalizeReplyToEmail(args.replyToEmail);
-		const workspace: { name: string; verificationCodeSentAt: number | null } = await ctx.runQuery(
+		const workspace: { name: string } = await ctx.runQuery(
 			internal.emails.getWorkspaceForEmailAction,
-			{
-				workspaceId: args.workspaceId
-			}
+			{ workspaceId: args.workspaceId }
 		);
-		if (
-			workspace.verificationCodeSentAt !== null &&
-			Date.now() - workspace.verificationCodeSentAt < REPLY_TO_VERIFICATION_RESEND_COOLDOWN_MS
-		) {
-			throw new ConvexError({
-				code: 'rate_limited',
-				message: 'A verification code was just sent. Wait a minute before requesting another.'
-			});
-		}
+		// Reserve the send slot in a mutation before calling Resend, so parallel
+		// requests cannot all pass the cooldown check.
+		await ctx.runMutation(internal.emails.reserveReplyToVerificationSend, {
+			workspaceId: args.workspaceId
+		});
 		const code = verificationCode();
 		const codeHash = await verificationCodeHash({ email, code });
 		const now = Date.now();
@@ -814,14 +808,39 @@ export const getWorkspaceForEmailAction = internalQuery({
 		if (!workspace) {
 			throw new ConvexError({ code: 'not_found', message: 'Workspace not found.' });
 		}
-		const settings = await ctx.db
+		return { name: workspace.name };
+	}
+});
+
+export const reserveReplyToVerificationSend = internalMutation({
+	args: { workspaceId: v.id('workspaces') },
+	handler: async (ctx, args) => {
+		await requireWorkspaceMember(ctx, args.workspaceId);
+		const existing = await ctx.db
 			.query('workspace_email_settings')
 			.withIndex('by_workspaceId', (q) => q.eq('workspaceId', args.workspaceId))
 			.unique();
-		return {
-			name: workspace.name,
-			verificationCodeSentAt: settings?.verificationCodeSentAt ?? null
-		};
+		const now = Date.now();
+		if (
+			existing?.verificationSendReservedAt !== undefined &&
+			now - existing.verificationSendReservedAt < REPLY_TO_VERIFICATION_RESEND_COOLDOWN_MS
+		) {
+			throw new ConvexError({
+				code: 'rate_limited',
+				message: 'A verification code was just sent. Wait a minute before requesting another.'
+			});
+		}
+
+		if (existing) {
+			await ctx.db.patch(existing._id, { verificationSendReservedAt: now });
+		} else {
+			await ctx.db.insert('workspace_email_settings', {
+				workspaceId: args.workspaceId,
+				verificationSendReservedAt: now,
+				verificationAttempts: 0,
+				updatedAt: now
+			});
+		}
 	}
 });
 

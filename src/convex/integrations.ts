@@ -830,6 +830,7 @@ export const markBookingIntegrationDisconnected = internalMutation({
 			status: 'disconnected',
 			encryptedApiKey: undefined,
 			syncStartedAt: undefined,
+			resyncRequested: undefined,
 			...(args.remoteCleanupError ? { lastSyncError: args.remoteCleanupError } : {}),
 			disconnectedAt: now,
 			updatedAt: now
@@ -1014,6 +1015,7 @@ export const saveBookeoConnection = internalMutation({
 			lastSyncError: undefined,
 			// A new key always gets its initial sync, even if an older sync is still running.
 			syncStartedAt: undefined,
+			resyncRequested: undefined,
 			disconnectedAt: undefined,
 			updatedAt: now
 		});
@@ -1150,6 +1152,11 @@ export const markBookeoSyncStarted = internalMutation({
 			integration.syncStartedAt !== undefined &&
 			now - integration.syncStartedAt < BOOKEO_SYNC_LOCK_TTL_MS
 		) {
+			// The running sync may already have passed the window this request
+			// is about, so queue one more sync for when it finishes.
+			if (!integration.resyncRequested) {
+				await ctx.db.patch(integration._id, { resyncRequested: true });
+			}
 			return false;
 		}
 
@@ -1157,6 +1164,7 @@ export const markBookeoSyncStarted = internalMutation({
 			status: 'syncing',
 			lastSyncError: undefined,
 			syncStartedAt: now,
+			resyncRequested: undefined,
 			updatedAt: now
 		});
 		return true;
@@ -1182,8 +1190,15 @@ export const markBookeoSyncFinished = internalMutation({
 			...(args.status === 'succeeded' ? { lastSyncError: undefined } : {}),
 			...(args.errorMessage ? { lastSyncError: args.errorMessage } : {}),
 			syncStartedAt: undefined,
+			resyncRequested: undefined,
 			updatedAt: now
 		});
+		if (integration.resyncRequested) {
+			await ctx.scheduler.runAfter(0, internal.integrations.syncBookeoIntegration, {
+				integrationId: args.integrationId,
+				syncType: 'repair'
+			});
+		}
 		return null;
 	}
 });
