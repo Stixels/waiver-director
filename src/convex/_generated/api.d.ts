@@ -18,6 +18,7 @@ import type * as emailAI from "../emailAI.js";
 import type * as emails from "../emails.js";
 import type * as http from "../http.js";
 import type * as integrations from "../integrations.js";
+import type * as lib_aiUsage from "../lib/aiUsage.js";
 import type * as lib_auth from "../lib/auth.js";
 import type * as lib_billing from "../lib/billing.js";
 import type * as lib_bookingSignatures from "../lib/bookingSignatures.js";
@@ -33,6 +34,7 @@ import type * as mailchimp from "../mailchimp.js";
 import type * as marketingIntegrations from "../marketingIntegrations.js";
 import type * as search from "../search.js";
 import type * as users from "../users.js";
+import type * as waiverAI from "../waiverAI.js";
 import type * as waivers from "../waivers.js";
 import type * as workspaces from "../workspaces.js";
 
@@ -53,6 +55,7 @@ declare const fullApi: ApiFromModules<{
   emails: typeof emails;
   http: typeof http;
   integrations: typeof integrations;
+  "lib/aiUsage": typeof lib_aiUsage;
   "lib/auth": typeof lib_auth;
   "lib/billing": typeof lib_billing;
   "lib/bookingSignatures": typeof lib_bookingSignatures;
@@ -68,6 +71,7 @@ declare const fullApi: ApiFromModules<{
   marketingIntegrations: typeof marketingIntegrations;
   search: typeof search;
   users: typeof users;
+  waiverAI: typeof waiverAI;
   waivers: typeof waivers;
   workspaces: typeof workspaces;
 }>;

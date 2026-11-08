@@ -14,7 +14,22 @@ type AIGatewayResponse = {
 	}>;
 };
 
-export function buildAIGatewayRequest(model: string, prompt: string, responseSchema: object) {
+export type AIGatewaySchemaInfo = {
+	name: string;
+	description: string;
+};
+
+const EMAIL_REVIEW_SCHEMA_INFO: AIGatewaySchemaInfo = {
+	name: 'email_review',
+	description: 'A scored review and improved version of an operator email template.'
+};
+
+export function buildAIGatewayRequest(
+	model: string,
+	prompt: string,
+	responseSchema: object,
+	schemaInfo: AIGatewaySchemaInfo = EMAIL_REVIEW_SCHEMA_INFO
+) {
 	return {
 		model,
 		messages: [{ role: 'user' as const, content: prompt }],
@@ -22,8 +37,8 @@ export function buildAIGatewayRequest(model: string, prompt: string, responseSch
 		response_format: {
 			type: 'json_schema' as const,
 			json_schema: {
-				name: 'email_review',
-				description: 'A scored review and improved version of an operator email template.',
+				name: schemaInfo.name,
+				description: schemaInfo.description,
 				schema: responseSchema
 			}
 		},

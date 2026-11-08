@@ -17,6 +17,7 @@
 		type SaveState
 	} from '$lib/components/waivers/WaiverBuilderCanvas.svelte';
 	import WaiverBuilderPanel from '$lib/components/waivers/WaiverBuilderPanel.svelte';
+	import WaiverAIGeneratorDialog from '$lib/components/waivers/WaiverAIGeneratorDialog.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import {
@@ -39,6 +40,7 @@
 		normalizeDefinitionForCompare,
 		type WaiverDefinition
 	} from '$lib/domain/waivers';
+	import { WAIVER_AI_LEGAL_NOTICE, type WaiverAIDraft } from '$lib/domain/waiver-ai';
 	import { getConvexErrorMessage } from '$lib/utils/convex-errors';
 	import { billingUpgradeHref } from '$lib/utils/billing';
 	import EllipsisIcon from '@lucide/svelte/icons/ellipsis';
@@ -77,6 +79,7 @@
 	let copyingKey = $state<string | null>(null);
 	let copiedKey = $state<string | null>(null);
 	let qrDialogOpen = $state(false);
+	let aiGeneratorOpen = $state(false);
 
 	// Inline title editing (header pencil)
 	let isEditingTitle = $state(false);
@@ -378,6 +381,36 @@
 		versionHistoryOpen = true;
 	}
 
+	function openAIGenerator() {
+		if (!draft) return;
+		aiGeneratorOpen = true;
+	}
+
+	function draftHasWaiverContent(definition: WaiverDefinition | null): boolean {
+		if (!definition) return false;
+		if (definition.fields.length > 0) return true;
+		return (
+			definition.introCopy
+				.replace(/<[^>]*>/g, '')
+				.replace(/&nbsp;/g, ' ')
+				.trim().length > 0
+		);
+	}
+
+	function applyAIDraft(generated: WaiverAIDraft) {
+		if (!draft) return;
+		cancelTitleEdit();
+		draft = {
+			title: generated.title,
+			introCopy: generated.introCopy,
+			fields: generated.fields,
+			theme: draft.theme
+		};
+		toast.success('AI draft added. Review it before you publish.', {
+			description: WAIVER_AI_LEGAL_NOTICE
+		});
+	}
+
 	async function copyText(key: string, text: string) {
 		try {
 			copyingKey = key;
@@ -463,6 +496,16 @@
 	<WaiverVersionHistorySheet
 		bind:open={versionHistoryOpen}
 		workspaceId={currentWorkspace.workspaceId}
+	/>
+{/if}
+
+{#if currentWorkspace}
+	<WaiverAIGeneratorDialog
+		bind:open={aiGeneratorOpen}
+		workspaceId={currentWorkspace.workspaceId}
+		workspaceSlug={page.params.workspaceSlug ?? ''}
+		replacesContent={draftHasWaiverContent(draft)}
+		onApply={applyAIDraft}
 	/>
 {/if}
 
@@ -641,6 +684,7 @@
 							{/snippet}
 						</DropdownMenuTrigger>
 						<DropdownMenuContent align="end" class="w-56">
+							<DropdownMenuItem onclick={openAIGenerator}>Generate with AI</DropdownMenuItem>
 							<DropdownMenuItem onclick={openVersionHistory}>Version history</DropdownMenuItem>
 						</DropdownMenuContent>
 					</DropdownMenu>
@@ -862,7 +906,7 @@
 						</div>
 
 						<div class="min-h-0 flex-1 overflow-hidden">
-							<WaiverBuilderPanel bind:draft />
+							<WaiverBuilderPanel bind:draft onGenerateWithAI={openAIGenerator} />
 						</div>
 					</div>
 				</aside>
