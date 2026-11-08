@@ -27,6 +27,9 @@ const FOLLOW_UP_STATS_LIMIT = 1000;
 const REPLY_TO_VERIFICATION_TTL_MS = 15 * 60 * 1000;
 const REPLY_TO_VERIFICATION_MAX_ATTEMPTS = 5;
 const REPLY_TO_VERIFICATION_RESEND_COOLDOWN_MS = 60 * 1000;
+// A delivery claim older than this is treated as abandoned (e.g. the action
+// crashed) so the follow-up can be sent again.
+const FOLLOW_UP_DELIVERY_CLAIM_TTL_MS = 10 * 60 * 1000;
 const EMAIL_ADDRESS_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const followUpStatusValue = v.union(
@@ -1097,6 +1100,7 @@ export const markFollowUpSent = internalMutation({
 		await ctx.db.patch(args.followUpId, {
 			status: 'sent',
 			sentAt: Date.now(),
+			deliveryClaimedAt: undefined,
 			sentSubject: args.sentSubject,
 			sentBodyHtml: args.sentBodyHtml,
 			sentFrom: args.sentFrom,
@@ -1118,8 +1122,34 @@ export const markFollowUpFailed = internalMutation({
 		await ctx.db.patch(args.followUpId, {
 			status: 'failed',
 			failedAt: Date.now(),
-			failureReason: args.reason
+			failureReason: args.reason,
+			deliveryClaimedAt: undefined
 		});
+	}
+});
+
+/**
+ * Atomically claim a queued follow-up for one delivery attempt. Returns the
+ * claim timestamp (used to build a per-attempt Resend idempotency key), or
+ * null when the follow-up is not queued or another attempt is in flight.
+ */
+export const claimFollowUpForDelivery = internalMutation({
+	args: { followUpId: v.id('email_follow_ups') },
+	returns: v.union(v.number(), v.null()),
+	handler: async (ctx, args) => {
+		const followUp = await ctx.db.get(args.followUpId);
+		if (!followUp || followUp.status !== 'queued') return null;
+
+		const now = Date.now();
+		if (
+			followUp.deliveryClaimedAt !== undefined &&
+			now - followUp.deliveryClaimedAt < FOLLOW_UP_DELIVERY_CLAIM_TTL_MS
+		) {
+			return null;
+		}
+
+		await ctx.db.patch(args.followUpId, { deliveryClaimedAt: now });
+		return now;
 	}
 });
 
@@ -1351,6 +1381,14 @@ export const deliverFollowUpEmail = internalAction({
 			return;
 		}
 
+		// Only one delivery action may call Resend for this follow-up at a time
+		// (e.g. "Send now" pressed while the scheduled send is already running).
+		const claimedAt: number | null = await ctx.runMutation(
+			internal.emails.claimFollowUpForDelivery,
+			{ followUpId: args.followUpId }
+		);
+		if (claimedAt === null) return;
+
 		const resend = new Resend(apiKey);
 		const sentFrom = friendlyFromAddress(
 			sender.workspaceName || template.workspaceName,
@@ -1368,10 +1406,9 @@ export const deliverFollowUpEmail = internalAction({
 					html,
 					text: bodyText
 				},
-				// Two delivery actions for the same follow-up (e.g. "Send now" pressed
-				// while the scheduled send is already running) must not both email the
-				// customer. Resend dedupes sends with the same key for 24 hours.
-				{ idempotencyKey: `follow-up/${args.followUpId}` }
+				// Scoped to this claimed attempt: protects against SDK-level retries of
+				// this request without blocking a later retry with edited content.
+				{ idempotencyKey: `follow-up/${args.followUpId}/${claimedAt}` }
 			);
 
 			if (error) throw new Error(error.message);

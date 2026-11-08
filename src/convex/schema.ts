@@ -314,6 +314,9 @@ export default defineSchema({
 		sentFrom: v.optional(v.string()),
 		sentReplyTo: v.optional(v.string()),
 		resendMessageId: v.optional(v.string()),
+		// Set when a delivery action claims this follow-up, so only one action
+		// at a time can call Resend for it. Cleared when it is marked sent/failed.
+		deliveryClaimedAt: v.optional(v.number()),
 		failedAt: v.optional(v.number()),
 		failureReason: v.optional(v.string()),
 		unscheduledAt: v.optional(v.number())

@@ -12,6 +12,8 @@
 		appContext.workspaces.find((w) => w.slug === page.params.workspaceSlug) ?? null
 	);
 
+	const isOwner = $derived(currentWorkspace?.role === 'owner');
+
 	const editorContentQuery = useProtectedQuery(api.emails.getEmailEditorContent, () =>
 		currentWorkspace ? { workspaceId: currentWorkspace.workspaceId } : 'skip'
 	);
@@ -42,6 +44,7 @@
 			workspaceId={currentWorkspace.workspaceId}
 			workspaceName={currentWorkspace.name}
 			{subjectPreview}
+			canEdit={isOwner}
 		/>
 	</SettingsSection>
 
