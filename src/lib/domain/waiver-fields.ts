@@ -76,7 +76,9 @@ export function isValidPhone(value: string): boolean {
 
 export function parseNumberAnswer(value: string): number | null {
 	const trimmed = value.trim();
-	if (!/^-?\d+(\.\d+)?$/.test(trimmed)) return null;
+	// Matches what <input type="number"> accepts: optional sign, leading or
+	// trailing decimal point, and exponent (e.g. "-2", ".5", "3.", "1e3").
+	if (!/^[+-]?(\d+\.?\d*|\.\d+)(e[+-]?\d+)?$/i.test(trimmed)) return null;
 	const parsed = Number(trimmed);
 	return Number.isFinite(parsed) ? parsed : null;
 }
@@ -239,6 +241,8 @@ export function normalizeSubmissionAnswers(
 					if (field.max !== undefined && parsed > field.max) {
 						return fail(field, `"${field.label}" must be at most ${field.max}.`);
 					}
+					normalized = String(parsed);
+					break;
 				} else if (field.type === 'initials') {
 					if (text.length > MAX_INITIALS_LENGTH || !/^[\p{L}][\p{L}.\s'-]*$/u.test(text)) {
 						return fail(field, `Enter your initials for "${field.label}".`);

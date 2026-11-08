@@ -121,3 +121,21 @@ test('formats composite and multi-select answers for display', () => {
 		'Sam (Sibling)\n555'
 	);
 });
+
+test('accepts every number form the browser number input allows', () => {
+	for (const [raw, stored] of [
+		['.5', '0.5'],
+		['1e2', '100'],
+		['3.', '3'],
+		['+42', '42'],
+		['0.25e1', '2.5']
+	]) {
+		const result = normalizeSubmissionAnswers(fields, { ...validAnswers, age: raw });
+		assert.equal(result.ok, true, `${raw} should be accepted`);
+		if (result.ok) assert.equal(result.answers.age, stored);
+	}
+	for (const raw of ['1e', '.', '1.2.3', 'Infinity', '0x10']) {
+		const result = normalizeSubmissionAnswers(fields, { ...validAnswers, age: raw });
+		assert.equal(result.ok, false, `${raw} should be rejected`);
+	}
+});
