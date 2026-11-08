@@ -6,8 +6,11 @@ import { bookingProviderValidator } from './lib/bookings';
 import { requireWorkspaceOwner } from './lib/waivers';
 
 // Exports are fetched page by page by the client and assembled into a CSV in
-// the browser, so each query stays well inside Convex read limits.
+// the browser. Submission docs carry signature data URLs, so pages are also
+// capped by bytes read: Convex returns a partial page and the client follows
+// continueCursor, which keeps every query inside the per-query read limit.
 const MAX_EXPORT_PAGE_SIZE = 200;
+const MAX_EXPORT_PAGE_BYTES = 4 * 1024 * 1024;
 
 const exportAnswerValue = v.object({
 	fieldId: v.string(),
@@ -41,10 +44,16 @@ const customerExportRow = v.object({
 	visitCount: v.number()
 });
 
-function exportPageOpts<T extends { numItems: number }>(paginationOpts: T): T {
+function exportPageOpts<T extends { numItems: number; maximumBytesRead?: number }>(
+	paginationOpts: T
+): T {
 	return {
 		...paginationOpts,
-		numItems: Math.min(MAX_EXPORT_PAGE_SIZE, Math.max(1, Math.floor(paginationOpts.numItems)))
+		numItems: Math.min(MAX_EXPORT_PAGE_SIZE, Math.max(1, Math.floor(paginationOpts.numItems))),
+		maximumBytesRead: Math.min(
+			paginationOpts.maximumBytesRead ?? MAX_EXPORT_PAGE_BYTES,
+			MAX_EXPORT_PAGE_BYTES
+		)
 	};
 }
 
@@ -57,11 +66,16 @@ function formatAnswer(value: string | boolean | null | undefined): string {
 function historicalAnswers(submission: Doc<'waiver_submissions'>, version: Doc<'waiver_versions'>) {
 	// Answers are read against the published version the signer accepted, so
 	// labels reflect what the signer saw rather than the current template.
-	return version.fields.map((field) => ({
-		fieldId: field.id,
-		label: field.label,
-		value: formatAnswer(submission.answers[field.id])
-	}));
+	return version.fields.map((field) => {
+		const answer = submission.answers[field.id];
+		// Select answers are stored as option ids; export the label the signer
+		// picked, falling back to the raw value if the option is missing.
+		const value =
+			field.type === 'select' && typeof answer === 'string'
+				? (field.options.find((option) => option.id === answer)?.label ?? answer)
+				: formatAnswer(answer);
+		return { fieldId: field.id, label: field.label, value };
+	});
 }
 
 export const exportSubmissionsPage = query({
