@@ -11,6 +11,8 @@
 	import DataTablePagination from '$lib/components/app/DataTablePagination.svelte';
 	import DataTableShell from '$lib/components/app/DataTableShell.svelte';
 	import { useProtectedQuery } from '$lib/components/auth/convex-auth.svelte';
+	import TagFilter from '$lib/components/tags/TagFilter.svelte';
+	import TagList from '$lib/components/tags/TagList.svelte';
 	import SubmissionDetailSheet from '$lib/components/waivers/SubmissionDetailSheet.svelte';
 	import {
 		Table,
@@ -22,7 +24,7 @@
 	} from '$lib/components/ui/table';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { formatBookingTimestamp } from '$lib/utils/date';
-	import { queryString } from '$lib/utils/url';
+	import { parseConvexId, queryString } from '$lib/utils/url';
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 	import FileTextIcon from '@lucide/svelte/icons/file-text';
 	import SearchIcon from '@lucide/svelte/icons/search';
@@ -45,6 +47,9 @@
 	let lastSearchQuery = initialQuery;
 	let lastAppliedSearchQuery = initialQuery;
 	let lastOpenedSubmissionKey: string | null = null;
+	const initialTagFilter = parseConvexId<'workspace_tags'>(page.url.searchParams.get('tag'));
+	let tagFilter = $state<Id<'workspace_tags'> | null>(initialTagFilter);
+	let lastAppliedTagParam: string | null = initialTagFilter;
 
 	const submissionsQuery = useProtectedQuery(
 		api.waivers.listRecentSubmissions,
@@ -56,7 +61,8 @@
 							numItems: PAGE_SIZE,
 							cursor
 						},
-						searchQuery
+						searchQuery,
+						tagId: tagFilter ?? undefined
 					}
 				: 'skip',
 		() => ({ keepPreviousData: true })
@@ -68,6 +74,7 @@
 	const recentSubmissions = $derived((submissionPage?.submissions ?? []) as RecentSubmission[]);
 	const isLoadingSubmissions = $derived(submissionsQuery.isLoading || appContext.isLoading);
 	const searchQueryParam = $derived(page.url.searchParams.get('q')?.trim() ?? '');
+	const tagParam = $derived(parseConvexId<'workspace_tags'>(page.url.searchParams.get('tag')));
 	const submissionIdParam = $derived(
 		page.url.searchParams.get('submissionId') as Id<'waiver_submissions'> | null
 	);
@@ -92,6 +99,7 @@
 
 		const query = queryString([
 			['q', nextSearchQuery],
+			['tag', tagFilter],
 			['submissionId', args.submissionId ?? null]
 		]);
 		const pathname =
@@ -226,6 +234,27 @@
 		currentPage = Math.max(1, currentPage - 1);
 	}
 
+	function selectTagFilter(tagId: Id<'workspace_tags'> | null) {
+		if (tagId === tagFilter) return;
+		tagFilter = tagId;
+		lastAppliedTagParam = tagId;
+		resetPagination();
+		lastSubmissionId = null;
+		detailOpen = false;
+		void updateSubmissionsUrl({
+			searchQuery,
+			submissionId: null,
+			replaceState: true
+		});
+	}
+
+	$effect(() => {
+		if (tagParam === lastAppliedTagParam) return;
+		lastAppliedTagParam = tagParam;
+		tagFilter = tagParam;
+		resetPagination();
+	});
+
 	function clearSearch() {
 		if (!searchInput && !searchQuery) return;
 		searchInput = '';
@@ -261,27 +290,38 @@
 {/snippet}
 
 <DataTablePage>
-	<div class="relative w-full lg:max-w-md">
-		<SearchIcon
-			class="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground"
-			aria-hidden="true"
-		/>
-		<input
-			type="search"
-			placeholder="Search by customer, activity, or booking number"
-			bind:value={searchInput}
-			class="h-9 w-full rounded-lg border border-input bg-background/60 pr-10 pl-11 text-sm shadow-xs transition-all placeholder:text-muted-foreground/70 hover:bg-background focus-visible:border-ring focus-visible:bg-background focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
-			aria-label="Search submissions"
-		/>
-		{#if searchInput}
-			<button
-				type="button"
-				onclick={clearSearch}
-				class="absolute top-1/2 right-2 inline-flex size-6 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
-				aria-label="Clear search"
-			>
-				<XIcon class="size-3.5" aria-hidden="true" />
-			</button>
+	<div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+		<div class="relative w-full lg:max-w-md">
+			<SearchIcon
+				class="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground"
+				aria-hidden="true"
+			/>
+			<input
+				type="search"
+				placeholder="Search by customer, activity, or booking number"
+				bind:value={searchInput}
+				class="h-9 w-full rounded-lg border border-input bg-background/60 pr-10 pl-11 text-sm shadow-xs transition-all placeholder:text-muted-foreground/70 hover:bg-background focus-visible:border-ring focus-visible:bg-background focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
+				aria-label="Search submissions"
+			/>
+			{#if searchInput}
+				<button
+					type="button"
+					onclick={clearSearch}
+					class="absolute top-1/2 right-2 inline-flex size-6 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
+					aria-label="Clear search"
+				>
+					<XIcon class="size-3.5" aria-hidden="true" />
+				</button>
+			{/if}
+		</div>
+		{#if currentWorkspace}
+			<TagFilter
+				workspaceId={currentWorkspace.workspaceId}
+				kind="submission"
+				selectedTagId={tagFilter}
+				canManage={currentWorkspace.role === 'owner'}
+				onSelect={selectTagFilter}
+			/>
 		{/if}
 	</div>
 
@@ -371,10 +411,12 @@
 			<DataTableShell>
 				<DataTableEmptyState
 					icon={FileTextIcon}
-					title={searchQuery ? 'No matching submissions' : 'No submissions yet'}
+					title={searchQuery || tagFilter ? 'No matching submissions' : 'No submissions yet'}
 					description={searchQuery
 						? 'Try a different name, email, or booking number.'
-						: 'Once guests sign the live waiver, records will appear here.'}
+						: tagFilter
+							? 'No submissions have this tag yet.'
+							: 'Once guests sign the live waiver, records will appear here.'}
 				/>
 			</DataTableShell>
 		{:else}
@@ -406,6 +448,7 @@
 								<p class="mt-1 truncate text-xs text-muted-foreground">
 									{submission.signerEmail}
 								</p>
+								<TagList tags={submission.tags} class="mt-1.5" />
 							</div>
 							<ChevronRightIcon
 								class="mt-0.5 size-4 shrink-0 text-muted-foreground/50 transition-transform group-hover:translate-x-0.5 group-hover:text-muted-foreground"
@@ -494,6 +537,7 @@
 									<p class="mt-1 truncate text-xs text-muted-foreground">
 										{submission.signerEmail}
 									</p>
+									<TagList tags={submission.tags} class="mt-1.5" />
 								</TableCell>
 								<TableCell class="px-4 py-3">
 									<p class="truncate text-sm font-medium">

@@ -8,6 +8,13 @@ import { bookingSnapshot, bookingSnapshotValidator } from './lib/bookings';
 import { requireWorkspaceFeature, workspaceHasBillingFeature } from './lib/billing';
 import { upsertSignerCustomer } from './lib/customers';
 import { submissionSearchText } from './lib/submissions';
+import {
+	getWorkspaceTag,
+	loadSubmissionTags,
+	loadWorkspaceTagMap,
+	matchesSearchText,
+	tagSummaryValue
+} from './lib/tags';
 import { getOwnedWorkspaceLogoUrl } from './lib/workspaces';
 import { marketingConsentLabel } from './lib/marketing';
 import { sanitizeRichTextHtml } from '../lib/utils/rich-text';
@@ -318,7 +325,8 @@ export const getSubmission = query({
 			minors: v.array(v.string()),
 			booking: v.union(v.null(), bookingSnapshotValidator),
 			marketingConsent: v.boolean(),
-			marketingConsentLabel: v.union(v.string(), v.null())
+			marketingConsentLabel: v.union(v.string(), v.null()),
+			tags: v.array(tagSummaryValue)
 		})
 	),
 	handler: async (ctx, args) => {
@@ -376,7 +384,12 @@ export const getSubmission = query({
 			minors: submission.minors.map((participant) => participant.fullName),
 			booking: submission.bookingSnapshot ?? null,
 			marketingConsent: submission.marketingConsent ?? false,
-			marketingConsentLabel: submission.marketingConsentLabel ?? null
+			marketingConsentLabel: submission.marketingConsentLabel ?? null,
+			tags: await loadSubmissionTags(
+				ctx,
+				await loadWorkspaceTagMap(ctx, args.workspaceId),
+				submission._id
+			)
 		};
 	}
 });
@@ -385,7 +398,10 @@ export const listRecentSubmissions = query({
 	args: {
 		workspaceId: v.id('workspaces'),
 		paginationOpts: paginationOptsValidator,
-		searchQuery: v.optional(v.string())
+		searchQuery: v.optional(v.string()),
+		// Accepts a raw string so a stale or malformed ?tag= URL param yields an
+		// empty result instead of an argument validation error.
+		tagId: v.optional(v.string())
 	},
 	returns: v.object({
 		submissions: v.array(
@@ -397,7 +413,8 @@ export const listRecentSubmissions = query({
 				minorCount: v.number(),
 				bookingActivityName: v.union(v.string(), v.null()),
 				bookingStartTime: v.union(v.string(), v.null()),
-				submittedAt: v.number()
+				submittedAt: v.number(),
+				tags: v.array(tagSummaryValue)
 			})
 		),
 		continueCursor: v.string(),
@@ -407,32 +424,71 @@ export const listRecentSubmissions = query({
 		await requireWorkspaceMember(ctx, args.workspaceId);
 		const searchQuery = args.searchQuery?.trim().toLowerCase().replace(/\s+/g, ' ') ?? '';
 
-		const submissionPage = searchQuery
-			? await ctx.db
-					.query('waiver_submissions')
-					.withSearchIndex('search_submissionText', (q) =>
-						q.search('searchText', searchQuery).eq('workspaceId', args.workspaceId)
-					)
-					.paginate(args.paginationOpts)
-			: await ctx.db
-					.query('waiver_submissions')
-					.withIndex('by_workspaceId', (q) => q.eq('workspaceId', args.workspaceId))
-					.order('desc')
-					.paginate(args.paginationOpts);
+		let submissions: Doc<'waiver_submissions'>[];
+		let continueCursor: string;
+		let isDone: boolean;
+
+		if (args.tagId) {
+			const tagId = ctx.db.normalizeId('workspace_tags', args.tagId);
+			const tag = tagId ? await getWorkspaceTag(ctx, args.workspaceId, tagId) : null;
+			if (!tag) {
+				return { submissions: [], continueCursor: '', isDone: true };
+			}
+
+			// Tagged submissions are listed newest-tagged first. A text search is
+			// applied to each page in memory, so filtered pages can be shorter.
+			const assignmentPage = await ctx.db
+				.query('submission_tags')
+				.withIndex('by_tagId', (q) => q.eq('tagId', tag._id))
+				.order('desc')
+				.paginate(args.paginationOpts);
+			const taggedSubmissions = await Promise.all(
+				assignmentPage.page.map((row) => ctx.db.get(row.submissionId))
+			);
+			submissions = taggedSubmissions.filter(
+				(submission): submission is Doc<'waiver_submissions'> =>
+					submission !== null &&
+					submission.workspaceId === args.workspaceId &&
+					(!searchQuery || matchesSearchText(submission.searchText, searchQuery))
+			);
+			continueCursor = assignmentPage.continueCursor;
+			isDone = assignmentPage.isDone;
+		} else {
+			const submissionPage = searchQuery
+				? await ctx.db
+						.query('waiver_submissions')
+						.withSearchIndex('search_submissionText', (q) =>
+							q.search('searchText', searchQuery).eq('workspaceId', args.workspaceId)
+						)
+						.paginate(args.paginationOpts)
+				: await ctx.db
+						.query('waiver_submissions')
+						.withIndex('by_workspaceId', (q) => q.eq('workspaceId', args.workspaceId))
+						.order('desc')
+						.paginate(args.paginationOpts);
+			submissions = submissionPage.page;
+			continueCursor = submissionPage.continueCursor;
+			isDone = submissionPage.isDone;
+		}
+
+		const tagMap = await loadWorkspaceTagMap(ctx, args.workspaceId);
 
 		return {
-			submissions: submissionPage.page.map((submission) => ({
-				submissionId: submission._id,
-				signerName: submission.signerName,
-				signerEmail: submission.signerEmail,
-				signerDateOfBirth: submission.signerDateOfBirth,
-				minorCount: submission.minors.length,
-				bookingActivityName: submission.bookingSnapshot?.activityName ?? null,
-				bookingStartTime: submission.bookingSnapshot?.startTime ?? null,
-				submittedAt: submission.submittedAt
-			})),
-			continueCursor: submissionPage.continueCursor,
-			isDone: submissionPage.isDone
+			submissions: await Promise.all(
+				submissions.map(async (submission) => ({
+					submissionId: submission._id,
+					signerName: submission.signerName,
+					signerEmail: submission.signerEmail,
+					signerDateOfBirth: submission.signerDateOfBirth,
+					minorCount: submission.minors.length,
+					bookingActivityName: submission.bookingSnapshot?.activityName ?? null,
+					bookingStartTime: submission.bookingSnapshot?.startTime ?? null,
+					submittedAt: submission.submittedAt,
+					tags: await loadSubmissionTags(ctx, tagMap, submission._id)
+				}))
+			),
+			continueCursor,
+			isDone
 		};
 	}
 });

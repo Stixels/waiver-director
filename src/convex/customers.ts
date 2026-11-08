@@ -1,8 +1,15 @@
 import { paginationOptsValidator } from 'convex/server';
 import { ConvexError, v } from 'convex/values';
-import { query } from './_generated/server';
-import type { Doc } from './_generated/dataModel';
+import { query, type QueryCtx } from './_generated/server';
+import type { Doc, Id } from './_generated/dataModel';
 import { bookingSnapshotValidator } from './lib/bookings';
+import {
+	getWorkspaceTag,
+	loadCustomerTags,
+	loadWorkspaceTagMap,
+	matchesSearchText,
+	tagSummaryValue
+} from './lib/tags';
 import { requireWorkspaceMember } from './lib/waivers';
 
 const MAX_CUSTOMER_VISITS = 50;
@@ -13,7 +20,8 @@ const customerSummaryValue = v.object({
 	primaryEmail: v.string(),
 	firstSeenAt: v.number(),
 	lastSeenAt: v.number(),
-	visitCount: v.number()
+	visitCount: v.number(),
+	tags: v.array(tagSummaryValue)
 });
 
 const customerVisitValue = v.object({
@@ -29,22 +37,33 @@ function normalizedMatchValue(value?: string | null) {
 	return value?.trim().toLowerCase().replace(/\s+/g, ' ') ?? '';
 }
 
-function serializeCustomer(customer: Doc<'customers'>) {
-	return {
-		customerId: customer._id,
-		displayName: customer.displayName,
-		primaryEmail: customer.primaryEmail,
-		firstSeenAt: customer.firstSeenAt,
-		lastSeenAt: customer.lastSeenAt,
-		visitCount: customer.visitCount
-	};
+async function serializeCustomers(
+	ctx: QueryCtx,
+	workspaceId: Id<'workspaces'>,
+	customers: Doc<'customers'>[]
+) {
+	const tagMap = await loadWorkspaceTagMap(ctx, workspaceId);
+	return await Promise.all(
+		customers.map(async (customer) => ({
+			customerId: customer._id,
+			displayName: customer.displayName,
+			primaryEmail: customer.primaryEmail,
+			firstSeenAt: customer.firstSeenAt,
+			lastSeenAt: customer.lastSeenAt,
+			visitCount: customer.visitCount,
+			tags: await loadCustomerTags(ctx, tagMap, customer._id)
+		}))
+	);
 }
 
 export const listWorkspaceCustomers = query({
 	args: {
 		workspaceId: v.id('workspaces'),
 		paginationOpts: paginationOptsValidator,
-		searchQuery: v.optional(v.string())
+		searchQuery: v.optional(v.string()),
+		// Accepts a raw string so a stale or malformed ?tag= URL param yields an
+		// empty result instead of an argument validation error.
+		tagId: v.optional(v.string())
 	},
 	returns: v.object({
 		customers: v.array(customerSummaryValue),
@@ -65,6 +84,38 @@ export const listWorkspaceCustomers = query({
 		const searchQuery = normalizedMatchValue(args.searchQuery);
 		const pageSize = Math.max(1, Math.floor(args.paginationOpts.numItems));
 
+		if (args.tagId) {
+			const tagId = ctx.db.normalizeId('workspace_tags', args.tagId);
+			const tag = tagId ? await getWorkspaceTag(ctx, args.workspaceId, tagId) : null;
+			if (!tag) {
+				return { customers: [], totalCount: 0, continueCursor: '', isDone: true };
+			}
+
+			// Tagged customers are listed newest-tagged first. A text search is
+			// applied to each page in memory, so filtered pages can be shorter.
+			const assignmentPage = await ctx.db
+				.query('customer_tags')
+				.withIndex('by_tagId', (q) => q.eq('tagId', tag._id))
+				.order('desc')
+				.paginate({ ...args.paginationOpts, numItems: pageSize });
+			const taggedCustomers = await Promise.all(
+				assignmentPage.page.map((row) => ctx.db.get(row.customerId))
+			);
+			const matches = taggedCustomers.filter(
+				(customer): customer is Doc<'customers'> =>
+					customer !== null &&
+					customer.workspaceId === args.workspaceId &&
+					(!searchQuery || matchesSearchText(customer.searchText, searchQuery))
+			);
+
+			return {
+				customers: await serializeCustomers(ctx, args.workspaceId, matches),
+				totalCount: tag.customerCount,
+				continueCursor: assignmentPage.continueCursor,
+				isDone: assignmentPage.isDone
+			};
+		}
+
 		if (!searchQuery) {
 			const customerPage = await ctx.db
 				.query('customers')
@@ -73,7 +124,7 @@ export const listWorkspaceCustomers = query({
 				.paginate({ ...args.paginationOpts, numItems: pageSize });
 
 			return {
-				customers: customerPage.page.map((customer) => serializeCustomer(customer)),
+				customers: await serializeCustomers(ctx, args.workspaceId, customerPage.page),
 				totalCount: workspace.customerCount,
 				continueCursor: customerPage.continueCursor,
 				isDone: customerPage.isDone
@@ -88,7 +139,7 @@ export const listWorkspaceCustomers = query({
 			.paginate({ ...args.paginationOpts, numItems: pageSize });
 
 		return {
-			customers: customerPage.page.map((customer) => serializeCustomer(customer)),
+			customers: await serializeCustomers(ctx, args.workspaceId, customerPage.page),
 			totalCount: workspace.customerCount,
 			continueCursor: customerPage.continueCursor,
 			isDone: customerPage.isDone
@@ -134,7 +185,7 @@ export const getCustomerDetail = query({
 		}
 
 		return {
-			customer: serializeCustomer(customer),
+			customer: (await serializeCustomers(ctx, args.workspaceId, [customer]))[0],
 			visits: submissions.map((submission) => ({
 				submissionId: submission._id,
 				signerName: submission.signerName,
