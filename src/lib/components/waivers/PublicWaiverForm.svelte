@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Id } from '$convex/_generated/dataModel';
+	import { onDestroy } from 'svelte';
 	import { useConvexClient } from 'convex-svelte';
 	import { toast } from 'svelte-sonner';
 	import { api } from '$convex/_generated/api';
@@ -55,6 +56,12 @@
 	const autocompleteAttr = $derived(kiosk ? 'off' : undefined);
 
 	const convex = useConvexClient();
+	// A kiosk remounts this form on every reset. A submission that resolves after that belongs to
+	// the previous guest, so it must not drive the parent's screen.
+	let isDestroyed = false;
+	onDestroy(() => {
+		isDestroyed = true;
+	});
 
 	let signerName = $state('');
 	let signerEmail = $state('');
@@ -120,7 +127,7 @@
 			});
 
 			if (onSubmitted) {
-				onSubmitted();
+				if (!isDestroyed) onSubmitted();
 				return;
 			}
 			isSubmitted = true;

@@ -43,7 +43,9 @@
 	// Booking lookup only works on a device opened from the Waiver page (see ADR 0001 and
 	// kiosk.lookupBookings). Without a device token the kiosk offers walk-in signing only.
 	let deviceToken = $state<string | null>(null);
-	// Bumped on every reset so the signing form remounts with empty state and a blank signature.
+	// Bumped on every reset and every new signing session, so the signing form remounts with empty
+	// state and a blank signature. Async work captures it and drops its result if it changed, so a
+	// slow response from the previous guest can't reopen their booking or screen after a reset.
 	let sessionKey = $state(0);
 
 	let lookupQuery = $state('');
@@ -100,6 +102,8 @@
 		window.scrollTo({ top: 0 });
 	}
 
+	// PublicWaiverForm skips this callback once it has been unmounted, and every reset remounts it,
+	// so a submission that finishes after a reset never shows the done screen to the next guest.
 	function handleSubmitted() {
 		submittedAt = Date.now();
 		void goTo({ name: 'submitted' });
@@ -116,12 +120,14 @@
 		isLookingUp = true;
 		lookupError = null;
 		lookupResults = null;
+		const forSession = sessionKey;
 		try {
 			const result = await convex.mutation(api.kiosk.lookupBookings, {
 				slug: waiver.slug,
 				...(deviceToken ? { deviceToken } : {}),
 				query: lookupQuery
 			});
+			if (forSession !== sessionKey) return;
 			if (result.status === 'ok') {
 				lookupResults = result.results;
 			} else if (result.status === 'invalid') {
@@ -136,10 +142,13 @@
 				lookupError = 'Booking lookup is not available right now. Please sign as a walk-in.';
 			}
 		} catch (error) {
+			if (forSession !== sessionKey) return;
 			lookupError = getConvexErrorMessage(error, 'Unable to search bookings.');
 		} finally {
-			isLookingUp = false;
-			markActivity();
+			if (forSession === sessionKey) {
+				isLookingUp = false;
+				markActivity();
+			}
 		}
 	}
 
@@ -147,11 +156,13 @@
 		if (openingToken) return;
 		openingToken = result.lookupToken;
 		lookupError = null;
+		const forSession = sessionKey;
 		try {
 			const bookingWaiver = await convex.query(api.waivers.getPublicWaiverForBooking, {
 				slug: waiver.slug,
 				lookupToken: result.lookupToken
 			});
+			if (forSession !== sessionKey) return;
 			if (!bookingWaiver) {
 				lookupError = 'That booking is no longer available. Please ask staff for help.';
 				return;
@@ -159,9 +170,10 @@
 			sessionKey += 1;
 			await goTo({ name: 'booking', waiver: bookingWaiver });
 		} catch (error) {
+			if (forSession !== sessionKey) return;
 			lookupError = getConvexErrorMessage(error, 'Unable to open this booking.');
 		} finally {
-			openingToken = null;
+			if (forSession === sessionKey) openingToken = null;
 		}
 	}
 
