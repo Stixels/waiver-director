@@ -155,7 +155,8 @@ http.route({
 
 		if (result.status === 'rejected') return new Response('Rejected', { status: 401 });
 		if (result.status === 'invalid') return new Response('Bad request', { status: 400 });
-		return new Response(result.status, { status: 202 });
+		// FareHarbor expects 200; other statuses trigger retries and can deactivate the webhook.
+		return new Response(result.status, { status: 200 });
 	})
 });
 

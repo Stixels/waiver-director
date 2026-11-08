@@ -197,8 +197,10 @@ async function syncFareHarborBookings(
 	const deadline = Date.now() + FAREHARBOR_SYNC_MAX_RUNTIME_MS;
 	const base = companyPath(args.shortname);
 
-	// 1. List every item's availabilities in the window. This costs items x 31-day ranges
-	//    requests and gives the full slot list before any booking requests are spent.
+	// 1. List every item's availabilities in the window, including full, closed and past-cutoff
+	//    departures (bookable_only=no), since those can still hold bookings that need waivers.
+	//    This costs items x 31-day ranges requests and gives the full slot list before any
+	//    booking requests are spent.
 	const itemsResult = await fareHarborFetch(args.userApiKey, `${base}/items/`, budget);
 	const slots: FareHarborSyncSlot[] = [];
 	for (const range of fareHarborDateRanges(args.start, args.end)) {
@@ -207,7 +209,7 @@ async function syncFareHarborBookings(
 			if (!itemPk) continue;
 			const availabilityResult = await fareHarborFetch(
 				args.userApiKey,
-				`${base}/items/${itemPk}/minimal/availabilities/date-range/${range.start}/${range.end}/`,
+				`${base}/items/${itemPk}/minimal/availabilities/date-range/${range.start}/${range.end}/?bookable_only=no`,
 				budget
 			);
 			for (const availability of recordArray(availabilityResult.availabilities)) {
