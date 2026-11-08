@@ -1,7 +1,7 @@
 // Pure CSV helpers for Owner-only exports. Kept free of app imports so they can
 // be unit tested with `node --test`.
 
-export type CsvCell = string | number | boolean | null | undefined;
+type CsvCell = string | number | null | undefined;
 
 // Spreadsheet apps evaluate cells that start with these characters as
 // formulas. Signer-entered text must never run as a formula when an Owner
@@ -10,8 +10,8 @@ const FORMULA_PREFIXES = new Set(['=', '+', '-', '@', '\t', '\r']);
 
 export function escapeCsvCell(value: CsvCell): string {
 	if (value === null || value === undefined) return '';
-	let text = typeof value === 'string' ? value : String(value);
-	if (typeof value === 'string' && text.length > 0 && FORMULA_PREFIXES.has(text[0])) {
+	let text = String(value);
+	if (typeof value === 'string' && FORMULA_PREFIXES.has(text[0])) {
 		text = `'${text}`;
 	}
 	if (/[",\r\n]/.test(text)) {
@@ -24,7 +24,7 @@ export function toCsv(headers: string[], rows: CsvCell[][]): string {
 	return [headers, ...rows].map((row) => row.map(escapeCsvCell).join(',')).join('\r\n') + '\r\n';
 }
 
-export function formatExportTimestamp(timestamp: number): string {
+function formatExportTimestamp(timestamp: number): string {
 	return new Date(timestamp).toISOString();
 }
 
@@ -45,7 +45,7 @@ export type SubmissionExportRow = {
 	answers: Array<{ fieldId: string; label: string; value: string }>;
 };
 
-export type CustomerExportRow = {
+type CustomerExportRow = {
 	customerId: string;
 	displayName: string;
 	primaryEmail: string;
@@ -135,7 +135,7 @@ export function buildCustomersCsv(rows: CustomerExportRow[]): string {
 	);
 }
 
-export type ExportPage<T> = { page: T[]; isDone: boolean; continueCursor: string };
+type ExportPage<T> = { page: T[]; isDone: boolean; continueCursor: string };
 
 /** Reads every page from a cursor-paginated query, in order. */
 export async function collectAllPages<T>(

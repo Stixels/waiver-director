@@ -44,16 +44,11 @@ const customerExportRow = v.object({
 	visitCount: v.number()
 });
 
-function exportPageOpts<T extends { numItems: number; maximumBytesRead?: number }>(
-	paginationOpts: T
-): T {
+function exportPageOpts<T extends { numItems: number }>(paginationOpts: T): T {
 	return {
 		...paginationOpts,
 		numItems: Math.min(MAX_EXPORT_PAGE_SIZE, Math.max(1, Math.floor(paginationOpts.numItems))),
-		maximumBytesRead: Math.min(
-			paginationOpts.maximumBytesRead ?? MAX_EXPORT_PAGE_BYTES,
-			MAX_EXPORT_PAGE_BYTES
-		)
+		maximumBytesRead: MAX_EXPORT_PAGE_BYTES
 	};
 }
 
