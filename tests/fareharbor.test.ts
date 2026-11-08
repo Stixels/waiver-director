@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
 	fareHarborDateRanges,
+	fareHarborSyncSlot,
+	orderFareHarborSyncSlots,
 	fareHarborWebhookBooking,
 	fareHarborWebhookEventType,
 	normalizeFareHarborBooking,
@@ -97,4 +99,29 @@ test('splits sync windows into inclusive date ranges', () => {
 	assert.deepEqual(fareHarborDateRanges(new Date('2026-01-01'), new Date('2026-01-01')), [
 		{ start: '2026-01-01', end: '2026-01-01' }
 	]);
+});
+
+test('orders sync slots by start time across items and resumes from the cursor', () => {
+	const slot = (pk: number, startAt: string, itemName: string) =>
+		fareHarborSyncSlot({ pk, start_at: startAt }, itemName)!;
+	const slots = [
+		slot(3, '2026-05-02T09:00:00-0700', 'Kayak'),
+		slot(1, '2026-05-01T09:00:00-0700', 'Kayak'),
+		slot(2, '2026-05-01T10:00:00-0700', 'Paddleboard'),
+		slot(4, '2026-05-03T09:00:00-0700', 'Paddleboard')
+	];
+	assert.deepEqual(
+		orderFareHarborSyncSlots(slots).map((s) => s.availabilityPk),
+		['1', '2', '3', '4']
+	);
+	assert.deepEqual(
+		orderFareHarborSyncSlots(slots, '2026-05-02T09:00:00-0700').map((s) => s.availabilityPk),
+		['3', '4', '1', '2']
+	);
+	// A cursor past every slot (window moved on) starts from the beginning again.
+	assert.deepEqual(
+		orderFareHarborSyncSlots(slots, '2026-06-01T00:00:00Z').map((s) => s.availabilityPk),
+		['1', '2', '3', '4']
+	);
+	assert.equal(fareHarborSyncSlot({ pk: 'abc' }, 'Kayak'), null);
 });

@@ -754,6 +754,7 @@ export const markBookingIntegrationDisconnected = internalMutation({
 			status: 'disconnected',
 			encryptedApiKey: undefined,
 			encryptedWebhookToken: undefined,
+			syncCursor: undefined,
 			...(args.remoteCleanupError ? { lastSyncError: args.remoteCleanupError } : {}),
 			disconnectedAt: now,
 			updatedAt: now

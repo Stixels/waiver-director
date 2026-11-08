@@ -55,6 +55,7 @@ Cancelled and rebooked bookings are marked canceled. A rebooking arrives as a ne
 - **FareHarbor rejected the API key**: check the user key and that it was issued for the same company shortname.
 - **FareHarbor company not found**: check the shortname in your FareHarbor dashboard URL.
 - **Integration needs attention**: the last sync hit an error. It retries on the next 6-hour sync, or you can reconnect.
+- **FareHarbor has more bookings than one sync can fetch**: very large accounts take more than one sync to cover every date. Each sync continues where the last one stopped, so nothing is skipped, but some bookings can lag by up to 12 hours. Turning on webhooks keeps them instant.
 - **Owner access required**: ask a workspace Owner to connect the integration.
 
 ## Disconnect

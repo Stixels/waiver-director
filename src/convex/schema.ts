@@ -337,6 +337,8 @@ export default defineSchema({
 		encryptedApiKey: v.optional(v.string()),
 		// FareHarbor only: secret token embedded in the webhook URL the operator registers.
 		encryptedWebhookToken: v.optional(v.string()),
+		// FareHarbor only: start_at of the first availability the last truncated sync did not reach.
+		syncCursor: v.optional(v.string()),
 		accountId: v.optional(v.string()),
 		permissions: v.array(v.string()),
 		lastSyncError: v.optional(v.string()),

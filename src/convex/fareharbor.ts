@@ -17,7 +17,10 @@ import {
 	fareHarborWebhookEventType,
 	normalizeFareHarborBooking,
 	normalizeFareHarborShortname,
-	type FareHarborAvailabilityContext
+	orderFareHarborSyncSlots,
+	fareHarborSyncSlot,
+	type FareHarborAvailabilityContext,
+	type FareHarborSyncSlot
 } from './lib/fareharbor';
 import { requireWorkspaceOwner } from './lib/waivers';
 
@@ -30,6 +33,10 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 // so cap the requests a single run may make and walk the window in date order so the
 // nearest bookings always land first.
 const FAREHARBOR_SYNC_MAX_REQUESTS = 1_000;
+const FAREHARBOR_SYNC_MAX_RUNTIME_MS = 6 * 60 * 1000;
+// A run that dies (for example at the action time limit) leaves the row in "syncing";
+// the cron treats a "syncing" row this old as stuck and runs it again.
+const FAREHARBOR_STALE_SYNC_MS = 30 * 60 * 1000;
 const FAREHARBOR_SYNC_WINDOWS = {
 	initial: { pastDays: 7, futureDays: 120 },
 	scheduled: { pastDays: 1, futureDays: 30 }
@@ -126,7 +133,9 @@ async function fareHarborFetch(
 
 class FareHarborBudgetExhausted extends Error {
 	constructor() {
-		super('FareHarbor sync request budget exhausted.');
+		super(
+			'FareHarbor has too many tours to list in one sync. Contact support to raise the sync limit.'
+		);
 		this.name = 'FareHarborBudgetExhausted';
 	}
 }
@@ -161,6 +170,14 @@ async function getFareHarborCompany(userApiKey: string, shortname: string) {
 	};
 }
 
+type FareHarborSyncResult = {
+	bookingCount: number;
+	/** start_at of the first slot this run did not reach, or null when it covered every slot. */
+	nextCursor: string | null;
+	/** Date of the last slot synced, for the truncation message. */
+	syncedThrough: string | null;
+};
+
 async function syncFareHarborBookings(
 	ctx: ActionCtx,
 	args: {
@@ -169,66 +186,83 @@ async function syncFareHarborBookings(
 		shortname: string;
 		start: Date;
 		end: Date;
+		resumeAfter?: string;
 	}
-): Promise<{ truncated: boolean; bookingCount: number }> {
+): Promise<FareHarborSyncResult> {
 	const budget: FareHarborRequestBudget = {
 		remaining: FAREHARBOR_SYNC_MAX_REQUESTS,
 		truncated: false
 	};
+	// Stop well inside Convex's action time limit so the run always records its result.
+	const deadline = Date.now() + FAREHARBOR_SYNC_MAX_RUNTIME_MS;
 	const base = companyPath(args.shortname);
-	let bookingCount = 0;
 
-	try {
-		const itemsResult = await fareHarborFetch(args.userApiKey, `${base}/items/`, budget);
-		const items = recordArray(itemsResult.items);
-
-		for (const range of fareHarborDateRanges(args.start, args.end)) {
-			for (const item of items) {
-				const itemPk = pkSegment(item.pk);
-				if (!itemPk) continue;
-				const availabilityResult = await fareHarborFetch(
-					args.userApiKey,
-					`${base}/items/${itemPk}/minimal/availabilities/date-range/${range.start}/${range.end}/`,
-					budget
+	// 1. List every item's availabilities in the window. This costs items x 31-day ranges
+	//    requests and gives the full slot list before any booking requests are spent.
+	const itemsResult = await fareHarborFetch(args.userApiKey, `${base}/items/`, budget);
+	const slots: FareHarborSyncSlot[] = [];
+	for (const range of fareHarborDateRanges(args.start, args.end)) {
+		for (const item of recordArray(itemsResult.items)) {
+			const itemPk = pkSegment(item.pk);
+			if (!itemPk) continue;
+			const availabilityResult = await fareHarborFetch(
+				args.userApiKey,
+				`${base}/items/${itemPk}/minimal/availabilities/date-range/${range.start}/${range.end}/`,
+				budget
+			);
+			for (const availability of recordArray(availabilityResult.availabilities)) {
+				const slot = fareHarborSyncSlot(
+					availability,
+					typeof item.name === 'string' ? item.name : undefined
 				);
-
-				for (const availability of recordArray(availabilityResult.availabilities)) {
-					const availabilityPk = pkSegment(availability.pk);
-					if (!availabilityPk) continue;
-					const context: FareHarborAvailabilityContext = {
-						startAt: typeof availability.start_at === 'string' ? availability.start_at : undefined,
-						endAt: typeof availability.end_at === 'string' ? availability.end_at : undefined,
-						itemName: typeof item.name === 'string' ? item.name : undefined
-					};
-					const bookingsResult = await fareHarborFetch(
-						args.userApiKey,
-						`${base}/availabilities/${availabilityPk}/bookings/`,
-						budget
-					);
-
-					for (const booking of recordArray(bookingsResult.bookings)) {
-						const normalized = normalizeFareHarborBooking(booking, context);
-						if (!normalized) continue;
-						await ctx.runMutation(internal.integrations.upsertProviderBooking, {
-							integrationId: args.integrationId,
-							lookupToken: token(),
-							booking: normalized
-						});
-						bookingCount += 1;
-					}
-				}
+				if (slot) slots.push(slot);
 			}
 		}
-	} catch (error) {
-		if (!(error instanceof FareHarborBudgetExhausted)) throw error;
-		console.warn('[fareharbor/sync] reached request cap; later dates sync on the next run', {
-			integrationId: args.integrationId,
-			maxRequests: FAREHARBOR_SYNC_MAX_REQUESTS,
-			bookingCount
-		});
 	}
 
-	return { truncated: budget.truncated, bookingCount };
+	// 2. Fetch bookings slot by slot in date order across all items, starting where the
+	//    previous run stopped and wrapping around, so truncated runs still cover everything.
+	const ordered = orderFareHarborSyncSlots(slots, args.resumeAfter);
+	let bookingCount = 0;
+	let syncedThrough: string | null = null;
+	for (const [index, slot] of ordered.entries()) {
+		if (budget.remaining <= 0 || Date.now() > deadline) {
+			console.warn('[fareharbor/sync] run truncated; resuming from cursor next run', {
+				integrationId: args.integrationId,
+				slotsSynced: index,
+				slotsTotal: ordered.length,
+				bookingCount
+			});
+			return {
+				bookingCount,
+				nextCursor: slot.startAt ?? null,
+				syncedThrough
+			};
+		}
+		const context: FareHarborAvailabilityContext = {
+			startAt: slot.startAt,
+			endAt: slot.endAt,
+			itemName: slot.itemName
+		};
+		const bookingsResult = await fareHarborFetch(
+			args.userApiKey,
+			`${base}/availabilities/${slot.availabilityPk}/bookings/`,
+			budget
+		);
+		for (const booking of recordArray(bookingsResult.bookings)) {
+			const normalized = normalizeFareHarborBooking(booking, context);
+			if (!normalized) continue;
+			await ctx.runMutation(internal.integrations.upsertProviderBooking, {
+				integrationId: args.integrationId,
+				lookupToken: token(),
+				booking: normalized
+			});
+			bookingCount += 1;
+		}
+		syncedThrough = slot.startAt?.slice(0, 10) ?? syncedThrough;
+	}
+
+	return { bookingCount, nextCursor: null, syncedThrough };
 }
 
 function syncWindow(syncType: keyof typeof FAREHARBOR_SYNC_WINDOWS) {
@@ -386,6 +420,7 @@ export const saveFareHarborConnection = internalMutation({
 			accountId: args.accountId,
 			encryptedApiKey: args.encryptedApiKey,
 			encryptedWebhookToken: args.encryptedWebhookToken,
+			syncCursor: undefined,
 			permissions: [],
 			lastSyncError: undefined,
 			disconnectedAt: undefined,
@@ -413,7 +448,8 @@ export const getFareHarborIntegrationForSync = internalQuery({
 			workspaceId: v.id('workspaces'),
 			status: integrationStatusValidator,
 			accountId: v.union(v.string(), v.null()),
-			encryptedApiKey: v.union(v.string(), v.null())
+			encryptedApiKey: v.union(v.string(), v.null()),
+			syncCursor: v.union(v.string(), v.null())
 		})
 	),
 	handler: async (ctx, args) => {
@@ -423,8 +459,29 @@ export const getFareHarborIntegrationForSync = internalQuery({
 			workspaceId: integration.workspaceId,
 			status: integration.status,
 			accountId: integration.accountId ?? null,
-			encryptedApiKey: integration.encryptedApiKey ?? null
+			encryptedApiKey: integration.encryptedApiKey ?? null,
+			syncCursor: integration.syncCursor ?? null
 		};
+	}
+});
+
+export const finishFareHarborSync = internalMutation({
+	args: {
+		integrationId: v.id('booking_integrations'),
+		syncCursor: v.union(v.string(), v.null()),
+		notice: v.union(v.string(), v.null())
+	},
+	returns: v.null(),
+	handler: async (ctx, args) => {
+		const integration = await ctx.db.get(args.integrationId);
+		if (!integration || integration.status === 'disconnected') return null;
+		await ctx.db.patch(args.integrationId, {
+			status: 'connected',
+			syncCursor: args.syncCursor ?? undefined,
+			lastSyncError: args.notice ?? undefined,
+			updatedAt: Date.now()
+		});
+		return null;
 	}
 });
 
@@ -440,6 +497,7 @@ export const syncFareHarborIntegration = internalAction({
 			status: 'connected' | 'syncing' | 'error' | 'disconnected';
 			accountId: string | null;
 			encryptedApiKey: string | null;
+			syncCursor: string | null;
 		} | null = await ctx.runQuery(internal.fareharbor.getFareHarborIntegrationForSync, {
 			integrationId: args.integrationId
 		});
@@ -470,18 +528,17 @@ export const syncFareHarborIntegration = internalAction({
 				userApiKey: await decryptSecret(integration.encryptedApiKey),
 				shortname: integration.accountId,
 				start: window.start,
-				end: window.end
+				end: window.end,
+				...(integration.syncCursor ? { resumeAfter: integration.syncCursor } : {})
 			});
-			if (result.truncated) {
-				console.warn('[fareharbor/sync] sync window truncated', {
-					integrationId: args.integrationId,
-					syncType: args.syncType,
-					bookingCount: result.bookingCount
-				});
-			}
-			await ctx.runMutation(internal.integrations.markBookeoSyncFinished, {
+			await ctx.runMutation(internal.fareharbor.finishFareHarborSync, {
 				integrationId: args.integrationId,
-				status: 'succeeded'
+				syncCursor: result.nextCursor,
+				notice: result.nextCursor
+					? `FareHarbor has more bookings than one sync can fetch${
+							result.syncedThrough ? ` (this run reached ${result.syncedThrough})` : ''
+						}. The next sync continues from there, so some bookings can be up to 12 hours behind.`
+					: null
 			});
 		} catch (error) {
 			await ctx.runMutation(internal.integrations.markBookeoSyncFinished, {
@@ -499,7 +556,8 @@ export const scheduleFareHarborSyncsCron = internalMutation({
 	returns: v.object({ scheduledCount: v.number() }),
 	handler: async (ctx) => {
 		let scheduledCount = 0;
-		for (const status of ['connected', 'error'] as const) {
+		const staleBefore = Date.now() - FAREHARBOR_STALE_SYNC_MS;
+		for (const status of ['connected', 'error', 'syncing'] as const) {
 			const integrations = await ctx.db
 				.query('booking_integrations')
 				.withIndex('by_provider_and_status', (q) =>
@@ -507,6 +565,9 @@ export const scheduleFareHarborSyncsCron = internalMutation({
 				)
 				.take(200);
 			for (const integration of integrations) {
+				// A "syncing" row that hasn't moved in a while belongs to a run that died before
+				// recording its result; run it again instead of leaving it stuck.
+				if (status === 'syncing' && integration.updatedAt > staleBefore) continue;
 				// Spread runs out so many workspaces don't hit FareHarbor at the same instant.
 				await ctx.scheduler.runAfter(
 					scheduledCount * 5_000,

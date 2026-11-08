@@ -162,3 +162,55 @@ export function fareHarborDateRanges(
 	}
 	return ranges;
 }
+
+export type FareHarborSyncSlot = {
+	availabilityPk: string;
+	itemName?: string;
+	startAt?: string;
+	endAt?: string;
+	/** Sort key: epoch ms of start_at, or Infinity when it can't be parsed. */
+	sortAt: number;
+};
+
+/**
+ * Orders availabilities for a sync run: by start time across every item, beginning at the
+ * resume cursor (the first slot the previous run did not reach) and wrapping around to the
+ * start of the window. Consecutive truncated runs therefore cover the whole window instead
+ * of repeating the same first slots.
+ */
+export function orderFareHarborSyncSlots(
+	slots: FareHarborSyncSlot[],
+	resumeAfter?: string
+): FareHarborSyncSlot[] {
+	const sorted = [...slots].sort(
+		(a, b) => a.sortAt - b.sortAt || a.availabilityPk.localeCompare(b.availabilityPk)
+	);
+	const cursorAt = parseDateTime(normalizeFareHarborDateTime(resumeAfter));
+	if (cursorAt === undefined) return sorted;
+	const index = sorted.findIndex((slot) => slot.sortAt >= cursorAt);
+	if (index <= 0) return sorted;
+	return [...sorted.slice(index), ...sorted.slice(0, index)];
+}
+
+export function fareHarborSyncSlot(
+	availability: Record<string, unknown>,
+	itemName: string | undefined
+): FareHarborSyncSlot | null {
+	const pk = availability.pk;
+	const availabilityPk =
+		typeof pk === 'number' && Number.isSafeInteger(pk) && pk > 0
+			? String(pk)
+			: typeof pk === 'string' && /^\d+$/.test(pk.trim())
+				? pk.trim()
+				: null;
+	if (!availabilityPk) return null;
+	const startAt = trimmedString(availability.start_at);
+	const endAt = trimmedString(availability.end_at);
+	return {
+		availabilityPk,
+		...(itemName ? { itemName } : {}),
+		...(startAt ? { startAt } : {}),
+		...(endAt ? { endAt } : {}),
+		sortAt: parseDateTime(normalizeFareHarborDateTime(startAt)) ?? Number.POSITIVE_INFINITY
+	};
+}
