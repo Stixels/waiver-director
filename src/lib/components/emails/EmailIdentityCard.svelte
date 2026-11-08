@@ -113,10 +113,21 @@
 			: 0
 	);
 	const codeExpired = $derived(replyToPendingVerification && codeExpiresInMs <= 0);
+	// Mirrors the server's 60s resend cooldown so the button can't be spammed.
+	let resendCooldownActive = $state(false);
+	let resendCooldownTimer: ReturnType<typeof setTimeout> | undefined;
+	function startResendCooldown() {
+		resendCooldownActive = true;
+		clearTimeout(resendCooldownTimer);
+		resendCooldownTimer = setTimeout(() => (resendCooldownActive = false), 60_000);
+	}
+	$effect(() => () => clearTimeout(resendCooldownTimer));
+
 	const canRequestReplyToVerification = $derived(
 		Boolean(
 			senderSettings?.platformFromEmail &&
 			replyToEmail.trim() &&
+			!resendCooldownActive &&
 			!isSendingVerification &&
 			!isConfirmingVerification &&
 			!isCancellingVerification
@@ -200,6 +211,7 @@
 		} catch (err) {
 			toast.error(getConvexErrorMessage(err, 'Failed to send verification code.'));
 		} finally {
+			startResendCooldown();
 			isSendingVerification = false;
 		}
 	}

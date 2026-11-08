@@ -283,6 +283,9 @@ export default defineSchema({
 		verificationCodeHash: v.optional(v.string()),
 		verificationCodeExpiresAt: v.optional(v.number()),
 		verificationCodeSentAt: v.optional(v.number()),
+		// Last time a code send was attempted. Kept across cancel and failed sends so
+		// the resend cooldown cannot be skipped.
+		verificationSendReservedAt: v.optional(v.number()),
 		verificationAttempts: v.number(),
 		updatedAt: v.number()
 	}).index('by_workspaceId', ['workspaceId']),

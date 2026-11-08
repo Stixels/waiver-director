@@ -306,21 +306,12 @@ export const startReplyToVerification = action({
 	},
 	handler: async (ctx, args) => {
 		const email = normalizeReplyToEmail(args.replyToEmail);
-		const workspace: { name: string; verificationCodeSentAt: number | null } = await ctx.runQuery(
-			internal.emails.getWorkspaceForEmailAction,
-			{
-				workspaceId: args.workspaceId
-			}
+		// Reserve the send slot atomically before calling Resend, so parallel
+		// clicks, failed sends, and cancel-then-resend all count toward the cooldown.
+		const workspace: { name: string } = await ctx.runMutation(
+			internal.emails.reserveReplyToVerificationSend,
+			{ workspaceId: args.workspaceId }
 		);
-		if (
-			workspace.verificationCodeSentAt !== null &&
-			Date.now() - workspace.verificationCodeSentAt < REPLY_TO_VERIFICATION_RESEND_COOLDOWN_MS
-		) {
-			throw new ConvexError({
-				code: 'rate_limited',
-				message: 'A code was just sent. Wait a minute before requesting another.'
-			});
-		}
 		const code = verificationCode();
 		const codeHash = await verificationCodeHash({ email, code });
 		const now = Date.now();
@@ -805,8 +796,9 @@ export const unscheduleSelected = mutation({
 
 // ─── Internal functions ───────────────────────────────────────────────────────
 
-export const getWorkspaceForEmailAction = internalQuery({
+export const reserveReplyToVerificationSend = internalMutation({
 	args: { workspaceId: v.id('workspaces') },
+	returns: v.object({ name: v.string() }),
 	handler: async (ctx, args) => {
 		await requireWorkspaceOwner(ctx, args.workspaceId, 'change the reply-to email');
 		const workspace = await ctx.db.get(args.workspaceId);
@@ -817,10 +809,32 @@ export const getWorkspaceForEmailAction = internalQuery({
 			.query('workspace_email_settings')
 			.withIndex('by_workspaceId', (q) => q.eq('workspaceId', args.workspaceId))
 			.unique();
-		return {
-			name: workspace.name,
-			verificationCodeSentAt: settings?.verificationCodeSentAt ?? null
-		};
+		const now = Date.now();
+		const lastSendAt = Math.max(
+			settings?.verificationSendReservedAt ?? 0,
+			settings?.verificationCodeSentAt ?? 0
+		);
+		if (now - lastSendAt < REPLY_TO_VERIFICATION_RESEND_COOLDOWN_MS) {
+			const waitSeconds = Math.ceil(
+				(REPLY_TO_VERIFICATION_RESEND_COOLDOWN_MS - (now - lastSendAt)) / 1000
+			);
+			throw new ConvexError({
+				code: 'rate_limited',
+				message: `A code was just sent. Try again in ${waitSeconds} seconds.`
+			});
+		}
+
+		if (settings) {
+			await ctx.db.patch(settings._id, { verificationSendReservedAt: now });
+		} else {
+			await ctx.db.insert('workspace_email_settings', {
+				workspaceId: args.workspaceId,
+				verificationSendReservedAt: now,
+				verificationAttempts: 0,
+				updatedAt: now
+			});
+		}
+		return { name: workspace.name };
 	}
 });
 
