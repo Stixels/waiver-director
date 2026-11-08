@@ -283,8 +283,30 @@ export default defineSchema({
 		verificationCodeExpiresAt: v.optional(v.number()),
 		verificationCodeSentAt: v.optional(v.number()),
 		verificationAttempts: v.number(),
+		signedCopyEmailsEnabled: v.optional(v.boolean()),
 		updatedAt: v.number()
 	}).index('by_workspaceId', ['workspaceId']),
+
+	signed_copy_emails: defineTable({
+		workspaceId: v.id('workspaces'),
+		submissionId: v.id('waiver_submissions'),
+		recipientEmail: v.string(),
+		trigger: v.union(v.literal('submission'), v.literal('manual')),
+		requestedByUserId: v.optional(v.id('users')),
+		status: v.union(
+			v.literal('queued'),
+			v.literal('sent'),
+			v.literal('blocked'),
+			v.literal('failed')
+		),
+		failureReason: v.optional(v.string()),
+		resendMessageId: v.optional(v.string()),
+		createdAt: v.number(),
+		updatedAt: v.number(),
+		sentAt: v.optional(v.number())
+	})
+		.index('by_workspaceId', ['workspaceId'])
+		.index('by_submissionId', ['submissionId']),
 
 	email_follow_ups: defineTable({
 		workspaceId: v.id('workspaces'),

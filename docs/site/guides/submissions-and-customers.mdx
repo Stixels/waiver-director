@@ -33,6 +33,14 @@ description: 'Review signed waivers and each customer’s visit history.'
 	submitted.
 </Info>
 
+## Signed PDF copies
+
+On Pro and Business, every signed submission can be turned into a PDF. The PDF contains the waiver text exactly as signed, the signer's answers, covered minors, booking details, marketing consent, and the drawn signature. A **signature record** at the end lists the submission ID, the signing time in UTC, and a SHA-256 fingerprint of the signed record, so you can show later that a copy matches what is stored.
+
+- **Automatic copy to the signer**: right after someone signs, they get an email with their signed PDF attached. It is sent from your workspace name, and replies go to your verified reply-to address if you have one. Owners can turn this off under **Settings > Email > Signed copies**.
+- **Email copy to signer**: open a submission and select **Email copy to signer** to send it again, for example when a customer can't find the first email. The copy only ever goes to the signer's email on record. The submission header shows when the last copy was sent.
+- **Download PDF**: Owners can select **Download PDF** on any submission to save the signed copy, for example to answer a dispute or insurance request.
+
 ## Customers
 
 **Customers** groups signers by email address. Search by name or email, then select a customer to see their waiver visit history across all of their submissions in this workspace.

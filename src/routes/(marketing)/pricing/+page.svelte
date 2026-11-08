@@ -44,7 +44,7 @@
 		{
 			id: 'data',
 			q: 'Who owns the signed waiver data?',
-			a: 'You do. Signed records belong to your workspace and remain tied to the published waiver version that was signed. Owner-only PDF exports are planned but are not available yet.'
+			a: 'You do. Signed records belong to your workspace and remain tied to the published waiver version that was signed. On Pro, Owners can download any signed waiver as a PDF, and signers get a PDF copy by email.'
 		}
 	] as const;
 </script>

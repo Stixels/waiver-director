@@ -2,7 +2,7 @@
 	import { PUBLIC_APP_URL } from '$env/static/public';
 	import { resolve } from '$app/paths';
 	import type { Component } from 'svelte';
-	import { ArrowRight, CalendarCheck, FileDown, MailCheck } from '@lucide/svelte';
+	import { ArrowRight, CalendarCheck, MailCheck } from '@lucide/svelte';
 
 	import bookeoLogo from '$lib/assets/providers/bookeo-icon.webp';
 	import mailchimpLogo from '$lib/assets/providers/mailchimp-icon.webp';
@@ -36,11 +36,6 @@
 	const siteBase = (PUBLIC_APP_URL ?? '').replace(/\/$/, '');
 	const canonicalUrl = siteBase ? `${siteBase}/features` : '';
 	const roadmapItems = [
-		{
-			icon: FileDown,
-			name: 'PDF exports',
-			description: 'Export signed records'
-		},
 		{
 			icon: CalendarCheck,
 			name: 'Xola',
@@ -84,7 +79,7 @@
 			plans: ['Pro'],
 			title: 'Signed records and customers',
 			description:
-				'Each signature is stored against the waiver version it was signed on, with the answers given, consent, covered minors, and its booking.',
+				'Each signature is stored against the waiver version it was signed on, with the answers given, consent, covered minors, and its booking. Signers get a PDF copy by email, and Owners can download one anytime.',
 			preview: SignedRecordsPreview
 		},
 		{

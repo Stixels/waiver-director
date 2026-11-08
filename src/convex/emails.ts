@@ -14,6 +14,7 @@ import { Resend } from 'resend';
 import { internal } from './_generated/api';
 import { requireWorkspaceFeature } from './lib/billing';
 import { requireWorkspaceMember } from './lib/waivers';
+import { configuredFromEmail, friendlyFromAddress } from './lib/emailSender';
 import { escapeHtml, sanitizeRichTextHtml } from '../lib/utils/rich-text';
 import { richTextHtmlToPlainText } from '../lib/utils/rich-text-shared';
 
@@ -68,10 +69,6 @@ function normalizeReplyToEmail(value: string): string {
 	return email;
 }
 
-function configuredFromEmail(): string | null {
-	return process.env.RESEND_FROM_EMAIL?.trim() || null;
-}
-
 function canSendWorkspaceEmail(settings: Doc<'workspace_email_settings'> | null): boolean {
 	return Boolean(configuredFromEmail() && settings?.replyToEmail && settings.replyToVerifiedAt);
 }
@@ -85,20 +82,6 @@ function requireFromEmail(): string {
 		});
 	}
 	return fromAddress;
-}
-
-function emailDisplayName(value: string): string {
-	return (
-		value
-			.replace(/[\r\n<>]/g, ' ')
-			.replace(/\s+/g, ' ')
-			.trim() || 'Waiver'
-	);
-}
-
-function friendlyFromAddress(displayName: string, email: string): string {
-	const escapedName = emailDisplayName(displayName).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-	return `"${escapedName}" <${email}>`;
 }
 
 async function requireWorkspaceVerifiedReplyTo(
@@ -293,7 +276,8 @@ export const getWorkspaceEmailSenderSettings = query({
 			replyToVerifiedAt: settings?.replyToVerifiedAt ?? null,
 			pendingReplyToEmail: settings?.pendingReplyToEmail ?? null,
 			verificationCodeExpiresAt: settings?.verificationCodeExpiresAt ?? null,
-			canSendEmails: canSendWorkspaceEmail(settings)
+			canSendEmails: canSendWorkspaceEmail(settings),
+			signedCopyEmailsEnabled: settings?.signedCopyEmailsEnabled ?? true
 		};
 	}
 });
