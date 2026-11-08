@@ -35,16 +35,15 @@ Below the signed document, each submission shows an **Audit trail** you can poin
 - **Received by server**: when Waiver Director recorded the signature.
 - **IP address (reported)** and **Device / browser**: read from the signer's request headers. Waiver Director records them automatically, but cannot independently verify them.
 - **Document hash**: a SHA-256 fingerprint of the exact waiver version the signer saw. Two submissions with the same document hash signed identical text.
-- **Record hash**: a SHA-256 fingerprint of the signed record (signer details, answers, minors, signature, and consent). Any later change to the record would no longer match it.
-- **E-signature consent**: the exact statement the signer agreed to before submitting.
-- **Form opened**, **Consent accepted**, and **Signature drawn**: times reported by the signer's browser, for context.
+- **Record hash**: a SHA-256 fingerprint of the signed record (signer details, answers, minors, and signature). Any later change to the record would no longer match it.
+- **Form opened** and **Signature drawn**: times reported by the signer's browser, for context.
 
 Waivers signed before the audit trail was added show "No audit trail was recorded."
 
 <Frame caption="The audit trail on a signed submission. Sample data.">
 	<img
 		src="/images/app/submission-audit-trail.png"
-		alt="Audit trail panel listing server receive time, IP address, device and browser, document and record hashes, the e-signature consent statement, and browser-reported form, consent and signature times"
+		alt="Audit trail panel listing server receive time, IP address, device and browser, document and record hashes, and browser-reported form-opened and signature times"
 	/>
 </Frame>
 

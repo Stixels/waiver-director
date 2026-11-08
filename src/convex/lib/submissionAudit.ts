@@ -15,10 +15,8 @@ export const submissionAuditValidator = v.object({
 	hashAlgorithm: v.literal('SHA-256'),
 	documentHash: v.string(),
 	submissionHash: v.string(),
-	electronicSignatureConsentText: v.string(),
 	receivedAt: v.number(),
 	clientFormOpenedAt: v.union(v.number(), v.null()),
-	clientConsentAcceptedAt: v.union(v.number(), v.null()),
 	clientSignatureCompletedAt: v.union(v.number(), v.null())
 });
 
@@ -32,6 +30,5 @@ export const submissionAuditRequestValidator = v.object({
 
 export const submissionClientTimingValidator = v.object({
 	formOpenedAt: v.optional(v.number()),
-	consentAcceptedAt: v.optional(v.number()),
 	signatureCompletedAt: v.optional(v.number())
 });

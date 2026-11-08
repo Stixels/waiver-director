@@ -12,7 +12,6 @@ import { getOwnedWorkspaceLogoUrl } from './lib/workspaces';
 import { marketingConsentLabel } from './lib/marketing';
 import {
 	AUDIT_HASH_ALGORITHM,
-	ELECTRONIC_SIGNATURE_CONSENT_TEXT,
 	sanitizeClientTimestamp,
 	waiverDocumentHash,
 	waiverSubmissionHash
@@ -599,7 +598,6 @@ export const submitPublicWaiver = internalMutation({
 	args: {
 		request: submissionAuditRequestValidator,
 		clientTiming: v.optional(submissionClientTimingValidator),
-		electronicSignatureConsent: v.boolean(),
 		slug: v.string(),
 		versionId: v.id('waiver_versions'),
 		bookingLookupToken: v.optional(v.string()),
@@ -684,13 +682,6 @@ export const submitPublicWaiver = internalMutation({
 			});
 		}
 
-		if (!args.electronicSignatureConsent) {
-			throw new ConvexError({
-				code: 'invalid_argument',
-				message: 'Agree to sign electronically to submit this waiver.'
-			});
-		}
-
 		validateSubmissionAnswers(version, args.answers);
 		const minors = validateMinors(args.minors);
 		const marketingIntegration = await ctx.db
@@ -734,7 +725,6 @@ export const submitPublicWaiver = internalMutation({
 			signatureDataUrl: args.signatureDataUrl,
 			answers: args.answers,
 			minors,
-			consentText: ELECTRONIC_SIGNATURE_CONSENT_TEXT,
 			submittedAt
 		});
 		const audit = {
@@ -745,13 +735,8 @@ export const submitPublicWaiver = internalMutation({
 			hashAlgorithm: AUDIT_HASH_ALGORITHM,
 			documentHash,
 			submissionHash,
-			electronicSignatureConsentText: ELECTRONIC_SIGNATURE_CONSENT_TEXT,
 			receivedAt: submittedAt,
 			clientFormOpenedAt: sanitizeClientTimestamp(args.clientTiming?.formOpenedAt, submittedAt),
-			clientConsentAcceptedAt: sanitizeClientTimestamp(
-				args.clientTiming?.consentAcceptedAt,
-				submittedAt
-			),
 			clientSignatureCompletedAt: sanitizeClientTimestamp(
 				args.clientTiming?.signatureCompletedAt,
 				submittedAt
