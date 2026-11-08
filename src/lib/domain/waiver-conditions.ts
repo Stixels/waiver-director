@@ -87,6 +87,22 @@ export function getVisibleFieldIds(
 	return visible;
 }
 
+/**
+ * Trims string answers for known fields so visibility, validation and storage
+ * all see the same value (e.g. a select answer of " yes" becomes "yes").
+ */
+export function canonicalizeAnswers<T>(
+	fields: ReadonlyArray<ConditionalFieldLike>,
+	answers: Record<string, T>
+): Record<string, T> {
+	const fieldIds = new Set(fields.map((field) => field.id));
+	const next: Record<string, T> = {};
+	for (const [key, value] of Object.entries(answers)) {
+		next[key] = fieldIds.has(key) && typeof value === 'string' ? (value.trim() as T) : value;
+	}
+	return next;
+}
+
 /** Drops answers for fields that are hidden by their conditions. */
 export function pruneHiddenAnswers<T>(
 	fields: ReadonlyArray<ConditionalFieldLike>,

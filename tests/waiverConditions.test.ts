@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+	canonicalizeAnswers,
 	describeCondition,
 	findFirstConditionProblem,
 	getConditionProblem,
@@ -141,4 +142,13 @@ test('describes conditions for previews', () => {
 		describeCondition(fields, fields[3]!.visibleWhen!),
 		'Shown when "Experience level" is not Experienced'
 	);
+});
+
+test('trims answers before evaluating conditions so padded values cannot hide required fields', () => {
+	const answers = canonicalizeAnswers(fields, { experience: ' new ', unknown: ' keep ' });
+	assert.deepEqual(answers, { experience: 'new', unknown: ' keep ' });
+	assert.ok(getVisibleFieldIds(fields, answers).has('orientation'));
+
+	const padded = canonicalizeAnswers(fields, { experience: ' pro' });
+	assert.ok(!getVisibleFieldIds(fields, padded).has('orientation'));
 });

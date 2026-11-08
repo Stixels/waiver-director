@@ -20,6 +20,7 @@ import {
 	MIN_WAIVER_TITLE_LENGTH
 } from '../../lib/domain/waiver-constraints';
 import {
+	canonicalizeAnswers,
 	findFirstConditionProblem,
 	getVisibleFieldIds,
 	pruneHiddenAnswers,
@@ -376,8 +377,10 @@ export function waiverDefinitionsEqual(a: WaiverDefinition, b: WaiverDefinition)
  */
 export function validateSubmissionAnswers(
 	definition: Pick<WaiverDefinition, 'fields'>,
-	answers: Record<string, string | boolean | null>
+	rawAnswers: Record<string, string | boolean | null>
 ): Record<string, string | boolean | null> {
+	// Trim first so visibility, validation and the stored record agree.
+	const answers = canonicalizeAnswers(definition.fields, rawAnswers);
 	const visibleFieldIds = getVisibleFieldIds(definition.fields, answers);
 	for (const field of definition.fields) {
 		if (!visibleFieldIds.has(field.id)) {
