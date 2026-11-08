@@ -210,8 +210,9 @@
 					{/if}
 					<p class="text-xs text-muted-foreground">
 						Secret ends in <code class="font-mono">…{endpoint.signingSecretHint}</code> · Last
-						delivery: {formatTime(endpoint.lastDeliveryAt)}{#if endpoint.lastDeliveryOk === false}
-							(failed){/if}
+						delivery: {formatTime(endpoint.lastDeliveryAt)}{endpoint.lastDeliveryOk === false
+							? ' (failed)'
+							: ''}
 					</p>
 					<div class="flex flex-wrap gap-1.5">
 						<Button
@@ -278,14 +279,10 @@
 										<span class="text-muted-foreground">{formatTime(delivery.createdAt)}</span>
 										<span class="text-muted-foreground">
 											{delivery.attempts}
-											{delivery.attempts === 1
-												? 'attempt'
-												: 'attempts'}{#if delivery.lastResponseStatus}
-												· HTTP {delivery.lastResponseStatus}{/if}
+											{delivery.attempts === 1 ? 'attempt' : 'attempts'}{delivery.lastResponseStatus
+												? ` · HTTP ${delivery.lastResponseStatus}`
+												: ''}
 										</span>
-										{#if delivery.lastError && delivery.status !== 'succeeded'}
-											<span class="w-full text-muted-foreground">{delivery.lastError}</span>
-										{/if}
 										{#if delivery.status === 'failed' || delivery.status === 'succeeded'}
 											<Button
 												size="xs"
@@ -295,6 +292,9 @@
 											>
 												Resend
 											</Button>
+										{/if}
+										{#if delivery.lastError && delivery.status !== 'succeeded'}
+											<span class="w-full text-muted-foreground">{delivery.lastError}</span>
 										{/if}
 									</li>
 								{/each}
