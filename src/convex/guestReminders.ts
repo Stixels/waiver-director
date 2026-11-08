@@ -18,7 +18,7 @@ import {
 } from './lib/waiverPolicies';
 
 const WORKSPACES_PER_SWEEP_PAGE = 100;
-const MAX_BOOKINGS_PER_WORKSPACE_SWEEP = 200;
+const BOOKINGS_PER_WORKSPACE_PAGE = 200;
 const MAX_REMINDERS_PER_WORKSPACE_SWEEP = 50;
 
 function appOrigin(): string | null {
@@ -66,8 +66,18 @@ export const sweepGuestRemindersCron = internalMutation({
 	}
 });
 
+/**
+ * Queues reminders for one workspace. Reads the reminder window a page at a time and
+ * continues itself with a cursor, so bookings past the first page are reached even when
+ * many share a start time. Each run queues at most MAX_REMINDERS_PER_WORKSPACE_SWEEP sends.
+ */
 export const queueWorkspaceGuestReminders = internalMutation({
-	args: { workspaceId: v.id('workspaces') },
+	args: {
+		workspaceId: v.id('workspaces'),
+		cursor: v.optional(v.union(v.string(), v.null())),
+		windowStart: v.optional(v.number()),
+		windowEnd: v.optional(v.number())
+	},
 	returns: v.null(),
 	handler: async (ctx, args) => {
 		const workspace = await ctx.db.get(args.workspaceId);
@@ -87,19 +97,19 @@ export const queueWorkspaceGuestReminders = internalMutation({
 		if (!emailSettings?.replyToEmail || !emailSettings.replyToVerifiedAt) return null;
 
 		const now = Date.now();
-		const bookings = await ctx.db
+		// A continuation keeps the original window so its cursor stays valid for the same query.
+		const windowStart = args.windowStart ?? now;
+		const windowEnd = args.windowEnd ?? now + policy.guestReminders.leadHours * HOUR_MS;
+		const page = await ctx.db
 			.query('bookings')
 			.withIndex('by_workspaceId_and_startAt', (q) =>
-				q
-					.eq('workspaceId', args.workspaceId)
-					.gt('startAt', now)
-					.lte('startAt', now + policy.guestReminders.leadHours * HOUR_MS)
+				q.eq('workspaceId', args.workspaceId).gt('startAt', windowStart).lte('startAt', windowEnd)
 			)
-			.take(MAX_BOOKINGS_PER_WORKSPACE_SWEEP);
+			.paginate({ cursor: args.cursor ?? null, numItems: BOOKINGS_PER_WORKSPACE_PAGE });
 
 		let queued = 0;
-		for (const booking of bookings) {
-			if (queued >= MAX_REMINDERS_PER_WORKSPACE_SWEEP) break;
+		let hitSendLimit = false;
+		for (const booking of page.page) {
 			if (
 				!bookingNeedsGuestReminder({
 					booking,
@@ -114,6 +124,10 @@ export const queueWorkspaceGuestReminders = internalMutation({
 				.withIndex('by_bookingId', (q) => q.eq('bookingId', booking._id))
 				.first();
 			if (existing) continue;
+			if (queued >= MAX_REMINDERS_PER_WORKSPACE_SWEEP) {
+				hitSendLimit = true;
+				break;
+			}
 
 			const reminderId = await ctx.db.insert('booking_guest_reminders', {
 				workspaceId: args.workspaceId,
@@ -131,6 +145,21 @@ export const queueWorkspaceGuestReminders = internalMutation({
 				{ reminderId }
 			);
 			queued++;
+		}
+
+		// Hitting the send limit re-reads the same page (bookings just queued are skipped);
+		// otherwise move on to the next page. Start after this run's sends are spaced out.
+		const nextCursor = hitSendLimit
+			? (args.cursor ?? null)
+			: page.isDone
+				? undefined
+				: page.continueCursor;
+		if (nextCursor !== undefined) {
+			await ctx.scheduler.runAfter(
+				queued * REMINDER_SEND_SPACING_MS,
+				internal.guestReminders.queueWorkspaceGuestReminders,
+				{ workspaceId: args.workspaceId, cursor: nextCursor, windowStart, windowEnd }
+			);
 		}
 		return null;
 	}
