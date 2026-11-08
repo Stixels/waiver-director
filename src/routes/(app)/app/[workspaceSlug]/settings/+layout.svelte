@@ -4,6 +4,7 @@
 	import { useAppContext } from '$lib/components/app/app-context.svelte';
 	import { cn } from '$lib/utils';
 	import Building2Icon from '@lucide/svelte/icons/building-2';
+	import CodeIcon from '@lucide/svelte/icons/code';
 	import MailIcon from '@lucide/svelte/icons/mail';
 	import PaletteIcon from '@lucide/svelte/icons/palette';
 	import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
@@ -38,6 +39,14 @@
 			description: 'Sender name, reply-to address',
 			icon: MailIcon,
 			match: 'email',
+			tone: 'default' as const
+		},
+		{
+			href: `/app/${page.params.workspaceSlug}/settings/developers` as const,
+			label: 'Developers',
+			description: 'Webhooks and API keys',
+			icon: CodeIcon,
+			match: 'developers',
 			tone: 'default' as const
 		},
 		{

@@ -1,7 +1,9 @@
 import { httpRouter } from 'convex/server';
 import { httpAction } from './_generated/server';
 import { internal } from './_generated/api';
+import type { ActionCtx } from './_generated/server';
 import type { Id } from './_generated/dataModel';
+import { looksLikeApiKey, parseBearerToken, parsePageLimit, sha256Hex } from './lib/webhooks';
 
 const http = httpRouter();
 
@@ -158,6 +160,131 @@ http.route({
 		}
 
 		return new Response(result.status, { status: 200 });
+	})
+});
+
+// ---------------------------------------------------------------------------------------------
+// Public read API (v1). Authenticated with a workspace API key: `Authorization: Bearer wd_live_…`.
+// ---------------------------------------------------------------------------------------------
+
+const API_JSON_HEADERS = {
+	'Content-Type': 'application/json; charset=utf-8',
+	'Cache-Control': 'no-store'
+};
+
+function apiJson(body: unknown, status = 200) {
+	return new Response(JSON.stringify(body), { status, headers: API_JSON_HEADERS });
+}
+
+function apiError(status: number, code: string, message: string) {
+	return apiJson({ error: { code, message } }, status);
+}
+
+async function authenticateApiRequest(
+	ctx: ActionCtx,
+	request: Request
+): Promise<{ workspaceId: Id<'workspaces'> } | Response> {
+	const token = parseBearerToken(request.headers.get('Authorization'));
+	if (!token || !looksLikeApiKey(token)) {
+		return apiError(401, 'unauthenticated', 'Provide an API key as a Bearer token.');
+	}
+	const key: {
+		apiKeyId: Id<'api_keys'>;
+		workspaceId: Id<'workspaces'>;
+		needsLastUsedRefresh: boolean;
+	} | null = await ctx.runQuery(internal.apiKeys.authenticateApiKey, {
+		keyHash: await sha256Hex(token)
+	});
+	if (!key) {
+		return apiError(401, 'unauthenticated', 'This API key is invalid or has been revoked.');
+	}
+	if (key.needsLastUsedRefresh) {
+		await ctx.runMutation(internal.apiKeys.markApiKeyUsed, { apiKeyId: key.apiKeyId });
+	}
+	return { workspaceId: key.workspaceId };
+}
+
+function parsePageArgs(request: Request): { numItems: number; cursor: string | null } | Response {
+	const url = new URL(request.url);
+	const numItems = parsePageLimit(url.searchParams.get('limit'));
+	if (numItems === null) {
+		return apiError(400, 'invalid_argument', 'limit must be a whole number from 1 to 100.');
+	}
+	return { numItems, cursor: url.searchParams.get('cursor') || null };
+}
+
+function apiHandler(
+	handler: (ctx: ActionCtx, request: Request, workspaceId: Id<'workspaces'>) => Promise<Response>
+) {
+	return httpAction(async (ctx, request) => {
+		const auth = await authenticateApiRequest(ctx, request);
+		if (auth instanceof Response) return auth;
+		try {
+			return await handler(ctx, request, auth.workspaceId);
+		} catch (error) {
+			if (error instanceof Error && /cursor/i.test(error.message)) {
+				return apiError(400, 'invalid_argument', 'cursor is invalid or has expired.');
+			}
+			console.error('[api/v1] unexpected error', error);
+			return apiError(500, 'internal_error', 'Something went wrong.');
+		}
+	});
+}
+
+http.route({
+	path: '/api/v1/workspace',
+	method: 'GET',
+	handler: apiHandler(async (ctx, _request, workspaceId) => {
+		const workspace: unknown = await ctx.runQuery(internal.publicApi.getWorkspace, { workspaceId });
+		if (!workspace) return apiError(404, 'not_found', 'Workspace not found.');
+		return apiJson({ data: workspace });
+	})
+});
+
+http.route({
+	path: '/api/v1/submissions',
+	method: 'GET',
+	handler: apiHandler(async (ctx, request, workspaceId) => {
+		const page = parsePageArgs(request);
+		if (page instanceof Response) return page;
+		const result: unknown = await ctx.runQuery(internal.publicApi.listSubmissions, {
+			workspaceId,
+			...page
+		});
+		return apiJson(result);
+	})
+});
+
+http.route({
+	pathPrefix: '/api/v1/submissions/',
+	method: 'GET',
+	handler: apiHandler(async (ctx, request, workspaceId) => {
+		const submissionId = decodeURIComponent(
+			new URL(request.url).pathname.slice('/api/v1/submissions/'.length)
+		);
+		if (!submissionId || submissionId.includes('/')) {
+			return apiError(404, 'not_found', 'Submission not found.');
+		}
+		const submission: unknown = await ctx.runQuery(internal.publicApi.getSubmission, {
+			workspaceId,
+			submissionId
+		});
+		if (!submission) return apiError(404, 'not_found', 'Submission not found.');
+		return apiJson({ data: submission });
+	})
+});
+
+http.route({
+	path: '/api/v1/customers',
+	method: 'GET',
+	handler: apiHandler(async (ctx, request, workspaceId) => {
+		const page = parsePageArgs(request);
+		if (page instanceof Response) return page;
+		const result: unknown = await ctx.runQuery(internal.publicApi.listCustomers, {
+			workspaceId,
+			...page
+		});
+		return apiJson(result);
 	})
 });
 

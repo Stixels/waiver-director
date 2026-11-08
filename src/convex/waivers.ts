@@ -731,6 +731,8 @@ export const submitPublicWaiver = mutation({
 			await ctx.scheduler.runAfter(0, internal.mailchimp.syncContact, { syncId });
 		}
 
+		await ctx.scheduler.runAfter(0, internal.webhooks.enqueueSubmissionCreated, { submissionId });
+
 		await ctx.scheduler.runAfter(0, internal.emails.scheduleFollowUpOnSubmission, {
 			workspaceId: waiver.workspaceId,
 			submissionId,
