@@ -57,7 +57,7 @@
 	type="button"
 	variant="outline"
 	size="lg"
-	class="h-9 gap-2"
+	class="h-9 cursor-pointer gap-2 disabled:cursor-wait"
 	disabled={isExporting}
 	onclick={handleExport}
 	aria-live="polite"
