@@ -44,6 +44,7 @@
 	let isDisconnecting = $state(false);
 	let audienceDialogOpen = $state(false);
 	let audiences = $state<Audience[]>([]);
+	let audienceLoadError = $state<string | null>(null);
 	let selectedAudienceId = $state('');
 
 	function formatTimestamp(timestamp: number | null) {
@@ -55,22 +56,23 @@
 	}
 
 	async function connect() {
-		if (convex.disabled || !canManage) return;
+		if (convex.disabled || !canManage || isStartingConnect) return;
 		isStartingConnect = true;
 		try {
 			const result = await convex.action(api.mailchimp.startConnect, { workspaceId });
+			// Stay in the loading state while the browser navigates to Mailchimp.
 			window.location.href = result.authorizationUrl;
 		} catch (error) {
 			toast.error(getConvexErrorMessage(error, 'Unable to start Mailchimp connection.'));
-		} finally {
 			isStartingConnect = false;
 		}
 	}
 
 	async function openAudiencePicker() {
-		if (convex.disabled || !canManage) return;
+		if (convex.disabled || !canManage || isLoadingAudiences) return;
 		audienceDialogOpen = true;
 		selectedAudienceId = integration?.audienceId ?? '';
+		audienceLoadError = null;
 		isLoadingAudiences = true;
 		try {
 			audiences = await convex.action(api.mailchimp.listAudiences, { workspaceId });
@@ -78,14 +80,15 @@
 				selectedAudienceId = audiences[0].id;
 			}
 		} catch (error) {
-			toast.error(getConvexErrorMessage(error, 'Unable to load Mailchimp audiences.'));
+			audiences = [];
+			audienceLoadError = getConvexErrorMessage(error, 'Unable to load Mailchimp audiences.');
 		} finally {
 			isLoadingAudiences = false;
 		}
 	}
 
 	async function saveAudience() {
-		if (convex.disabled || !selectedAudienceId || !canManage) return;
+		if (convex.disabled || !selectedAudienceId || !canManage || isSavingAudience) return;
 		isSavingAudience = true;
 		try {
 			await convex.action(api.mailchimp.chooseAudience, {
@@ -102,7 +105,7 @@
 	}
 
 	async function disconnect() {
-		if (convex.disabled || !canManage) return;
+		if (convex.disabled || !canManage || isDisconnecting) return;
 		isDisconnecting = true;
 		try {
 			await convex.mutation(api.marketingIntegrations.disconnectMailchimp, { workspaceId });
@@ -130,6 +133,17 @@
 				<p class="flex min-h-20 items-center text-sm text-muted-foreground" aria-live="polite">
 					Loading audiences...
 				</p>
+			{:else if audienceLoadError}
+				<div
+					class="flex flex-col items-start gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive"
+					role="alert"
+				>
+					<p>{audienceLoadError}</p>
+					<Button variant="outline" size="sm" onclick={openAudiencePicker}>
+						<RefreshCwIcon class="size-3.5" aria-hidden="true" />
+						Try again
+					</Button>
+				</div>
 			{:else if audiences.length === 0}
 				<div class="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
 					No audiences were found in this Mailchimp account. Create one in Mailchimp, then try
@@ -155,7 +169,11 @@
 		</div>
 
 		<DialogFooter>
-			<Button variant="outline" onclick={() => (audienceDialogOpen = false)}>Cancel</Button>
+			<Button
+				variant="outline"
+				onclick={() => (audienceDialogOpen = false)}
+				disabled={isSavingAudience}>Cancel</Button
+			>
 			<Button
 				onclick={saveAudience}
 				disabled={convex.disabled || !selectedAudienceId || isSavingAudience}
@@ -167,7 +185,12 @@
 </Dialog>
 
 <Dialog bind:open={disconnectDialogOpen}>
-	<DialogContent class="max-w-md">
+	<DialogContent
+		class="max-w-md"
+		showCloseButton={!isDisconnecting}
+		escapeKeydownBehavior={isDisconnecting ? 'ignore' : 'close'}
+		interactOutsideBehavior={isDisconnecting ? 'ignore' : 'close'}
+	>
 		<DialogHeader>
 			<DialogTitle>Disconnect Mailchimp?</DialogTitle>
 			<DialogDescription>
@@ -176,7 +199,11 @@
 			</DialogDescription>
 		</DialogHeader>
 		<DialogFooter>
-			<Button variant="outline" onclick={() => (disconnectDialogOpen = false)}>Cancel</Button>
+			<Button
+				variant="outline"
+				onclick={() => (disconnectDialogOpen = false)}
+				disabled={isDisconnecting}>Cancel</Button
+			>
 			<Button variant="destructive" onclick={disconnect} disabled={isDisconnecting}>
 				{isDisconnecting ? 'Disconnecting...' : 'Disconnect Mailchimp'}
 			</Button>
@@ -264,7 +291,12 @@
 		{/if}
 
 		<div class="flex flex-wrap gap-2">
-			<Button variant="outline" size="sm" onclick={openAudiencePicker}>
+			<Button
+				variant="outline"
+				size="sm"
+				onclick={openAudiencePicker}
+				disabled={convex.disabled || isLoadingAudiences}
+			>
 				<RefreshCwIcon class="size-3.5" aria-hidden="true" />
 				Change audience
 			</Button>

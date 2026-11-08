@@ -1,8 +1,10 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { useClerkContext } from 'svelte-clerk';
 	import { getClerkErrorMessage, getSafePostAuthRedirectHref } from '$lib/auth/clerk-helpers';
 	import AuthPageShell from '$lib/components/marketing/auth/AuthPageShell.svelte';
+	import PasswordInput from '$lib/components/marketing/auth/PasswordInput.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 
@@ -25,6 +27,7 @@
 	let submitError = $state<string | null>(null);
 	const redirectTo = $derived(page.url.searchParams.get('redirectTo'));
 	const postAuthRedirectUrl = $derived(getSafePostAuthRedirectHref(redirectTo));
+	const redirectQuery = $derived(redirectTo ? `?redirectTo=${encodeURIComponent(redirectTo)}` : '');
 
 	function getSignInResource() {
 		return clerk.client?.signIn ?? null;
@@ -166,10 +169,9 @@
 				bind:value={code}
 			/>
 
-			<Input
+			<PasswordInput
 				id="reset-password"
 				name="password"
-				type="password"
 				autocomplete="new-password"
 				placeholder="New password"
 				aria-label="New password"
@@ -177,10 +179,9 @@
 				bind:value={newPassword}
 			/>
 
-			<Input
+			<PasswordInput
 				id="reset-password-confirm"
 				name="password_confirm"
-				type="password"
 				autocomplete="new-password"
 				placeholder="Confirm new password"
 				aria-label="Confirm new password"
@@ -193,7 +194,13 @@
 					{isSubmitting ? 'Updating password...' : 'Update password'}
 				</Button>
 
-				<Button type="button" variant="outline" class={backButtonClass} onclick={restartResetFlow}>
+				<Button
+					type="button"
+					variant="outline"
+					class={backButtonClass}
+					disabled={isSubmitting}
+					onclick={restartResetFlow}
+				>
 					Use a different email
 				</Button>
 
@@ -202,7 +209,7 @@
 				{/if}
 
 				{#if submitError}
-					<p class="text-center text-sm text-destructive" role="status">{submitError}</p>
+					<p class="text-center text-sm text-destructive" role="alert">{submitError}</p>
 				{/if}
 			</div>
 		</form>
@@ -215,6 +222,7 @@
 				autocomplete="email"
 				placeholder="Email"
 				aria-label="Email"
+				required
 				class={inputClass}
 				bind:value={email}
 			/>
@@ -229,8 +237,18 @@
 				{/if}
 
 				{#if submitError}
-					<p class="text-center text-sm text-destructive" role="status">{submitError}</p>
+					<p class="text-center text-sm text-destructive" role="alert">{submitError}</p>
 				{/if}
+
+				<p class="text-center text-sm text-muted-foreground">
+					Remembered it?
+					<a
+						href={resolve(`/sign-in${redirectQuery}` as '/sign-in')}
+						class="font-semibold text-primary transition-[filter] hover:brightness-150"
+					>
+						Back to sign in
+					</a>
+				</p>
 			</div>
 		</form>
 	{/if}

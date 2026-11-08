@@ -24,8 +24,9 @@
 	import { formatBookingTimestamp } from '$lib/utils/date';
 	import { parseConvexId, queryString } from '$lib/utils/url';
 	import { cn } from '$lib/utils';
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import CalendarClockIcon from '@lucide/svelte/icons/calendar-clock';
+	import CircleAlertIcon from '@lucide/svelte/icons/circle-alert';
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 	import MailIcon from '@lucide/svelte/icons/mail';
 	import SearchIcon from '@lucide/svelte/icons/search';
@@ -56,6 +57,7 @@
 	let detailOpen = $state(false);
 	let selectedSubmissionId = $state<Id<'waiver_submissions'> | null>(null);
 	let now = $state(Date.now());
+	let detailPanel = $state<HTMLElement | null>(null);
 
 	onMount(() => {
 		const interval = setInterval(() => {
@@ -82,9 +84,27 @@
 
 	type CustomerPage = FunctionReturnType<typeof api.customers.listWorkspaceCustomers>;
 	type CustomerSummary = CustomerPage['customers'][number];
-	const customerPage = $derived((customersQuery.data ?? null) as CustomerPage | null);
+	// keepPreviousData keeps the previous workspace's rows on screen while the new
+	// workspace loads; treat that as loading so rows from another workspace are
+	// never shown (or clickable) under this workspace.
+	let dataWorkspaceId = $state<string | null>(null);
+	$effect(() => {
+		if (customersQuery.data !== undefined && !customersQuery.isStale) {
+			dataWorkspaceId = currentWorkspace?.workspaceId ?? null;
+		}
+	});
+	const isWorkspaceDataStale = $derived(
+		customersQuery.isStale &&
+			dataWorkspaceId !== null &&
+			dataWorkspaceId !== currentWorkspace?.workspaceId
+	);
+	const customerPage = $derived(
+		(isWorkspaceDataStale ? null : (customersQuery.data ?? null)) as CustomerPage | null
+	);
 	const customers = $derived((customerPage?.customers ?? []) as CustomerSummary[]);
-	const isLoadingCustomers = $derived(customersQuery.isLoading || appContext.isLoading);
+	const isLoadingCustomers = $derived(
+		customersQuery.isLoading || appContext.isLoading || isWorkspaceDataStale
+	);
 	const totalCount = $derived(customerPage?.totalCount ?? null);
 	const hasPreviousPage = $derived(previousCursors.length > 0);
 	const currentPage = $derived(previousCursors.length + 1);
@@ -226,6 +246,9 @@
 	$effect(() => {
 		if (isClearingWorkspaceUrl) return;
 		if (!customerIdParam) {
+			// Browser Back from a selected customer drops `customerId`; clear the
+			// selection so the detail panel matches the URL.
+			if (lastAppliedCustomerId !== null) selectedCustomerId = null;
 			lastAppliedCustomerId = null;
 			return;
 		}
@@ -315,6 +338,16 @@
 			submissionId: null,
 			replaceState: false
 		});
+		void revealDetailPanel();
+	}
+
+	// Below the xl breakpoint the detail panel stacks under the list, so a tap on a
+	// customer would otherwise appear to do nothing. Bring the panel into view.
+	async function revealDetailPanel() {
+		if (typeof window === 'undefined' || window.matchMedia('(min-width: 80rem)').matches) return;
+		await tick();
+		const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+		detailPanel?.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
 	}
 
 	function handleCustomerRowKeydown(event: KeyboardEvent, customerId: Id<'customers'>) {
@@ -500,6 +533,14 @@
 						description="Choose a workspace to review customers."
 					/>
 				</DataTableShell>
+			{:else if customersQuery.error && !customerPage}
+				<DataTableShell>
+					<DataTableEmptyState
+						icon={CircleAlertIcon}
+						title="Unable to load customers"
+						description="Something went wrong while loading customers. Try refreshing the page."
+					/>
+				</DataTableShell>
 			{:else if customers.length === 0}
 				<DataTableShell>
 					<DataTableEmptyState
@@ -661,7 +702,11 @@
 			{/if}
 		</section>
 
-		<aside class="flex min-w-0 flex-col gap-4 xl:min-h-0">
+		<aside
+			bind:this={detailPanel}
+			class="flex min-w-0 scroll-mt-4 flex-col gap-4 xl:min-h-0"
+			aria-label="Customer details"
+		>
 			{#if isLoadingDetail}
 				{#snippet loadingVisitHistoryHeader()}
 					<div class="flex items-center justify-between">

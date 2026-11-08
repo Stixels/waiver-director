@@ -59,7 +59,7 @@
 	import { sanitizeRichTextHtml } from '$lib/utils/rich-text-client';
 	import WaiverFieldDisplay from '$lib/components/waivers/WaiverFieldDisplay.svelte';
 
-	export type SaveState = 'idle' | 'saving' | 'saved' | 'dirty' | 'error';
+	export type SaveState = 'idle' | 'saving' | 'saved' | 'dirty' | 'invalid' | 'error';
 
 	interface Props {
 		introCopy: string;
@@ -70,6 +70,8 @@
 		canEditBranding?: boolean;
 		saveState?: SaveState;
 		lastSavedAt?: number | null;
+		/** Why the draft cannot be saved, shown while `saveState` is `invalid`. */
+		saveIssue?: string | null;
 	}
 
 	type TextAlignValue = 'left' | 'center' | 'right' | 'justify';
@@ -83,7 +85,8 @@
 		workspaceId = null,
 		canEditBranding = false,
 		saveState = 'idle',
-		lastSavedAt = null
+		lastSavedAt = null,
+		saveIssue = null
 	}: Props = $props();
 
 	const brandingQuery = useProtectedQuery(api.workspaces.getWorkspaceBranding, () =>
@@ -117,6 +120,7 @@
 	const savedLabel = $derived.by(() => {
 		if (saveState === 'saving') return 'Saving…';
 		if (saveState === 'error') return 'Could not save';
+		if (saveState === 'invalid') return saveIssue ? `Not saved: ${saveIssue}` : 'Not saved';
 		if (saveState === 'dirty') return 'Unsaved changes';
 		if (!lastSavedAt) return 'All changes saved';
 
@@ -299,6 +303,9 @@
 			],
 			editorProps: {
 				attributes: {
+					role: 'textbox',
+					'aria-multiline': 'true',
+					'aria-label': 'Waiver copy',
 					class: 'waiver-canvas-editor w-full text-base leading-7 text-foreground/85 outline-none'
 				},
 				handleDOMEvents: {
@@ -399,7 +406,7 @@
 			>
 				{#if saveState === 'saving'}
 					<LoaderIcon class="size-3.5 animate-spin" />
-				{:else if saveState === 'error'}
+				{:else if saveState === 'error' || saveState === 'invalid'}
 					<CloudOffIcon class="size-3.5" />
 				{:else if saveState === 'dirty'}
 					<CloudIcon class="size-3.5" />
@@ -698,6 +705,8 @@
 
 	.save-indicator {
 		display: inline-flex;
+		min-width: 0;
+		max-width: 100%;
 		align-items: center;
 		gap: 0.4rem;
 		padding: 0.25rem 0.55rem;
@@ -721,7 +730,8 @@
 		color: color-mix(in srgb, var(--muted-foreground) 85%, var(--foreground));
 	}
 
-	.save-indicator[data-state='error'] {
+	.save-indicator[data-state='error'],
+	.save-indicator[data-state='invalid'] {
 		color: var(--destructive);
 		background: color-mix(in srgb, var(--destructive) 14%, transparent);
 	}

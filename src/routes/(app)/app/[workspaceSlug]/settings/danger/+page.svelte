@@ -44,7 +44,7 @@
 	}
 
 	async function confirmDelete() {
-		if (!currentWorkspace || !slugMatchesConfirm) return;
+		if (!currentWorkspace || !slugMatchesConfirm || isDeleting) return;
 		isDeleting = true;
 		try {
 			await convex.mutation(api.workspaces.archiveWorkspace, {
@@ -63,7 +63,12 @@
 </script>
 
 <Dialog bind:open={confirmOpen}>
-	<DialogContent class="overflow-hidden p-0 sm:max-w-md">
+	<DialogContent
+		class="overflow-hidden p-0 sm:max-w-md"
+		showCloseButton={!isDeleting}
+		escapeKeydownBehavior={isDeleting ? 'ignore' : 'close'}
+		interactOutsideBehavior={isDeleting ? 'ignore' : 'close'}
+	>
 		<DialogHeader class="space-y-2 border-b border-border px-6 py-5">
 			<div class="flex items-start gap-3">
 				<div
@@ -89,7 +94,14 @@
 				</p>
 			</div>
 
-			<div class="space-y-2">
+			<form
+				id="confirm-delete-form"
+				class="space-y-2"
+				onsubmit={(event) => {
+					event.preventDefault();
+					void confirmDelete();
+				}}
+			>
 				<label class="text-xs font-medium text-foreground" for="confirm-delete-slug">
 					Type
 					<code class="rounded bg-muted px-1 py-0.5 font-mono text-[11px]"
@@ -104,9 +116,11 @@
 					class="font-mono text-sm"
 					autocomplete="off"
 					autocorrect="off"
+					autocapitalize="none"
 					spellcheck={false}
+					disabled={isDeleting}
 				/>
-			</div>
+			</form>
 		</div>
 
 		<DialogFooter class="border-t border-border bg-muted/20 px-6 py-3">
@@ -119,10 +133,11 @@
 				Cancel
 			</Button>
 			<Button
+				type="submit"
+				form="confirm-delete-form"
 				variant="destructive"
 				size="sm"
 				disabled={!slugMatchesConfirm || isDeleting}
-				onclick={confirmDelete}
 				class="gap-1.5"
 			>
 				{#if isDeleting}

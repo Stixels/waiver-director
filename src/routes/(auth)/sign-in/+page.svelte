@@ -5,6 +5,7 @@
 	import { useClerkContext } from 'svelte-clerk';
 	import { getClerkErrorMessage, getSafePostAuthRedirectHref } from '$lib/auth/clerk-helpers';
 	import AuthPageShell from '$lib/components/marketing/auth/AuthPageShell.svelte';
+	import PasswordInput from '$lib/components/marketing/auth/PasswordInput.svelte';
 	import { REGEXP_ONLY_DIGITS } from 'bits-ui';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
@@ -42,6 +43,8 @@
 	let backupCodeAvailable = $state(false);
 	const redirectTo = $derived(page.url.searchParams.get('redirectTo'));
 	const postAuthRedirectUrl = $derived(getSafePostAuthRedirectHref(redirectTo, '/app'));
+	// Carry the post-auth destination across sign-in / sign-up / forgot-password links.
+	const redirectQuery = $derived(redirectTo ? `?redirectTo=${encodeURIComponent(redirectTo)}` : '');
 
 	const authPageTitle = $derived(
 		isAwaitingSecondFactor && secondFactorStrategy
@@ -473,7 +476,7 @@
 				{/if}
 
 				{#if submitError}
-					<p class="text-center text-sm text-destructive" role="status">{submitError}</p>
+					<p class="text-center text-sm text-destructive" role="alert">{submitError}</p>
 				{/if}
 			</div>
 		</form>
@@ -486,23 +489,24 @@
 				autocomplete="email"
 				placeholder="Email"
 				aria-label="Email"
+				required
 				class={inputClass}
 				bind:value={email}
 			/>
 
 			<div class="space-y-1.5">
-				<Input
+				<PasswordInput
 					id="sign-in-password"
 					name="password"
-					type="password"
 					autocomplete="current-password"
 					placeholder="Password"
 					aria-label="Password"
+					required
 					class={inputClass}
 					bind:value={password}
 				/>
 				<a
-					href={resolve('/forgot-password')}
+					href={resolve(`/forgot-password${redirectQuery}` as '/forgot-password')}
 					class="block pt-1 text-right text-xs font-semibold text-primary transition-[filter] hover:brightness-150 sm:text-sm"
 				>
 					Forgot password?
@@ -556,13 +560,13 @@
 				</Button>
 
 				{#if submitError}
-					<p class="text-center text-sm text-destructive" role="status">{submitError}</p>
+					<p class="text-center text-sm text-destructive" role="alert">{submitError}</p>
 				{/if}
 
 				<p class="text-center text-sm text-muted-foreground">
 					Don't have an account?
 					<a
-						href={resolve('/sign-up')}
+						href={resolve(`/sign-up${redirectQuery}` as '/sign-up')}
 						class="font-semibold text-primary transition-[filter] hover:brightness-150"
 					>
 						Sign up

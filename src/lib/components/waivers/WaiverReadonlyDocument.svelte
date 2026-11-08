@@ -153,11 +153,15 @@
 					{:else}
 						<div class="space-y-5">
 							<div class="overflow-hidden rounded-2xl border border-border bg-white p-4">
-								<img
-									src={signatureDataUrl}
-									alt="Signature"
-									class="mx-auto max-h-28 w-full object-contain"
-								/>
+								{#if signatureDataUrl}
+									<img
+										src={signatureDataUrl}
+										alt="Signature"
+										class="mx-auto max-h-28 w-full object-contain"
+									/>
+								{:else}
+									<p class="py-6 text-center text-xs text-neutral-500">No signature on file</p>
+								{/if}
 							</div>
 
 							{#if submittedAt}

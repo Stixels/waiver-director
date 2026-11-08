@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { Button } from '$lib/components/ui/button';
-	import { Dialog, DialogContent } from '$lib/components/ui/dialog';
+	import { Dialog, DialogContent, DialogTitle } from '$lib/components/ui/dialog';
 	import WaiverRichText from '$lib/components/waivers/WaiverRichText.svelte';
 	import {
 		EMAIL_AI_RUBRIC_KEYS,
@@ -74,7 +74,11 @@
 				<span class="review-mark"><SparklesIcon class="size-4" /></span>
 				<div class="min-w-0">
 					<p class="review-eyebrow">AI proposal</p>
-					<h2 class="review-title">Review proposed changes</h2>
+					<DialogTitle>
+						{#snippet child({ props })}
+							<h2 {...props} class="review-title">Review proposed changes</h2>
+						{/snippet}
+					</DialogTitle>
 				</div>
 			</div>
 			<div class="review-header-actions">
@@ -148,7 +152,7 @@
 									Issues
 								</p>
 								<ul>
-									{#each result.issues as issue (issue)}
+									{#each result.issues as issue, index (index)}
 										<li>{issue}</li>
 									{/each}
 								</ul>
@@ -162,7 +166,7 @@
 									Suggestions
 								</p>
 								<ul>
-									{#each result.suggestions as suggestion (suggestion)}
+									{#each result.suggestions as suggestion, index (index)}
 										<li>{suggestion}</li>
 									{/each}
 								</ul>

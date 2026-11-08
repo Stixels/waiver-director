@@ -17,7 +17,7 @@
 	} from '$lib/components/ui/tooltip';
 	import { Area, AreaChart, BarChart, ChartClipPath } from 'layerchart';
 	import AnalyticsDateRangePicker from '$lib/components/dashboard/AnalyticsDateRangePicker.svelte';
-	import { curveNatural } from 'd3-shape';
+	import { curveMonotoneX } from 'd3-shape';
 	import { scaleBand } from 'd3-scale';
 	import { cubicInOut } from 'svelte/easing';
 	import TrendingUpIcon from '@lucide/svelte/icons/trending-up';
@@ -55,8 +55,20 @@
 	let startDateStr = $state(defaultStartStr());
 	let endDateStr = $state(toDateInputValue(new Date()));
 
-	const rangeStartAt = $derived(dateFromInput(startDateStr).getTime());
-	const rangeEndAt = $derived(dateFromInput(endDateStr).getTime() + 24 * 60 * 60 * 1000);
+	const DAY_MS = 24 * 60 * 60 * 1000;
+	// The server caps analytics ranges at exactly 30 * 24h. A 30-day window that
+	// crosses a DST "fall back" change is 30 days + 1h of wall-clock time, so clamp
+	// the start to keep the 30d preset from failing for a month after each change.
+	const MAX_RANGE_MS = 30 * DAY_MS;
+
+	// Next local midnight (not +24h) so the end date's full day is included on DST days.
+	const rangeEndAt = $derived.by(() => {
+		const end = dateFromInput(endDateStr);
+		return new Date(end.getFullYear(), end.getMonth(), end.getDate() + 1).getTime();
+	});
+	const rangeStartAt = $derived(
+		Math.max(dateFromInput(startDateStr).getTime(), rangeEndAt - MAX_RANGE_MS)
+	);
 
 	const analyticsQuery = useProtectedQuery(
 		api.dashboard.getAnalyticsSeries,
@@ -141,7 +153,7 @@
 	const bookingsTotal = $derived(
 		analyticsData?.bookingsByDay.reduce((sum, d) => sum + d.count, 0) ?? 0
 	);
-	const rangeDays = $derived(Math.round((rangeEndAt - rangeStartAt) / (24 * 60 * 60 * 1000)));
+	const rangeDays = $derived(Math.round((rangeEndAt - rangeStartAt) / DAY_MS));
 
 	const emailSent = $derived(analyticsData?.emailTotals.sent ?? 0);
 	const emailQueued = $derived(analyticsData?.emailTotals.queued ?? 0);
@@ -311,7 +323,7 @@
 											{#each context.series.visibleSeries as s (s.key)}
 												<Area
 													seriesKey={s.key}
-													curve={curveNatural}
+													curve={curveMonotoneX}
 													fill={`url(#${submissionsGradientId})`}
 													line={{ class: 'stroke-1.5' }}
 													motion="tween"
@@ -393,7 +405,7 @@
 											{#each context.series.visibleSeries as s (s.key)}
 												<Area
 													seriesKey={s.key}
-													curve={curveNatural}
+													curve={curveMonotoneX}
 													fill={`url(#${bookingsGradientId})`}
 													line={{ class: 'stroke-1.5' }}
 													motion="tween"

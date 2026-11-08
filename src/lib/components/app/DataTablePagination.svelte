@@ -33,7 +33,9 @@
 	}: Props = $props();
 
 	const hasPaginationControls = $derived(hasPreviousPage || hasNextPage);
-	const itemLabelText = $derived(itemCount === 1 ? itemLabel : `${itemLabel}s`);
+	// Pluralize against the total when shown ("1 of 5 customers", not "1 of 5 customer").
+	const labelCount = $derived(totalCount ?? itemCount);
+	const itemLabelText = $derived(labelCount === 1 ? itemLabel : `${itemLabel}s`);
 </script>
 
 <div

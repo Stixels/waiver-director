@@ -345,15 +345,17 @@
 	async function startBookeoConnect() {
 		if (!currentWorkspace || convex.disabled) return;
 		if (isBookingIntegrationAccessBlocked()) return;
+		if (isStartingConnect) return;
 		isStartingConnect = true;
 		try {
 			const result = await convex.action(api.integrations.startBookeoConnect, {
 				workspaceId: currentWorkspace.workspaceId
 			});
+			// Keep the button in its loading state while the browser leaves for Bookeo so a
+			// second click can't start a competing authorization flow.
 			window.location.href = result.authorizationUrl;
 		} catch (error) {
 			toast.error(getConvexErrorMessage(error, 'Unable to start Bookeo connection.'));
-		} finally {
 			isStartingConnect = false;
 		}
 	}
@@ -362,6 +364,7 @@
 		if (!currentWorkspace || convex.disabled) return;
 		if (isBookingIntegrationAccessBlocked()) return;
 		const apiKeyTrimmed = manualApiKey.trim();
+		if (!apiKeyTrimmed || isConnectingManually) return;
 		isConnectingManually = true;
 		try {
 			await convex.action(api.integrations.connectBookeoManually, {
@@ -384,7 +387,13 @@
 	}
 
 	async function disconnect() {
-		if (!currentWorkspace || !connectedIntegration || convex.disabled || !canConfirmDisconnect)
+		if (
+			!currentWorkspace ||
+			!connectedIntegration ||
+			convex.disabled ||
+			!canConfirmDisconnect ||
+			isDisconnecting
+		)
 			return;
 		const providerName = providerNameFor(connectedIntegration.provider);
 		isDisconnecting = true;
@@ -410,7 +419,12 @@
 
 {#if connectedIntegration}
 	<Dialog bind:open={disconnectDialogOpen}>
-		<DialogContent class="max-w-md">
+		<DialogContent
+			class="max-w-md"
+			showCloseButton={!isDisconnecting}
+			escapeKeydownBehavior={isDisconnecting ? 'ignore' : 'close'}
+			interactOutsideBehavior={isDisconnecting ? 'ignore' : 'close'}
+		>
 			<DialogHeader>
 				<DialogTitle>Disconnect {connectedProviderName}?</DialogTitle>
 				<DialogDescription>
@@ -419,7 +433,14 @@
 				</DialogDescription>
 			</DialogHeader>
 
-			<div class="space-y-2">
+			<form
+				id="disconnect-confirmation-form"
+				class="space-y-2"
+				onsubmit={(event) => {
+					event.preventDefault();
+					void disconnect();
+				}}
+			>
 				<Label for="disconnect-confirmation" class="text-xs">
 					Type <span class="font-semibold text-foreground">{disconnectConfirmationPhrase}</span> to disconnect.
 				</Label>
@@ -427,9 +448,11 @@
 					id="disconnect-confirmation"
 					bind:value={disconnectConfirmation}
 					autocomplete="off"
+					autocapitalize="characters"
+					spellcheck={false}
 					disabled={isDisconnecting}
 				/>
-			</div>
+			</form>
 
 			<DialogFooter>
 				<Button
@@ -441,9 +464,9 @@
 					Cancel
 				</Button>
 				<Button
-					type="button"
+					type="submit"
+					form="disconnect-confirmation-form"
 					variant="destructive"
-					onclick={disconnect}
 					disabled={convex.disabled || !canConfirmDisconnect || isDisconnecting}
 				>
 					{isDisconnecting ? 'Disconnecting...' : `Disconnect ${connectedProviderName}`}
@@ -553,7 +576,7 @@
 	</SheetContent>
 </Sheet>
 
-<div class="relative h-full min-h-0 w-full overflow-hidden p-4 sm:p-5">
+<div class="relative w-full p-4 sm:p-5 md:h-full md:min-h-0 md:overflow-hidden">
 	{#if !isLoading && currentWorkspace && !canUseBookingIntegrations}
 		<UpgradeOverlay
 			title={workspacePausedOnPro ? 'Workspace paused on Pro' : 'Upgrade to connect integrations'}
@@ -562,12 +585,13 @@
 				: 'Booking integrations are available on Pro plans and trials. Upgrade to connect Bookeo and keep booking-linked waiver operations in sync.'}
 			href={billingHref}
 			actionLabel={workspacePausedOnPro ? 'Manage primary workspace' : 'View billing'}
+			class="items-start pt-10 md:items-center md:pt-4"
 		/>
 	{/if}
 
 	{#if isLoading}
 		<section
-			class="-mx-4 grid h-full min-h-0 overflow-hidden border-y sm:-mx-5 md:grid-cols-[calc(15rem+1.25rem)_minmax(0,1fr)]"
+			class="-mx-4 grid border-y sm:-mx-5 md:h-full md:min-h-0 md:grid-cols-[calc(15rem+1.25rem)_minmax(0,1fr)] md:grid-rows-[minmax(0,1fr)] md:overflow-hidden"
 		>
 			<div class="flex min-h-60 flex-col gap-4 border-b px-5 py-3 md:border-r md:border-b-0">
 				<Skeleton class="h-4 w-24" />
@@ -597,10 +621,10 @@
 		</div>
 	{:else}
 		<article
-			class="-mx-4 grid h-full min-h-0 overflow-hidden border-y sm:-mx-5 md:grid-cols-[calc(15rem+1.25rem)_minmax(0,1fr)]"
+			class="-mx-4 grid border-y sm:-mx-5 md:h-full md:min-h-0 md:grid-cols-[calc(15rem+1.25rem)_minmax(0,1fr)] md:grid-rows-[minmax(0,1fr)] md:overflow-hidden"
 		>
 			<aside
-				class="flex flex-col gap-4 border-b px-5 py-3 md:border-r md:border-b-0"
+				class="flex flex-col gap-4 border-b px-5 py-3 md:min-h-0 md:overflow-y-auto md:border-r md:border-b-0"
 				aria-label="Integration providers"
 			>
 				<p class="px-2 pb-0.5 text-sm font-semibold">Integrations</p>
@@ -663,7 +687,7 @@
 				{/each}
 			</aside>
 
-			<div class="flex min-w-0 flex-col gap-5 px-5 py-5">
+			<div class="flex min-w-0 flex-col gap-5 px-5 py-5 md:min-h-0 md:overflow-y-auto">
 				<div class="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
 					<div class="flex min-w-0 items-start gap-4">
 						<span
@@ -912,8 +936,8 @@
 					<section class="flex min-w-0 flex-col items-start gap-4 border-t pt-4">
 						<h3 class="text-sm font-semibold">{selectedProvider.status}</h3>
 						<p class="text-sm leading-relaxed text-muted-foreground">
-							{selectedProvider.description} This provider is shown here so the integrations model can
-							grow by category without changing the page structure later.
+							{selectedProvider.description} We'll let you know here when {selectedProvider.name} is ready
+							to connect.
 						</p>
 						<Button variant="outline" size="sm" disabled>Not available yet</Button>
 					</section>
