@@ -117,7 +117,14 @@
 			isDisconnecting = false;
 		}
 	}
+	// The Connect button stays busy while the browser leaves for the provider. If the
+	// user backs out, the page can come back from the back/forward cache, so reset it.
+	function handlePageShow(event: PageTransitionEvent) {
+		if (event.persisted) isStartingConnect = false;
+	}
 </script>
+
+<svelte:window onpageshow={handlePageShow} />
 
 <Dialog bind:open={audienceDialogOpen}>
 	<DialogContent class="max-w-md">

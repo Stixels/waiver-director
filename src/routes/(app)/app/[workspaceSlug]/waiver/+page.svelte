@@ -191,16 +191,28 @@
 		navigation.cancel();
 		const target = navigation.to?.url;
 		if (!target) return;
-		void saveThenNavigate(target);
+		// Browser Back/Forward must be replayed through history, not with goto(),
+		// otherwise the target is pushed as a new entry and the next Back returns here.
+		const historyDelta =
+			navigation.type === 'popstate' && typeof navigation.delta === 'number'
+				? navigation.delta
+				: null;
+		void saveThenNavigate(target, historyDelta);
 	});
 
-	async function saveThenNavigate(target: URL) {
+	async function saveThenNavigate(target: URL, historyDelta: number | null) {
 		const saved = await flushAndWaitForSave();
 		if (!saved) {
 			toast.error(lastSaveError ?? 'We could not save your latest changes. Please try again.');
 			return;
 		}
 		isLeavingAfterSave = true;
+		if (historyDelta !== null) {
+			// The flag stays set until this page unmounts, so the replayed popstate
+			// passes straight through the guard above.
+			history.go(historyDelta);
+			return;
+		}
 		try {
 			// The target URL comes from SvelteKit's own navigation, so it is already resolved.
 			// eslint-disable-next-line svelte/no-navigation-without-resolve

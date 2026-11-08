@@ -411,7 +411,14 @@
 			isDisconnecting = false;
 		}
 	}
+	// The Connect button stays busy while the browser leaves for the provider. If the
+	// user backs out, the page can come back from the back/forward cache, so reset it.
+	function handlePageShow(event: PageTransitionEvent) {
+		if (event.persisted) isStartingConnect = false;
+	}
 </script>
+
+<svelte:window onpageshow={handlePageShow} />
 
 <svelte:head>
 	<title>{currentWorkspace?.name ?? 'Workspace'} Integrations | Waiver Director</title>
