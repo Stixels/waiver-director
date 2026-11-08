@@ -1,8 +1,8 @@
 <script lang="ts">
 	import type { Id } from '$convex/_generated/dataModel';
-	import { useConvexClient } from 'convex-svelte';
 	import { toast } from 'svelte-sonner';
-	import { api } from '$convex/_generated/api';
+	import { ELECTRONIC_SIGNATURE_CONSENT_TEXT } from '$convex/lib/audit';
+	import { publicEnv } from '$lib/config/public';
 	import SignaturePad from '$lib/components/waivers/SignaturePad.svelte';
 	import WaiverCopySection from '$lib/components/waivers/WaiverCopySection.svelte';
 	import WaiverDocumentShell from '$lib/components/waivers/WaiverDocumentShell.svelte';
@@ -16,7 +16,6 @@
 		waiverUnderlineTextareaClass
 	} from '$lib/components/waivers/waiver-public-form-classes';
 	import type { WaiverField, WaiverMinor, WaiverTheme } from '$lib/domain/waivers';
-	import { getConvexErrorMessage } from '$lib/utils/convex-errors';
 	import { formatBookingTimestamp } from '$lib/utils/date';
 
 	type PublicWaiver = {
@@ -49,8 +48,6 @@
 
 	let { waiver, booking = null }: Props = $props();
 
-	const convex = useConvexClient();
-
 	let signerName = $state('');
 	let signerEmail = $state('');
 	let signerDateOfBirth = $state('');
@@ -58,16 +55,50 @@
 	let answers = $state<Record<string, string | boolean | null>>({});
 	let marketingConsent = $state(false);
 	let minors = $state<MinorFormState[]>([]);
+	let electronicSignatureConsent = $state(false);
+	// Client-side timing for the audit trail. The server records its own receive time.
+	let formOpenedAt = Date.now();
+	let consentAcceptedAt: number | null = null;
+	let signatureCompletedAt: number | null = null;
 	let isSubmitting = $state(false);
 	let submitError = $state<string | null>(null);
 	let isSubmitted = $state(false);
 
 	function addMinor() {
-		minors.push({ _uid: crypto.randomUUID(), fullName: '' });
+		minors.push({ _uid: crypto.randomUUID(), fullName: '', dateOfBirth: '' });
 	}
 
 	function removeMinor(index: number) {
 		minors.splice(index, 1);
+	}
+
+	$effect(() => {
+		signatureCompletedAt = signatureDataUrl ? Date.now() : null;
+	});
+
+	$effect(() => {
+		consentAcceptedAt = electronicSignatureConsent ? Date.now() : null;
+	});
+
+	function todayIsoDate() {
+		const now = new Date();
+		const month = String(now.getMonth() + 1).padStart(2, '0');
+		const day = String(now.getDate()).padStart(2, '0');
+		return `${now.getFullYear()}-${month}-${day}`;
+	}
+
+	async function postSubmission(body: Record<string, unknown>) {
+		const response = await fetch(`${publicEnv.convexSiteUrl}/waivers/submit`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify(body)
+		});
+		const result = (await response.json().catch(() => null)) as { message?: unknown } | null;
+		if (!response.ok) {
+			throw new Error(
+				typeof result?.message === 'string' ? result.message : 'Unable to submit this waiver.'
+			);
+		}
 	}
 
 	function setFieldAnswer(fieldId: string, value: string | boolean | null) {
@@ -86,22 +117,25 @@
 	async function handleSubmit(event: SubmitEvent) {
 		event.preventDefault();
 
-		if (convex.disabled) {
-			submitError = 'The waiver form is still loading. Please try again.';
-			return;
-		}
-
 		if (!signatureDataUrl || !signatureDataUrl.startsWith('data:image/')) {
 			submitError = 'Please provide a signature.';
 			return;
 		}
 
+		if (!electronicSignatureConsent) {
+			submitError = 'Please agree to sign electronically.';
+			return;
+		}
+
 		isSubmitting = true;
 		submitError = null;
-		const minorsPayload = minors.map((minor) => ({ fullName: minor.fullName }));
+		const minorsPayload = minors.map((minor) => ({
+			fullName: minor.fullName,
+			dateOfBirth: minor.dateOfBirth ?? ''
+		}));
 
 		try {
-			await convex.mutation(api.waivers.submitPublicWaiver, {
+			await postSubmission({
 				slug: waiver.slug,
 				versionId: waiver.versionId,
 				...(booking ? { bookingLookupToken: booking.lookupToken } : {}),
@@ -111,13 +145,19 @@
 				signatureDataUrl,
 				marketingConsent,
 				answers,
-				minors: minorsPayload
+				minors: minorsPayload,
+				electronicSignatureConsent,
+				clientTiming: {
+					formOpenedAt,
+					...(consentAcceptedAt ? { consentAcceptedAt } : {}),
+					...(signatureCompletedAt ? { signatureCompletedAt } : {})
+				}
 			});
 
 			isSubmitted = true;
 			toast.success('Waiver submitted.');
 		} catch (error) {
-			submitError = getConvexErrorMessage(error, 'Unable to submit this waiver.');
+			submitError = error instanceof Error ? error.message : 'Unable to submit this waiver.';
 		} finally {
 			isSubmitting = false;
 		}
@@ -131,6 +171,8 @@
 		answers = {};
 		marketingConsent = false;
 		minors = [];
+		electronicSignatureConsent = false;
+		formOpenedAt = Date.now();
 		submitError = null;
 		isSubmitted = false;
 	}
@@ -280,6 +322,18 @@
 													id={`minor-name-${index}`}
 													class={waiverUnderlineInputClass}
 													bind:value={minor.fullName}
+													required
+												/>
+
+												<label class={`${waiverFieldLabelClass} mt-4`} for={`minor-dob-${index}`}>
+													Date of birth
+												</label>
+												<input
+													id={`minor-dob-${index}`}
+													type="date"
+													class={waiverUnderlineInputClass}
+													bind:value={minor.dateOfBirth}
+													max={todayIsoDate()}
 													required
 												/>
 											</div>
@@ -434,6 +488,38 @@
 								<h3 class="text-lg font-semibold tracking-tight">Signature</h3>
 							</div>
 							<SignaturePad bind:value={signatureDataUrl} canvasId="signature-pad" />
+
+							<label class="waiver-checkbox-label mt-6 flex cursor-pointer items-start gap-3">
+								<span
+									class={`waiver-checkbox-box mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center border transition-colors ${electronicSignatureConsent ? 'border-foreground bg-foreground' : 'border-foreground/25 bg-transparent'}`}
+									aria-hidden="true"
+								>
+									{#if electronicSignatureConsent}
+										<svg
+											xmlns="http://www.w3.org/2000/svg"
+											width="12"
+											height="12"
+											viewBox="0 0 24 24"
+											fill="none"
+											stroke="currentColor"
+											stroke-width="2.5"
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											class="text-background"
+											aria-hidden="true"
+										>
+											<polyline points="20 6 9 17 4 12" />
+										</svg>
+									{/if}
+								</span>
+								<input
+									type="checkbox"
+									class="sr-only"
+									bind:checked={electronicSignatureConsent}
+									required
+								/>
+								<span class="text-sm">{ELECTRONIC_SIGNATURE_CONSENT_TEXT}</span>
+							</label>
 						</div>
 					</WaiverPublicAboutSignerCard>
 

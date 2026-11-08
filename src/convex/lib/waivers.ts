@@ -67,7 +67,8 @@ export const waiverDefinitionValidator = v.object({
 export const waiverAnswerValueValidator = v.union(v.string(), v.boolean(), v.null());
 
 export const minorInputValidator = v.object({
-	fullName: v.string()
+	fullName: v.string(),
+	dateOfBirth: v.optional(v.string())
 });
 
 export type WaiverDefinition = {
@@ -109,6 +110,7 @@ export type WaiverDefinition = {
 
 export type MinorInput = {
 	fullName: string;
+	dateOfBirth?: string;
 };
 
 const PUBLIC_SLUG_REGEX = /^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])$/;
@@ -403,8 +405,32 @@ export function validateMinors(minors: MinorInput[]): MinorInput[] {
 				message: `Each minor name must be between ${MIN_MINOR_NAME_LENGTH} and ${MAX_MINOR_NAME_LENGTH} characters.`
 			});
 		}
-		return { fullName };
+		const dateOfBirth = minor.dateOfBirth?.trim();
+		if (!dateOfBirth) {
+			throw new ConvexError({
+				code: 'invalid_argument',
+				message: 'Enter a date of birth for each minor.'
+			});
+		}
+		if (!isValidIsoDate(dateOfBirth) || dateOfBirth > todayIsoDate()) {
+			throw new ConvexError({
+				code: 'invalid_argument',
+				message: 'Enter a valid date of birth for each minor.'
+			});
+		}
+		return { fullName, dateOfBirth };
 	});
+}
+
+function isValidIsoDate(value: string) {
+	if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+	const parsed = new Date(`${value}T00:00:00Z`);
+	return !isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+}
+
+function todayIsoDate() {
+	// Allow one day of slack so signers ahead of UTC are not rejected.
+	return new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
 
 export function normalizePublicSlug(value: string): string {

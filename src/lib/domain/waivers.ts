@@ -71,6 +71,7 @@ export type PublicWaiverRecord = {
 
 export type WaiverMinor = {
 	fullName: string;
+	dateOfBirth?: string;
 };
 
 export const waiverFieldTypeOptions: Array<{

@@ -3,6 +3,7 @@ import { v } from 'convex/values';
 import { billingFeatureValidator } from './lib/billing';
 import { bookingProviderValidator, bookingSnapshotValidator } from './lib/bookings';
 import { marketingIntegrationStatusValidator, marketingProviderValidator } from './lib/marketing';
+import { submissionAuditValidator } from './lib/submissionAudit';
 
 export default defineSchema({
 	users: defineTable({
@@ -227,13 +228,17 @@ export default defineSchema({
 		answers: v.record(v.string(), v.union(v.string(), v.boolean(), v.null())),
 		minors: v.array(
 			v.object({
-				fullName: v.string()
+				fullName: v.string(),
+				// Optional so submissions signed before minor DOB capture stay valid.
+				dateOfBirth: v.optional(v.string())
 			})
 		),
 		status: v.union(v.literal('submitted')),
 		marketingConsent: v.optional(v.boolean()),
 		marketingConsentLabel: v.optional(v.string()),
-		submittedAt: v.number()
+		submittedAt: v.number(),
+		// Optional so submissions signed before audit capture stay valid.
+		audit: v.optional(submissionAuditValidator)
 	})
 		.index('by_workspaceId', ['workspaceId'])
 		.index('by_workspaceId_and_submittedAt', ['workspaceId', 'submittedAt'])
