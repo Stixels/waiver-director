@@ -188,20 +188,22 @@ async function authenticateApiRequest(
 	if (!token || !looksLikeApiKey(token)) {
 		return apiError(401, 'unauthenticated', 'Provide an API key as a Bearer token.');
 	}
-	const key: {
-		apiKeyId: Id<'api_keys'>;
-		workspaceId: Id<'workspaces'>;
-		needsLastUsedRefresh: boolean;
-	} | null = await ctx.runQuery(internal.apiKeys.authenticateApiKey, {
+	const result = await ctx.runMutation(internal.apiKeys.authenticateApiRequest, {
 		keyHash: await sha256Hex(token)
 	});
-	if (!key) {
+	if (result.kind === 'unauthenticated') {
 		return apiError(401, 'unauthenticated', 'This API key is invalid or has been revoked.');
 	}
-	if (key.needsLastUsedRefresh) {
-		await ctx.runMutation(internal.apiKeys.markApiKeyUsed, { apiKeyId: key.apiKeyId });
+	if (result.kind === 'rate_limited') {
+		const response = apiError(
+			429,
+			'rate_limited',
+			`Too many requests. Try again in ${result.retryAfterSeconds} seconds.`
+		);
+		response.headers.set('Retry-After', String(result.retryAfterSeconds));
+		return response;
 	}
-	return { workspaceId: key.workspaceId };
+	return { workspaceId: result.workspaceId };
 }
 
 function parsePageArgs(request: Request): { numItems: number; cursor: string | null } | Response {

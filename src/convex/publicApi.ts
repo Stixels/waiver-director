@@ -71,7 +71,8 @@ export const listCustomers = internalQuery({
 	handler: async (ctx, args) => {
 		const result = await ctx.db
 			.query('customers')
-			.withIndex('by_workspaceId_and_lastSeenAt', (q) => q.eq('workspaceId', args.workspaceId))
+			// Creation order is stable; lastSeenAt changes on every visit and would skip rows mid-export.
+			.withIndex('by_workspaceId', (q) => q.eq('workspaceId', args.workspaceId))
 			.order('desc')
 			.paginate({ numItems: args.numItems, cursor: args.cursor });
 		return {

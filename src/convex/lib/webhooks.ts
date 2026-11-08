@@ -43,18 +43,75 @@ function parseIPv4(hostname: string): number[] | null {
 	return octets;
 }
 
-function isPrivateIPv4([a, b]: number[]): boolean {
+function isPrivateIPv4([a, b, c]: number[]): boolean {
 	return (
-		a === 0 ||
-		a === 10 ||
-		a === 127 ||
-		(a === 100 && b >= 64 && b <= 127) ||
-		(a === 169 && b === 254) ||
-		(a === 172 && b >= 16 && b <= 31) ||
-		(a === 192 && b === 168) ||
-		(a === 198 && (b === 18 || b === 19)) ||
-		a >= 224
+		a === 0 || // "this" network
+		a === 10 || // private
+		a === 127 || // loopback
+		(a === 100 && b >= 64 && b <= 127) || // carrier-grade NAT
+		(a === 169 && b === 254) || // link-local / cloud metadata
+		(a === 172 && b >= 16 && b <= 31) || // private
+		(a === 192 && b === 0 && c === 0) || // IETF protocol assignments
+		(a === 192 && b === 0 && c === 2) || // TEST-NET-1
+		(a === 192 && b === 88 && c === 99) || // 6to4 relay anycast
+		(a === 192 && b === 168) || // private
+		(a === 198 && (b === 18 || b === 19)) || // benchmarking
+		(a === 198 && b === 51 && c === 100) || // TEST-NET-2
+		(a === 203 && b === 0 && c === 113) || // TEST-NET-3
+		a >= 224 // multicast and reserved
 	);
+}
+
+function parseIPv6(address: string): number[] | null {
+	let value = address.toLowerCase().replace(/^\[|\]$/g, '');
+	const zone = value.indexOf('%');
+	if (zone !== -1) value = value.slice(0, zone);
+	// Embedded IPv4 tail (e.g. ::ffff:10.0.0.1).
+	const v4 = value.match(/^(.*:)(\d+\.\d+\.\d+\.\d+)$/);
+	if (v4) {
+		const octets = parseIPv4(v4[2]);
+		if (!octets) return null;
+		value = `${v4[1]}${((octets[0] << 8) | octets[1]).toString(16)}:${((octets[2] << 8) | octets[3]).toString(16)}`;
+	}
+	const halves = value.split('::');
+	if (halves.length > 2) return null;
+	const head = halves[0] ? halves[0].split(':') : [];
+	const tail = halves.length === 2 && halves[1] ? halves[1].split(':') : [];
+	const missing = 8 - head.length - tail.length;
+	if (halves.length === 1 ? missing !== 0 : missing < 1) return null;
+	const groups = [...head, ...Array(halves.length === 2 ? missing : 0).fill('0'), ...tail];
+	if (groups.length !== 8 || groups.some((group) => !/^[0-9a-f]{1,4}$/.test(group))) return null;
+	return groups.map((group) => parseInt(group, 16));
+}
+
+function isPrivateIPv6(groups: number[]): boolean {
+	const [g0, g1, , , , g5, g6, g7] = groups;
+	const allZeroPrefix = groups.slice(0, 5).every((group) => group === 0);
+	if (allZeroPrefix && g5 === 0 && g6 === 0 && (g7 === 0 || g7 === 1)) return true; // :: and ::1
+	if (allZeroPrefix && (g5 === 0xffff || g5 === 0)) {
+		// IPv4-mapped / IPv4-compatible
+		return isPrivateIPv4([g6 >> 8, g6 & 0xff, g7 >> 8, g7 & 0xff]);
+	}
+	if (g0 === 0x64 && g1 === 0xff9b) return true; // NAT64
+	if ((g0 & 0xfe00) === 0xfc00) return true; // unique local fc00::/7
+	if ((g0 & 0xffc0) === 0xfe80) return true; // link-local fe80::/10
+	if ((g0 & 0xff00) === 0xff00) return true; // multicast
+	if (g0 === 0x2001 && g1 === 0x0db8) return true; // documentation
+	if (g0 === 0x2002) return true; // 6to4 can tunnel to private IPv4
+	if (g0 === 0x2001 && g1 === 0) return true; // Teredo
+	return false;
+}
+
+/**
+ * True when a resolved IP address (v4 or v6) is loopback, private, link-local, or otherwise
+ * not a public unicast address. Unparseable input is treated as private.
+ */
+export function isPrivateIpAddress(address: string): boolean {
+	const v4 = parseIPv4(address);
+	if (v4) return isPrivateIPv4(v4);
+	const v6 = parseIPv6(address);
+	if (v6) return isPrivateIPv6(v6);
+	return true;
 }
 
 const BLOCKED_HOST_SUFFIXES = ['.localhost', '.local', '.internal', '.lan', '.home.arpa'];
@@ -176,4 +233,58 @@ export function parsePageLimit(raw: string | null, fallback = 25, max = 100): nu
 	const value = Number(raw);
 	if (value < 1 || value > max) return null;
 	return value;
+}
+
+const DOH_ENDPOINT = 'https://cloudflare-dns.com/dns-query';
+const DNS_TYPE_A = 1;
+const DNS_TYPE_AAAA = 28;
+
+export type HostCheckResult = { ok: true; addresses: string[] } | { ok: false; message: string };
+
+/**
+ * Resolves a webhook hostname with DNS-over-HTTPS and rejects it if any A/AAAA record points at
+ * a private or reserved address. Run right before each delivery so a DNS name such as
+ * `10.0.0.5.nip.io`, or one re-pointed after it was saved, cannot reach internal services.
+ * A small DNS-rebinding window between this lookup and the fetch's own lookup remains.
+ */
+export async function checkWebhookHostResolvesPublic(
+	hostname: string,
+	fetchImpl: typeof fetch = fetch
+): Promise<HostCheckResult> {
+	if (isBlockedWebhookHostname(hostname)) {
+		return { ok: false, message: 'Webhook endpoints must be on a public hostname.' };
+	}
+	// Canonical public IPv4 literals were already validated above; nothing to resolve.
+	if (parseIPv4(hostname)) return { ok: true, addresses: [hostname] };
+
+	const addresses: string[] = [];
+	for (const type of ['A', 'AAAA'] as const) {
+		let body: { Status?: number; Answer?: Array<{ type?: number; data?: string }> };
+		try {
+			const response = await fetchImpl(
+				`${DOH_ENDPOINT}?name=${encodeURIComponent(hostname)}&type=${type}`,
+				{ headers: { Accept: 'application/dns-json' } }
+			);
+			if (!response.ok) throw new Error(`DNS lookup failed (${response.status})`);
+			body = await response.json();
+		} catch {
+			return { ok: false, message: 'Could not resolve the endpoint hostname.' };
+		}
+		if (body.Status !== 0 && body.Status !== 3) {
+			return { ok: false, message: 'Could not resolve the endpoint hostname.' };
+		}
+		for (const answer of body.Answer ?? []) {
+			if ((answer.type === DNS_TYPE_A || answer.type === DNS_TYPE_AAAA) && answer.data) {
+				addresses.push(answer.data.trim());
+			}
+		}
+	}
+
+	if (addresses.length === 0) {
+		return { ok: false, message: 'The endpoint hostname does not resolve to an address.' };
+	}
+	if (addresses.some(isPrivateIpAddress)) {
+		return { ok: false, message: 'The endpoint hostname resolves to a private address.' };
+	}
+	return { ok: true, addresses };
 }

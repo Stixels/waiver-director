@@ -98,3 +98,75 @@ test('parses bearer tokens and page limits', () => {
 	assert.equal(parsePageLimit('101'), null);
 	assert.equal(parsePageLimit('5.5'), null);
 });
+
+test('classifies resolved IP addresses', async () => {
+	const { isPrivateIpAddress } = await import('../src/convex/lib/webhooks.ts');
+	for (const address of [
+		'10.0.0.5',
+		'127.0.0.1',
+		'169.254.169.254',
+		'192.0.0.8',
+		'192.0.2.10',
+		'198.51.100.7',
+		'203.0.113.9',
+		'0.0.0.0',
+		'::',
+		'::1',
+		'fd00::1',
+		'fe80::1',
+		'::ffff:10.0.0.1',
+		'::ffff:7f00:1',
+		'64:ff9b::a00:1',
+		'2001:db8::1',
+		'garbage'
+	]) {
+		assert.equal(isPrivateIpAddress(address), true, address);
+	}
+	for (const address of ['8.8.8.8', '1.1.1.1', '2606:4700:4700::1111', '::ffff:8.8.8.8']) {
+		assert.equal(isPrivateIpAddress(address), false, address);
+	}
+});
+
+function fakeDns(records: Record<string, Array<{ type: number; data: string }>>, status = 0) {
+	return (async (input: string | URL | Request) => {
+		const url = new URL(String(input));
+		const type = url.searchParams.get('type') ?? 'A';
+		return new Response(JSON.stringify({ Status: status, Answer: records[type] ?? [] }), {
+			status: 200
+		});
+	}) as typeof fetch;
+}
+
+test('rejects hostnames whose DNS points at private addresses', async () => {
+	const { checkWebhookHostResolvesPublic } = await import('../src/convex/lib/webhooks.ts');
+	const privateA = await checkWebhookHostResolvesPublic(
+		'10.0.0.5.nip.io',
+		fakeDns({ A: [{ type: 1, data: '10.0.0.5' }] })
+	);
+	assert.equal(privateA.ok, false);
+
+	const mixed = await checkWebhookHostResolvesPublic(
+		'rebind.example.com',
+		fakeDns({ A: [{ type: 1, data: '93.184.216.34' }], AAAA: [{ type: 28, data: '::1' }] })
+	);
+	assert.equal(mixed.ok, false);
+
+	const none = await checkWebhookHostResolvesPublic('nothing.example.com', fakeDns({}, 3));
+	assert.equal(none.ok, false);
+
+	const failing = await checkWebhookHostResolvesPublic('x.example.com', (async () => {
+		throw new Error('offline');
+	}) as unknown as typeof fetch);
+	assert.equal(failing.ok, false);
+
+	const good = await checkWebhookHostResolvesPublic(
+		'hooks.zapier.com',
+		fakeDns({
+			A: [
+				{ type: 5, data: 'cname.example.' },
+				{ type: 1, data: '54.1.2.3' }
+			]
+		})
+	);
+	assert.deepEqual(good, { ok: true, addresses: ['54.1.2.3'] });
+});

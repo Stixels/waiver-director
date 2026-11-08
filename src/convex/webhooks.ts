@@ -19,6 +19,7 @@ import {
 	WEBHOOK_EVENT_HEADER,
 	WEBHOOK_SIGNATURE_HEADER,
 	WEBHOOK_SIGNING_SECRET_PREFIX,
+	checkWebhookHostResolvesPublic,
 	normalizeWebhookUrl,
 	randomToken,
 	secretHint,
@@ -236,6 +237,8 @@ export const createWebhookEndpoint = action({
 		args
 	): Promise<{ endpointId: Id<'webhook_endpoints'>; signingSecret: string }> => {
 		const url = requireValidUrl(args.url);
+		const host = await checkWebhookHostResolvesPublic(new URL(url).hostname);
+		if (!host.ok) throw new ConvexError({ code: 'invalid_argument', message: host.message });
 		const signingSecret = randomToken(WEBHOOK_SIGNING_SECRET_PREFIX);
 		const endpointId: Id<'webhook_endpoints'> = await ctx.runMutation(
 			internal.webhooks.insertWebhookEndpoint,
@@ -509,6 +512,8 @@ export const getDeliveryForAttempt = internalQuery({
 	}
 });
 
+class BlockedEndpointError extends Error {}
+
 function truncateError(message: string) {
 	return message.length > ERROR_MESSAGE_MAX_LENGTH
 		? `${message.slice(0, ERROR_MESSAGE_MAX_LENGTH - 1)}…`
@@ -535,7 +540,9 @@ export const deliverWebhook = internalAction({
 		try {
 			// Re-check at send time in case validation rules tightened after the endpoint was saved.
 			const url = normalizeWebhookUrl(target.url);
-			if (!url.ok) throw new Error(url.message);
+			if (!url.ok) throw new BlockedEndpointError(url.message);
+			const host = await checkWebhookHostResolvesPublic(new URL(url.url).hostname);
+			if (!host.ok) throw new BlockedEndpointError(host.message);
 
 			const secret = await decryptPurposeSecret(SECRET_PURPOSE, target.encryptedSigningSecret);
 			const timestamp = Math.floor(Date.now() / 1000);
@@ -568,12 +575,13 @@ export const deliverWebhook = internalAction({
 				clearTimeout(timeout);
 			}
 		} catch (caught) {
+			// Keep network error detail out of the owner-visible log: only our own messages surface.
 			error =
-				caught instanceof Error && caught.name === 'AbortError'
-					? `Endpoint did not respond within ${DELIVERY_TIMEOUT_MS / 1000} seconds.`
-					: caught instanceof Error
-						? caught.message
-						: 'Delivery failed.';
+				caught instanceof BlockedEndpointError
+					? caught.message
+					: caught instanceof Error && caught.name === 'AbortError'
+						? `Endpoint did not respond within ${DELIVERY_TIMEOUT_MS / 1000} seconds.`
+						: 'Could not connect to the endpoint.';
 		}
 
 		await ctx.runMutation(internal.webhooks.recordDeliveryAttempt, {

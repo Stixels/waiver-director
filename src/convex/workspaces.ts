@@ -49,7 +49,8 @@ const WORKSPACE_SCOPED_TABLES = {
 	marketing_contact_syncs: true,
 	webhook_endpoints: true,
 	webhook_deliveries: true,
-	api_keys: true
+	api_keys: true,
+	api_rate_limits: true
 } as const satisfies Record<WorkspaceScopedTableName, true>;
 type WorkspaceCleanupTableName = keyof typeof WORKSPACE_SCOPED_TABLES;
 const WORKSPACE_CLEANUP_TABLE_NAMES = Object.keys(

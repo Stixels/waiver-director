@@ -516,6 +516,17 @@ export default defineSchema({
 		.index('by_workspaceId', ['workspaceId'])
 		.index('by_keyHash', ['keyHash']),
 
+	// Fixed-window request counters for the public API, one row per key. Kept apart from api_keys
+	// because it is written on every request.
+	api_rate_limits: defineTable({
+		workspaceId: v.id('workspaces'),
+		apiKeyId: v.id('api_keys'),
+		windowStartedAt: v.number(),
+		requestCount: v.number()
+	})
+		.index('by_workspaceId', ['workspaceId'])
+		.index('by_apiKeyId', ['apiKeyId']),
+
 	booking_webhook_events: defineTable({
 		workspaceId: v.id('workspaces'),
 		integrationId: v.id('booking_integrations'),
