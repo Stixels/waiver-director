@@ -47,7 +47,8 @@ const WORKSPACE_SCOPED_TABLES = {
 	marketing_integrations: true,
 	marketing_connection_sessions: true,
 	marketing_contact_syncs: true,
-	kiosk_lookup_rate_limits: true
+	kiosk_lookup_rate_limits: true,
+	participant_check_ins: true
 } as const satisfies Record<WorkspaceScopedTableName, true>;
 type WorkspaceCleanupTableName = keyof typeof WORKSPACE_SCOPED_TABLES;
 const WORKSPACE_CLEANUP_TABLE_NAMES = Object.keys(

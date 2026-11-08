@@ -493,5 +493,20 @@ export default defineSchema({
 	})
 		.index('by_workspaceId', ['workspaceId'])
 		.index('by_workspaceId_and_scopeKey', ['workspaceId', 'scopeKey'])
-		.index('by_updatedAt', ['updatedAt'])
+		.index('by_updatedAt', ['updatedAt']),
+
+	// Operational front-desk arrival marks. Kept separate from the immutable signed
+	// submission; participantIndex 0 is the adult signer, 1..n are submission.minors.
+	participant_check_ins: defineTable({
+		workspaceId: v.id('workspaces'),
+		submissionId: v.id('waiver_submissions'),
+		bookingId: v.optional(v.id('bookings')),
+		participantIndex: v.number(),
+		checkedInAt: v.number(),
+		checkedInByUserId: v.id('users')
+	})
+		.index('by_workspaceId', ['workspaceId'])
+		.index('by_workspaceId_and_checkedInAt', ['workspaceId', 'checkedInAt'])
+		.index('by_submissionId_and_participantIndex', ['submissionId', 'participantIndex'])
+		.index('by_bookingId', ['bookingId'])
 });

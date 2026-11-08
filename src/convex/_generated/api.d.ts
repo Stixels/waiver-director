@@ -11,6 +11,7 @@
 import type * as app from "../app.js";
 import type * as billing from "../billing.js";
 import type * as bookings from "../bookings.js";
+import type * as checkIns from "../checkIns.js";
 import type * as crons from "../crons.js";
 import type * as customers from "../customers.js";
 import type * as dashboard from "../dashboard.js";
@@ -23,6 +24,7 @@ import type * as lib_auth from "../lib/auth.js";
 import type * as lib_billing from "../lib/billing.js";
 import type * as lib_bookingSignatures from "../lib/bookingSignatures.js";
 import type * as lib_bookings from "../lib/bookings.js";
+import type * as lib_checkIns from "../lib/checkIns.js";
 import type * as lib_customers from "../lib/customers.js";
 import type * as lib_emailAIRateLimit from "../lib/emailAIRateLimit.js";
 import type * as lib_marketing from "../lib/marketing.js";
@@ -47,6 +49,7 @@ declare const fullApi: ApiFromModules<{
   app: typeof app;
   billing: typeof billing;
   bookings: typeof bookings;
+  checkIns: typeof checkIns;
   crons: typeof crons;
   customers: typeof customers;
   dashboard: typeof dashboard;
@@ -59,6 +62,7 @@ declare const fullApi: ApiFromModules<{
   "lib/billing": typeof lib_billing;
   "lib/bookingSignatures": typeof lib_bookingSignatures;
   "lib/bookings": typeof lib_bookings;
+  "lib/checkIns": typeof lib_checkIns;
   "lib/customers": typeof lib_customers;
   "lib/emailAIRateLimit": typeof lib_emailAIRateLimit;
   "lib/marketing": typeof lib_marketing;
