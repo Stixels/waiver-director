@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Id } from '$convex/_generated/dataModel';
+	import type { FullAutoFill } from 'svelte/elements';
 	import { useConvexClient } from 'convex-svelte';
 	import { toast } from 'svelte-sonner';
 	import { api } from '$convex/_generated/api';
@@ -15,7 +16,18 @@
 		waiverUnderlineInputClass,
 		waiverUnderlineTextareaClass
 	} from '$lib/components/waivers/waiver-public-form-classes';
-	import type { WaiverField, WaiverMinor, WaiverTheme } from '$lib/domain/waivers';
+	import type {
+		WaiverAnswers,
+		WaiverAnswerValue,
+		WaiverField,
+		WaiverMinor,
+		WaiverTheme
+	} from '$lib/domain/waivers';
+	import {
+		MAX_INITIALS_LENGTH,
+		compositeParts,
+		normalizeSubmissionAnswers
+	} from '$lib/domain/waiver-fields';
 	import { getConvexErrorMessage } from '$lib/utils/convex-errors';
 	import { formatBookingTimestamp } from '$lib/utils/date';
 
@@ -55,7 +67,7 @@
 	let signerEmail = $state('');
 	let signerDateOfBirth = $state('');
 	let signatureDataUrl = $state('');
-	let answers = $state<Record<string, string | boolean | null>>({});
+	let answers = $state<WaiverAnswers>({});
 	let marketingConsent = $state(false);
 	let minors = $state<MinorFormState[]>([]);
 	let isSubmitting = $state(false);
@@ -70,8 +82,39 @@
 		minors.splice(index, 1);
 	}
 
-	function setFieldAnswer(fieldId: string, value: string | boolean | null) {
+	const groupFieldTypes = new Set<WaiverField['type']>([
+		'multiselect',
+		'address',
+		'emergency_contact',
+		'initials'
+	]);
+
+	function setFieldAnswer(fieldId: string, value: WaiverAnswerValue) {
 		answers[fieldId] = value;
+	}
+
+	function currentSelections(fieldId: string): string[] {
+		const value = answers[fieldId];
+		return Array.isArray(value) ? value : [];
+	}
+
+	function toggleSelection(fieldId: string, optionId: string, checked: boolean) {
+		const current = currentSelections(fieldId).filter((entry) => entry !== optionId);
+		answers[fieldId] = checked ? [...current, optionId] : current;
+	}
+
+	function currentPart(fieldId: string, key: string): string {
+		const value = answers[fieldId];
+		if (value && typeof value === 'object' && !Array.isArray(value)) {
+			return value[key] ?? '';
+		}
+		return '';
+	}
+
+	function setPart(fieldId: string, key: string, partValue: string) {
+		const value = answers[fieldId];
+		const current = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+		answers[fieldId] = { ...current, [key]: partValue };
 	}
 
 	function currentStringAnswer(fieldId: string): string {
@@ -96,6 +139,13 @@
 			return;
 		}
 
+		const checkedAnswers = normalizeSubmissionAnswers(waiver.fields, answers);
+		if (!checkedAnswers.ok) {
+			submitError = checkedAnswers.message;
+			document.getElementById(checkedAnswers.fieldId)?.focus();
+			return;
+		}
+
 		isSubmitting = true;
 		submitError = null;
 		const minorsPayload = minors.map((minor) => ({ fullName: minor.fullName }));
@@ -110,7 +160,7 @@
 				signerDateOfBirth,
 				signatureDataUrl,
 				marketingConsent,
-				answers,
+				answers: checkedAnswers.answers,
 				minors: minorsPayload
 			});
 
@@ -292,8 +342,20 @@
 						{#if waiver.fields.length > 0}
 							<WaiverPublicAdditionalInfoSection>
 								{#each waiver.fields as field (field.id)}
-									<div>
-										{#if field.type !== 'checkbox'}
+									<div
+										role={groupFieldTypes.has(field.type) ? 'group' : undefined}
+										aria-labelledby={groupFieldTypes.has(field.type)
+											? `${field.id}-label`
+											: undefined}
+									>
+										{#if groupFieldTypes.has(field.type)}
+											<div class={waiverFieldLabelClass} id={`${field.id}-label`}>
+												{field.label}
+												{#if field.required}
+													<span class="text-foreground/40">*</span>
+												{/if}
+											</div>
+										{:else if field.type !== 'checkbox'}
 											<label class={waiverFieldLabelClass} for={field.id}>
 												{field.label}
 												{#if field.required}
@@ -386,6 +448,133 @@
 												oninput={(event) =>
 													setFieldAnswer(field.id, (event.currentTarget as HTMLInputElement).value)}
 											/>
+										{:else if field.type === 'phone'}
+											<input
+												id={field.id}
+												type="tel"
+												inputmode="tel"
+												autocomplete="tel"
+												class={waiverUnderlineInputClass}
+												value={currentStringAnswer(field.id)}
+												placeholder={field.placeholder ?? ''}
+												required={field.required}
+												maxlength={25}
+												oninput={(event) =>
+													setFieldAnswer(field.id, (event.currentTarget as HTMLInputElement).value)}
+											/>
+										{:else if field.type === 'number'}
+											<input
+												id={field.id}
+												type="number"
+												inputmode="decimal"
+												step="any"
+												class={waiverUnderlineInputClass}
+												value={currentStringAnswer(field.id)}
+												min={field.min}
+												max={field.max}
+												required={field.required}
+												oninput={(event) =>
+													setFieldAnswer(field.id, (event.currentTarget as HTMLInputElement).value)}
+											/>
+										{:else if field.type === 'multiselect'}
+											<div class="mt-2 space-y-3">
+												{#each field.options as option, optionIndex (option.id)}
+													{@const checked = currentSelections(field.id).includes(option.id)}
+													<label
+														class="waiver-checkbox-label flex cursor-pointer items-center gap-3"
+													>
+														<span
+															class={`waiver-checkbox-box flex h-5 w-5 shrink-0 items-center justify-center border transition-colors ${checked ? 'border-foreground bg-foreground' : 'border-foreground/25 bg-transparent'}`}
+															aria-hidden="true"
+														>
+															{#if checked}
+																<svg
+																	xmlns="http://www.w3.org/2000/svg"
+																	width="12"
+																	height="12"
+																	viewBox="0 0 24 24"
+																	fill="none"
+																	stroke="currentColor"
+																	stroke-width="2.5"
+																	stroke-linecap="round"
+																	stroke-linejoin="round"
+																	class="text-background"
+																	aria-hidden="true"
+																>
+																	<polyline points="20 6 9 17 4 12" />
+																</svg>
+															{/if}
+														</span>
+														<input
+															id={optionIndex === 0 ? field.id : `${field.id}-${option.id}`}
+															type="checkbox"
+															class="sr-only"
+															{checked}
+															onchange={(event) =>
+																toggleSelection(
+																	field.id,
+																	option.id,
+																	(event.currentTarget as HTMLInputElement).checked
+																)}
+														/>
+														<span class="text-sm">{option.label}</span>
+													</label>
+												{/each}
+											</div>
+										{:else if field.type === 'address' || field.type === 'emergency_contact'}
+											<div class="grid gap-x-4 sm:grid-cols-2">
+												{#each compositeParts(field.type) as part, partIndex (part.key)}
+													{@const inputId = partIndex === 0 ? field.id : `${field.id}-${part.key}`}
+													<div>
+														<label class="sr-only" for={inputId}>{part.label}</label>
+														<input
+															id={inputId}
+															type={part.key === 'phone' ? 'tel' : 'text'}
+															inputmode={part.key === 'phone' ? 'tel' : undefined}
+															autocomplete={field.type === 'address'
+																? (part.autocomplete as FullAutoFill)
+																: undefined}
+															class={waiverUnderlineInputClass}
+															placeholder={`${part.label}${field.required && part.required ? ' *' : ''}`}
+															value={currentPart(field.id, part.key)}
+															required={field.required && part.required}
+															maxlength={200}
+															oninput={(event) =>
+																setPart(
+																	field.id,
+																	part.key,
+																	(event.currentTarget as HTMLInputElement).value
+																)}
+														/>
+													</div>
+												{/each}
+											</div>
+										{:else if field.type === 'initials'}
+											<div class="mt-2 rounded-lg border border-border bg-muted/20 p-4">
+												<p class="text-sm leading-relaxed whitespace-pre-wrap">{field.clause}</p>
+												<div class="mt-3 flex items-center gap-3">
+													<label
+														class="text-[11px] font-medium tracking-wide text-muted-foreground uppercase"
+														for={field.id}
+													>
+														Your initials
+													</label>
+													<input
+														id={field.id}
+														class={`${waiverUnderlineInputClass} w-24 py-1 text-center font-semibold tracking-widest uppercase`}
+														autocomplete="off"
+														autocapitalize="characters"
+														maxlength={MAX_INITIALS_LENGTH}
+														value={currentStringAnswer(field.id)}
+														required={field.required}
+														oninput={(event) =>
+															setFieldAnswer(
+																field.id,
+																(event.currentTarget as HTMLInputElement).value
+															)}
+													/>
+												</div>
+											</div>
 										{/if}
 									</div>
 								{/each}

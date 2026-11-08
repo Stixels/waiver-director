@@ -312,6 +312,7 @@ export const getSubmission = query({
 			signerDateOfBirth: v.string(),
 			signatureDataUrl: v.string(),
 			answers: v.record(v.string(), waiverAnswerValueValidator),
+			flaggedFieldIds: v.array(v.string()),
 			submittedAt: v.number(),
 			workspaceName: v.string(),
 			waiver: waiverDefinitionValidator,
@@ -365,6 +366,7 @@ export const getSubmission = query({
 			signerDateOfBirth: submission.signerDateOfBirth,
 			signatureDataUrl: submission.signatureDataUrl,
 			answers: submission.answers,
+			flaggedFieldIds: submission.flaggedFieldIds ?? [],
 			submittedAt: submission.submittedAt,
 			workspaceName: workspace.name,
 			waiver: {
@@ -395,6 +397,7 @@ export const listRecentSubmissions = query({
 				signerEmail: v.string(),
 				signerDateOfBirth: v.string(),
 				minorCount: v.number(),
+				flaggedCount: v.number(),
 				bookingActivityName: v.union(v.string(), v.null()),
 				bookingStartTime: v.union(v.string(), v.null()),
 				submittedAt: v.number()
@@ -427,6 +430,7 @@ export const listRecentSubmissions = query({
 				signerEmail: submission.signerEmail,
 				signerDateOfBirth: submission.signerDateOfBirth,
 				minorCount: submission.minors.length,
+				flaggedCount: submission.flaggedFieldIds?.length ?? 0,
 				bookingActivityName: submission.bookingSnapshot?.activityName ?? null,
 				bookingStartTime: submission.bookingSnapshot?.startTime ?? null,
 				submittedAt: submission.submittedAt
@@ -652,7 +656,7 @@ export const submitPublicWaiver = mutation({
 			});
 		}
 
-		validateSubmissionAnswers(version, args.answers);
+		const { answers, flaggedFieldIds } = validateSubmissionAnswers(version, args.answers);
 		const minors = validateMinors(args.minors);
 		const marketingIntegration = await ctx.db
 			.query('marketing_integrations')
@@ -699,7 +703,8 @@ export const submitPublicWaiver = mutation({
 			}),
 			signerDateOfBirth,
 			signatureDataUrl: args.signatureDataUrl,
-			answers: args.answers,
+			answers,
+			flaggedFieldIds,
 			minors,
 			status: 'submitted',
 			marketingConsent,

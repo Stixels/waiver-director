@@ -18,6 +18,7 @@
 	import ArrowRightIcon from '@lucide/svelte/icons/arrow-right';
 	import CalendarClockIcon from '@lucide/svelte/icons/calendar-clock';
 	import FileTextIcon from '@lucide/svelte/icons/file-text';
+	import FlagIcon from '@lucide/svelte/icons/flag';
 	import MailIcon from '@lucide/svelte/icons/mail';
 	import TicketIcon from '@lucide/svelte/icons/ticket';
 	import UsersRoundIcon from '@lucide/svelte/icons/users-round';
@@ -54,6 +55,14 @@
 			new Date(ts)
 		);
 	}
+
+	const flaggedLabels = $derived(
+		submission
+			? submission.waiver.fields
+					.filter((field) => submission.flaggedFieldIds.includes(field.id))
+					.map((field) => field.label)
+			: []
+	);
 
 	function minorSummary(minorCount: number) {
 		if (minorCount === 0) return null;
@@ -152,6 +161,19 @@
 						</DialogDescription>
 					</div>
 				</div>
+
+				{#if flaggedLabels.length > 0}
+					<div
+						class="flex items-start gap-2 border-b border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-xs text-amber-800 dark:text-amber-300"
+						role="status"
+					>
+						<FlagIcon class="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+						<p class="min-w-0">
+							<span class="font-semibold">Flagged for review:</span>
+							{flaggedLabels.join(', ')}
+						</p>
+					</div>
+				{/if}
 
 				<div class="grid bg-muted/10 sm:grid-cols-[1fr_1.05fr_1.35fr_1.05fr]">
 					<div class={metaItemClass}>

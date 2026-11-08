@@ -18,6 +18,13 @@
 	import SquareCheckIcon from '@lucide/svelte/icons/square-check';
 	import ChevronsUpDownIcon from '@lucide/svelte/icons/chevrons-up-down';
 	import CalendarIcon from '@lucide/svelte/icons/calendar';
+	import ListChecksIcon from '@lucide/svelte/icons/list-checks';
+	import PhoneIcon from '@lucide/svelte/icons/phone';
+	import HashIcon from '@lucide/svelte/icons/hash';
+	import MapPinIcon from '@lucide/svelte/icons/map-pin';
+	import HeartPulseIcon from '@lucide/svelte/icons/heart-pulse';
+	import PenLineIcon from '@lucide/svelte/icons/pen-line';
+	import FlagIcon from '@lucide/svelte/icons/flag';
 	import {
 		createBlankField,
 		createOptionId,
@@ -27,6 +34,9 @@
 		type WaiverFieldType
 	} from '$lib/domain/waivers';
 	import { MAX_SELECT_OPTIONS, MAX_WAIVER_FIELDS } from '$lib/domain/waiver-constraints';
+	import { MAX_CLAUSE_LENGTH, isOptionField } from '$lib/domain/waiver-fields';
+
+	type OptionField = Extract<WaiverField, { type: 'select' | 'multiselect' }>;
 
 	interface Props {
 		draft?: WaiverDefinition | null;
@@ -47,7 +57,23 @@
 		{ type: 'text', label: 'Text', icon: TypeIcon, hint: 'Written answer' },
 		{ type: 'checkbox', label: 'Checkbox', icon: SquareCheckIcon, hint: 'Single agreement' },
 		{ type: 'select', label: 'Dropdown', icon: ChevronsUpDownIcon, hint: 'Pick one option' },
-		{ type: 'date', label: 'Date', icon: CalendarIcon, hint: 'Calendar picker' }
+		{
+			type: 'multiselect',
+			label: 'Multi-select',
+			icon: ListChecksIcon,
+			hint: 'Pick any number of options'
+		},
+		{ type: 'date', label: 'Date', icon: CalendarIcon, hint: 'Calendar picker' },
+		{ type: 'phone', label: 'Phone', icon: PhoneIcon, hint: 'Validated phone number' },
+		{ type: 'number', label: 'Number', icon: HashIcon, hint: 'Numeric answer with limits' },
+		{ type: 'address', label: 'Address', icon: MapPinIcon, hint: 'Street, city, postal code' },
+		{
+			type: 'emergency_contact',
+			label: 'Emergency contact',
+			icon: HeartPulseIcon,
+			hint: 'Name, phone, relationship'
+		},
+		{ type: 'initials', label: 'Initials', icon: PenLineIcon, hint: 'Signer initials a clause' }
 	];
 	const canAddField = $derived((draft?.fields.length ?? 0) < MAX_WAIVER_FIELDS);
 
@@ -98,22 +124,53 @@
 		reorderFields(source.initialIndex, source.index);
 	}
 
-	function addOption(field: Extract<WaiverField, { type: 'select' }>) {
+	function addOption(field: OptionField) {
 		field.options.push({
 			id: createOptionId('option'),
 			label: `Option ${field.options.length + 1}`
 		});
 	}
 
-	function removeOption(field: Extract<WaiverField, { type: 'select' }>, optionIndex: number) {
+	function removeOption(field: OptionField, optionIndex: number) {
 		field.options.splice(optionIndex, 1);
+	}
+
+	function toggleOptionFlag(field: OptionField, optionIndex: number) {
+		const option = field.options[optionIndex];
+		if (!option) return;
+		if (option.flagged) {
+			delete option.flagged;
+		} else {
+			option.flagged = true;
+		}
+	}
+
+	function setCheckboxFlag(field: Extract<WaiverField, { type: 'checkbox' }>, checked: boolean) {
+		if (checked) {
+			field.flagWhenChecked = true;
+		} else {
+			delete field.flagWhenChecked;
+		}
+	}
+
+	function setNumberLimit(
+		field: Extract<WaiverField, { type: 'number' }>,
+		key: 'min' | 'max',
+		raw: string
+	) {
+		const trimmed = raw.trim();
+		const parsed = trimmed === '' ? undefined : Number(trimmed);
+		if (parsed === undefined || !Number.isFinite(parsed)) {
+			delete field[key];
+		} else {
+			field[key] = parsed;
+		}
 	}
 
 	function reorderOptions(fieldId: string, fromIndex: number, toIndex: number) {
 		if (!draft) return;
 		const field = draft.fields.find(
-			(entry): entry is Extract<WaiverField, { type: 'select' }> =>
-				entry.id === fieldId && entry.type === 'select'
+			(entry): entry is OptionField => entry.id === fieldId && isOptionField(entry)
 		);
 		if (!field) return;
 		if (fromIndex === toIndex) return;
@@ -134,7 +191,7 @@
 		draft = {
 			...draft,
 			fields: draft.fields.map((entry) =>
-				entry.id === fieldId && entry.type === 'select'
+				entry.id === fieldId && isOptionField(entry)
 					? {
 							...entry,
 							options: nextOptions
@@ -279,7 +336,71 @@
 										/>
 									</div>
 
-									{#if field.type === 'select'}
+									{#if field.type === 'checkbox'}
+										<label class="required-switch mt-2">
+											<input
+												type="checkbox"
+												checked={field.flagWhenChecked === true}
+												onchange={(event) =>
+													setCheckboxFlag(field, (event.currentTarget as HTMLInputElement).checked)}
+											/>
+											<span class="switch-track">
+												<span class="switch-thumb"></span>
+											</span>
+											<span class="switch-label">Flag signer when checked</span>
+										</label>
+									{:else if field.type === 'number'}
+										<div class="mt-2 grid grid-cols-2 gap-2">
+											<label class="limit-label">
+												<span>Min</span>
+												<Input
+													type="number"
+													step="any"
+													value={field.min ?? ''}
+													class="option-input"
+													placeholder="None"
+													oninput={(event) =>
+														setNumberLimit(
+															field,
+															'min',
+															(event.currentTarget as HTMLInputElement).value
+														)}
+												/>
+											</label>
+											<label class="limit-label">
+												<span>Max</span>
+												<Input
+													type="number"
+													step="any"
+													value={field.max ?? ''}
+													class="option-input"
+													placeholder="None"
+													oninput={(event) =>
+														setNumberLimit(
+															field,
+															'max',
+															(event.currentTarget as HTMLInputElement).value
+														)}
+												/>
+											</label>
+										</div>
+									{:else if field.type === 'initials'}
+										<div class="mt-2">
+											<label for={`${field.id}-clause`} class="options-label">
+												Clause to initial
+											</label>
+											<textarea
+												id={`${field.id}-clause`}
+												class="clause-input"
+												rows={4}
+												maxlength={MAX_CLAUSE_LENGTH}
+												bind:value={field.clause}
+												placeholder="Text the signer must initial"
+											></textarea>
+										</div>
+									{/if}
+
+									{#if isOptionField(field)}
 										<div class="options-card mt-2">
 											<div class="flex items-center justify-between gap-2">
 												<p class="options-label">Options</p>
@@ -320,6 +441,21 @@
 																class="option-input"
 																placeholder="Option label"
 															/>
+															<button
+																type="button"
+																class="option-flag"
+																class:is-flagged={option.flagged === true}
+																aria-pressed={option.flagged === true}
+																onclick={() => toggleOptionFlag(field, optionIndex)}
+																aria-label={option.flagged
+																	? 'Stop flagging signers who choose this option'
+																	: 'Flag signers who choose this option'}
+																title={option.flagged
+																	? 'Flags signer for review'
+																	: 'Flag signers who choose this'}
+															>
+																<FlagIcon class="size-3" />
+															</button>
 															<button
 																type="button"
 																class="option-remove"
@@ -547,6 +683,58 @@
 	.field-delete:hover {
 		background: color-mix(in srgb, var(--destructive) 12%, transparent);
 		color: var(--destructive);
+	}
+
+	.limit-label {
+		display: flex;
+		flex-direction: column;
+		gap: 0.25rem;
+		font-size: 0.65rem;
+		font-weight: 600;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: var(--muted-foreground);
+	}
+
+	.clause-input {
+		margin-top: 0.375rem;
+		width: 100%;
+		resize: vertical;
+		border: 1px solid var(--border);
+		border-radius: var(--radius-md);
+		background: transparent;
+		padding: 0.5rem 0.625rem;
+		font-size: 0.75rem;
+		line-height: 1.5;
+	}
+
+	.clause-input:focus {
+		outline: none;
+		border-color: color-mix(in srgb, var(--primary) 45%, var(--border));
+	}
+
+	.option-flag {
+		display: flex;
+		height: 1.5rem;
+		width: 1.5rem;
+		flex-shrink: 0;
+		align-items: center;
+		justify-content: center;
+		border-radius: var(--radius-sm);
+		color: color-mix(in srgb, var(--muted-foreground) 55%, transparent);
+		transition:
+			background 150ms ease,
+			color 150ms ease;
+	}
+
+	.option-flag:hover {
+		background: color-mix(in srgb, var(--muted) 60%, transparent);
+		color: var(--foreground);
+	}
+
+	.option-flag.is-flagged {
+		color: rgb(217 119 6);
+		background: rgb(245 158 11 / 0.12);
 	}
 
 	.options-card {

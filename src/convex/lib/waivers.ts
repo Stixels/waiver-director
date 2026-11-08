@@ -5,6 +5,13 @@ import { getCurrentUser } from './auth';
 import { getWorkspaceMembership } from './workspaces';
 import { sanitizeRichTextHtml } from '../../lib/utils/rich-text';
 import {
+	MAX_CLAUSE_LENGTH,
+	MIN_CLAUSE_LENGTH,
+	normalizeSubmissionAnswers,
+	type WaiverAnswers
+} from '../../lib/domain/waiver-fields';
+import { waiverFieldValidator, type WaiverFieldValue } from './waiverFields';
+import {
 	MAX_MINOR_NAME_LENGTH,
 	MAX_MINORS,
 	MAX_SELECT_OPTION_LABEL_LENGTH,
@@ -21,39 +28,7 @@ import {
 
 type FunctionCtx = QueryCtx | MutationCtx;
 
-export const waiverFieldValidator = v.union(
-	v.object({
-		id: v.string(),
-		type: v.literal('text'),
-		label: v.string(),
-		required: v.boolean(),
-		placeholder: v.optional(v.string())
-	}),
-	v.object({
-		id: v.string(),
-		type: v.literal('checkbox'),
-		label: v.string(),
-		required: v.boolean()
-	}),
-	v.object({
-		id: v.string(),
-		type: v.literal('select'),
-		label: v.string(),
-		required: v.boolean(),
-		options: v.array(
-			v.object({
-				id: v.string(),
-				label: v.string()
-			})
-		)
-	}),
-	v.object({
-		id: v.string(),
-		type: v.literal('date'),
-		label: v.string(),
-		required: v.boolean()
-	})
-);
+export { waiverAnswerValueValidator, waiverFieldValidator } from './waiverFields';
 
 export const waiverThemeValidator = v.union(v.literal('light'), v.literal('dark'));
 
@@ -64,8 +39,6 @@ export const waiverDefinitionValidator = v.object({
 	fields: v.array(waiverFieldValidator)
 });
 
-export const waiverAnswerValueValidator = v.union(v.string(), v.boolean(), v.null());
-
 export const minorInputValidator = v.object({
 	fullName: v.string()
 });
@@ -74,37 +47,7 @@ export type WaiverDefinition = {
 	title: string;
 	introCopy: string;
 	theme?: 'light' | 'dark';
-	fields: Array<
-		| {
-				id: string;
-				type: 'text';
-				label: string;
-				required: boolean;
-				placeholder?: string;
-		  }
-		| {
-				id: string;
-				type: 'checkbox';
-				label: string;
-				required: boolean;
-		  }
-		| {
-				id: string;
-				type: 'select';
-				label: string;
-				required: boolean;
-				options: Array<{
-					id: string;
-					label: string;
-				}>;
-		  }
-		| {
-				id: string;
-				type: 'date';
-				label: string;
-				required: boolean;
-		  }
-	>;
+	fields: WaiverFieldValue[];
 };
 
 export type MinorInput = {
@@ -236,11 +179,11 @@ export function normalizeWaiverDefinition(definition: WaiverDefinition): WaiverD
 			});
 		}
 
-		if (field.type === 'select') {
+		if (field.type === 'select' || field.type === 'multiselect') {
 			if (field.options.length < MIN_SELECT_OPTIONS || field.options.length > MAX_SELECT_OPTIONS) {
 				throw new ConvexError({
 					code: 'invalid_argument',
-					message: `Select fields require ${MIN_SELECT_OPTIONS}-${MAX_SELECT_OPTIONS} options.`
+					message: `Choice fields require ${MIN_SELECT_OPTIONS}-${MAX_SELECT_OPTIONS} options.`
 				});
 			}
 
@@ -255,13 +198,13 @@ export function normalizeWaiverDefinition(definition: WaiverDefinition): WaiverD
 					if (!/^[a-z0-9-]{2,64}$/.test(optionId)) {
 						throw new ConvexError({
 							code: 'invalid_argument',
-							message: 'Select option ids must be lowercase letters, numbers, or hyphens.'
+							message: 'Option ids must be lowercase letters, numbers, or hyphens.'
 						});
 					}
 					if (optionIds.has(optionId)) {
 						throw new ConvexError({
 							code: 'invalid_argument',
-							message: 'Select option ids must be unique within a field.'
+							message: 'Option ids must be unique within a field.'
 						});
 					}
 					if (
@@ -270,16 +213,60 @@ export function normalizeWaiverDefinition(definition: WaiverDefinition): WaiverD
 					) {
 						throw new ConvexError({
 							code: 'invalid_argument',
-							message: `Select option labels must be between ${MIN_SELECT_OPTION_LABEL_LENGTH} and ${MAX_SELECT_OPTION_LABEL_LENGTH} characters.`
+							message: `Option labels must be between ${MIN_SELECT_OPTION_LABEL_LENGTH} and ${MAX_SELECT_OPTION_LABEL_LENGTH} characters.`
 						});
 					}
 					optionIds.add(optionId);
 					return {
 						id: optionId,
-						label: optionLabel
+						label: optionLabel,
+						...(option.flagged ? { flagged: true } : {})
 					};
 				})
 			};
+		}
+
+		if (field.type === 'checkbox') {
+			return {
+				id,
+				type: field.type,
+				label,
+				required: field.required,
+				...(field.flagWhenChecked ? { flagWhenChecked: true } : {})
+			};
+		}
+
+		if (field.type === 'number') {
+			const { min, max } = field;
+			if (
+				(min !== undefined && !Number.isFinite(min)) ||
+				(max !== undefined && !Number.isFinite(max)) ||
+				(min !== undefined && max !== undefined && min > max)
+			) {
+				throw new ConvexError({
+					code: 'invalid_argument',
+					message: `"${label}" needs a minimum that is not above its maximum.`
+				});
+			}
+			return {
+				id,
+				type: field.type,
+				label,
+				required: field.required,
+				...(min !== undefined ? { min } : {}),
+				...(max !== undefined ? { max } : {})
+			};
+		}
+
+		if (field.type === 'initials') {
+			const clause = field.clause.trim();
+			if (clause.length < MIN_CLAUSE_LENGTH || clause.length > MAX_CLAUSE_LENGTH) {
+				throw new ConvexError({
+					code: 'invalid_argument',
+					message: `Each initialed clause must be between ${MIN_CLAUSE_LENGTH} and ${MAX_CLAUSE_LENGTH} characters.`
+				});
+			}
+			return { ...field, id, label, clause };
 		}
 
 		if ('placeholder' in field) {
@@ -306,36 +293,44 @@ export function normalizeWaiverDefinition(definition: WaiverDefinition): WaiverD
 	};
 }
 
+function normalizeFieldForCompare(field: WaiverFieldValue): WaiverFieldValue {
+	const label = field.label.trim();
+	switch (field.type) {
+		case 'select':
+		case 'multiselect':
+			return {
+				...field,
+				label,
+				options: field.options.map((option) => ({
+					id: option.id.trim(),
+					label: option.label.trim(),
+					...(option.flagged ? { flagged: true } : {})
+				}))
+			};
+		case 'checkbox':
+			return {
+				id: field.id,
+				type: field.type,
+				label,
+				required: field.required,
+				...(field.flagWhenChecked ? { flagWhenChecked: true } : {})
+			};
+		case 'text':
+		case 'phone':
+			return { ...field, label, placeholder: field.placeholder?.trim() || undefined };
+		case 'initials':
+			return { ...field, label, clause: field.clause.trim() };
+		default:
+			return { ...field, label };
+	}
+}
+
 function normalizeWaiverDefinitionForCompare(definition: WaiverDefinition): WaiverDefinition {
 	return {
 		title: definition.title.trim(),
 		introCopy: sanitizeRichTextHtml(definition.introCopy),
 		theme: definition.theme ?? 'dark',
-		fields: definition.fields.map((field) => {
-			if (field.type === 'select') {
-				return {
-					...field,
-					label: field.label.trim(),
-					options: field.options.map((option) => ({
-						id: option.id.trim(),
-						label: option.label.trim()
-					}))
-				};
-			}
-
-			if ('placeholder' in field) {
-				return {
-					...field,
-					label: field.label.trim(),
-					placeholder: field.placeholder?.trim() || undefined
-				};
-			}
-
-			return {
-				...field,
-				label: field.label.trim()
-			};
-		})
+		fields: definition.fields.map(normalizeFieldForCompare)
 	};
 }
 
@@ -346,41 +341,22 @@ export function waiverDefinitionsEqual(a: WaiverDefinition, b: WaiverDefinition)
 	);
 }
 
+/**
+ * Validates answers against the signed version and returns the canonical
+ * answers to store plus the field ids whose answers flag the participant.
+ */
 export function validateSubmissionAnswers(
 	definition: Pick<WaiverDefinition, 'fields'>,
-	answers: Record<string, string | boolean | null>
-) {
-	for (const field of definition.fields) {
-		const answer = answers[field.id] ?? null;
-
-		if (field.type === 'checkbox') {
-			if (field.required && answer !== true) {
-				throw new ConvexError({
-					code: 'invalid_argument',
-					message: `Please accept "${field.label}".`
-				});
-			}
-			continue;
-		}
-
-		const stringValue = typeof answer === 'string' ? answer.trim() : '';
-		if (field.required && stringValue.length === 0) {
-			throw new ConvexError({
-				code: 'invalid_argument',
-				message: `Please complete "${field.label}".`
-			});
-		}
-
-		if (field.type === 'select' && stringValue.length > 0) {
-			const matchingOption = field.options.some((option) => option.id === stringValue);
-			if (!matchingOption) {
-				throw new ConvexError({
-					code: 'invalid_argument',
-					message: `Please choose a valid option for "${field.label}".`
-				});
-			}
-		}
+	answers: WaiverAnswers
+): { answers: WaiverAnswers; flaggedFieldIds: string[] } {
+	const result = normalizeSubmissionAnswers(definition.fields, answers);
+	if (!result.ok) {
+		throw new ConvexError({
+			code: 'invalid_argument',
+			message: result.message
+		});
 	}
+	return { answers: result.answers, flaggedFieldIds: result.flaggedFieldIds };
 }
 
 export function validateMinors(minors: MinorInput[]): MinorInput[] {

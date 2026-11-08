@@ -3,6 +3,7 @@ import { v } from 'convex/values';
 import { billingFeatureValidator } from './lib/billing';
 import { bookingProviderValidator, bookingSnapshotValidator } from './lib/bookings';
 import { marketingIntegrationStatusValidator, marketingProviderValidator } from './lib/marketing';
+import { waiverAnswerValueValidator, waiverFieldValidator } from './lib/waiverFields';
 
 export default defineSchema({
 	users: defineTable({
@@ -105,41 +106,7 @@ export default defineSchema({
 		title: v.string(),
 		introCopy: v.string(),
 		theme: v.optional(v.union(v.literal('light'), v.literal('dark'))),
-		fields: v.array(
-			v.union(
-				v.object({
-					id: v.string(),
-					type: v.literal('text'),
-					label: v.string(),
-					required: v.boolean(),
-					placeholder: v.optional(v.string())
-				}),
-				v.object({
-					id: v.string(),
-					type: v.literal('checkbox'),
-					label: v.string(),
-					required: v.boolean()
-				}),
-				v.object({
-					id: v.string(),
-					type: v.literal('select'),
-					label: v.string(),
-					required: v.boolean(),
-					options: v.array(
-						v.object({
-							id: v.string(),
-							label: v.string()
-						})
-					)
-				}),
-				v.object({
-					id: v.string(),
-					type: v.literal('date'),
-					label: v.string(),
-					required: v.boolean()
-				})
-			)
-		)
+		fields: v.array(waiverFieldValidator)
 	})
 		.index('by_workspaceId', ['workspaceId'])
 		.index('by_publicSlug', ['publicSlug']),
@@ -151,41 +118,7 @@ export default defineSchema({
 		title: v.string(),
 		introCopy: v.string(),
 		theme: v.optional(v.union(v.literal('light'), v.literal('dark'))),
-		fields: v.array(
-			v.union(
-				v.object({
-					id: v.string(),
-					type: v.literal('text'),
-					label: v.string(),
-					required: v.boolean(),
-					placeholder: v.optional(v.string())
-				}),
-				v.object({
-					id: v.string(),
-					type: v.literal('checkbox'),
-					label: v.string(),
-					required: v.boolean()
-				}),
-				v.object({
-					id: v.string(),
-					type: v.literal('select'),
-					label: v.string(),
-					required: v.boolean(),
-					options: v.array(
-						v.object({
-							id: v.string(),
-							label: v.string()
-						})
-					)
-				}),
-				v.object({
-					id: v.string(),
-					type: v.literal('date'),
-					label: v.string(),
-					required: v.boolean()
-				})
-			)
-		),
+		fields: v.array(waiverFieldValidator),
 		publishedAt: v.number()
 	})
 		.index('by_workspaceId', ['workspaceId'])
@@ -224,7 +157,8 @@ export default defineSchema({
 		searchText: v.string(),
 		signerDateOfBirth: v.string(),
 		signatureDataUrl: v.string(),
-		answers: v.record(v.string(), v.union(v.string(), v.boolean(), v.null())),
+		answers: v.record(v.string(), waiverAnswerValueValidator),
+		flaggedFieldIds: v.optional(v.array(v.string())),
 		minors: v.array(
 			v.object({
 				fullName: v.string()
