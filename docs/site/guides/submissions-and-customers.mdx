@@ -45,3 +45,12 @@ description: 'Review signed waivers and each customer’s visit history.'
 </Frame>
 
 Customers are scoped to one workspace. The same person signing for two of your workspaces appears separately in each.
+
+## Export to CSV
+
+Owners can download every record in the workspace as a CSV file that opens in Excel, Google Sheets, or Numbers. Select **Export CSV** at the top of **Submissions** or **Customers**. Staff don't see the button, and the server refuses export requests from anyone who isn't an Owner.
+
+- **Submissions** export one row per signed waiver, oldest first: signer details, signing time, covered minors, the waiver version signed, booking details captured at signing, marketing consent, and one column per custom field. Answers are labeled the way the signer saw them in the version they signed.
+- **Customers** export one row per customer: name, email, first and last seen, and visit count.
+
+Times are in UTC. The export includes the whole workspace, not only the current search. Drawn signatures aren't included; open the submission to see one.

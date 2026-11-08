@@ -7,6 +7,7 @@
 	import { page } from '$app/state';
 	import { useAppContext } from '$lib/components/app/app-context.svelte';
 	import DataTableEmptyState from '$lib/components/app/DataTableEmptyState.svelte';
+	import ExportCsvButton from '$lib/components/app/ExportCsvButton.svelte';
 	import DataTablePage from '$lib/components/app/DataTablePage.svelte';
 	import DataTablePagination from '$lib/components/app/DataTablePagination.svelte';
 	import DataTableShell from '$lib/components/app/DataTableShell.svelte';
@@ -22,6 +23,8 @@
 	} from '$lib/components/ui/table';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { formatBookingTimestamp } from '$lib/utils/date';
+	import { useConvexClient } from 'convex-svelte';
+	import { buildSubmissionsCsv, collectAllPages, exportFilename } from '$lib/domain/csv-export';
 	import { queryString } from '$lib/utils/url';
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 	import FileTextIcon from '@lucide/svelte/icons/file-text';
@@ -34,6 +37,27 @@
 	const currentWorkspace = $derived(
 		appContext.workspaces.find((workspace) => workspace.slug === page.params.workspaceSlug) ?? null
 	);
+	const convex = useConvexClient();
+	const isOwner = $derived(currentWorkspace?.role === 'owner');
+
+	async function buildSubmissionExport(onProgress: (rowCount: number) => void) {
+		const workspace = currentWorkspace;
+		if (!workspace) throw new Error('Workspace not loaded yet.');
+		const rows = await collectAllPages(
+			(cursor) =>
+				convex.query(api.exports.exportSubmissionsPage, {
+					workspaceId: workspace.workspaceId,
+					paginationOpts: { numItems: 200, cursor }
+				}),
+			onProgress
+		);
+		return {
+			filename: exportFilename(workspace.slug, 'submissions'),
+			csv: buildSubmissionsCsv(rows),
+			rowCount: rows.length
+		};
+	}
+
 	const initialQuery = initialSearchQuery();
 
 	let cursor = $state<string | null>(null);
@@ -261,27 +285,32 @@
 {/snippet}
 
 <DataTablePage>
-	<div class="relative w-full lg:max-w-md">
-		<SearchIcon
-			class="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground"
-			aria-hidden="true"
-		/>
-		<input
-			type="search"
-			placeholder="Search by customer, activity, or booking number"
-			bind:value={searchInput}
-			class="h-9 w-full rounded-lg border border-input bg-background/60 pr-10 pl-11 text-sm shadow-xs transition-all placeholder:text-muted-foreground/70 hover:bg-background focus-visible:border-ring focus-visible:bg-background focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
-			aria-label="Search submissions"
-		/>
-		{#if searchInput}
-			<button
-				type="button"
-				onclick={clearSearch}
-				class="absolute top-1/2 right-2 inline-flex size-6 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
-				aria-label="Clear search"
-			>
-				<XIcon class="size-3.5" aria-hidden="true" />
-			</button>
+	<div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+		<div class="relative w-full lg:max-w-md">
+			<SearchIcon
+				class="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground"
+				aria-hidden="true"
+			/>
+			<input
+				type="search"
+				placeholder="Search by customer, activity, or booking number"
+				bind:value={searchInput}
+				class="h-9 w-full rounded-lg border border-input bg-background/60 pr-10 pl-11 text-sm shadow-xs transition-all placeholder:text-muted-foreground/70 hover:bg-background focus-visible:border-ring focus-visible:bg-background focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
+				aria-label="Search submissions"
+			/>
+			{#if searchInput}
+				<button
+					type="button"
+					onclick={clearSearch}
+					class="absolute top-1/2 right-2 inline-flex size-6 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
+					aria-label="Clear search"
+				>
+					<XIcon class="size-3.5" aria-hidden="true" />
+				</button>
+			{/if}
+		</div>
+		{#if isOwner}
+			<ExportCsvButton label="Export CSV" buildCsv={buildSubmissionExport} />
 		{/if}
 	</div>
 

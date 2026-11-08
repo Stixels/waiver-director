@@ -16,6 +16,7 @@ import type * as customers from "../customers.js";
 import type * as dashboard from "../dashboard.js";
 import type * as emailAI from "../emailAI.js";
 import type * as emails from "../emails.js";
+import type * as exports from "../exports.js";
 import type * as http from "../http.js";
 import type * as integrations from "../integrations.js";
 import type * as lib_auth from "../lib/auth.js";
@@ -51,6 +52,7 @@ declare const fullApi: ApiFromModules<{
   dashboard: typeof dashboard;
   emailAI: typeof emailAI;
   emails: typeof emails;
+  exports: typeof exports;
   http: typeof http;
   integrations: typeof integrations;
   "lib/auth": typeof lib_auth;
