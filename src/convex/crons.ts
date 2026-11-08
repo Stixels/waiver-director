@@ -31,4 +31,11 @@ crons.interval(
 	{}
 );
 
+crons.interval(
+	'queue unsigned guest reminders',
+	{ minutes: 15 },
+	internal.guestReminders.sweepGuestRemindersCron,
+	{}
+);
+
 export default crons;

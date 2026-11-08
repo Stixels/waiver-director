@@ -8,6 +8,7 @@ import { requireWorkspaceMember } from './lib/waivers';
 const MAX_BOOKING_LIST_SPAN_MS = 48 * 60 * 60 * 1000;
 const MAX_BOOKINGS_PER_LIST_WINDOW = 5_000;
 const DEFAULT_BOOKING_DURATION_MS = 60 * 60 * 1000;
+const MAX_REUSES_FOR_BOOKING = 200;
 
 const bookingSummaryValue = v.object({
 	bookingId: v.id('bookings'),
@@ -47,12 +48,28 @@ const signedUserValue = v.object({
 	name: v.string(),
 	email: v.union(v.string(), v.null()),
 	kind: v.union(v.literal('signer'), v.literal('minor')),
-	submittedAt: v.number()
+	submittedAt: v.number(),
+	/** Set when a returning guest used a still-valid waiver instead of signing again. */
+	reusedAt: v.union(v.number(), v.null())
+});
+
+const guestReminderValue = v.object({
+	status: v.union(
+		v.literal('queued'),
+		v.literal('sent'),
+		v.literal('skipped'),
+		v.literal('failed')
+	),
+	recipientEmail: v.string(),
+	createdAt: v.number(),
+	sentAt: v.union(v.number(), v.null()),
+	failureReason: v.union(v.string(), v.null())
 });
 
 const bookingDetailValue = v.object({
 	booking: bookingSummaryValue,
-	signedUsers: v.array(signedUserValue)
+	signedUsers: v.array(signedUserValue),
+	guestReminder: v.union(v.null(), guestReminderValue)
 });
 
 function signedUsersFromSubmissions(
@@ -64,14 +81,16 @@ function signedUsersFromSubmissions(
 			name: submission.signerName,
 			email: submission.signerEmail,
 			kind: 'signer' as const,
-			submittedAt: submission.submittedAt
+			submittedAt: submission.submittedAt,
+			reusedAt: null
 		},
 		...submission.minors.map((minor) => ({
 			submissionId: submission._id,
 			name: minor.fullName,
 			email: null,
 			kind: 'minor' as const,
-			submittedAt: submission.submittedAt
+			submittedAt: submission.submittedAt,
+			reusedAt: null
 		}))
 	]);
 }
@@ -259,12 +278,44 @@ export const getWorkspaceBookingDetail = query({
 		const booking = await ctx.db.get(args.bookingId);
 		if (!booking || booking.workspaceId !== args.workspaceId) return null;
 
-		const submissions = await submissionsForBooking(ctx, booking._id);
-		const signedUsers = signedUsersFromSubmissions(submissions);
+		const [submissions, reuses, reminder] = await Promise.all([
+			submissionsForBooking(ctx, booking._id),
+			ctx.db
+				.query('booking_waiver_reuses')
+				.withIndex('by_bookingId', (q) => q.eq('bookingId', booking._id))
+				.take(MAX_REUSES_FOR_BOOKING),
+			ctx.db
+				.query('booking_guest_reminders')
+				.withIndex('by_bookingId', (q) => q.eq('bookingId', booking._id))
+				.first()
+		]);
+		const reusedUsers = reuses
+			.filter((reuse) => reuse.workspaceId === args.workspaceId)
+			.map((reuse) => ({
+				submissionId: reuse.submissionId,
+				name: reuse.signerName,
+				email: reuse.signerEmail,
+				kind: 'signer' as const,
+				submittedAt: reuse.reusedAt,
+				reusedAt: reuse.reusedAt
+			}));
+		const signedUsers = [...signedUsersFromSubmissions(submissions), ...reusedUsers].sort(
+			(a, b) => b.submittedAt - a.submittedAt
+		);
 
 		return {
 			booking: serializeBooking(booking),
-			signedUsers
+			signedUsers,
+			guestReminder:
+				reminder && reminder.workspaceId === args.workspaceId
+					? {
+							status: reminder.status,
+							recipientEmail: reminder.recipientEmail,
+							createdAt: reminder.createdAt,
+							sentAt: reminder.sentAt ?? null,
+							failureReason: reminder.failureReason ?? null
+						}
+					: null
 		};
 	}
 });

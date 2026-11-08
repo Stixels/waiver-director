@@ -45,9 +45,11 @@
 	interface Props {
 		waiver: PublicWaiver;
 		booking?: BookingContext | null;
+		/** When true, returning guests can confirm a still-valid waiver instead of signing again. */
+		allowReuse?: boolean;
 	}
 
-	let { waiver, booking = null }: Props = $props();
+	let { waiver, booking = null, allowReuse = false }: Props = $props();
 
 	const convex = useConvexClient();
 
@@ -61,6 +63,84 @@
 	let isSubmitting = $state(false);
 	let submitError = $state<string | null>(null);
 	let isSubmitted = $state(false);
+
+	let reuseOpen = $state(false);
+	let reuseEmail = $state('');
+	let reuseDateOfBirth = $state('');
+	let isCheckingReuse = $state(false);
+	let reuseError = $state<string | null>(null);
+	let reuseResult = $state<{
+		signerName: string;
+		signedAt: number | null;
+		expiresAt: number | null;
+		alreadyCovered: boolean;
+	} | null>(null);
+
+	function formatReuseDate(timestamp: number) {
+		return new Intl.DateTimeFormat('en-US', { dateStyle: 'long' }).format(new Date(timestamp));
+	}
+
+	const reuseMessage = $derived.by(() => {
+		if (!reuseResult) return '';
+		if (reuseResult.alreadyCovered || reuseResult.signedAt === null) {
+			return `${reuseResult.signerName} is already counted for this booking. No need to sign again.`;
+		}
+		const validUntil =
+			reuseResult.expiresAt !== null
+				? ` and stays valid until ${formatReuseDate(reuseResult.expiresAt)}`
+				: '';
+		return `Thanks, ${reuseResult.signerName}. The waiver you signed on ${formatReuseDate(reuseResult.signedAt)} covers this booking${validUntil}.`;
+	});
+
+	async function handleReuse(event: SubmitEvent) {
+		event.preventDefault();
+		if (!booking) return;
+		if (convex.disabled) {
+			reuseError = 'The waiver form is still loading. Please try again.';
+			return;
+		}
+
+		isCheckingReuse = true;
+		reuseError = null;
+		try {
+			const result = await convex.mutation(api.waiverPolicies.claimExistingWaiverForBooking, {
+				slug: waiver.slug,
+				lookupToken: booking.lookupToken,
+				email: reuseEmail,
+				dateOfBirth: reuseDateOfBirth
+			});
+			if (result.status === 'covered') {
+				reuseResult = {
+					signerName: result.signerName,
+					signedAt: result.signedAt,
+					expiresAt: result.expiresAt,
+					alreadyCovered: false
+				};
+				toast.success('Your waiver on file covers this booking.');
+			} else if (result.status === 'already_covered') {
+				reuseResult = {
+					signerName: result.signerName,
+					signedAt: null,
+					expiresAt: null,
+					alreadyCovered: true
+				};
+			} else if (result.status === 'needs_new_signature') {
+				reuseError =
+					result.reason === 'new_version'
+						? `${waiver.workspaceName} has updated its waiver since you last signed. Please sign the new version below.`
+						: 'Your waiver on file has expired. Please sign again below.';
+			} else if (result.status === 'rate_limited') {
+				reuseError = 'Too many attempts for this booking. Please sign the waiver below.';
+			} else {
+				reuseError =
+					"We couldn't find a waiver on file for that email and date of birth. Please sign below.";
+			}
+		} catch (error) {
+			reuseError = getConvexErrorMessage(error, 'Unable to check for a waiver on file.');
+		} finally {
+			isCheckingReuse = false;
+		}
+	}
 
 	function addMinor() {
 		minors.push({ _uid: crypto.randomUUID(), fullName: '' });
@@ -133,6 +213,11 @@
 		minors = [];
 		submitError = null;
 		isSubmitted = false;
+		reuseOpen = false;
+		reuseEmail = '';
+		reuseDateOfBirth = '';
+		reuseError = null;
+		reuseResult = null;
 	}
 </script>
 
@@ -145,7 +230,7 @@
 		workspaceName={waiver.workspaceName}
 		workspaceLogoUrl={waiver.workspaceLogoUrl}
 	>
-		{#if isSubmitted}
+		{#if isSubmitted || reuseResult}
 			<div class="flex flex-col items-center py-20 text-center">
 				<div
 					class="mb-8 flex h-16 w-16 items-center justify-center rounded-full border-2 border-foreground/20"
@@ -165,13 +250,23 @@
 						<polyline points="20 6 9 17 4 12" />
 					</svg>
 				</div>
-				<p class="mb-2 text-xs font-bold tracking-[0.2em] text-muted-foreground uppercase">
-					Submission received
-				</p>
-				<h1 class="mb-4 text-3xl font-bold tracking-tight">Waiver complete</h1>
-				<p class="max-w-sm text-base leading-relaxed text-muted-foreground">
-					Thank you. Your signed waiver has been recorded for {waiver.workspaceName}.
-				</p>
+				{#if reuseResult}
+					<p class="mb-2 text-xs font-bold tracking-[0.2em] text-muted-foreground uppercase">
+						Waiver on file
+					</p>
+					<h1 class="mb-4 text-3xl font-bold tracking-tight">You're all set</h1>
+					<p class="max-w-sm text-base leading-relaxed text-muted-foreground">
+						{reuseMessage}
+					</p>
+				{:else}
+					<p class="mb-2 text-xs font-bold tracking-[0.2em] text-muted-foreground uppercase">
+						Submission received
+					</p>
+					<h1 class="mb-4 text-3xl font-bold tracking-tight">Waiver complete</h1>
+					<p class="max-w-sm text-base leading-relaxed text-muted-foreground">
+						Thank you. Your signed waiver has been recorded for {waiver.workspaceName}.
+					</p>
+				{/if}
 				{#if booking}
 					<button
 						type="button"
@@ -205,6 +300,81 @@
 								{booking.signedCount} signed of {booking.participantCount} expected
 							</p>
 						</div>
+					</section>
+				{/if}
+
+				{#if booking && allowReuse}
+					<section class="border border-border p-4">
+						{#if !reuseOpen}
+							<div class="flex flex-wrap items-center justify-between gap-3">
+								<div>
+									<h2 class="text-sm font-semibold">Signed with {waiver.workspaceName} before?</h2>
+									<p class="mt-1 text-sm text-muted-foreground">
+										If your waiver is still current, confirm it instead of signing again.
+									</p>
+								</div>
+								<button
+									type="button"
+									class="h-10 border border-foreground/25 px-4 text-sm font-semibold transition-colors hover:bg-muted/40"
+									onclick={() => (reuseOpen = true)}
+								>
+									Use my waiver on file
+								</button>
+							</div>
+						{:else}
+							<form onsubmit={handleReuse} class="space-y-5">
+								<div>
+									<h2 class="text-sm font-semibold">Use your waiver on file</h2>
+									<p class="mt-1 text-sm text-muted-foreground">
+										Enter the email and date of birth you signed with last time.
+									</p>
+								</div>
+								<div class="grid gap-5 sm:grid-cols-2">
+									<div>
+										<label class={waiverFieldLabelClass} for="reuse-email">Email</label>
+										<input
+											id="reuse-email"
+											type="email"
+											class={waiverUnderlineInputClass}
+											bind:value={reuseEmail}
+											required
+										/>
+									</div>
+									<div>
+										<label class={waiverFieldLabelClass} for="reuse-dob">Date of birth</label>
+										<input
+											id="reuse-dob"
+											type="date"
+											class={waiverUnderlineInputClass}
+											bind:value={reuseDateOfBirth}
+											required
+										/>
+									</div>
+								</div>
+								{#if reuseError}
+									<p class="text-sm text-destructive">{reuseError}</p>
+								{/if}
+								<div class="flex flex-wrap gap-3">
+									<button
+										type="submit"
+										class="h-10 bg-foreground px-5 text-sm font-semibold text-background transition-opacity hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-40"
+										disabled={isCheckingReuse}
+									>
+										{isCheckingReuse ? 'Checking...' : 'Confirm my waiver'}
+									</button>
+									<button
+										type="button"
+										class="h-10 px-3 text-sm text-muted-foreground hover:text-foreground"
+										onclick={() => {
+											reuseOpen = false;
+											reuseError = null;
+										}}
+									>
+										Sign a new waiver instead
+									</button>
+								</div>
+							</form>
+						{/if}
 					</section>
 				{/if}
 

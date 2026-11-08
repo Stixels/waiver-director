@@ -9,6 +9,7 @@ import { requireWorkspaceFeature, workspaceHasBillingFeature } from './lib/billi
 import { upsertSignerCustomer } from './lib/customers';
 import { submissionSearchText } from './lib/submissions';
 import { getOwnedWorkspaceLogoUrl } from './lib/workspaces';
+import { getWorkspacePolicyRecord, policyFromRecord } from './lib/waiverPolicyRecords';
 import { marketingConsentLabel } from './lib/marketing';
 import { sanitizeRichTextHtml } from '../lib/utils/rich-text';
 import {
@@ -86,7 +87,8 @@ const publicBookingWaiverValue = v.object({
 		leadCustomerName: v.union(v.string(), v.null()),
 		participantCount: v.number(),
 		signedCount: v.number()
-	})
+	}),
+	returningGuestsCanReuse: v.boolean()
 });
 
 async function getWorkspaceWaiverRecord(ctx: FunctionCtx, workspaceId: Id<'workspaces'>) {
@@ -561,7 +563,10 @@ export const getPublicWaiverForBooking = query({
 				leadCustomerName: booking.leadCustomerName ?? null,
 				participantCount: booking.participantCount,
 				signedCount: booking.signedCount
-			}
+			},
+			returningGuestsCanReuse: policyFromRecord(
+				await getWorkspacePolicyRecord(ctx, waiver.workspaceId)
+			).reuseEnabled
 		};
 	}
 });

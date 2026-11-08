@@ -7,6 +7,7 @@
 	import MailIcon from '@lucide/svelte/icons/mail';
 	import PaletteIcon from '@lucide/svelte/icons/palette';
 	import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
+	import UserCheckIcon from '@lucide/svelte/icons/user-check';
 
 	let { children } = $props();
 
@@ -38,6 +39,14 @@
 			description: 'Sender name, reply-to address',
 			icon: MailIcon,
 			match: 'email',
+			tone: 'default' as const
+		},
+		{
+			href: `/app/${page.params.workspaceSlug}/settings/guests` as const,
+			label: 'Guests',
+			description: 'Re-sign rules, reminders',
+			icon: UserCheckIcon,
+			match: 'guests',
 			tone: 'default' as const
 		},
 		{

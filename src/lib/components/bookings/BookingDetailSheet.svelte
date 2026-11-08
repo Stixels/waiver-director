@@ -109,6 +109,19 @@
 		return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(date);
 	}
 
+	const guestReminderText = $derived.by(() => {
+		const reminder = detail?.guestReminder;
+		if (!reminder) return null;
+		if (reminder.status === 'sent') {
+			return `Reminder emailed to ${reminder.recipientEmail} (${formatRelativeTime(reminder.sentAt ?? reminder.createdAt)}).`;
+		}
+		if (reminder.status === 'queued') return `Sending a reminder to ${reminder.recipientEmail}.`;
+		if (reminder.status === 'failed') {
+			return `Reminder to ${reminder.recipientEmail} failed${reminder.failureReason ? `: ${reminder.failureReason}` : '.'}`;
+		}
+		return reminder.failureReason ? `Reminder not sent: ${reminder.failureReason}` : null;
+	});
+
 	function getInitials(name: string): string {
 		return name
 			.trim()
@@ -393,6 +406,14 @@
 														minor
 													</span>
 												{/if}
+												{#if user.reusedAt !== null}
+													<span
+														class="shrink-0 rounded border border-emerald-500/20 bg-emerald-500/10 px-1 py-px text-[10px] leading-tight font-medium text-emerald-600 dark:text-emerald-400"
+														title="Returning guest: an earlier signed waiver that is still valid covers this booking"
+													>
+														on file
+													</span>
+												{/if}
 											</div>
 											<p class="truncate text-[11px] leading-snug text-muted-foreground">
 												{user.email ?? 'Signed as minor'}
@@ -422,6 +443,9 @@
 									{remainingCount === 1 ? 'guest' : 'guests'} still to sign
 								</p>
 							</div>
+						{/if}
+						{#if guestReminderText}
+							<p class="mx-2 mt-2 text-[11px] text-muted-foreground">{guestReminderText}</p>
 						{/if}
 					{/if}
 				</section>

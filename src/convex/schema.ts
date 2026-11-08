@@ -460,6 +460,63 @@ export default defineSchema({
 			filterFields: ['workspaceId']
 		}),
 
+	// Workspace rules for reusing a still-valid waiver and for reminding unsigned guests.
+	workspace_waiver_policies: defineTable({
+		workspaceId: v.id('workspaces'),
+		reuseEnabled: v.boolean(),
+		validityDays: v.optional(v.number()),
+		resignOnNewVersion: v.boolean(),
+		guestRemindersEnabled: v.boolean(),
+		guestReminderLeadHours: v.number(),
+		updatedAt: v.number()
+	})
+		.index('by_workspaceId', ['workspaceId'])
+		.index('by_guestRemindersEnabled', ['guestRemindersEnabled']),
+
+	// A returning guest's existing signed submission counted toward a booking.
+	// The submission itself is never modified.
+	booking_waiver_reuses: defineTable({
+		workspaceId: v.id('workspaces'),
+		bookingId: v.id('bookings'),
+		customerId: v.id('customers'),
+		submissionId: v.id('waiver_submissions'),
+		signerName: v.string(),
+		signerEmail: v.string(),
+		reusedAt: v.number()
+	})
+		.index('by_bookingId', ['bookingId'])
+		.index('by_bookingId_and_customerId', ['bookingId', 'customerId'])
+		.index('by_workspaceId', ['workspaceId']),
+
+	booking_waiver_reuse_attempts: defineTable({
+		workspaceId: v.id('workspaces'),
+		bookingId: v.id('bookings'),
+		windowStartedAt: v.number(),
+		failedCount: v.number()
+	})
+		.index('by_bookingId', ['bookingId'])
+		.index('by_workspaceId', ['workspaceId']),
+
+	booking_guest_reminders: defineTable({
+		workspaceId: v.id('workspaces'),
+		bookingId: v.id('bookings'),
+		recipientEmail: v.string(),
+		status: v.union(
+			v.literal('queued'),
+			v.literal('sent'),
+			v.literal('skipped'),
+			v.literal('failed')
+		),
+		signedCountAtQueue: v.number(),
+		participantCount: v.number(),
+		createdAt: v.number(),
+		sentAt: v.optional(v.number()),
+		resendMessageId: v.optional(v.string()),
+		failureReason: v.optional(v.string())
+	})
+		.index('by_bookingId', ['bookingId'])
+		.index('by_workspaceId', ['workspaceId']),
+
 	booking_webhook_events: defineTable({
 		workspaceId: v.id('workspaces'),
 		integrationId: v.id('booking_integrations'),
