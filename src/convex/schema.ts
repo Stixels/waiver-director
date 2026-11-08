@@ -106,6 +106,8 @@ export default defineSchema({
 		title: v.string(),
 		introCopy: v.string(),
 		theme: v.optional(v.union(v.literal('light'), v.literal('dark'))),
+		// Optional so waivers and versions saved before this setting default to 18.
+		minimumSignerAge: v.optional(v.number()),
 		fields: v.array(
 			v.union(
 				v.object({
@@ -152,6 +154,8 @@ export default defineSchema({
 		title: v.string(),
 		introCopy: v.string(),
 		theme: v.optional(v.union(v.literal('light'), v.literal('dark'))),
+		// Optional so waivers and versions saved before this setting default to 18.
+		minimumSignerAge: v.optional(v.number()),
 		fields: v.array(
 			v.union(
 				v.object({

@@ -16,7 +16,11 @@
 		waiverUnderlineTextareaClass
 	} from '$lib/components/waivers/waiver-public-form-classes';
 	import type { WaiverField, WaiverMinor, WaiverTheme } from '$lib/domain/waivers';
-	import { minorBirthDateBounds } from '$lib/domain/waiver-constraints';
+	import {
+		isSignerBirthDate,
+		minorBirthDateBounds,
+		signerBirthDateBounds
+	} from '$lib/domain/waiver-constraints';
 	import { formatBookingTimestamp } from '$lib/utils/date';
 
 	type PublicWaiver = {
@@ -27,6 +31,7 @@
 		title: string;
 		introCopy: string;
 		theme: WaiverTheme;
+		minimumSignerAge: number;
 		fields: WaiverField[];
 		marketingOptIn: { provider: 'mailchimp'; label: string } | null;
 	};
@@ -125,6 +130,11 @@
 
 		if (!electronicSignatureConsent) {
 			submitError = 'Please agree to sign electronically.';
+			return;
+		}
+
+		if (!isSignerBirthDate(signerDateOfBirth, todayIsoDate(), waiver.minimumSignerAge)) {
+			submitError = `You must be at least ${waiver.minimumSignerAge} to sign this waiver. A parent or guardian can sign and add minors instead.`;
 			return;
 		}
 
@@ -285,8 +295,15 @@
 									type="date"
 									class={waiverUnderlineInputClass}
 									bind:value={signerDateOfBirth}
+									min={signerBirthDateBounds(todayIsoDate(), waiver.minimumSignerAge).min}
+									max={signerBirthDateBounds(todayIsoDate(), waiver.minimumSignerAge).max}
+									aria-describedby="signer-dob-hint"
 									required
 								/>
+								<p id="signer-dob-hint" class="mt-1.5 text-xs text-muted-foreground">
+									You must be {waiver.minimumSignerAge} or older to sign. Signing for someone younger?
+									Add them as a minor below.
+								</p>
 							</div>
 						</div>
 
