@@ -304,6 +304,7 @@ export default defineSchema({
 			v.literal('failed')
 		),
 		scheduledFunctionId: v.optional(v.id('_scheduled_functions')),
+		deliveryClaimedAt: v.optional(v.number()),
 		sentAt: v.optional(v.number()),
 		sentSubject: v.optional(v.string()),
 		sentBodyHtml: v.optional(v.string()),

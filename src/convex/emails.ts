@@ -16,6 +16,11 @@ import { requireWorkspaceFeature } from './lib/billing';
 import { requireWorkspaceMember } from './lib/waivers';
 import { escapeHtml, sanitizeRichTextHtml } from '../lib/utils/rich-text';
 import { richTextHtmlToPlainText } from '../lib/utils/rich-text-shared';
+import {
+	formatFollowUpActivityDate,
+	resolveTemplateVariables,
+	type FollowUpTemplateVariables
+} from '../lib/utils/email-variables';
 
 const DEFAULT_SEND_AFTER_AMOUNT = 2;
 const DEFAULT_SEND_AFTER_UNIT = 'hours' as const;
@@ -26,6 +31,10 @@ const EMAIL_TEMPLATE_LIMIT = 100;
 const FOLLOW_UP_STATS_LIMIT = 1000;
 const REPLY_TO_VERIFICATION_TTL_MS = 15 * 60 * 1000;
 const REPLY_TO_VERIFICATION_MAX_ATTEMPTS = 5;
+const REPLY_TO_VERIFICATION_RESEND_COOLDOWN_MS = 60 * 1000;
+// A delivery action that claimed a follow-up but never finished (for example it
+// was killed mid-send) stops blocking "Send now" after this long.
+const FOLLOW_UP_DELIVERY_CLAIM_TTL_MS = 10 * 60 * 1000;
 const EMAIL_ADDRESS_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const followUpStatusValue = v.union(
@@ -305,10 +314,21 @@ export const startReplyToVerification = action({
 	},
 	handler: async (ctx, args) => {
 		const email = normalizeReplyToEmail(args.replyToEmail);
-		const workspace: { name: string } = await ctx.runQuery(
+		const workspace: { name: string; verificationCodeSentAt: number | null } = await ctx.runQuery(
 			internal.emails.getWorkspaceForEmailAction,
-			{ workspaceId: args.workspaceId }
+			{
+				workspaceId: args.workspaceId
+			}
 		);
+		if (
+			workspace.verificationCodeSentAt !== null &&
+			Date.now() - workspace.verificationCodeSentAt < REPLY_TO_VERIFICATION_RESEND_COOLDOWN_MS
+		) {
+			throw new ConvexError({
+				code: 'rate_limited',
+				message: 'A verification code was just sent. Wait a minute before requesting another.'
+			});
+		}
 		const code = verificationCode();
 		const codeHash = await verificationCodeHash({ email, code });
 		const now = Date.now();
@@ -689,6 +709,13 @@ export const sendFollowUpNow = mutation({
 			});
 		}
 
+		if (isFollowUpDeliveryInFlight(followUp)) {
+			throw new ConvexError({
+				code: 'invalid_state',
+				message: 'This follow-up is already being sent.'
+			});
+		}
+
 		if (followUp.scheduledFunctionId) {
 			try {
 				await ctx.scheduler.cancel(followUp.scheduledFunctionId);
@@ -725,6 +752,7 @@ export const sendSelected = mutation({
 			const followUp = await ctx.db.get(followUpId);
 			if (!followUp || followUp.workspaceId !== args.workspaceId) continue;
 			if (!['queued', 'blocked', 'unscheduled', 'failed'].includes(followUp.status)) continue;
+			if (isFollowUpDeliveryInFlight(followUp)) continue;
 			if (followUp.scheduledFunctionId) {
 				try {
 					await ctx.scheduler.cancel(followUp.scheduledFunctionId);
@@ -786,7 +814,14 @@ export const getWorkspaceForEmailAction = internalQuery({
 		if (!workspace) {
 			throw new ConvexError({ code: 'not_found', message: 'Workspace not found.' });
 		}
-		return { name: workspace.name };
+		const settings = await ctx.db
+			.query('workspace_email_settings')
+			.withIndex('by_workspaceId', (q) => q.eq('workspaceId', args.workspaceId))
+			.unique();
+		return {
+			name: workspace.name,
+			verificationCodeSentAt: settings?.verificationCodeSentAt ?? null
+		};
 	}
 });
 
@@ -1047,6 +1082,7 @@ export const markFollowUpSent = internalMutation({
 		await ctx.db.patch(args.followUpId, {
 			status: 'sent',
 			sentAt: Date.now(),
+			deliveryClaimedAt: undefined,
 			sentSubject: args.sentSubject,
 			sentBodyHtml: args.sentBodyHtml,
 			sentFrom: args.sentFrom,
@@ -1068,7 +1104,8 @@ export const markFollowUpFailed = internalMutation({
 		await ctx.db.patch(args.followUpId, {
 			status: 'failed',
 			failedAt: Date.now(),
-			failureReason: args.reason
+			failureReason: args.reason,
+			deliveryClaimedAt: undefined
 		});
 	}
 });
@@ -1085,20 +1122,34 @@ export const markFollowUpBlocked = internalMutation({
 		await ctx.db.patch(args.followUpId, {
 			status: 'blocked',
 			failureReason: args.reason,
-			scheduledFunctionId: undefined
+			scheduledFunctionId: undefined,
+			deliveryClaimedAt: undefined
 		});
 	}
 });
 
-function resolveVariables(
-	template: string,
-	vars: { signerName: string; bookingId: string; businessName: string; activityDate: string }
-): string {
-	return template
-		.replace(/\{\{customer_name\}\}|\{customer_name\}/g, vars.signerName)
-		.replace(/\{\{booking_id\}\}|\{booking_id\}/g, vars.bookingId)
-		.replace(/\{\{business_name\}\}|\{business_name\}/g, vars.businessName)
-		.replace(/\{\{activity_date\}\}|\{activity_date\}/g, vars.activityDate);
+export const claimFollowUpForDelivery = internalMutation({
+	args: { followUpId: v.id('email_follow_ups') },
+	handler: async (ctx, args) => {
+		const followUp = await ctx.db.get(args.followUpId);
+		if (!followUp || followUp.status !== 'queued') return false;
+		const now = Date.now();
+		if (isFollowUpDeliveryInFlight(followUp, now)) return false;
+		await ctx.db.patch(args.followUpId, { deliveryClaimedAt: now });
+		return true;
+	}
+});
+
+function isFollowUpDeliveryInFlight(followUp: Doc<'email_follow_ups'>, now = Date.now()) {
+	return (
+		followUp.status === 'queued' &&
+		followUp.deliveryClaimedAt !== undefined &&
+		now - followUp.deliveryClaimedAt < FOLLOW_UP_DELIVERY_CLAIM_TTL_MS
+	);
+}
+
+function resolveVariables(template: string, vars: FollowUpTemplateVariables): string {
+	return resolveTemplateVariables(template, vars);
 }
 
 function resolveHtmlVariables(
@@ -1245,9 +1296,9 @@ export const deliverFollowUpEmail = internalAction({
 		const bookingId = followUpWithBooking.bookingNumber
 			? `#${followUpWithBooking.bookingNumber}`
 			: '';
-		const bookingStartAt = parseTimestamp(followUp.bookingStartTime);
-		const activityDate = new Intl.DateTimeFormat('en-US', { dateStyle: 'long' }).format(
-			new Date(bookingStartAt ?? followUp.submittedAt)
+		const activityDate = formatFollowUpActivityDate(
+			followUp.bookingStartTime,
+			followUp.submittedAt
 		);
 
 		const vars = {
@@ -1300,6 +1351,14 @@ export const deliverFollowUpEmail = internalAction({
 			});
 			return;
 		}
+
+		// Claim the row right before sending so a second delivery action (a double
+		// click on "Send now", or "Send now" racing the scheduled send) cannot
+		// email the customer twice.
+		const claimed: boolean = await ctx.runMutation(internal.emails.claimFollowUpForDelivery, {
+			followUpId: args.followUpId
+		});
+		if (!claimed) return;
 
 		const resend = new Resend(apiKey);
 		const sentFrom = friendlyFromAddress(
