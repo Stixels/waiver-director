@@ -1,15 +1,19 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import { useClerkContext } from 'svelte-clerk';
-	import { getClerkErrorMessage, getSafePostAuthRedirectHref } from '$lib/auth/clerk-helpers';
+	import {
+		activateSessionAndRedirect,
+		getClerkErrorMessage,
+		getSafePostAuthRedirectHref
+	} from '$lib/auth/clerk-helpers';
 	import AuthPageShell from '$lib/components/marketing/auth/AuthPageShell.svelte';
+	import {
+		authInputClass as inputClass,
+		authSubmitButtonClass as submitButtonClass
+	} from '$lib/components/marketing/auth/auth-form-classes';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 
-	const inputClass =
-		'h-14 rounded-xl border-(--m-border-strong) bg-(--m-elevated) px-4 text-sm text-foreground shadow-none transition-[border-color,box-shadow] placeholder:text-(--m-text-3) focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/25 sm:px-5 md:text-sm';
-	const submitButtonClass =
-		'btn-mkt-accent h-14 w-full rounded-xl text-base font-semibold shadow-none';
 	const backButtonClass =
 		'btn-mkt-outline h-14 w-full rounded-xl border-(--m-border-strong) text-base font-semibold shadow-none';
 
@@ -31,20 +35,12 @@
 	}
 
 	async function activateCreatedSession(sessionId: string | null) {
-		if (!sessionId || !clerk.clerk) {
-			throw new Error('Your password was reset, but no active session could be set.');
-		}
-
-		await clerk.clerk.setActive({
-			session: sessionId,
-			navigate: async ({ session, decorateUrl }) => {
-				if (session?.currentTask) {
-					return;
-				}
-
-				window.location.replace(decorateUrl(postAuthRedirectUrl));
-			}
-		});
+		await activateSessionAndRedirect(
+			clerk.clerk,
+			sessionId,
+			postAuthRedirectUrl,
+			'Your password was reset, but no active session could be set.'
+		);
 	}
 
 	async function handleRequestReset(event: SubmitEvent) {
