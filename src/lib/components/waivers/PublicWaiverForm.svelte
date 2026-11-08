@@ -16,6 +16,7 @@
 		waiverUnderlineTextareaClass
 	} from '$lib/components/waivers/waiver-public-form-classes';
 	import type { WaiverField, WaiverMinor, WaiverTheme } from '$lib/domain/waivers';
+	import { getVisibleFieldIds, pruneHiddenAnswers } from '$lib/domain/waiver-conditions';
 	import { getConvexErrorMessage } from '$lib/utils/convex-errors';
 	import { formatBookingTimestamp } from '$lib/utils/date';
 
@@ -61,6 +62,8 @@
 	let isSubmitting = $state(false);
 	let submitError = $state<string | null>(null);
 	let isSubmitted = $state(false);
+	const visibleFieldIds = $derived(getVisibleFieldIds(waiver.fields, answers));
+	const visibleFields = $derived(waiver.fields.filter((field) => visibleFieldIds.has(field.id)));
 
 	function addMinor() {
 		minors.push({ _uid: crypto.randomUUID(), fullName: '' });
@@ -110,7 +113,7 @@
 				signerDateOfBirth,
 				signatureDataUrl,
 				marketingConsent,
-				answers,
+				answers: pruneHiddenAnswers(waiver.fields, answers),
 				minors: minorsPayload
 			});
 
@@ -289,9 +292,9 @@
 							{/snippet}
 						</WaiverPublicMinorsBlock>
 
-						{#if waiver.fields.length > 0}
+						{#if visibleFields.length > 0}
 							<WaiverPublicAdditionalInfoSection>
-								{#each waiver.fields as field (field.id)}
+								{#each visibleFields as field (field.id)}
 									<div>
 										{#if field.type !== 'checkbox'}
 											<label class={waiverFieldLabelClass} for={field.id}>

@@ -1,4 +1,5 @@
 import { ConvexError, v } from 'convex/values';
+import { waiverFieldConditionValidator } from './waiverConditionValidator';
 import type { Doc, Id } from '../_generated/dataModel';
 import type { MutationCtx, QueryCtx } from '../_generated/server';
 import { getCurrentUser } from './auth';
@@ -18,6 +19,12 @@ import {
 	MIN_WAIVER_FIELD_LABEL_LENGTH,
 	MIN_WAIVER_TITLE_LENGTH
 } from '../../lib/domain/waiver-constraints';
+import {
+	findFirstConditionProblem,
+	getVisibleFieldIds,
+	pruneHiddenAnswers,
+	type WaiverFieldCondition
+} from '../../lib/domain/waiver-conditions';
 
 type FunctionCtx = QueryCtx | MutationCtx;
 
@@ -27,19 +34,22 @@ export const waiverFieldValidator = v.union(
 		type: v.literal('text'),
 		label: v.string(),
 		required: v.boolean(),
+		visibleWhen: v.optional(waiverFieldConditionValidator),
 		placeholder: v.optional(v.string())
 	}),
 	v.object({
 		id: v.string(),
 		type: v.literal('checkbox'),
 		label: v.string(),
-		required: v.boolean()
+		required: v.boolean(),
+		visibleWhen: v.optional(waiverFieldConditionValidator)
 	}),
 	v.object({
 		id: v.string(),
 		type: v.literal('select'),
 		label: v.string(),
 		required: v.boolean(),
+		visibleWhen: v.optional(waiverFieldConditionValidator),
 		options: v.array(
 			v.object({
 				id: v.string(),
@@ -51,7 +61,8 @@ export const waiverFieldValidator = v.union(
 		id: v.string(),
 		type: v.literal('date'),
 		label: v.string(),
-		required: v.boolean()
+		required: v.boolean(),
+		visibleWhen: v.optional(waiverFieldConditionValidator)
 	})
 );
 
@@ -80,6 +91,7 @@ export type WaiverDefinition = {
 				type: 'text';
 				label: string;
 				required: boolean;
+				visibleWhen?: WaiverFieldCondition;
 				placeholder?: string;
 		  }
 		| {
@@ -87,12 +99,14 @@ export type WaiverDefinition = {
 				type: 'checkbox';
 				label: string;
 				required: boolean;
+				visibleWhen?: WaiverFieldCondition;
 		  }
 		| {
 				id: string;
 				type: 'select';
 				label: string;
 				required: boolean;
+				visibleWhen?: WaiverFieldCondition;
 				options: Array<{
 					id: string;
 					label: string;
@@ -103,6 +117,7 @@ export type WaiverDefinition = {
 				type: 'date';
 				label: string;
 				required: boolean;
+				visibleWhen?: WaiverFieldCondition;
 		  }
 	>;
 };
@@ -298,6 +313,14 @@ export function normalizeWaiverDefinition(definition: WaiverDefinition): WaiverD
 		};
 	});
 
+	const conditionProblem = findFirstConditionProblem(fields);
+	if (conditionProblem) {
+		throw new ConvexError({
+			code: 'invalid_argument',
+			message: conditionProblem
+		});
+	}
+
 	return {
 		title,
 		introCopy,
@@ -346,11 +369,20 @@ export function waiverDefinitionsEqual(a: WaiverDefinition, b: WaiverDefinition)
 	);
 }
 
+/**
+ * Validates answers against the published fields and returns the answers to
+ * store. Fields hidden by conditional logic are never required, and their
+ * answers are dropped so the signed record only holds what the signer saw.
+ */
 export function validateSubmissionAnswers(
 	definition: Pick<WaiverDefinition, 'fields'>,
 	answers: Record<string, string | boolean | null>
-) {
+): Record<string, string | boolean | null> {
+	const visibleFieldIds = getVisibleFieldIds(definition.fields, answers);
 	for (const field of definition.fields) {
+		if (!visibleFieldIds.has(field.id)) {
+			continue;
+		}
 		const answer = answers[field.id] ?? null;
 
 		if (field.type === 'checkbox') {
@@ -381,6 +413,8 @@ export function validateSubmissionAnswers(
 			}
 		}
 	}
+
+	return pruneHiddenAnswers(definition.fields, answers);
 }
 
 export function validateMinors(minors: MinorInput[]): MinorInput[] {

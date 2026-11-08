@@ -35,6 +35,15 @@ You can also choose a light or dark theme for the public waiver page.
 
 Any field can be marked required. Dropdown answers feed into [analytics](/guides/analytics).
 
+### Conditional fields
+
+Use **Add condition** on a field to show it only when an earlier checkbox or dropdown has a certain answer. For example, show "Describe your condition" only when "I have a medical condition" is checked, or show a safety orientation question only when "Experience level" is not "Experienced".
+
+- A condition can only depend on a checkbox or dropdown that appears **above** the field. If you drag a field above the one it depends on, the builder flags it and stops saving until you move it back or remove the condition.
+- A required conditional field is only required while it is shown.
+- If a field is hidden, any answer typed into it before it was hidden is discarded, so the signed record only contains questions the signer actually saw.
+- Deleting a field or dropdown option that a condition depends on removes that condition.
+
 ## Publish
 
 Publishing saves the current draft as a new **published waiver version** and makes it the version customers sign. Edits you make after publishing stay in the draft until you publish again.

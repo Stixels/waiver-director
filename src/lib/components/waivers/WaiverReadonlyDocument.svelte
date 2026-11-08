@@ -12,6 +12,7 @@
 		waiverFieldLabelClass,
 		waiverUnderlineInputClass
 	} from '$lib/components/waivers/waiver-public-form-classes';
+	import { describeCondition, getVisibleFieldIds } from '$lib/domain/waiver-conditions';
 
 	interface Props {
 		workspaceName?: string;
@@ -46,6 +47,14 @@
 		signatureDataUrl = '',
 		submittedAt
 	}: Props = $props();
+
+	// Signed records only show fields the signer actually saw; previews show
+	// every field with a note on the conditional ones.
+	const displayedFields = $derived.by(() => {
+		if (preview) return fields;
+		const visible = getVisibleFieldIds(fields, answers);
+		return fields.filter((field) => visible.has(field.id));
+	});
 
 	function formatTimestamp(ts: number) {
 		return new Intl.DateTimeFormat('en-US', { dateStyle: 'long', timeStyle: 'short' }).format(
@@ -126,10 +135,17 @@
 					</WaiverPublicMinorsBlock>
 				{/if}
 
-				{#if fields.length > 0}
+				{#if displayedFields.length > 0}
 					<WaiverPublicAdditionalInfoSection>
-						{#each fields as field (field.id)}
-							<WaiverFieldDisplay {field} value={answers[field.id]} {preview} />
+						{#each displayedFields as field (field.id)}
+							<div>
+								<WaiverFieldDisplay {field} value={answers[field.id]} {preview} />
+								{#if preview && field.visibleWhen}
+									<p class="mt-1.5 text-[11px] text-muted-foreground">
+										{describeCondition(fields, field.visibleWhen)}
+									</p>
+								{/if}
+							</div>
 						{/each}
 					</WaiverPublicAdditionalInfoSection>
 				{/if}
