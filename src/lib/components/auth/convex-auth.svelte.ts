@@ -14,6 +14,7 @@ type ConvexAuthStatus = 'loading' | 'authenticated' | 'unauthenticated';
 export type ConvexAuthState = {
 	status: ConvexAuthStatus;
 	sessionId: string | null;
+	isSigningOut: boolean;
 	signOut: (redirectUrl: string) => Promise<void>;
 };
 
@@ -34,6 +35,7 @@ export function useConvexAuthState(): ConvexAuthState {
 		getContext<ConvexAuthState>(CONVEX_AUTH_CONTEXT) ?? {
 			status: 'unauthenticated',
 			sessionId: null,
+			isSigningOut: false,
 			signOut: async () => {}
 		}
 	);
