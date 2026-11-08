@@ -554,14 +554,14 @@
 												<p class="text-sm leading-relaxed whitespace-pre-wrap">{field.clause}</p>
 												<div class="mt-3 flex items-center gap-3">
 													<label
-														class="text-[11px] font-medium tracking-wide text-muted-foreground uppercase"
+														class="shrink-0 text-[11px] font-medium tracking-wide whitespace-nowrap text-muted-foreground uppercase"
 														for={field.id}
 													>
 														Your initials
 													</label>
 													<input
 														id={field.id}
-														class={`${waiverUnderlineInputClass} w-24 py-1 text-center font-semibold tracking-widest uppercase`}
+														class={`${waiverUnderlineInputClass} max-w-28 py-1 text-center font-semibold tracking-widest uppercase`}
 														autocomplete="off"
 														autocapitalize="characters"
 														maxlength={MAX_INITIALS_LENGTH}
