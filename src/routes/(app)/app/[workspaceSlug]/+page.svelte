@@ -29,11 +29,14 @@
 	});
 
 	// 14-day window supports the visible 7-day trend plus a prior-week comparison.
-	const trendStartAt = $derived.by(() => {
+	// The exact local midnights are sent too, because a day around a daylight
+	// saving change is 23 or 25 hours long and the server cannot know our time zone.
+	const trendDayBoundaries = $derived.by(() => {
 		const now = new Date();
 		const [y, m, d] = toDateInputValue(now).split('-').map(Number);
-		return new Date(y, m - 1, d - 13).getTime();
+		return Array.from({ length: 15 }, (_, index) => new Date(y, m - 1, d - 13 + index).getTime());
 	});
+	const trendStartAt = $derived(trendDayBoundaries[0]);
 
 	const snapshotQuery = useProtectedQuery(
 		api.dashboard.getDashboardSnapshot,
@@ -43,7 +46,8 @@
 						workspaceId: currentWorkspace.workspaceId,
 						todayStartAt: today.startAt,
 						todayEndAt: today.endAt,
-						trendStartAt
+						trendStartAt,
+						dayBoundaries: trendDayBoundaries
 					}
 				: 'skip',
 		() => ({ keepPreviousData: true })
