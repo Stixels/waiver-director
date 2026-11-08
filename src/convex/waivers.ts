@@ -8,6 +8,7 @@ import { bookingSnapshot, bookingSnapshotValidator } from './lib/bookings';
 import { requireWorkspaceFeature, workspaceHasBillingFeature } from './lib/billing';
 import { upsertSignerCustomer } from './lib/customers';
 import { submissionSearchText } from './lib/submissions';
+import { rosterSummaryFromSubmission } from './lib/checkIns';
 import { getOwnedWorkspaceLogoUrl } from './lib/workspaces';
 import { marketingConsentLabel } from './lib/marketing';
 import { sanitizeRichTextHtml } from '../lib/utils/rich-text';
@@ -715,6 +716,13 @@ export const submitPublicWaiver = mutation({
 			latestSubmissionId: submissionId
 		});
 		await ctx.db.patch(submissionId, { customerId });
+		await ctx.db.insert('submission_rosters', {
+			workspaceId: waiver.workspaceId,
+			submissionId,
+			...(booking ? { bookingId: booking._id } : {}),
+			submittedAt,
+			...rosterSummaryFromSubmission({ signerName, minors })
+		});
 
 		if (marketingConsent && marketingIntegration?.audienceId) {
 			const syncId = await ctx.db.insert('marketing_contact_syncs', {

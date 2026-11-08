@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+	rosterInputFromSummary,
+	rosterSummaryFromSubmission,
 	computeRosterTotals,
 	isValidParticipantIndex,
 	rosterPeopleForSubmission,
@@ -65,4 +67,21 @@ test('computes day totals and excludes canceled bookings from expected and unsig
 		arrived: 1 + 1 + 1,
 		unsigned: 2
 	});
+});
+
+test('roster summaries round-trip to the same roster people', () => {
+	const submission = {
+		_id: 'sub1',
+		signerName: 'Dana Smith',
+		minors: [{ fullName: 'Ava Smith' }, { fullName: 'Leo Smith' }]
+	};
+	const summary = rosterSummaryFromSubmission(submission);
+	assert.deepEqual(summary, { signerName: 'Dana Smith', minorNames: ['Ava Smith', 'Leo Smith'] });
+	assert.deepEqual(
+		rosterPeopleForSubmission(
+			rosterInputFromSummary({ submissionId: 'sub1', ...summary }),
+			new Map([[2, 99]])
+		),
+		rosterPeopleForSubmission(submission, new Map([[2, 99]]))
+	);
 });

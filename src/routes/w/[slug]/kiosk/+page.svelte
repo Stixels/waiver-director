@@ -2,13 +2,18 @@
 	import type { FunctionReturnType } from 'convex/server';
 	import { onDestroy, onMount, tick } from 'svelte';
 	import { useConvexClient } from 'convex-svelte';
+	import { afterNavigate, replaceState } from '$app/navigation';
+	import { resolve } from '$app/paths';
+	import { page } from '$app/state';
 	import { api } from '$convex/_generated/api';
 	import PublicWaiverForm from '$lib/components/waivers/PublicWaiverForm.svelte';
 	import WaiverDocumentShell from '$lib/components/waivers/WaiverDocumentShell.svelte';
 	import {
+		KIOSK_DEVICE_PARAM,
 		KIOSK_IDLE_TIMEOUT_MS,
 		KIOSK_IDLE_WARNING_MS,
-		KIOSK_SUBMITTED_RESET_MS
+		KIOSK_SUBMITTED_RESET_MS,
+		kioskDeviceStorageKey
 	} from '$lib/domain/kiosk';
 	import { getConvexErrorMessage } from '$lib/utils/convex-errors';
 	import { formatBookingTimestamp } from '$lib/utils/date';
@@ -35,6 +40,9 @@
 	const convex = useConvexClient();
 
 	let screen = $state<Screen>({ name: 'home' });
+	// Booking lookup only works on a device opened from the Waiver page (see ADR 0001 and
+	// kiosk.lookupBookings). Without a device token the kiosk offers walk-in signing only.
+	let deviceToken = $state<string | null>(null);
 	// Bumped on every reset so the signing form remounts with empty state and a blank signature.
 	let sessionKey = $state(0);
 
@@ -111,6 +119,7 @@
 		try {
 			const result = await convex.mutation(api.kiosk.lookupBookings, {
 				slug: waiver.slug,
+				...(deviceToken ? { deviceToken } : {}),
 				query: lookupQuery
 			});
 			if (result.status === 'ok') {
@@ -119,6 +128,10 @@
 				lookupError = result.message;
 			} else if (result.status === 'rate_limited') {
 				lookupError = `Too many searches right now. Try again in ${Math.ceil(result.retryAfterSeconds / 60)} min, or sign as a walk-in.`;
+			} else if (result.status === 'device_required') {
+				forgetDeviceToken();
+				lookupError =
+					'Booking lookup is turned off on this device. Please sign as a walk-in or ask staff for help.';
 			} else {
 				lookupError = 'Booking lookup is not available right now. Please sign as a walk-in.';
 			}
@@ -174,7 +187,49 @@
 		}
 	});
 
+	function readStoredDeviceToken() {
+		try {
+			return localStorage.getItem(kioskDeviceStorageKey(waiver.slug));
+		} catch {
+			return null;
+		}
+	}
+
+	function storeDeviceToken(token: string) {
+		try {
+			localStorage.setItem(kioskDeviceStorageKey(waiver.slug), token);
+		} catch {
+			// Storage can be blocked (private mode); the token still works for this page load.
+		}
+	}
+
+	function forgetDeviceToken() {
+		deviceToken = null;
+		try {
+			localStorage.removeItem(kioskDeviceStorageKey(waiver.slug));
+		} catch {
+			// Nothing stored.
+		}
+	}
+
+	// Keep the device token out of the address bar so it can't be copied off the shared device.
+	// The router isn't ready during the first load's mount callbacks, so wait one task.
+	afterNavigate(() => {
+		if (!page.url.searchParams.has(KIOSK_DEVICE_PARAM)) return;
+		setTimeout(() => {
+			replaceState(resolve('/w/[slug]/kiosk', { slug: page.params.slug ?? waiver.slug }), {});
+		}, 0);
+	});
+
 	onMount(() => {
+		const fromUrl = page.url.searchParams.get(KIOSK_DEVICE_PARAM)?.trim();
+		if (fromUrl) {
+			storeDeviceToken(fromUrl);
+			deviceToken = fromUrl;
+		} else {
+			deviceToken = readStoredDeviceToken();
+		}
+
 		ticker = setInterval(() => {
 			now = Date.now();
 		}, 1000);
@@ -249,20 +304,23 @@
 						</p>
 						<h1 class="mb-4 text-3xl font-bold tracking-tight sm:text-4xl">Sign your waiver</h1>
 						<p class="mb-10 max-w-md text-base leading-relaxed text-muted-foreground">
-							Booked ahead? Find your booking so your waiver is attached to it. Otherwise, sign as a
-							walk-in.
+							{deviceToken
+								? 'Booked ahead? Find your booking so your waiver is attached to it. Otherwise, sign as a walk-in.'
+								: 'Tap below to read and sign your waiver.'}
 						</p>
 						<div class="grid w-full max-w-md gap-4">
+							{#if deviceToken}
+								<button
+									type="button"
+									class={primaryButtonClass}
+									onclick={() => goTo({ name: 'lookup' })}
+								>
+									I have a booking
+								</button>
+							{/if}
 							<button
 								type="button"
-								class={primaryButtonClass}
-								onclick={() => goTo({ name: 'lookup' })}
-							>
-								I have a booking
-							</button>
-							<button
-								type="button"
-								class={secondaryButtonClass}
+								class={deviceToken ? secondaryButtonClass : primaryButtonClass}
 								onclick={() => {
 									sessionKey += 1;
 									void goTo({ name: 'walk-in' });
@@ -278,6 +336,12 @@
 						>
 							Toggle full screen
 						</button>
+						{#if !deviceToken}
+							<p class="mt-3 max-w-sm text-xs text-muted-foreground/60">
+								Booking lookup is off on this device. Staff can turn it on by opening the kiosk from
+								the Waiver page in Waiver Director.
+							</p>
+						{/if}
 					</div>
 				{:else if screen.name === 'lookup'}
 					<div class="py-8 sm:py-12">

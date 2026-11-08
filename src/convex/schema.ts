@@ -508,5 +508,37 @@ export default defineSchema({
 		.index('by_workspaceId', ['workspaceId'])
 		.index('by_workspaceId_and_checkedInAt', ['workspaceId', 'checkedInAt'])
 		.index('by_submissionId_and_participantIndex', ['submissionId', 'participantIndex'])
-		.index('by_bookingId', ['bookingId'])
+		.index('by_bookingId', ['bookingId']),
+
+	// Small per-submission copy of who a signed submission covers, so the check-in roster
+	// never has to read full signed records (signature images make those large).
+	// Written once at signing time; the signed submission stays the source of truth.
+	submission_rosters: defineTable({
+		workspaceId: v.id('workspaces'),
+		submissionId: v.id('waiver_submissions'),
+		bookingId: v.optional(v.id('bookings')),
+		submittedAt: v.number(),
+		signerName: v.string(),
+		minorNames: v.array(v.string())
+	})
+		.index('by_workspaceId', ['workspaceId'])
+		.index('by_submissionId', ['submissionId'])
+		.index('by_bookingId_and_submittedAt', ['bookingId', 'submittedAt'])
+		.index('by_workspaceId_and_bookingId_and_submittedAt', [
+			'workspaceId',
+			'bookingId',
+			'submittedAt'
+		]),
+
+	// Front-desk devices allowed to use kiosk booking lookup. Only a hash of the token is stored.
+	kiosk_devices: defineTable({
+		workspaceId: v.id('workspaces'),
+		tokenHash: v.string(),
+		createdByUserId: v.id('users'),
+		createdAt: v.number(),
+		lastUsedAt: v.optional(v.number()),
+		revokedAt: v.optional(v.number())
+	})
+		.index('by_workspaceId', ['workspaceId'])
+		.index('by_tokenHash', ['tokenHash'])
 });

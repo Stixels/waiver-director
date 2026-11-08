@@ -59,3 +59,13 @@ See `src/convex/schema.ts` for the full schema.
 ## Scheduled jobs
 
 Daily cron jobs in `src/convex/crons.ts` prune expired connection sessions, old Bookeo webhook events, old marketing contact sync records, and stale kiosk lookup rate-limit counters.
+
+## One-time backfills
+
+The check-in roster reads `submission_rosters`, a small per-submission list of signer and minor names written at signing time. After deploying the check-in feature to a deployment that already has signed submissions, run this once to create rows for older submissions:
+
+```sh
+npx convex run checkIns:backfillSubmissionRosters '{}'
+```
+
+It is safe to run again; submissions that already have a row are skipped.

@@ -48,6 +48,7 @@
 	import CheckIcon from '@lucide/svelte/icons/check';
 	import QrCodeIcon from '@lucide/svelte/icons/qr-code';
 	import TabletSmartphoneIcon from '@lucide/svelte/icons/tablet-smartphone';
+	import { KIOSK_DEVICE_PARAM } from '$lib/domain/kiosk';
 	import UploadCloudIcon from '@lucide/svelte/icons/cloud-upload';
 	import Pencil from '@lucide/svelte/icons/pencil';
 	import XIcon from '@lucide/svelte/icons/x';
@@ -379,6 +380,73 @@
 		versionHistoryOpen = true;
 	}
 
+	let isOpeningKiosk = $state(false);
+
+	// Each call registers a new kiosk device, which is what lets that device use booking lookup.
+	async function createKioskUrl(): Promise<string | null> {
+		if (convex.disabled || !currentWorkspace || !workspaceWaiver) return null;
+		const { token } = await convex.mutation(api.kiosk.createKioskDevice, {
+			workspaceId: currentWorkspace.workspaceId
+		});
+		const baseUrl = publicEnv.appUrl || window.location.origin;
+		const url = new URL(
+			resolve(`/w/${workspaceWaiver.publicSlug}/kiosk` as `/w/${string}/kiosk`),
+			baseUrl
+		);
+		url.searchParams.set(KIOSK_DEVICE_PARAM, token);
+		return url.toString();
+	}
+
+	async function openKiosk() {
+		if (isOpeningKiosk) return;
+		isOpeningKiosk = true;
+		// Open the tab synchronously so popup blockers allow it, then point it at the kiosk.
+		const kioskWindow = window.open('about:blank', '_blank');
+		try {
+			const url = await createKioskUrl();
+			if (!url) {
+				kioskWindow?.close();
+				return;
+			}
+			if (kioskWindow) {
+				kioskWindow.opener = null;
+				kioskWindow.location.href = url;
+			} else {
+				window.location.href = url;
+			}
+		} catch (error) {
+			kioskWindow?.close();
+			toast.error(getConvexErrorMessage(error, 'Unable to open kiosk mode.'));
+		} finally {
+			isOpeningKiosk = false;
+		}
+	}
+
+	async function copyKioskLink() {
+		try {
+			const url = await createKioskUrl();
+			if (url) await copyText('kiosk', url);
+		} catch (error) {
+			toast.error(getConvexErrorMessage(error, 'Unable to create a kiosk link.'));
+		}
+	}
+
+	async function resetKioskLinks() {
+		if (convex.disabled || !currentWorkspace) return;
+		try {
+			const { revokedCount } = await convex.mutation(api.kiosk.revokeKioskDevices, {
+				workspaceId: currentWorkspace.workspaceId
+			});
+			toast.success(
+				revokedCount === 1
+					? 'Booking lookup is off on 1 kiosk. Open kiosk mode again on that tablet.'
+					: `Booking lookup is off on ${revokedCount} kiosks. Open kiosk mode again on each tablet.`
+			);
+		} catch (error) {
+			toast.error(getConvexErrorMessage(error, 'Unable to reset kiosk links.'));
+		}
+	}
+
 	async function copyText(key: string, text: string) {
 		try {
 			copyingKey = key;
@@ -609,16 +677,16 @@
 						</Tooltip>
 
 						<Tooltip>
-							<TooltipTrigger class="topbar-icon-btn" aria-label="Open kiosk mode">
+							<TooltipTrigger
+								class="topbar-icon-btn"
+								aria-label="Open kiosk mode"
+								onclick={openKiosk}
+								disabled={isOpeningKiosk}
+							>
 								{#snippet child({ props })}
-									<a
-										href={resolve(`/w/${workspaceWaiver.publicSlug}/kiosk` as `/w/${string}/kiosk`)}
-										target="_blank"
-										rel="noopener noreferrer"
-										{...props}
-									>
+									<button {...props}>
 										<TabletSmartphoneIcon class="size-3.5" />
-									</a>
+									</button>
 								{/snippet}
 							</TooltipTrigger>
 							<TooltipContent side="bottom" sideOffset={4}>Open kiosk mode</TooltipContent>
@@ -659,6 +727,14 @@
 						</DropdownMenuTrigger>
 						<DropdownMenuContent align="end" class="w-56">
 							<DropdownMenuItem onclick={openVersionHistory}>Version history</DropdownMenuItem>
+							{#if activePublicHref}
+								<DropdownMenuItem onclick={copyKioskLink}
+									>Copy kiosk link for a tablet</DropdownMenuItem
+								>
+								{#if currentWorkspace?.role === 'owner'}
+									<DropdownMenuItem onclick={resetKioskLinks}>Reset kiosk links</DropdownMenuItem>
+								{/if}
+							{/if}
 						</DropdownMenuContent>
 					</DropdownMenu>
 				{/if}

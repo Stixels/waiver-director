@@ -33,7 +33,21 @@ Once your waiver is published, the **Waiver** page gives you several ways to sha
 
 ## Kiosk mode
 
-**Open kiosk mode** opens a full-screen signing station for a tablet or computer at your front desk. Guests don't need an account, and no one needs to stay signed in on the device. The kiosk address is your waiver link followed by `/kiosk`.
+**Open kiosk mode** opens a full-screen signing station for a tablet or computer at your front desk. Guests don't need an account, and no one needs to stay signed in on the device.
+
+### Set up a kiosk tablet
+
+1. On the tablet, sign in to Waiver Director and open the **Waiver** page.
+2. Select **Open kiosk mode** (the tablet icon). The kiosk opens in a new tab.
+3. Sign out of Waiver Director in the other tab if you like. The kiosk keeps working.
+
+Opening the kiosk this way registers that tablet, which is what turns on booking lookup there. To set up a tablet without signing in on it, choose **Copy kiosk link for a tablet** from the **⋯** menu on the **Waiver** page and open that link on the tablet. Each link registers a new device, so use a fresh link for each tablet.
+
+Anyone can open your waiver link followed by `/kiosk`, but without a registered device they can only sign as a walk-in.
+
+If a kiosk link gets shared by mistake, an Owner can choose **Reset kiosk links** from the same menu. Booking lookup then turns off on every kiosk until you open kiosk mode again on each tablet.
+
+### What guests see
 
 <Frame caption="Sample data from a fictional workspace.">
 	<img
@@ -59,7 +73,7 @@ To protect each guest's details on a shared device, the kiosk:
 - Returns to the start screen 10 seconds after a waiver is submitted, or when the guest taps **Done**.
 - Asks "Still there?" after about 75 seconds without a tap or keystroke, and clears the form 15 seconds later.
 - Turns off browser autofill, so one guest's name and email are never suggested to the next.
-- Limits how many booking searches can be made in a few minutes. If the limit is reached, guests can still sign as walk-ins.
+- Limits how many booking searches each kiosk can make in a few minutes. If the limit is reached, guests can still sign as walk-ins.
 
 <Frame caption="Sample data from a fictional workspace.">
 	<img

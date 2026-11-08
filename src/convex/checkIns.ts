@@ -1,20 +1,25 @@
+import { paginationOptsValidator } from 'convex/server';
 import { ConvexError, v } from 'convex/values';
-import { mutation, query } from './_generated/server';
+import { internalMutation, mutation, query } from './_generated/server';
 import type { Doc } from './_generated/dataModel';
 import type { QueryCtx } from './_generated/server';
+import { internal } from './_generated/api';
 import { bookingStatusValidator } from './lib/bookings';
-import { submissionsForBooking } from './lib/bookingSignatures';
 import {
 	computeRosterTotals,
 	isValidParticipantIndex,
+	rosterInputFromSummary,
 	rosterPeopleForSubmission,
+	rosterSummaryFromSubmission,
 	unsignedParticipantCount
 } from './lib/checkIns';
 import { assertWorkspaceRecord, requireWorkspaceMember } from './lib/waivers';
 
 const MAX_ROSTER_SPAN_MS = 48 * 60 * 60 * 1000;
 const MAX_ROSTER_BOOKINGS = 200;
+const MAX_ROSTER_SUBMISSIONS_PER_BOOKING = 200;
 const MAX_ROSTER_WALK_IN_SUBMISSIONS = 300;
+const ROSTER_BACKFILL_BATCH_SIZE = 50;
 
 const rosterPersonValue = v.object({
 	submissionId: v.id('waiver_submissions'),
@@ -57,17 +62,21 @@ const dayRosterValue = v.object({
 	hasMoreWalkIns: v.boolean()
 });
 
-async function rosterPeopleWithCheckIns(ctx: QueryCtx, submission: Doc<'waiver_submissions'>) {
+// Reads only the small `submission_rosters` row and its check-ins, never the signed record,
+// so a busy day stays far below Convex's per-function read limit.
+async function rosterPeopleWithCheckIns(ctx: QueryCtx, row: Doc<'submission_rosters'>) {
 	const checkIns = await ctx.db
 		.query('participant_check_ins')
-		.withIndex('by_submissionId_and_participantIndex', (q) => q.eq('submissionId', submission._id))
-		.take(submission.minors.length + 1);
+		.withIndex('by_submissionId_and_participantIndex', (q) =>
+			q.eq('submissionId', row.submissionId)
+		)
+		.take(row.minorNames.length + 1);
 	const checkedInAtByIndex = new Map<number, number>();
 	for (const checkIn of checkIns) {
-		if (checkIn.workspaceId !== submission.workspaceId) continue;
+		if (checkIn.workspaceId !== row.workspaceId) continue;
 		checkedInAtByIndex.set(checkIn.participantIndex, checkIn.checkedInAt);
 	}
-	return rosterPeopleForSubmission(submission, checkedInAtByIndex);
+	return rosterPeopleForSubmission(rosterInputFromSummary(row), checkedInAtByIndex);
 }
 
 export const getDayRoster = query({
@@ -106,13 +115,14 @@ export const getDayRoster = query({
 
 		const bookings = await Promise.all(
 			dayBookings.slice(0, MAX_ROSTER_BOOKINGS).map(async (booking) => {
-				const submissions = (await submissionsForBooking(ctx, booking._id))
-					.filter((submission) => submission.workspaceId === args.workspaceId)
-					.sort((a, b) => a.submittedAt - b.submittedAt);
+				const rows = (
+					await ctx.db
+						.query('submission_rosters')
+						.withIndex('by_bookingId_and_submittedAt', (q) => q.eq('bookingId', booking._id))
+						.take(MAX_ROSTER_SUBMISSIONS_PER_BOOKING)
+				).filter((row) => row.workspaceId === args.workspaceId);
 				const people = (
-					await Promise.all(
-						submissions.map((submission) => rosterPeopleWithCheckIns(ctx, submission))
-					)
+					await Promise.all(rows.map((row) => rosterPeopleWithCheckIns(ctx, row)))
 				).flat();
 
 				return {
@@ -134,25 +144,25 @@ export const getDayRoster = query({
 			})
 		);
 
-		const windowSubmissions = await ctx.db
-			.query('waiver_submissions')
-			.withIndex('by_workspaceId_and_submittedAt', (q) =>
+		// Walk-ins are queried directly (bookingId unset), so booking-linked signatures
+		// never use up the walk-in cap.
+		const walkInRows = await ctx.db
+			.query('submission_rosters')
+			.withIndex('by_workspaceId_and_bookingId_and_submittedAt', (q) =>
 				q
 					.eq('workspaceId', args.workspaceId)
+					.eq('bookingId', undefined)
 					.gte('submittedAt', args.dayStartAt)
 					.lt('submittedAt', dayEndAt)
 			)
 			.take(MAX_ROSTER_WALK_IN_SUBMISSIONS + 1);
-		const hasMoreWalkIns = windowSubmissions.length > MAX_ROSTER_WALK_IN_SUBMISSIONS;
+		const hasMoreWalkIns = walkInRows.length > MAX_ROSTER_WALK_IN_SUBMISSIONS;
 		const walkIns = await Promise.all(
-			windowSubmissions
-				.slice(0, MAX_ROSTER_WALK_IN_SUBMISSIONS)
-				.filter((submission) => submission.bookingId === undefined)
-				.map(async (submission) => ({
-					submissionId: submission._id,
-					submittedAt: submission.submittedAt,
-					people: await rosterPeopleWithCheckIns(ctx, submission)
-				}))
+			walkInRows.slice(0, MAX_ROSTER_WALK_IN_SUBMISSIONS).map(async (row) => ({
+				submissionId: row.submissionId,
+				submittedAt: row.submittedAt,
+				people: await rosterPeopleWithCheckIns(ctx, row)
+			}))
 		);
 
 		bookings.sort((a, b) => (a.startAt ?? 0) - (b.startAt ?? 0));
@@ -222,5 +232,46 @@ export const setParticipantArrived = mutation({
 		});
 
 		return { checkedInAt };
+	}
+});
+
+/**
+ * Creates `submission_rosters` rows for submissions signed before the roster table existed.
+ * Run once after deploying: `npx convex run checkIns:backfillSubmissionRosters '{}'`.
+ * Safe to re-run; submissions that already have a row are skipped.
+ */
+export const backfillSubmissionRosters = internalMutation({
+	args: {
+		paginationOpts: v.optional(paginationOptsValidator)
+	},
+	returns: v.object({ inserted: v.number(), isDone: v.boolean() }),
+	handler: async (ctx, args) => {
+		const page = await ctx.db
+			.query('waiver_submissions')
+			.paginate(args.paginationOpts ?? { numItems: ROSTER_BACKFILL_BATCH_SIZE, cursor: null });
+
+		let inserted = 0;
+		for (const submission of page.page) {
+			const existing = await ctx.db
+				.query('submission_rosters')
+				.withIndex('by_submissionId', (q) => q.eq('submissionId', submission._id))
+				.first();
+			if (existing) continue;
+			await ctx.db.insert('submission_rosters', {
+				workspaceId: submission.workspaceId,
+				submissionId: submission._id,
+				...(submission.bookingId ? { bookingId: submission.bookingId } : {}),
+				submittedAt: submission.submittedAt,
+				...rosterSummaryFromSubmission(submission)
+			});
+			inserted += 1;
+		}
+
+		if (!page.isDone) {
+			await ctx.scheduler.runAfter(0, internal.checkIns.backfillSubmissionRosters, {
+				paginationOpts: { numItems: ROSTER_BACKFILL_BATCH_SIZE, cursor: page.continueCursor }
+			});
+		}
+		return { inserted, isDone: page.isDone };
 	}
 });

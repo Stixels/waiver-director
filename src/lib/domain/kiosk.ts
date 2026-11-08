@@ -13,9 +13,19 @@ export const KIOSK_MAX_RESULTS = 5;
 export const KIOSK_MIN_BOOKING_NUMBER_LENGTH = 3;
 export const KIOSK_MAX_QUERY_LENGTH = 120;
 
-/** Workspace-wide lookup cap; bounds booking-number enumeration from any device. */
-export const KIOSK_WORKSPACE_LOOKUP_LIMIT = 60;
+/** Per-device lookup cap. Each kiosk device has its own budget, so one device can't starve another. */
+export const KIOSK_DEVICE_LOOKUP_LIMIT = 30;
+export const KIOSK_DEVICE_LOOKUP_WINDOW_MS = 5 * 60 * 1000;
+/** Workspace-wide backstop across all of a workspace's kiosk devices. */
+export const KIOSK_WORKSPACE_LOOKUP_LIMIT = 600;
 export const KIOSK_WORKSPACE_LOOKUP_WINDOW_MS = 5 * 60 * 1000;
+
+/** Query parameter that carries a kiosk device token the first time a kiosk opens. */
+export const KIOSK_DEVICE_PARAM = 'device';
+
+export function kioskDeviceStorageKey(slug: string) {
+	return `waiver-director:kiosk-device:${slug}`;
+}
 /** Per-identifier cap so one email or booking number cannot be probed repeatedly. */
 export const KIOSK_IDENTIFIER_LOOKUP_LIMIT = 6;
 export const KIOSK_IDENTIFIER_LOOKUP_WINDOW_MS = 10 * 60 * 1000;

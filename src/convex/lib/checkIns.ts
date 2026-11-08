@@ -64,6 +64,34 @@ export function rosterPeopleForSubmission<SubmissionId extends string>(
 	];
 }
 
+export type SubmissionRosterSummary = {
+	signerName: string;
+	minorNames: string[];
+};
+
+/** The names a signed submission covers, as stored in `submission_rosters`. */
+export function rosterSummaryFromSubmission(submission: {
+	signerName: string;
+	minors: Array<{ fullName: string }>;
+}): SubmissionRosterSummary {
+	return {
+		signerName: submission.signerName,
+		minorNames: submission.minors.map((minor) => minor.fullName)
+	};
+}
+
+export function rosterInputFromSummary<SubmissionId extends string>(row: {
+	submissionId: SubmissionId;
+	signerName: string;
+	minorNames: string[];
+}): RosterSubmissionInput<SubmissionId> {
+	return {
+		_id: row.submissionId,
+		signerName: row.signerName,
+		minors: row.minorNames.map((fullName) => ({ fullName }))
+	};
+}
+
 export function unsignedParticipantCount(participantCount: number, signedPeople: number) {
 	return Math.max(0, participantCount - signedPeople);
 }

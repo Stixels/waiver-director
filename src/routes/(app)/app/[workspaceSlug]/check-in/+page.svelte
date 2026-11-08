@@ -397,8 +397,8 @@
 			<DataTableShell class="border-0 bg-transparent" viewportClass="space-y-6">
 				{#if roster?.hasMoreBookings || roster?.hasMoreWalkIns}
 					<p class="text-xs text-muted-foreground" role="status">
-						This day has more records than the check-in view shows at once. Use search to find
-						someone specific.
+						This day has more than 200 bookings or 300 walk-ins, so only the earliest ones are shown
+						here.
 					</p>
 				{/if}
 
