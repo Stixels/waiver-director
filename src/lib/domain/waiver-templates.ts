@@ -88,7 +88,7 @@ export const waiverTemplates: WaiverTemplate[] = [
 		activities: 'Climbing gyms, bouldering, ropes courses',
 		description: 'Covers falls, belaying, equipment checks and gym rules.',
 		title: 'Climbing Release and Waiver of Liability',
-		introCopy: `<p>Please read this agreement carefully before climbing at ${BUSINESS_NAME_TOKEN}.</p>
+		introCopy: `<p>Please read this agreement with ${BUSINESS_NAME_TOKEN} carefully before you climb.</p>
 <h3>Assumption of risk</h3>
 <p>I understand that climbing, bouldering, and related activities carry inherent risks, including:</p>
 <ul>
@@ -131,7 +131,7 @@ ${releaseSection}`,
 		activities: 'Kayak, paddleboard, surf, boat and snorkel',
 		description: 'Covers drowning risk, weather, swimming ability and life jackets.',
 		title: 'Watersports Release and Waiver of Liability',
-		introCopy: `<p>Please read this agreement carefully before taking part in any water activity or renting equipment from ${BUSINESS_NAME_TOKEN}.</p>
+		introCopy: `<p>Please read this agreement with ${BUSINESS_NAME_TOKEN} carefully before you take part in any water activity or rent equipment.</p>
 <h3>Assumption of risk</h3>
 <p>I understand that water activities carry inherent risks, including:</p>
 <ul>
@@ -175,7 +175,7 @@ ${releaseSection}`,
 		activities: 'Hiking, bike, ATV, walking and sightseeing tours',
 		description: 'Covers terrain, transport, fitness level and following the guide.',
 		title: 'Tour Participant Release and Waiver of Liability',
-		introCopy: `<p>Please read this agreement carefully before joining a tour with ${BUSINESS_NAME_TOKEN}.</p>
+		introCopy: `<p>Please read this agreement with ${BUSINESS_NAME_TOKEN} carefully before you join a tour.</p>
 <h3>Assumption of risk</h3>
 <p>I understand that tours carry inherent risks, including:</p>
 <ul>
@@ -212,7 +212,7 @@ ${releaseSection}`,
 		activities: 'Classes, trampoline parks, studios, camps',
 		description: 'A general-purpose release for physical activities.',
 		title: 'Activity Release and Waiver of Liability',
-		introCopy: `<p>Please read this agreement carefully before taking part in activities at ${BUSINESS_NAME_TOKEN}.</p>
+		introCopy: `<p>Please read this agreement with ${BUSINESS_NAME_TOKEN} carefully before you take part in any activity.</p>
 <h3>Assumption of risk</h3>
 <p>I understand that physical activity carries inherent risks, including strains, sprains, fractures, collisions with other participants, and in rare cases serious injury. I confirm I am in suitable health to take part and will stop and tell staff if I feel unwell.</p>
 <h3>Rules</h3>

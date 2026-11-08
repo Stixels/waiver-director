@@ -41,7 +41,6 @@
 		type WaiverDefinition
 	} from '$lib/domain/waivers';
 	import {
-		WAIVER_TEMPLATE_LEGAL_NOTICE,
 		buildDefinitionFromTemplate,
 		draftHasContent,
 		type WaiverTemplate
@@ -394,8 +393,8 @@
 			businessName: currentWorkspace?.name,
 			theme: draft.theme
 		});
-		toast.success(`${template.name} template applied. Review it before you publish.`, {
-			description: WAIVER_TEMPLATE_LEGAL_NOTICE
+		toast.success(`${template.name} template applied`, {
+			description: 'It is not legal advice. Have a lawyer review it before you publish.'
 		});
 	}
 
