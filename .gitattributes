@@ -1,0 +1,19 @@
+# Keep every text file LF in the repo and in the working tree, on every OS.
+# Without this, Git on Windows (core.autocrlf=true) checks files out as CRLF,
+# and tools like `npx convex dev` that write LF (or vice versa) make files such
+# as src/convex/_generated/api.d.ts show up as modified with no real change.
+* text=auto eol=lf
+
+# Convex codegen output: always LF, never a line-ending diff.
+src/convex/_generated/** text eol=lf
+
+# Binary assets: never touch line endings.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
