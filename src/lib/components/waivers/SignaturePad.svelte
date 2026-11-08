@@ -6,9 +6,19 @@
 		value?: string;
 		disabled?: boolean;
 		canvasId?: string;
+		capturedLabel?: string;
+		hintLabel?: string;
+		clearLabel?: string;
 	}
 
-	let { value = $bindable(''), disabled = false, canvasId = 'signature-pad' }: Props = $props();
+	let {
+		value = $bindable(''),
+		disabled = false,
+		canvasId = 'signature-pad',
+		capturedLabel = 'Signature captured.',
+		hintLabel = 'Draw your signature with a mouse or touch.',
+		clearLabel = 'Clear'
+	}: Props = $props();
 
 	let canvas = $state<HTMLCanvasElement | null>(null);
 	let context = $state<CanvasRenderingContext2D | null>(null);
@@ -153,10 +163,10 @@
 
 	<div class="flex items-center justify-between gap-3">
 		<p class="text-xs text-muted-foreground">
-			{hasSignature ? 'Signature captured.' : 'Draw your signature with a mouse or touch.'}
+			{hasSignature ? capturedLabel : hintLabel}
 		</p>
 		<Button type="button" variant="outline" size="sm" onclick={clearSignature} {disabled}>
-			Clear
+			{clearLabel}
 		</Button>
 	</div>
 </div>

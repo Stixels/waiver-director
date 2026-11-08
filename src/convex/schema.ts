@@ -3,6 +3,7 @@ import { v } from 'convex/values';
 import { billingFeatureValidator } from './lib/billing';
 import { bookingProviderValidator, bookingSnapshotValidator } from './lib/bookings';
 import { marketingIntegrationStatusValidator, marketingProviderValidator } from './lib/marketing';
+import { waiverLocaleValidator, waiverTranslationValidator } from './lib/waiverTranslations';
 
 export default defineSchema({
 	users: defineTable({
@@ -105,6 +106,9 @@ export default defineSchema({
 		title: v.string(),
 		introCopy: v.string(),
 		theme: v.optional(v.union(v.literal('light'), v.literal('dark'))),
+		// Primary language of title/introCopy/fields. Absent means English.
+		defaultLocale: v.optional(waiverLocaleValidator),
+		translations: v.optional(v.array(waiverTranslationValidator)),
 		fields: v.array(
 			v.union(
 				v.object({
@@ -151,6 +155,9 @@ export default defineSchema({
 		title: v.string(),
 		introCopy: v.string(),
 		theme: v.optional(v.union(v.literal('light'), v.literal('dark'))),
+		// Primary language of title/introCopy/fields. Absent means English.
+		defaultLocale: v.optional(waiverLocaleValidator),
+		translations: v.optional(v.array(waiverTranslationValidator)),
 		fields: v.array(
 			v.union(
 				v.object({
@@ -233,6 +240,9 @@ export default defineSchema({
 		status: v.union(v.literal('submitted')),
 		marketingConsent: v.optional(v.boolean()),
 		marketingConsentLabel: v.optional(v.string()),
+		// Language the signer read and signed in. Absent on submissions made before
+		// multi-language signing, which were all signed in the primary language.
+		signedLocale: v.optional(waiverLocaleValidator),
 		submittedAt: v.number()
 	})
 		.index('by_workspaceId', ['workspaceId'])

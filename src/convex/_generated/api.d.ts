@@ -26,6 +26,7 @@ import type * as lib_customers from "../lib/customers.js";
 import type * as lib_emailAIRateLimit from "../lib/emailAIRateLimit.js";
 import type * as lib_marketing from "../lib/marketing.js";
 import type * as lib_submissions from "../lib/submissions.js";
+import type * as lib_waiverTranslations from "../lib/waiverTranslations.js";
 import type * as lib_waivers from "../lib/waivers.js";
 import type * as lib_workspaceHandles from "../lib/workspaceHandles.js";
 import type * as lib_workspaces from "../lib/workspaces.js";
@@ -61,6 +62,7 @@ declare const fullApi: ApiFromModules<{
   "lib/emailAIRateLimit": typeof lib_emailAIRateLimit;
   "lib/marketing": typeof lib_marketing;
   "lib/submissions": typeof lib_submissions;
+  "lib/waiverTranslations": typeof lib_waiverTranslations;
   "lib/waivers": typeof lib_waivers;
   "lib/workspaceHandles": typeof lib_workspaceHandles;
   "lib/workspaces": typeof lib_workspaces;

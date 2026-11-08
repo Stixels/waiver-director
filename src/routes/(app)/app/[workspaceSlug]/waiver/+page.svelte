@@ -13,6 +13,7 @@
 	import ConfirmDialog from '$lib/components/ui/ConfirmDialog.svelte';
 	import QrCodeDialog from '$lib/components/waivers/QrCodeDialog.svelte';
 	import WaiverVersionHistorySheet from '$lib/components/waivers/WaiverVersionHistorySheet.svelte';
+	import WaiverTranslationsSheet from '$lib/components/waivers/WaiverTranslationsSheet.svelte';
 	import WaiverBuilderCanvas, {
 		type SaveState
 	} from '$lib/components/waivers/WaiverBuilderCanvas.svelte';
@@ -74,6 +75,7 @@
 	let baselineDraft = $state<WaiverDefinition | null>(null);
 	let hydratedWaiverId = $state<WorkspaceWaiverSummary['waiverId'] | null>(null);
 	let versionHistoryOpen = $state(false);
+	let translationsOpen = $state(false);
 	let copyingKey = $state<string | null>(null);
 	let copiedKey = $state<string | null>(null);
 	let qrDialogOpen = $state(false);
@@ -466,6 +468,20 @@
 	/>
 {/if}
 
+{#if currentWorkspace && workspaceWaiver}
+	<WaiverTranslationsSheet
+		bind:open={translationsOpen}
+		workspaceId={currentWorkspace.workspaceId}
+		waiverId={workspaceWaiver.waiverId}
+		workspaceName={currentWorkspace.name}
+		title={workspaceWaiver.title}
+		introCopy={workspaceWaiver.introCopy}
+		fields={workspaceWaiver.fields}
+		defaultLocale={workspaceWaiver.defaultLocale}
+		translations={workspaceWaiver.translations}
+	/>
+{/if}
+
 {#if activePublicUrl}
 	<QrCodeDialog
 		bind:open={qrDialogOpen}
@@ -641,6 +657,9 @@
 							{/snippet}
 						</DropdownMenuTrigger>
 						<DropdownMenuContent align="end" class="w-56">
+							<DropdownMenuItem onclick={() => (translationsOpen = true)}
+								>Languages</DropdownMenuItem
+							>
 							<DropdownMenuItem onclick={openVersionHistory}>Version history</DropdownMenuItem>
 						</DropdownMenuContent>
 					</DropdownMenu>

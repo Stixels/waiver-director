@@ -1,5 +1,7 @@
 <script lang="ts">
 	import type { Id } from '$convex/_generated/dataModel';
+	import { onMount, untrack } from 'svelte';
+	import { page } from '$app/state';
 	import { useConvexClient } from 'convex-svelte';
 	import { toast } from 'svelte-sonner';
 	import { api } from '$convex/_generated/api';
@@ -16,6 +18,17 @@
 		waiverUnderlineTextareaClass
 	} from '$lib/components/waivers/waiver-public-form-classes';
 	import type { WaiverField, WaiverMinor, WaiverTheme } from '$lib/domain/waivers';
+	import {
+		WAIVER_LOCALE_NATIVE_NAMES,
+		availableWaiverLocales,
+		formatWaiverString,
+		localizeWaiver,
+		localizedMarketingConsentLabel,
+		pickWaiverLocale,
+		waiverChromeStrings,
+		type WaiverLocale,
+		type WaiverTranslation
+	} from '$lib/domain/waiver-i18n';
 	import { getConvexErrorMessage } from '$lib/utils/convex-errors';
 	import { formatBookingTimestamp } from '$lib/utils/date';
 
@@ -28,6 +41,8 @@
 		introCopy: string;
 		theme: WaiverTheme;
 		fields: WaiverField[];
+		defaultLocale: WaiverLocale;
+		translations: WaiverTranslation[];
 		marketingOptIn: { provider: 'mailchimp'; label: string } | null;
 	};
 
@@ -50,6 +65,25 @@
 	let { waiver, booking = null }: Props = $props();
 
 	const convex = useConvexClient();
+
+	const availableLocales = $derived(
+		availableWaiverLocales(waiver.defaultLocale, waiver.translations)
+	);
+	// Server render honours an explicit ?lang=; the browser's languages are applied on mount.
+	let locale = $state<WaiverLocale>(
+		untrack(() =>
+			pickWaiverLocale(availableWaiverLocales(waiver.defaultLocale, waiver.translations), [
+				page.url.searchParams.get('lang')
+			])
+		)
+	);
+	const localized = $derived(localizeWaiver(waiver, waiver.translations, locale));
+	const t = $derived(waiverChromeStrings(locale));
+
+	onMount(() => {
+		if (page.url.searchParams.get('lang') || availableLocales.length < 2) return;
+		locale = pickWaiverLocale(availableLocales, [...(navigator.languages ?? [navigator.language])]);
+	});
 
 	let signerName = $state('');
 	let signerEmail = $state('');
@@ -87,12 +121,12 @@
 		event.preventDefault();
 
 		if (convex.disabled) {
-			submitError = 'The waiver form is still loading. Please try again.';
+			submitError = t.formLoading;
 			return;
 		}
 
 		if (!signatureDataUrl || !signatureDataUrl.startsWith('data:image/')) {
-			submitError = 'Please provide a signature.';
+			submitError = t.signatureRequired;
 			return;
 		}
 
@@ -111,13 +145,14 @@
 				signatureDataUrl,
 				marketingConsent,
 				answers,
-				minors: minorsPayload
+				minors: minorsPayload,
+				locale
 			});
 
 			isSubmitted = true;
-			toast.success('Waiver submitted.');
+			toast.success(t.submitted);
 		} catch (error) {
-			submitError = getConvexErrorMessage(error, 'Unable to submit this waiver.');
+			submitError = getConvexErrorMessage(error, t.submitFailed);
 		} finally {
 			isSubmitting = false;
 		}
@@ -138,12 +173,14 @@
 
 <div
 	class="min-h-screen bg-background text-foreground"
+	lang={locale}
 	class:waiver-theme-light={waiver.theme === 'light'}
 	class:waiver-theme-dark={waiver.theme === 'dark'}
 >
 	<WaiverDocumentShell
 		workspaceName={waiver.workspaceName}
 		workspaceLogoUrl={waiver.workspaceLogoUrl}
+		headerActions={availableLocales.length > 1 ? languagePicker : undefined}
 	>
 		{#if isSubmitted}
 			<div class="flex flex-col items-center py-20 text-center">
@@ -166,11 +203,11 @@
 					</svg>
 				</div>
 				<p class="mb-2 text-xs font-bold tracking-[0.2em] text-muted-foreground uppercase">
-					Submission received
+					{t.submissionReceived}
 				</p>
-				<h1 class="mb-4 text-3xl font-bold tracking-tight">Waiver complete</h1>
+				<h1 class="mb-4 text-3xl font-bold tracking-tight">{t.waiverComplete}</h1>
 				<p class="max-w-sm text-base leading-relaxed text-muted-foreground">
-					Thank you. Your signed waiver has been recorded for {waiver.workspaceName}.
+					{formatWaiverString(t.thankYou, { workspace: waiver.workspaceName })}
 				</p>
 				{#if booking}
 					<button
@@ -178,7 +215,7 @@
 						class="mt-8 h-12 bg-foreground px-8 text-sm font-semibold tracking-wide text-background transition-opacity hover:opacity-85"
 						onclick={resetForm}
 					>
-						Sign another waiver
+						{t.signAnother}
 					</button>
 				{/if}
 			</div>
@@ -191,7 +228,7 @@
 					})}
 					<section class="border border-border bg-muted/20 p-4">
 						<p class="text-xs font-bold tracking-[0.16em] text-muted-foreground uppercase">
-							Booking
+							{t.booking}
 						</p>
 						<h2 class="mt-1 text-lg font-semibold tracking-tight">{booking.activityName}</h2>
 						<div class="mt-2 grid gap-1 text-sm text-muted-foreground sm:grid-cols-2">
@@ -199,22 +236,25 @@
 								<p>{formattedStart}</p>
 							{/if}
 							{#if booking.leadCustomerName}
-								<p>Booked by {booking.leadCustomerName}</p>
+								<p>{formatWaiverString(t.bookedBy, { name: booking.leadCustomerName })}</p>
 							{/if}
 							<p>
-								{booking.signedCount} signed of {booking.participantCount} expected
+								{formatWaiverString(t.signedOfExpected, {
+									signed: booking.signedCount,
+									expected: booking.participantCount
+								})}
 							</p>
 						</div>
 					</section>
 				{/if}
 
-				<WaiverCopySection introCopy={waiver.introCopy} />
+				<WaiverCopySection introCopy={localized.introCopy} />
 
 				<form onsubmit={handleSubmit} class="space-y-6">
-					<WaiverPublicAboutSignerCard>
+					<WaiverPublicAboutSignerCard heading={t.signerDetails}>
 						<div class="space-y-6">
 							<div>
-								<label class={waiverFieldLabelClass} for="signer-name">Full name</label>
+								<label class={waiverFieldLabelClass} for="signer-name">{t.fullName}</label>
 								<input
 									id="signer-name"
 									class={waiverUnderlineInputClass}
@@ -225,7 +265,7 @@
 							</div>
 
 							<div>
-								<label class={waiverFieldLabelClass} for="signer-email">Email</label>
+								<label class={waiverFieldLabelClass} for="signer-email">{t.email}</label>
 								<input
 									id="signer-email"
 									type="email"
@@ -236,7 +276,7 @@
 							</div>
 
 							<div>
-								<label class={waiverFieldLabelClass} for="signer-dob">Date of birth</label>
+								<label class={waiverFieldLabelClass} for="signer-dob">{t.dateOfBirth}</label>
 								<input
 									id="signer-dob"
 									type="date"
@@ -250,7 +290,7 @@
 						<WaiverPublicMinorsBlock>
 							{#snippet headerActions()}
 								<button type="button" class={waiverAddMinorButtonClass} onclick={addMinor}>
-									Add minor
+									{t.addMinor}
 								</button>
 							{/snippet}
 							{#snippet body()}
@@ -262,19 +302,19 @@
 													<p
 														class="text-xs font-bold tracking-[0.16em] text-muted-foreground uppercase"
 													>
-														Minor {index + 1}
+														{formatWaiverString(t.minorNumber, { number: index + 1 })}
 													</p>
 													<button
 														type="button"
 														class="text-xs text-muted-foreground/60 hover:text-muted-foreground"
 														onclick={() => removeMinor(index)}
 													>
-														Remove
+														{t.remove}
 													</button>
 												</div>
 
 												<label class={waiverFieldLabelClass} for={`minor-name-${index}`}>
-													Full name
+													{t.fullName}
 												</label>
 												<input
 													id={`minor-name-${index}`}
@@ -289,9 +329,9 @@
 							{/snippet}
 						</WaiverPublicMinorsBlock>
 
-						{#if waiver.fields.length > 0}
-							<WaiverPublicAdditionalInfoSection>
-								{#each waiver.fields as field (field.id)}
+						{#if localized.fields.length > 0}
+							<WaiverPublicAdditionalInfoSection heading={t.additionalDetails}>
+								{#each localized.fields as field (field.id)}
 									<div>
 										{#if field.type !== 'checkbox'}
 											<label class={waiverFieldLabelClass} for={field.id}>
@@ -371,7 +411,7 @@
 														(event.currentTarget as HTMLSelectElement).value
 													)}
 											>
-												<option value="">Select one</option>
+												<option value="">{t.selectOne}</option>
 												{#each field.options as option (option.id)}
 													<option value={option.id}>{option.label}</option>
 												{/each}
@@ -394,7 +434,7 @@
 
 						{#if waiver.marketingOptIn}
 							<div class="mt-8 border-t border-border pt-8">
-								<h3 class="mb-4 text-lg font-semibold tracking-tight">Stay in touch</h3>
+								<h3 class="mb-4 text-lg font-semibold tracking-tight">{t.stayInTouch}</h3>
 								<label class="waiver-checkbox-label flex cursor-pointer items-start gap-3">
 									<span
 										class={`waiver-checkbox-box mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center border transition-colors ${marketingConsent ? 'border-foreground bg-foreground' : 'border-foreground/25 bg-transparent'}`}
@@ -420,9 +460,11 @@
 									</span>
 									<input type="checkbox" class="sr-only" bind:checked={marketingConsent} />
 									<span>
-										<span class="block text-sm">{waiver.marketingOptIn.label}</span>
+										<span class="block text-sm"
+											>{localizedMarketingConsentLabel(locale, waiver.workspaceName)}</span
+										>
 										<span class="mt-1 block text-xs leading-relaxed text-muted-foreground">
-											Optional. You can unsubscribe from marketing emails at any time.
+											{t.marketingOptional}
 										</span>
 									</span>
 								</label>
@@ -431,9 +473,15 @@
 
 						<div class="mt-8 border-t border-border pt-8">
 							<div class="mb-7">
-								<h3 class="text-lg font-semibold tracking-tight">Signature</h3>
+								<h3 class="text-lg font-semibold tracking-tight">{t.signature}</h3>
 							</div>
-							<SignaturePad bind:value={signatureDataUrl} canvasId="signature-pad" />
+							<SignaturePad
+								bind:value={signatureDataUrl}
+								canvasId="signature-pad"
+								capturedLabel={t.signatureCaptured}
+								hintLabel={t.signatureHint}
+								clearLabel={t.clear}
+							/>
 						</div>
 					</WaiverPublicAboutSignerCard>
 
@@ -449,7 +497,7 @@
 							class="h-12 w-full bg-foreground text-sm font-semibold tracking-wide text-background transition-opacity hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-40"
 							disabled={isSubmitting}
 						>
-							{isSubmitting ? 'Submitting...' : 'Submit waiver'}
+							{isSubmitting ? t.submitting : t.submit}
 						</button>
 					</div>
 				</form>
@@ -457,6 +505,22 @@
 		{/if}
 	</WaiverDocumentShell>
 </div>
+
+{#snippet languagePicker()}
+	<label class="flex items-center gap-2 self-end text-xs text-muted-foreground">
+		<span>{t.language}</span>
+		<select
+			class="h-8 border border-border bg-background px-2 text-sm text-foreground"
+			value={locale}
+			onchange={(event) =>
+				(locale = (event.currentTarget as HTMLSelectElement).value as WaiverLocale)}
+		>
+			{#each availableLocales as option (option)}
+				<option value={option} lang={option}>{WAIVER_LOCALE_NATIVE_NAMES[option]}</option>
+			{/each}
+		</select>
+	</label>
+{/snippet}
 
 <style>
 	.waiver-checkbox-label:focus-within .waiver-checkbox-box {
