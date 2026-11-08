@@ -1,0 +1,48 @@
+---
+title: 'FareHarbor'
+description: 'Import FareHarbor bookings so every signature is tied to the right tour.'
+---
+
+Connecting FareHarbor imports your upcoming bookings into Waiver Director, re-syncs them every 6 hours, and gives each booking its own waiver link. Guests can find their booking with the number FareHarbor shows them, without the `#`.
+
+<Note>
+	Booking integrations require a Pro plan or trial. On Pro, they work in your primary workspace; on
+	Business, in every workspace. See [Plans and billing](/account/plans-and-billing).
+</Note>
+
+## Before you start
+
+FareHarbor issues API access per company. Contact FareHarbor support and ask them to enable API access for Waiver Director on your company. They give you an **API user key**. You also need your **company shortname**: the part after `fareharbor.com/` in your FareHarbor dashboard URL.
+
+## Connect
+
+<Steps>
+	<Step title="Open Integrations">
+		As an Owner, open **Integrations** and select **FareHarbor**.
+	</Step>
+	<Step title="Enter your details">
+		Enter your company shortname and API user key, then click **Connect FareHarbor**. Waiver
+		Director checks the key with FareHarbor before saving it, and stores it encrypted.
+	</Step>
+	<Step title="Initial sync">
+		Waiver Director imports bookings from the last 7 days through the next 120 days. They appear on
+		the [Bookings](/guides/bookings) page as the sync completes.
+	</Step>
+</Steps>
+
+## Real-time updates (optional)
+
+Without webhooks, bookings for the next 30 days refresh every 6 hours. For instant updates, open FareHarbor in **Integrations**, click **Show webhook URL**, and ask FareHarbor support to send booking webhooks to that URL. The URL contains a secret, so share it only with FareHarbor.
+
+Cancelled and rebooked bookings are marked canceled. A rebooking arrives as a new booking with its own number.
+
+## Troubleshooting
+
+- **FareHarbor rejected the API key**: check the user key and that it was issued for the same company shortname.
+- **FareHarbor company not found**: check the shortname in your FareHarbor dashboard URL.
+- **Integration needs attention**: the last sync hit an error. It retries on the next 6-hour sync, or you can reconnect.
+- **Owner access required**: ask a workspace Owner to connect the integration.
+
+## Disconnect
+
+Owners can disconnect FareHarbor from the Integrations page. This deletes the stored key and invalidates the webhook URL. Signed submissions keep the booking snapshot captured when they were signed.

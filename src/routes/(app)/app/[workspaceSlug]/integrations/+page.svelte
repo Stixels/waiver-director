@@ -11,6 +11,7 @@
 	import xolaIcon from '$lib/assets/providers/xola-icon.webp';
 	import { useAppContext } from '$lib/components/app/app-context.svelte';
 	import UpgradeOverlay from '$lib/components/app/UpgradeOverlay.svelte';
+	import FareHarborIntegrationPanel from '$lib/components/integrations/FareHarborIntegrationPanel.svelte';
 	import MailchimpIntegrationPanel from '$lib/components/integrations/MailchimpIntegrationPanel.svelte';
 	import { useProtectedQuery } from '$lib/components/auth/convex-auth.svelte';
 	import { Badge } from '$lib/components/ui/badge';
@@ -76,6 +77,17 @@
 			description: 'Sync bookings and customers.',
 			detailDescription: 'Sync bookings and capture participant emails via Bookeo authorization.',
 			logo: bookeoIcon
+		},
+		{
+			key: 'fareharbor',
+			name: 'FareHarbor',
+			category: 'booking',
+			availability: 'available',
+			status: 'Available',
+			description: 'Sync bookings with your FareHarbor API key.',
+			detailDescription:
+				'Sync FareHarbor bookings with the API user key FareHarbor issues for your company.',
+			initial: 'F'
 		},
 		{
 			key: 'xola',
@@ -755,6 +767,14 @@
 							</div>
 						</div>
 
+						{#if selectedIntegration.provider === 'fareharbor'}
+							<FareHarborIntegrationPanel
+								workspaceId={currentWorkspace.workspaceId}
+								integrationId={selectedIntegration.integrationId}
+								canManage={selectedIntegration.canManage}
+							/>
+						{/if}
+
 						{#if webhookEvents.length > 0}
 							<div class="divide-y rounded-lg border bg-card">
 								<div class="px-3 py-2 text-xs font-medium text-muted-foreground">
@@ -839,8 +859,13 @@
 							<div class="min-w-0 space-y-1">
 								<h3 class="text-sm font-semibold">Ready to connect</h3>
 								<p class="text-sm leading-relaxed text-muted-foreground">
-									Authorize access in Bookeo with the required permissions. Future booking changes
-									sync automatically.
+									{#if selectedProvider.key === 'fareharbor'}
+										Connect with your FareHarbor company shortname and API user key. Bookings import
+										in the background and re-sync every 6 hours.
+									{:else}
+										Authorize access in Bookeo with the required permissions. Future booking changes
+										sync automatically.
+									{/if}
 								</p>
 							</div>
 						</div>
@@ -855,11 +880,13 @@
 						{:else if !canUseBookingIntegrations}
 							<div class="rounded-lg border border-dashed bg-card/50 p-10 text-center">
 								<p class="text-sm font-medium">
-									{workspacePausedOnPro ? 'Workspace paused on Pro' : 'Upgrade to connect Bookeo'}
+									{workspacePausedOnPro
+										? 'Workspace paused on Pro'
+										: `Upgrade to connect ${selectedProvider.name}`}
 								</p>
 								<p class="mt-1 text-xs text-muted-foreground">
 									{workspacePausedOnPro
-										? 'Make this workspace primary to connect Bookeo here.'
+										? `Make this workspace primary to connect ${selectedProvider.name} here.`
 										: 'Booking integrations are available on Pro plans and trials.'}
 								</p>
 								<Button class="mt-4" href={billingHref}>
@@ -873,6 +900,12 @@
 									Disconnect the current booking provider before connecting another one.
 								</p>
 							</div>
+						{:else if selectedProvider.key === 'fareharbor'}
+							<FareHarborIntegrationPanel
+								workspaceId={currentWorkspace.workspaceId}
+								{canManage}
+								isBlocked={isBookingIntegrationAccessBlocked}
+							/>
 						{:else}
 							<div class="overflow-hidden border-y" aria-label="Connection workflow">
 								<div class="flex gap-3 border-b py-3">
