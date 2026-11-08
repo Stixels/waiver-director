@@ -6,9 +6,6 @@
  * Web Crypto (`crypto.subtle`).
  */
 
-export const ELECTRONIC_SIGNATURE_CONSENT_TEXT =
-	'I agree to sign this waiver electronically. I understand my electronic signature is legally binding, the same as a handwritten signature.';
-
 export const AUDIT_HASH_ALGORITHM = 'SHA-256' as const;
 
 const MAX_USER_AGENT_LENGTH = 512;
@@ -79,7 +76,6 @@ export type AuditSubmissionInput = {
 	signatureDataUrl: string;
 	answers: Record<string, string | boolean | null>;
 	minors: Array<{ fullName: string; dateOfBirth?: string }>;
-	consentText: string;
 	submittedAt: number;
 };
 

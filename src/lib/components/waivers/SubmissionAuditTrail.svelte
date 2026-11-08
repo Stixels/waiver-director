@@ -66,22 +66,16 @@
 					{audit.hashAlgorithm}: {audit.submissionHash}
 				</dd>
 
-				<dt class={rowLabelClass}>E-signature consent</dt>
-				<dd class={rowValueClass}>“{audit.electronicSignatureConsentText}”</dd>
-
 				<dt class={rowLabelClass}>Form opened</dt>
 				<dd class={rowValueClass}>{formatTimestamp(audit.clientFormOpenedAt)}</dd>
-
-				<dt class={rowLabelClass}>Consent accepted</dt>
-				<dd class={rowValueClass}>{formatTimestamp(audit.clientConsentAcceptedAt)}</dd>
 
 				<dt class={rowLabelClass}>Signature drawn</dt>
 				<dd class={rowValueClass}>{formatTimestamp(audit.clientSignatureCompletedAt)}</dd>
 			</dl>
 			<p class="mt-4 text-[11px] leading-relaxed text-muted-foreground">
 				Waiver Director computes the hashes and the server time itself. IP address and device are
-				read from the request headers and are not independently verified. Form opened, consent and
-				signature times are reported by the signer's browser.
+				read from the request headers and are not independently verified. Form opened and signature
+				times are reported by the signer's browser.
 			</p>
 		{/if}
 	</div>

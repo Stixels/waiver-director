@@ -1,7 +1,6 @@
 <script lang="ts">
 	import type { Id } from '$convex/_generated/dataModel';
 	import { toast } from 'svelte-sonner';
-	import { ELECTRONIC_SIGNATURE_CONSENT_TEXT } from '$convex/lib/audit';
 	import { publicEnv } from '$lib/config/public';
 	import SignaturePad from '$lib/components/waivers/SignaturePad.svelte';
 	import WaiverCopySection from '$lib/components/waivers/WaiverCopySection.svelte';
@@ -61,10 +60,8 @@
 	let answers = $state<Record<string, string | boolean | null>>({});
 	let marketingConsent = $state(false);
 	let minors = $state<MinorFormState[]>([]);
-	let electronicSignatureConsent = $state(false);
 	// Client-side timing for the audit trail. The server records its own receive time.
 	let formOpenedAt = Date.now();
-	let consentAcceptedAt: number | null = null;
 	let signatureCompletedAt: number | null = null;
 	let isSubmitting = $state(false);
 	let submitError = $state<string | null>(null);
@@ -80,10 +77,6 @@
 
 	$effect(() => {
 		signatureCompletedAt = signatureDataUrl ? Date.now() : null;
-	});
-
-	$effect(() => {
-		consentAcceptedAt = electronicSignatureConsent ? Date.now() : null;
 	});
 
 	function todayIsoDate() {
@@ -128,11 +121,6 @@
 			return;
 		}
 
-		if (!electronicSignatureConsent) {
-			submitError = 'Please agree to sign electronically.';
-			return;
-		}
-
 		if (!isSignerBirthDate(signerDateOfBirth, todayIsoDate(), waiver.minimumSignerAge)) {
 			submitError = `You must be at least ${waiver.minimumSignerAge} to sign this waiver. A parent or guardian can sign and add minors instead.`;
 			return;
@@ -157,10 +145,8 @@
 				marketingConsent,
 				answers,
 				minors: minorsPayload,
-				electronicSignatureConsent,
 				clientTiming: {
 					formOpenedAt,
-					...(consentAcceptedAt ? { consentAcceptedAt } : {}),
 					...(signatureCompletedAt ? { signatureCompletedAt } : {})
 				}
 			});
@@ -182,7 +168,6 @@
 		answers = {};
 		marketingConsent = false;
 		minors = [];
-		electronicSignatureConsent = false;
 		formOpenedAt = Date.now();
 		submitError = null;
 		isSubmitted = false;
@@ -508,38 +493,6 @@
 								<h3 class="text-lg font-semibold tracking-tight">Signature</h3>
 							</div>
 							<SignaturePad bind:value={signatureDataUrl} canvasId="signature-pad" />
-
-							<label class="waiver-checkbox-label mt-6 flex cursor-pointer items-start gap-3">
-								<span
-									class={`waiver-checkbox-box mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center border transition-colors ${electronicSignatureConsent ? 'border-foreground bg-foreground' : 'border-foreground/25 bg-transparent'}`}
-									aria-hidden="true"
-								>
-									{#if electronicSignatureConsent}
-										<svg
-											xmlns="http://www.w3.org/2000/svg"
-											width="12"
-											height="12"
-											viewBox="0 0 24 24"
-											fill="none"
-											stroke="currentColor"
-											stroke-width="2.5"
-											stroke-linecap="round"
-											stroke-linejoin="round"
-											class="text-background"
-											aria-hidden="true"
-										>
-											<polyline points="20 6 9 17 4 12" />
-										</svg>
-									{/if}
-								</span>
-								<input
-									type="checkbox"
-									class="sr-only"
-									bind:checked={electronicSignatureConsent}
-									required
-								/>
-								<span class="text-sm">{ELECTRONIC_SIGNATURE_CONSENT_TEXT}</span>
-							</label>
 						</div>
 					</WaiverPublicAboutSignerCard>
 

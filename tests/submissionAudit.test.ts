@@ -47,7 +47,6 @@ test('submission hash covers signer data, minors and signature', async () => {
 		signatureDataUrl: 'data:image/png;base64,AAA',
 		answers: { f1: true },
 		minors: [{ fullName: 'Byron', dateOfBirth: '2015-05-05' }],
-		consentText: 'I agree',
 		submittedAt: 1
 	};
 	const hash = await waiverSubmissionHash(base);
