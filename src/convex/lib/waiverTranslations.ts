@@ -40,7 +40,8 @@ export const waiverTranslationValidator = v.object({
 	locale: waiverLocaleValidator,
 	title: v.string(),
 	introCopy: v.string(),
-	fields: v.array(waiverFieldTranslationValidator)
+	fields: v.array(waiverFieldTranslationValidator),
+	sourceHash: v.optional(v.string())
 });
 
 const MAX_PLACEHOLDER_LENGTH = 200;
@@ -143,11 +144,17 @@ export function normalizeWaiverTranslations(
 			}
 		}
 
+		const sourceHash = translation.sourceHash?.trim();
+		if (sourceHash !== undefined && !/^[0-9a-f]{16}$/.test(sourceHash)) {
+			throw new ConvexError({ code: 'invalid_argument', message: 'Invalid translation source.' });
+		}
+
 		return {
 			locale: translation.locale,
 			title,
 			introCopy: sanitizeRichTextHtml(translation.introCopy),
-			fields: fieldTranslations
+			fields: fieldTranslations,
+			...(sourceHash ? { sourceHash } : {})
 		};
 	});
 }

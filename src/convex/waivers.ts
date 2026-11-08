@@ -35,6 +35,8 @@ import {
 import {
 	DEFAULT_WAIVER_LOCALE,
 	localizedMarketingConsentLabel,
+	waiverSourceFingerprint,
+	waiverTranslationStatus,
 	type WaiverLocale,
 	type WaiverTranslation
 } from '../lib/domain/waiver-i18n';
@@ -159,22 +161,28 @@ async function waiverHasUnpublishedChanges(ctx: FunctionCtx, waiver: Doc<'worksp
 	// entries for deleted fields do not count as unpublished changes.
 	const defaultLocale = waiver.defaultLocale ?? DEFAULT_WAIVER_LOCALE;
 	return (
-		waiverTranslationsKey(
-			defaultLocale,
-			publishableTranslations(defaultLocale, waiver.fields, waiver.translations)
-		) !== waiverTranslationsKey(version.defaultLocale, version.translations)
+		waiverTranslationsKey(defaultLocale, publishableTranslations(defaultLocale, waiver)) !==
+		waiverTranslationsKey(version.defaultLocale, version.translations)
 	);
 }
 
+/**
+ * Translations that go into a published version: cleaned against the current fields,
+ * and only those whose waiver text is translated and up to date with the primary text.
+ */
 function publishableTranslations(
 	defaultLocale: WaiverLocale,
-	fields: Doc<'workspace_waivers'>['fields'],
-	translations: WaiverTranslation[] | undefined
+	waiver: Pick<Doc<'workspace_waivers'>, 'title' | 'introCopy' | 'fields' | 'translations'>
 ): WaiverTranslation[] {
+	const fingerprint = waiverSourceFingerprint(waiver);
 	return normalizeWaiverTranslations(
 		defaultLocale,
-		fields,
-		(translations ?? []).filter((translation) => translation.locale !== defaultLocale)
+		waiver.fields,
+		(waiver.translations ?? []).filter(
+			(translation) =>
+				translation.locale !== defaultLocale &&
+				waiverTranslationStatus(translation, fingerprint) === 'ready'
+		)
 	);
 }
 
@@ -327,11 +335,7 @@ export const publishWorkspaceWaiver = mutation({
 			theme: definition.theme ?? 'dark',
 			fields: definition.fields,
 			defaultLocale: waiver.defaultLocale ?? DEFAULT_WAIVER_LOCALE,
-			translations: publishableTranslations(
-				waiver.defaultLocale ?? DEFAULT_WAIVER_LOCALE,
-				definition.fields,
-				waiver.translations
-			),
+			translations: publishableTranslations(waiver.defaultLocale ?? DEFAULT_WAIVER_LOCALE, waiver),
 			publishedAt: Date.now()
 		});
 

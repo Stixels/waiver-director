@@ -8,6 +8,8 @@ import {
 	localizeWaiver,
 	localizedMarketingConsentLabel,
 	pickWaiverLocale,
+	waiverSourceFingerprint,
+	waiverTranslationStatus,
 	type WaiverTranslation
 } from '../src/lib/domain/waiver-i18n.ts';
 
@@ -114,4 +116,40 @@ test('marketing consent label matches the stored English wording', () => {
 		'Sí, quiero recibir correos de marketing de Rock Gym.'
 	);
 	assert.equal(formatWaiverString('{a} of {b} {c}', { a: 1, b: 2 }), '1 of 2 {c}');
+});
+
+test('translations go stale when the primary text changes', () => {
+	const fingerprint = waiverSourceFingerprint(baseWaiver);
+	assert.match(fingerprint, /^[0-9a-f]{16}$/);
+	assert.equal(waiverSourceFingerprint({ ...baseWaiver }), fingerprint);
+
+	const current = { ...spanish, sourceHash: fingerprint };
+	assert.equal(waiverTranslationStatus(current, fingerprint), 'ready');
+
+	const newClause = waiverSourceFingerprint({
+		...baseWaiver,
+		introCopy: '<p>You accept the risks.</p><p>New release clause.</p>'
+	});
+	const rewordedCheckbox = waiverSourceFingerprint({
+		...baseWaiver,
+		fields: baseWaiver.fields.map((field) =>
+			field.id === 'agree' ? { ...field, label: 'I agree to all terms' } : field
+		)
+	});
+	assert.notEqual(newClause, fingerprint);
+	assert.notEqual(rewordedCheckbox, fingerprint);
+	assert.equal(waiverTranslationStatus(current, newClause), 'outdated');
+	assert.equal(waiverTranslationStatus({ ...spanish }, fingerprint), 'outdated');
+});
+
+test('a translation without waiver text is never ready', () => {
+	const fingerprint = waiverSourceFingerprint(baseWaiver);
+	assert.equal(
+		waiverTranslationStatus({ introCopy: '<p></p>', sourceHash: fingerprint }, fingerprint),
+		'missing_text'
+	);
+	assert.equal(
+		waiverTranslationStatus({ introCopy: '<p>&nbsp;</p>', sourceHash: fingerprint }, fingerprint),
+		'missing_text'
+	);
 });

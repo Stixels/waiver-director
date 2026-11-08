@@ -59,6 +59,12 @@ export type WaiverTranslation = {
 	title: string;
 	introCopy: string;
 	fields: WaiverFieldTranslation[];
+	/**
+	 * Fingerprint of the primary-language text this translation was written against
+	 * (see `waiverSourceFingerprint`). When the primary text changes, the translation is
+	 * outdated and is left off published versions until the owner updates it.
+	 */
+	sourceHash?: string;
 };
 
 type LocalizableField =
@@ -79,7 +85,7 @@ type LocalizableWaiver<F extends LocalizableField> = {
 	fields: F[];
 };
 
-function isBlankHtml(html: string) {
+export function isBlankHtml(html: string) {
 	return (
 		html
 			.replace(/<[^>]*>/g, '')
@@ -138,6 +144,60 @@ export function localizeWaiver<F extends LocalizableField, W extends Localizable
 			return { ...field, label };
 		})
 	};
+}
+
+type FingerprintSource = {
+	title: string;
+	introCopy: string;
+	fields: LocalizableField[];
+};
+
+/** 64-bit FNV-1a, hex encoded. Change detection only, not a security boundary. */
+function fnv1a64(input: string): string {
+	let hash = 0xcbf29ce484222325n;
+	const prime = 0x100000001b3n;
+	const mask = 0xffffffffffffffffn;
+	for (let index = 0; index < input.length; index += 1) {
+		hash ^= BigInt(input.charCodeAt(index));
+		hash = (hash * prime) & mask;
+	}
+	return hash.toString(16).padStart(16, '0');
+}
+
+/**
+ * Fingerprint of the primary-language text a signer agrees to: title, waiver text, and
+ * every field label, placeholder and option label. Computed the same way on the server
+ * and in the browser, from the stored (already sanitized) values.
+ */
+export function waiverSourceFingerprint(waiver: FingerprintSource): string {
+	return fnv1a64(
+		JSON.stringify([
+			waiver.title,
+			waiver.introCopy,
+			waiver.fields.map((field) => [
+				field.id,
+				field.label,
+				field.type === 'text' ? (field.placeholder ?? '') : '',
+				field.type === 'select' ? field.options.map((option) => [option.id, option.label]) : []
+			])
+		])
+	);
+}
+
+export type WaiverTranslationStatus = 'ready' | 'missing_text' | 'outdated';
+
+/**
+ * Whether a translation can go live. A language is only offered to signers when its
+ * waiver text has been translated and it was written against the current primary text,
+ * so nobody signs a stale or untranslated legal text under another language's label.
+ */
+export function waiverTranslationStatus(
+	translation: Pick<WaiverTranslation, 'introCopy' | 'sourceHash'>,
+	currentFingerprint: string
+): WaiverTranslationStatus {
+	if (isBlankHtml(translation.introCopy)) return 'missing_text';
+	if (translation.sourceHash !== currentFingerprint) return 'outdated';
+	return 'ready';
 }
 
 /** Locales a signer can choose for a waiver: the primary language first, then translations. */
