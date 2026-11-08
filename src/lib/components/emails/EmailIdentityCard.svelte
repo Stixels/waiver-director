@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import { useConvexClient } from 'convex-svelte';
 	import { toast } from 'svelte-sonner';
 	import type { Id } from '$convex/_generated/dataModel';
@@ -253,9 +254,14 @@
 	}
 
 	function handleAutoVerify() {
-		if (verificationCode.trim().length === 6 && canConfirmReplyToVerification) {
-			void confirmReplyToEmail();
-		}
+		// bits-ui calls onComplete inside an $effect. Without untrack, the state read
+		// here re-runs that effect whenever an attempt finishes, resubmitting a wrong
+		// code in a loop.
+		untrack(() => {
+			if (verificationCode.trim().length === 6 && canConfirmReplyToVerification) {
+				void confirmReplyToEmail();
+			}
+		});
 	}
 </script>
 
