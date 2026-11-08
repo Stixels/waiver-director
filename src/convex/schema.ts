@@ -339,6 +339,7 @@ export default defineSchema({
 		accountId: v.optional(v.string()),
 		permissions: v.array(v.string()),
 		lastSyncError: v.optional(v.string()),
+		syncStartedAt: v.optional(v.number()),
 		connectedAt: v.optional(v.number()),
 		disconnectedAt: v.optional(v.number()),
 		updatedAt: v.number()

@@ -31,6 +31,10 @@ const BOOKEO_BACKFILL_MONTHS = 6;
 const BOOKEO_UPCOMING_IMPORT_MONTHS = 12;
 const BOOKEO_FETCH_TIMEOUT_MS = 20_000;
 const BOOKEO_SYNC_MAX_PAGES = 200;
+// Only one sync runs per integration at a time. A sync that never reported
+// back (for example it hit the action time limit) stops blocking new ones
+// after this long.
+const BOOKEO_SYNC_LOCK_TTL_MS = 30 * 60 * 1000;
 const CONNECTION_SESSION_RETENTION_MS = 7 * DAY_MS;
 const BOOKEO_WEBHOOK_SUCCESS_RETENTION_MS = 7 * DAY_MS;
 const BOOKEO_WEBHOOK_FAILED_RETENTION_MS = 30 * DAY_MS;
@@ -825,6 +829,7 @@ export const markBookingIntegrationDisconnected = internalMutation({
 		await ctx.db.patch(integration._id, {
 			status: 'disconnected',
 			encryptedApiKey: undefined,
+			syncStartedAt: undefined,
 			...(args.remoteCleanupError ? { lastSyncError: args.remoteCleanupError } : {}),
 			disconnectedAt: now,
 			updatedAt: now
@@ -1007,6 +1012,8 @@ export const saveBookeoConnection = internalMutation({
 			accountId: args.accountId,
 			permissions: args.permissions,
 			lastSyncError: undefined,
+			// A new key always gets its initial sync, even if an older sync is still running.
+			syncStartedAt: undefined,
 			disconnectedAt: undefined,
 			updatedAt: now
 		});
@@ -1137,9 +1144,19 @@ export const markBookeoSyncStarted = internalMutation({
 		}
 
 		const now = Date.now();
+		// Several "previous message lost" webhooks in a burst each schedule a
+		// repair sync. Running them in parallel only gets them all rate limited.
+		if (
+			integration.syncStartedAt !== undefined &&
+			now - integration.syncStartedAt < BOOKEO_SYNC_LOCK_TTL_MS
+		) {
+			return false;
+		}
+
 		await ctx.db.patch(integration._id, {
 			status: 'syncing',
 			lastSyncError: undefined,
+			syncStartedAt: now,
 			updatedAt: now
 		});
 		return true;
@@ -1164,6 +1181,7 @@ export const markBookeoSyncFinished = internalMutation({
 			status: args.status === 'succeeded' ? 'connected' : 'error',
 			...(args.status === 'succeeded' ? { lastSyncError: undefined } : {}),
 			...(args.errorMessage ? { lastSyncError: args.errorMessage } : {}),
+			syncStartedAt: undefined,
 			updatedAt: now
 		});
 		return null;
@@ -1188,7 +1206,7 @@ export const upsertProviderBooking = internalMutation({
 			participantCount: v.number()
 		})
 	},
-	returns: v.id('bookings'),
+	returns: v.union(v.id('bookings'), v.null()),
 	handler: async (ctx, args) => {
 		const integration = await ctx.db.get(args.integrationId);
 		if (!integration) {
@@ -1197,6 +1215,9 @@ export const upsertProviderBooking = internalMutation({
 				message: 'Integration not found.'
 			});
 		}
+		// A sync or webhook job that was already queued when the owner disconnected
+		// must not keep writing bookings into the workspace.
+		if (integration.status === 'disconnected') return null;
 
 		const now = Date.now();
 		const existing = await ctx.db
@@ -1213,6 +1234,27 @@ export const upsertProviderBooking = internalMutation({
 			args.booking.activityName === UNKNOWN_ACTIVITY_NAME && existing
 				? existing.activityName
 				: args.booking.activityName;
+		// Webhook payloads are not always expanded the way the backfill request
+		// is, so a missing time or customer must not erase what is already stored.
+		const incoming = args.booking;
+		const keepTime = existing && incoming.startTime === undefined;
+		const timeFields = keepTime
+			? {
+					startTime: existing.startTime,
+					endTime: existing.endTime,
+					startAt: existing.startAt,
+					endAt: existing.endAt,
+					serviceDate: existing.serviceDate
+				}
+			: {
+					startTime: incoming.startTime,
+					endTime: incoming.endTime,
+					startAt: incoming.startAt,
+					endAt: incoming.endAt,
+					serviceDate: incoming.serviceDate
+				};
+		const leadCustomerName = incoming.leadCustomerName ?? existing?.leadCustomerName;
+		const leadCustomerEmail = incoming.leadCustomerEmail ?? existing?.leadCustomerEmail;
 		const bookingFields = {
 			workspaceId: integration.workspaceId,
 			integrationId: integration._id,
@@ -1221,18 +1263,14 @@ export const upsertProviderBooking = internalMutation({
 			searchText: bookingSearchText({
 				providerBookingId: args.booking.providerBookingId,
 				activityName,
-				leadCustomerName: args.booking.leadCustomerName,
-				leadCustomerEmail: args.booking.leadCustomerEmail
+				leadCustomerName,
+				leadCustomerEmail
 			}),
 			status: args.booking.status,
 			activityName,
-			startTime: args.booking.startTime,
-			endTime: args.booking.endTime,
-			startAt: args.booking.startAt,
-			endAt: args.booking.endAt,
-			serviceDate: args.booking.serviceDate,
-			leadCustomerName: args.booking.leadCustomerName,
-			leadCustomerEmail: args.booking.leadCustomerEmail,
+			...timeFields,
+			leadCustomerName,
+			leadCustomerEmail,
 			participantCount: args.booking.participantCount,
 			updatedAt: now
 		};
@@ -1250,6 +1288,34 @@ export const upsertProviderBooking = internalMutation({
 		}
 
 		return bookingId;
+	}
+});
+
+export const cancelProviderBooking = internalMutation({
+	args: {
+		integrationId: v.id('booking_integrations'),
+		providerBookingId: v.string()
+	},
+	returns: v.boolean(),
+	handler: async (ctx, args) => {
+		const integration = await ctx.db.get(args.integrationId);
+		if (!integration || integration.status === 'disconnected') return false;
+
+		const existing = await ctx.db
+			.query('bookings')
+			.withIndex('by_workspaceId_and_provider_and_providerBookingId', (q) =>
+				q
+					.eq('workspaceId', integration.workspaceId)
+					.eq('provider', integration.provider)
+					.eq('providerBookingId', args.providerBookingId)
+			)
+			.unique();
+		if (!existing) return false;
+
+		if (existing.status !== 'canceled') {
+			await ctx.db.patch(existing._id, { status: 'canceled', updatedAt: Date.now() });
+		}
+		return true;
 	}
 });
 
@@ -1316,6 +1382,7 @@ export const getWebhookEvent = internalQuery({
 			eventId: v.id('booking_webhook_events'),
 			integrationId: v.id('booking_integrations'),
 			eventType: v.string(),
+			itemId: v.string(),
 			rawBody: v.string()
 		})
 	),
@@ -1326,6 +1393,7 @@ export const getWebhookEvent = internalQuery({
 			eventId: event._id,
 			integrationId: event.integrationId,
 			eventType: event.eventType,
+			itemId: event.itemId,
 			rawBody: event.rawBody
 		};
 	}
@@ -1358,6 +1426,7 @@ export const processBookeoWebhookEvent = internalAction({
 			eventId: Id<'booking_webhook_events'>;
 			integrationId: Id<'booking_integrations'>;
 			eventType: string;
+			itemId: string;
 			rawBody: string;
 		} | null = await ctx.runQuery(internal.integrations.getWebhookEvent, args);
 		if (!event) return null;
@@ -1365,6 +1434,20 @@ export const processBookeoWebhookEvent = internalAction({
 		try {
 			const body = JSON.parse(event.rawBody) as { item?: BookeoBooking };
 			const normalized = normalizeBookeoBooking(toRecord(body.item));
+			// A delete notification may carry only the booking number. A later
+			// repair sync cannot fix this either, because deleted bookings no
+			// longer appear in the Bookeo bookings list.
+			if (!normalized && event.eventType === 'deleted' && event.itemId !== 'unknown') {
+				const canceled: boolean = await ctx.runMutation(
+					internal.integrations.cancelProviderBooking,
+					{ integrationId: event.integrationId, providerBookingId: event.itemId }
+				);
+				await ctx.runMutation(internal.integrations.markWebhookEvent, {
+					eventId: args.eventId,
+					status: canceled ? 'processed' : 'ignored'
+				});
+				return null;
+			}
 			if (!normalized) {
 				await ctx.runMutation(internal.integrations.markWebhookEvent, {
 					eventId: args.eventId,
