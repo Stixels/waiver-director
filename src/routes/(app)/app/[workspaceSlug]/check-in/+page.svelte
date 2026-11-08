@@ -297,7 +297,7 @@
 		</div>
 
 		<div
-			class="flex h-9 w-full flex-wrap items-center gap-1 rounded-lg border border-border bg-card/40 p-px lg:w-auto"
+			class="flex h-9 w-full flex-nowrap items-center gap-1 rounded-lg border border-border bg-card/40 p-px lg:w-auto lg:shrink-0"
 		>
 			<Button
 				size="icon-lg"
