@@ -203,3 +203,21 @@ export function reminderRetryDelayMs(attempt: number, jitter = Math.random()): n
 	const base = Math.min(30_000 * 2 ** Math.max(0, attempt - 1), 30 * 60 * 1000);
 	return Math.round(base + jitter * 5_000);
 }
+
+/** The moment a reused waiver has to be valid at: the booking start, or now if that is later or unknown. */
+export function reuseValidityCheckAt(booking: { startAt?: number }, now: number): number {
+	return Math.max(now, booking.startAt ?? now);
+}
+
+/** Participants a reuse adds to a booking's signed count: the signer plus any minors on the waiver. */
+export function reuseCoveredCount(reuse: { minorNames?: string[] }): number {
+	return 1 + (reuse.minorNames?.length ?? 0);
+}
+
+/** Whether a reuse no longer covers a booking that now starts at `startAt`. */
+export function reuseExpiredForStart(
+	reuse: { coveredUntil?: number },
+	startAt: number | undefined
+) {
+	return reuse.coveredUntil !== undefined && startAt !== undefined && reuse.coveredUntil <= startAt;
+}

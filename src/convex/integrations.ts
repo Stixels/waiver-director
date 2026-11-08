@@ -21,6 +21,7 @@ import {
 } from './lib/bookings';
 import { requireWorkspaceFeature } from './lib/billing';
 import { requireWorkspaceMember, requireWorkspaceOwner } from './lib/waivers';
+import { releaseReusesExpiredBeforeStart } from './lib/waiverPolicyRecords';
 
 const BOOKEO_API_BASE_URL = 'https://api.bookeo.com/v2';
 const BOOKEO_WEBHOOK_TYPES = ['created', 'updated', 'deleted'] as const;
@@ -1247,6 +1248,9 @@ export const upsertProviderBooking = internalMutation({
 
 		if (existing) {
 			await ctx.db.patch(existing._id, bookingFields);
+			if ((args.booking.startAt ?? 0) > (existing.startAt ?? 0)) {
+				await releaseReusesExpiredBeforeStart(ctx, existing._id);
+			}
 		}
 
 		return bookingId;

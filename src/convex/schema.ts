@@ -483,6 +483,8 @@ export default defineSchema({
 		signerName: v.string(),
 		signerEmail: v.string(),
 		minorNames: v.optional(v.array(v.string())),
+		/** When the reused waiver expires; absent when it has no time limit. */
+		coveredUntil: v.optional(v.number()),
 		reusedAt: v.number()
 	})
 		.index('by_bookingId', ['bookingId'])

@@ -9,6 +9,9 @@ import {
 	formatBookingWallClock,
 	isRetryableEmailError,
 	reminderRetryDelayMs,
+	reuseCoveredCount,
+	reuseExpiredForStart,
+	reuseValidityCheckAt,
 	nextReuseLookupAttempts,
 	normalizeReminderLeadHours,
 	normalizeValidityDays,
@@ -170,4 +173,28 @@ test('backs off exponentially with a cap', () => {
 	assert.equal(reminderRetryDelayMs(4, 0), 240_000);
 	assert.equal(reminderRetryDelayMs(20, 0), 30 * 60 * 1000);
 	assert.equal(reminderRetryDelayMs(1, 1), 35_000);
+});
+
+test('checks reuse validity at the booking start, not just at claim time', () => {
+	const startAt = now + 7 * DAY_MS;
+	assert.equal(reuseValidityCheckAt({ startAt }, now), startAt);
+	assert.equal(reuseValidityCheckAt({ startAt: now - DAY_MS }, now), now);
+	assert.equal(reuseValidityCheckAt({}, now), now);
+	// Signed 363 days ago with a 365-day policy: valid today, expired by next week's booking.
+	const result = submissionReuseEligibility({
+		policy,
+		submission: { submittedAt: now - 363 * DAY_MS, versionId: 'v1' },
+		publishedVersionId: 'v1',
+		now: reuseValidityCheckAt({ startAt }, now)
+	});
+	assert.deepEqual(result, { eligible: false, reason: 'expired' });
+});
+
+test('releases reuses that expire before a rescheduled start', () => {
+	assert.equal(reuseCoveredCount({ minorNames: ['Maya', 'Leo'] }), 3);
+	assert.equal(reuseCoveredCount({}), 1);
+	assert.equal(reuseExpiredForStart({ coveredUntil: now + DAY_MS }, now + 2 * DAY_MS), true);
+	assert.equal(reuseExpiredForStart({ coveredUntil: now + 3 * DAY_MS }, now + 2 * DAY_MS), false);
+	assert.equal(reuseExpiredForStart({}, now + 2 * DAY_MS), false);
+	assert.equal(reuseExpiredForStart({ coveredUntil: now }, undefined), false);
 });

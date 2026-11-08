@@ -13,6 +13,7 @@ import {
 	normalizeReminderLeadHours,
 	normalizeValidityDays,
 	reuseLookupAllowed,
+	reuseValidityCheckAt,
 	submissionReuseEligibility
 } from './lib/waiverPolicies';
 
@@ -235,11 +236,12 @@ export const claimExistingWaiverForBooking = mutation({
 			return { status: 'already_covered' as const, signerName: submission.signerName };
 		}
 
+		// The waiver must still be valid when the activity happens, not just when the guest clicks.
 		const eligibility = submissionReuseEligibility({
 			policy,
 			submission: { submittedAt: submission.submittedAt, versionId: submission.versionId },
 			publishedVersionId,
-			now
+			now: reuseValidityCheckAt(booking, now)
 		});
 		if (!eligibility.eligible) {
 			return {
@@ -258,6 +260,7 @@ export const claimExistingWaiverForBooking = mutation({
 			signerName: submission.signerName,
 			signerEmail: submission.signerEmail,
 			minorNames,
+			...(eligibility.expiresAt !== null ? { coveredUntil: eligibility.expiresAt } : {}),
 			reusedAt: now
 		});
 		// The reused waiver covers the signer and every minor listed on it, matching how a
