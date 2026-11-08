@@ -14,8 +14,11 @@ import { sanitizeRichTextHtml } from '../lib/utils/rich-text';
 import {
 	assertWorkspaceRecord,
 	minorInputValidator,
+	createDefaultWaiverDefinition,
+	normalizePublicSlug,
 	normalizeWaiverDefinition,
 	requireWorkspaceMember,
+	requireWorkspaceOwner,
 	validateMinors,
 	validateSubmissionAnswers,
 	waiverDefinitionsEqual,
@@ -24,6 +27,17 @@ import {
 	waiverDefinitionValidator,
 	waiverThemeValidator
 } from './lib/waivers';
+import {
+	MAX_ACTIVITY_NAME_LENGTH,
+	MAX_WAIVERS_PER_REQUIREMENT,
+	MAX_WAIVERS_PER_WORKSPACE,
+	isWaiverActive,
+	normalizeActivityKey,
+	pickDefaultWaiver,
+	resolveRequiredWaiverIds,
+	waiverSlugBase,
+	waiverSlugCandidate
+} from './lib/waiverRequirements';
 
 type FunctionCtx = QueryCtx | MutationCtx;
 
@@ -35,7 +49,23 @@ const workspaceWaiverValue = v.object({
 	theme: waiverThemeValidator,
 	fields: v.array(waiverFieldValidator),
 	publishedVersionId: v.union(v.id('waiver_versions'), v.null()),
-	hasUnpublishedChanges: v.boolean()
+	hasUnpublishedChanges: v.boolean(),
+	isDefault: v.boolean()
+});
+
+const workspaceWaiverListItemValue = v.object({
+	waiverId: v.id('workspace_waivers'),
+	publicSlug: v.string(),
+	title: v.string(),
+	isDefault: v.boolean(),
+	isPublished: v.boolean(),
+	createdAt: v.number()
+});
+
+const requiredWaiverLinkValue = v.object({
+	slug: v.string(),
+	title: v.string(),
+	isCurrent: v.boolean()
 });
 
 const waiverVersionPreviewValue = v.object({
@@ -86,14 +116,100 @@ const publicBookingWaiverValue = v.object({
 		leadCustomerName: v.union(v.string(), v.null()),
 		participantCount: v.number(),
 		signedCount: v.number()
-	})
+	}),
+	// Every published waiver this booking's activity requires, in order. The
+	// first entry is the primary waiver that counts toward the waiver gap.
+	requiredWaivers: v.array(requiredWaiverLinkValue)
 });
 
-async function getWorkspaceWaiverRecord(ctx: FunctionCtx, workspaceId: Id<'workspaces'>) {
+async function listWorkspaceWaiverRecords(ctx: FunctionCtx, workspaceId: Id<'workspaces'>) {
+	// Archived waivers stay in the table for signed-record integrity, so allow
+	// headroom beyond the active-waiver limit.
 	return await ctx.db
 		.query('workspace_waivers')
 		.withIndex('by_workspaceId', (q) => q.eq('workspaceId', workspaceId))
+		.take(MAX_WAIVERS_PER_WORKSPACE * 4);
+}
+
+async function getDefaultWaiverRecord(ctx: FunctionCtx, workspaceId: Id<'workspaces'>) {
+	return pickDefaultWaiver(await listWorkspaceWaiverRecords(ctx, workspaceId));
+}
+
+async function getWaiverRecordForMember(
+	ctx: FunctionCtx,
+	workspaceId: Id<'workspaces'>,
+	waiverId: Id<'workspace_waivers'> | undefined
+) {
+	if (!waiverId) {
+		return await getDefaultWaiverRecord(ctx, workspaceId);
+	}
+	const waiver = await ctx.db.get(waiverId);
+	if (!waiver || waiver.workspaceId !== workspaceId || !isWaiverActive(waiver)) {
+		// A stale link to an archived or deleted waiver opens the default instead.
+		return await getDefaultWaiverRecord(ctx, workspaceId);
+	}
+	return waiver;
+}
+
+/**
+ * Resolves the waivers a booking requires: an activity-specific requirement
+ * when one matches the booking's activity, otherwise the default waiver.
+ */
+async function getBookingRequiredWaivers(ctx: FunctionCtx, booking: Doc<'bookings'>) {
+	const [waivers, requirement] = await Promise.all([
+		listWorkspaceWaiverRecords(ctx, booking.workspaceId),
+		ctx.db
+			.query('activity_waiver_requirements')
+			.withIndex('by_workspaceId_and_activityKey', (q) =>
+				q
+					.eq('workspaceId', booking.workspaceId)
+					.eq('activityKey', normalizeActivityKey(booking.activityName))
+			)
+			.unique()
+	]);
+	const activeWaivers = waivers.filter(isWaiverActive);
+	const byId = new Map(activeWaivers.map((waiver) => [waiver._id, waiver]));
+	const requiredIds = resolveRequiredWaiverIds({
+		defaultWaiverId: pickDefaultWaiver(activeWaivers)?._id ?? null,
+		requirementWaiverIds: requirement?.waiverIds ?? null,
+		activeWaiverIds: new Set(byId.keys())
+	});
+
+	return requiredIds.flatMap((waiverId) => {
+		const waiver = byId.get(waiverId);
+		return waiver ? [waiver] : [];
+	});
+}
+
+async function getPublicWaiverRecordBySlug(ctx: FunctionCtx, slug: string) {
+	const waiver = await ctx.db
+		.query('workspace_waivers')
+		.withIndex('by_publicSlug', (q) => q.eq('publicSlug', slug))
 		.unique();
+	if (!waiver || !waiver.publishedVersionId || !isWaiverActive(waiver)) {
+		return null;
+	}
+	return waiver;
+}
+
+async function generateWaiverPublicSlug(
+	ctx: MutationCtx,
+	workspaceSlug: string,
+	title: string
+): Promise<string> {
+	const base = normalizePublicSlug(waiverSlugBase(workspaceSlug, title));
+	for (let attempt = 1; attempt <= 50; attempt++) {
+		const candidate = waiverSlugCandidate(base, attempt);
+		const existing = await ctx.db
+			.query('workspace_waivers')
+			.withIndex('by_publicSlug', (q) => q.eq('publicSlug', candidate))
+			.first();
+		if (!existing) return candidate;
+	}
+	throw new ConvexError({
+		code: 'internal_error',
+		message: 'Unable to generate a unique waiver link. Try a different title.'
+	});
 }
 
 async function getNextVersionNumber(ctx: MutationCtx, waiverId: Id<'workspace_waivers'>) {
@@ -133,7 +249,11 @@ async function waiverHasUnpublishedChanges(ctx: FunctionCtx, waiver: Doc<'worksp
 	);
 }
 
-async function workspaceWaiverSummary(ctx: FunctionCtx, waiver: Doc<'workspace_waivers'>) {
+async function workspaceWaiverSummary(
+	ctx: FunctionCtx,
+	waiver: Doc<'workspace_waivers'>,
+	defaultWaiverId: Id<'workspace_waivers'> | null
+) {
 	const hasUnpublishedChanges = await waiverHasUnpublishedChanges(ctx, waiver);
 
 	return {
@@ -144,19 +264,25 @@ async function workspaceWaiverSummary(ctx: FunctionCtx, waiver: Doc<'workspace_w
 		theme: waiver.theme ?? 'dark',
 		fields: waiver.fields,
 		publishedVersionId: waiver.publishedVersionId ?? null,
-		hasUnpublishedChanges
+		hasUnpublishedChanges,
+		isDefault: waiver._id === defaultWaiverId
 	};
 }
 
 export const getWorkspaceWaiver = query({
 	args: {
-		workspaceId: v.id('workspaces')
+		workspaceId: v.id('workspaces'),
+		// Omit to get the workspace's default waiver.
+		waiverId: v.optional(v.id('workspace_waivers'))
 	},
 	returns: workspaceWaiverValue,
 	handler: async (ctx, args) => {
 		await requireWorkspaceMember(ctx, args.workspaceId);
 
-		const waiver = await getWorkspaceWaiverRecord(ctx, args.workspaceId);
+		const [waiver, defaultWaiver] = await Promise.all([
+			getWaiverRecordForMember(ctx, args.workspaceId, args.waiverId),
+			getDefaultWaiverRecord(ctx, args.workspaceId)
+		]);
 		if (!waiver) {
 			throw new ConvexError({
 				code: 'not_found',
@@ -164,7 +290,290 @@ export const getWorkspaceWaiver = query({
 			});
 		}
 
-		return await workspaceWaiverSummary(ctx, waiver);
+		return await workspaceWaiverSummary(ctx, waiver, defaultWaiver?._id ?? null);
+	}
+});
+
+export const listWorkspaceWaivers = query({
+	args: {
+		workspaceId: v.id('workspaces')
+	},
+	returns: v.array(workspaceWaiverListItemValue),
+	handler: async (ctx, args) => {
+		await requireWorkspaceMember(ctx, args.workspaceId);
+
+		const waivers = (await listWorkspaceWaiverRecords(ctx, args.workspaceId)).filter(
+			isWaiverActive
+		);
+		const defaultWaiverId = pickDefaultWaiver(waivers)?._id ?? null;
+
+		return waivers
+			.map((waiver) => ({
+				waiverId: waiver._id,
+				publicSlug: waiver.publicSlug,
+				title: waiver.title,
+				isDefault: waiver._id === defaultWaiverId,
+				isPublished: Boolean(waiver.publishedVersionId),
+				createdAt: waiver._creationTime
+			}))
+			.sort((a, b) => Number(b.isDefault) - Number(a.isDefault) || a.createdAt - b.createdAt);
+	}
+});
+
+export const createWorkspaceWaiver = mutation({
+	args: {
+		workspaceId: v.id('workspaces'),
+		title: v.string()
+	},
+	returns: v.object({
+		waiverId: v.id('workspace_waivers')
+	}),
+	handler: async (ctx, args) => {
+		await requireWorkspaceOwner(ctx, args.workspaceId, 'create waivers');
+
+		const workspace = await ctx.db.get(args.workspaceId);
+		if (!workspace) {
+			throw new ConvexError({ code: 'not_found', message: 'Workspace not found.' });
+		}
+
+		const waivers = await listWorkspaceWaiverRecords(ctx, args.workspaceId);
+		const activeWaivers = waivers.filter(isWaiverActive);
+		if (activeWaivers.length >= MAX_WAIVERS_PER_WORKSPACE) {
+			throw new ConvexError({
+				code: 'limit_reached',
+				message: `A workspace can have up to ${MAX_WAIVERS_PER_WORKSPACE} active waivers. Archive one to add another.`
+			});
+		}
+
+		// Reuse the definition validator so new waivers obey the same title rules.
+		const definition = normalizeWaiverDefinition({
+			...createDefaultWaiverDefinition(workspace.name),
+			title: args.title
+		});
+		const publicSlug = await generateWaiverPublicSlug(ctx, workspace.slug, definition.title);
+
+		const waiverId = await ctx.db.insert('workspace_waivers', {
+			workspaceId: args.workspaceId,
+			publicSlug,
+			isDefault: activeWaivers.length === 0,
+			status: 'active',
+			title: definition.title,
+			introCopy: definition.introCopy,
+			theme: definition.theme ?? 'dark',
+			fields: definition.fields
+		});
+
+		return { waiverId };
+	}
+});
+
+export const setDefaultWorkspaceWaiver = mutation({
+	args: {
+		workspaceId: v.id('workspaces'),
+		waiverId: v.id('workspace_waivers')
+	},
+	returns: v.null(),
+	handler: async (ctx, args) => {
+		await requireWorkspaceOwner(ctx, args.workspaceId, 'change the default waiver');
+
+		const waiver = assertWorkspaceRecord(
+			await ctx.db.get(args.waiverId),
+			args.workspaceId,
+			'Workspace waiver not found.'
+		);
+		if (!isWaiverActive(waiver)) {
+			throw new ConvexError({
+				code: 'invalid_argument',
+				message: 'Archived waivers cannot be the default.'
+			});
+		}
+
+		const waivers = await listWorkspaceWaiverRecords(ctx, args.workspaceId);
+		for (const other of waivers) {
+			const shouldBeDefault = other._id === waiver._id;
+			if ((other.isDefault === true) !== shouldBeDefault) {
+				await ctx.db.patch(other._id, { isDefault: shouldBeDefault });
+			}
+		}
+
+		return null;
+	}
+});
+
+export const archiveWorkspaceWaiver = mutation({
+	args: {
+		workspaceId: v.id('workspaces'),
+		waiverId: v.id('workspace_waivers')
+	},
+	returns: v.null(),
+	handler: async (ctx, args) => {
+		await requireWorkspaceOwner(ctx, args.workspaceId, 'archive waivers');
+
+		const waiver = assertWorkspaceRecord(
+			await ctx.db.get(args.waiverId),
+			args.workspaceId,
+			'Workspace waiver not found.'
+		);
+		if (!isWaiverActive(waiver)) {
+			return null;
+		}
+
+		const defaultWaiver = await getDefaultWaiverRecord(ctx, args.workspaceId);
+		if (defaultWaiver?._id === waiver._id) {
+			throw new ConvexError({
+				code: 'invalid_argument',
+				message: 'Make another waiver the default before archiving this one.'
+			});
+		}
+
+		// Versions and signed submissions are kept; archiving only takes the
+		// waiver out of the builder, public links and activity requirements.
+		await ctx.db.patch(waiver._id, {
+			status: 'archived',
+			isDefault: false,
+			archivedAt: Date.now()
+		});
+
+		return null;
+	}
+});
+
+const activityRequirementValue = v.object({
+	activityKey: v.string(),
+	activityName: v.string(),
+	// Null means the activity uses the default waiver requirement.
+	waiverIds: v.union(v.null(), v.array(v.id('workspace_waivers'))),
+	recentBookingCount: v.number()
+});
+
+export const listActivityWaiverRequirements = query({
+	args: {
+		workspaceId: v.id('workspaces')
+	},
+	returns: v.array(activityRequirementValue),
+	handler: async (ctx, args) => {
+		await requireWorkspaceMember(ctx, args.workspaceId);
+
+		const [requirements, recentBookings, waivers] = await Promise.all([
+			ctx.db
+				.query('activity_waiver_requirements')
+				.withIndex('by_workspaceId', (q) => q.eq('workspaceId', args.workspaceId))
+				.take(500),
+			ctx.db
+				.query('bookings')
+				.withIndex('by_workspaceId_and_startAt', (q) => q.eq('workspaceId', args.workspaceId))
+				.order('desc')
+				.take(500),
+			listWorkspaceWaiverRecords(ctx, args.workspaceId)
+		]);
+		const activeWaiverIds = new Set(waivers.filter(isWaiverActive).map((waiver) => waiver._id));
+
+		const rows = new Map<
+			string,
+			{
+				activityKey: string;
+				activityName: string;
+				waiverIds: Id<'workspace_waivers'>[] | null;
+				recentBookingCount: number;
+			}
+		>();
+		for (const booking of recentBookings) {
+			const activityKey = normalizeActivityKey(booking.activityName);
+			if (!activityKey) continue;
+			const row = rows.get(activityKey);
+			if (row) {
+				row.recentBookingCount += 1;
+			} else {
+				rows.set(activityKey, {
+					activityKey,
+					activityName: booking.activityName.trim(),
+					waiverIds: null,
+					recentBookingCount: 1
+				});
+			}
+		}
+		for (const requirement of requirements) {
+			const waiverIds = requirement.waiverIds.filter((waiverId) => activeWaiverIds.has(waiverId));
+			const row = rows.get(requirement.activityKey);
+			if (row) {
+				row.waiverIds = waiverIds;
+			} else {
+				rows.set(requirement.activityKey, {
+					activityKey: requirement.activityKey,
+					activityName: requirement.activityName,
+					waiverIds,
+					recentBookingCount: 0
+				});
+			}
+		}
+
+		return [...rows.values()].sort((a, b) => a.activityName.localeCompare(b.activityName));
+	}
+});
+
+export const setActivityWaiverRequirement = mutation({
+	args: {
+		workspaceId: v.id('workspaces'),
+		activityName: v.string(),
+		// An empty list removes the activity-specific requirement so the activity
+		// goes back to the default waiver.
+		waiverIds: v.array(v.id('workspace_waivers'))
+	},
+	returns: v.null(),
+	handler: async (ctx, args) => {
+		await requireWorkspaceOwner(ctx, args.workspaceId, 'change waiver requirements');
+
+		const activityName = args.activityName.trim().replace(/\s+/g, ' ');
+		const activityKey = normalizeActivityKey(activityName);
+		if (!activityKey || activityName.length > MAX_ACTIVITY_NAME_LENGTH) {
+			throw new ConvexError({
+				code: 'invalid_argument',
+				message: `Activity name must be between 1 and ${MAX_ACTIVITY_NAME_LENGTH} characters.`
+			});
+		}
+
+		const waiverIds = [...new Set(args.waiverIds)];
+		if (waiverIds.length > MAX_WAIVERS_PER_REQUIREMENT) {
+			throw new ConvexError({
+				code: 'invalid_argument',
+				message: `An activity can require up to ${MAX_WAIVERS_PER_REQUIREMENT} waivers.`
+			});
+		}
+		for (const waiverId of waiverIds) {
+			const waiver = await ctx.db.get(waiverId);
+			if (!waiver || waiver.workspaceId !== args.workspaceId || !isWaiverActive(waiver)) {
+				throw new ConvexError({
+					code: 'not_found',
+					message: 'One of the selected waivers was not found.'
+				});
+			}
+		}
+
+		const existing = await ctx.db
+			.query('activity_waiver_requirements')
+			.withIndex('by_workspaceId_and_activityKey', (q) =>
+				q.eq('workspaceId', args.workspaceId).eq('activityKey', activityKey)
+			)
+			.unique();
+
+		if (waiverIds.length === 0) {
+			if (existing) await ctx.db.delete(existing._id);
+			return null;
+		}
+
+		if (existing) {
+			await ctx.db.patch(existing._id, { activityName, waiverIds, updatedAt: Date.now() });
+		} else {
+			await ctx.db.insert('activity_waiver_requirements', {
+				workspaceId: args.workspaceId,
+				activityKey,
+				activityName,
+				waiverIds,
+				updatedAt: Date.now()
+			});
+		}
+
+		return null;
 	}
 });
 
@@ -217,6 +626,13 @@ export const publishWorkspaceWaiver = mutation({
 			'Workspace waiver not found.'
 		);
 
+		if (!isWaiverActive(waiver)) {
+			throw new ConvexError({
+				code: 'invalid_argument',
+				message: 'Archived waivers cannot be published.'
+			});
+		}
+
 		const definition = normalizeWaiverDefinition({
 			title: waiver.title,
 			introCopy: waiver.introCopy,
@@ -251,14 +667,16 @@ export const publishWorkspaceWaiver = mutation({
 
 export const listWaiverVersions = query({
 	args: {
-		workspaceId: v.id('workspaces')
+		workspaceId: v.id('workspaces'),
+		// Omit to list the default waiver's versions.
+		waiverId: v.optional(v.id('workspace_waivers'))
 	},
 	returns: v.array(waiverVersionPreviewValue),
 	handler: async (ctx, args) => {
 		await requireWorkspaceMember(ctx, args.workspaceId);
 
 		const [waiver, workspace] = await Promise.all([
-			getWorkspaceWaiverRecord(ctx, args.workspaceId),
+			getWaiverRecordForMember(ctx, args.workspaceId, args.waiverId),
 			ctx.db.get(args.workspaceId)
 		]);
 
@@ -443,11 +861,7 @@ export const getPublicWaiverBySlug = query({
 	},
 	returns: v.union(v.null(), publicWaiverValue),
 	handler: async (ctx, args) => {
-		const waiver = await ctx.db
-			.query('workspace_waivers')
-			.withIndex('by_publicSlug', (q) => q.eq('publicSlug', args.slug))
-			.unique();
-
+		const waiver = await getPublicWaiverRecordBySlug(ctx, args.slug);
 		if (!waiver || !waiver.publishedVersionId) {
 			return null;
 		}
@@ -501,10 +915,7 @@ export const getPublicWaiverForBooking = query({
 	},
 	returns: v.union(v.null(), publicBookingWaiverValue),
 	handler: async (ctx, args) => {
-		const waiver = await ctx.db
-			.query('workspace_waivers')
-			.withIndex('by_publicSlug', (q) => q.eq('publicSlug', args.slug))
-			.unique();
+		const waiver = await getPublicWaiverRecordBySlug(ctx, args.slug);
 		if (!waiver || !waiver.publishedVersionId) {
 			return null;
 		}
@@ -539,6 +950,25 @@ export const getPublicWaiverForBooking = query({
 			return null;
 		}
 		const workspaceLogoUrl = await getOwnedWorkspaceLogoUrl(ctx, workspace);
+		const requiredWaivers = (
+			await Promise.all(
+				(await getBookingRequiredWaivers(ctx, booking)).map(async (required) => {
+					// Show the published title, not unpublished builder edits.
+					const publishedVersion = required.publishedVersionId
+						? await ctx.db.get(required.publishedVersionId)
+						: null;
+					return publishedVersion
+						? [
+								{
+									slug: required.publicSlug,
+									title: publishedVersion.title,
+									isCurrent: required._id === waiver._id
+								}
+							]
+						: [];
+				})
+			)
+		).flat();
 
 		return {
 			slug: waiver.publicSlug,
@@ -553,6 +983,7 @@ export const getPublicWaiverForBooking = query({
 				marketingIntegration?.status === 'connected' && marketingIntegration.audienceId
 					? { provider: 'mailchimp' as const, label: marketingConsentLabel(workspace.name) }
 					: null,
+			requiredWaivers,
 			booking: {
 				lookupToken: booking.lookupToken,
 				activityName: booking.activityName,
@@ -583,10 +1014,7 @@ export const submitPublicWaiver = mutation({
 		submissionId: v.id('waiver_submissions')
 	}),
 	handler: async (ctx, args) => {
-		const waiver = await ctx.db
-			.query('workspace_waivers')
-			.withIndex('by_publicSlug', (q) => q.eq('publicSlug', args.slug))
-			.unique();
+		const waiver = await getPublicWaiverRecordBySlug(ctx, args.slug);
 		if (!waiver || !waiver.publishedVersionId) {
 			throw new ConvexError({
 				code: 'not_found',
@@ -740,9 +1168,15 @@ export const submitPublicWaiver = mutation({
 		});
 
 		if (booking) {
-			await ctx.db.patch(booking._id, {
-				signedCount: booking.signedCount + 1 + minors.length
-			});
+			// Only the primary required waiver counts toward the waiver gap, so a
+			// booking that needs two waivers is not double counted when each
+			// participant signs both. Per-waiver coverage is a follow-up (ADR 0002).
+			const [primaryWaiver] = await getBookingRequiredWaivers(ctx, booking);
+			if (!primaryWaiver || primaryWaiver._id === waiver._id) {
+				await ctx.db.patch(booking._id, {
+					signedCount: booking.signedCount + 1 + minors.length
+				});
+			}
 		}
 		return { submissionId };
 	}

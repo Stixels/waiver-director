@@ -31,6 +31,7 @@ type WorkspaceScopedTableName = {
 const WORKSPACE_SCOPED_TABLES = {
 	workspace_memberships: true,
 	workspace_waivers: true,
+	activity_waiver_requirements: true,
 	waiver_versions: true,
 	customers: true,
 	waiver_submissions: true,
@@ -126,6 +127,8 @@ export const createWorkspace = mutation({
 		await ctx.db.insert('workspace_waivers', {
 			workspaceId,
 			publicSlug: createDefaultPublicWaiverSlug(slug),
+			isDefault: true,
+			status: 'active',
 			title: waiverDefinition.title,
 			introCopy: waiverDefinition.introCopy,
 			theme: waiverDefinition.theme ?? 'dark',

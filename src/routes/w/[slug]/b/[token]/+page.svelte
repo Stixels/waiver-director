@@ -15,4 +15,4 @@
 	<title>{waiver.title} | {waiver.booking.activityName}</title>
 </svelte:head>
 
-<PublicWaiverForm {waiver} booking={waiver.booking} />
+<PublicWaiverForm {waiver} booking={waiver.booking} requiredWaivers={waiver.requiredWaivers} />

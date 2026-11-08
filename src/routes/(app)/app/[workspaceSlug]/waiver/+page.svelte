@@ -17,12 +17,16 @@
 		type SaveState
 	} from '$lib/components/waivers/WaiverBuilderCanvas.svelte';
 	import WaiverBuilderPanel from '$lib/components/waivers/WaiverBuilderPanel.svelte';
+	import WaiverSwitcher from '$lib/components/waivers/WaiverSwitcher.svelte';
+	import ActivityRequirementsSheet from '$lib/components/waivers/ActivityRequirementsSheet.svelte';
+	import type { Id } from '$convex/_generated/dataModel';
 	import { Button } from '$lib/components/ui/button';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import {
 		DropdownMenu,
 		DropdownMenuContent,
 		DropdownMenuItem,
+		DropdownMenuSeparator,
 		DropdownMenuTrigger
 	} from '$lib/components/ui/dropdown-menu';
 	import {
@@ -57,13 +61,24 @@
 	);
 
 	type WorkspaceWaiverSummary = FunctionReturnType<typeof api.waivers.getWorkspaceWaiver>;
-	type ConfirmKind = 'publish';
+	type ConfirmKind = 'publish' | 'archive';
 
 	const convex = useConvexClient();
+	const isOwner = $derived(currentWorkspace?.role === 'owner');
+
+	// Which waiver the builder is editing. No query param means the default waiver.
+	const selectedWaiverId = $derived(
+		(page.url.searchParams.get('waiver') || null) as Id<'workspace_waivers'> | null
+	);
 
 	const waiverQuery = useProtectedQuery(
 		api.waivers.getWorkspaceWaiver,
-		() => (currentWorkspace ? { workspaceId: currentWorkspace.workspaceId } : 'skip'),
+		() =>
+			currentWorkspace
+				? selectedWaiverId
+					? { workspaceId: currentWorkspace.workspaceId, waiverId: selectedWaiverId }
+					: { workspaceId: currentWorkspace.workspaceId }
+				: 'skip',
 		() => ({ keepPreviousData: true })
 	);
 
@@ -74,6 +89,8 @@
 	let baselineDraft = $state<WaiverDefinition | null>(null);
 	let hydratedWaiverId = $state<WorkspaceWaiverSummary['waiverId'] | null>(null);
 	let versionHistoryOpen = $state(false);
+	let requirementsOpen = $state(false);
+	let isChangingWaiver = $state(false);
 	let copyingKey = $state<string | null>(null);
 	let copiedKey = $state<string | null>(null);
 	let qrDialogOpen = $state(false);
@@ -371,6 +388,14 @@
 					confirmLabel: 'Publish waiver',
 					destructive: false
 				};
+			case 'archive':
+				return {
+					title: 'Archive this waiver?',
+					description:
+						'Its public link stops working and it is removed from activity requirements. Signed submissions and version history are kept.',
+					confirmLabel: 'Archive waiver',
+					destructive: true
+				};
 		}
 	}
 
@@ -432,10 +457,63 @@
 		}
 	}
 
+	async function selectWaiver(waiverId: Id<'workspace_waivers'>) {
+		if (waiverId === workspaceWaiver?.waiverId) return;
+		await flushAutosave();
+		await goto(
+			resolve(
+				`/app/${page.params.workspaceSlug}/waiver?waiver=${encodeURIComponent(waiverId)}` as `/app/${string}`
+			),
+			{ keepFocus: true, noScroll: true }
+		);
+	}
+
+	async function handleMakeDefault() {
+		if (convex.disabled || !currentWorkspace || !workspaceWaiver) return;
+		isChangingWaiver = true;
+		try {
+			await convex.mutation(api.waivers.setDefaultWorkspaceWaiver, {
+				workspaceId: currentWorkspace.workspaceId,
+				waiverId: workspaceWaiver.waiverId
+			});
+			toast.success('Default waiver updated.');
+		} catch (error) {
+			toast.error(getConvexErrorMessage(error, 'Unable to change the default waiver.'));
+		} finally {
+			isChangingWaiver = false;
+		}
+	}
+
+	async function handleArchive() {
+		if (convex.disabled || !currentWorkspace || !workspaceWaiver) return;
+		isChangingWaiver = true;
+		try {
+			await flushAutosave();
+			await convex.mutation(api.waivers.archiveWorkspaceWaiver, {
+				workspaceId: currentWorkspace.workspaceId,
+				waiverId: workspaceWaiver.waiverId
+			});
+			confirmOpen = false;
+			confirmKind = null;
+			toast.success('Waiver archived. Signed submissions are kept.');
+			await goto(resolve(`/app/${page.params.workspaceSlug}/waiver` as `/app/${string}`), {
+				keepFocus: true,
+				noScroll: true
+			});
+		} catch (error) {
+			toast.error(getConvexErrorMessage(error, 'Unable to archive this waiver.'));
+		} finally {
+			isChangingWaiver = false;
+		}
+	}
+
 	async function handleConfirm() {
 		switch (confirmKind) {
 			case 'publish':
 				await handlePublish();
+				return;
+			case 'archive':
+				await handleArchive();
 				return;
 			default:
 				return;
@@ -454,7 +532,7 @@
 		description={confirmConfig(confirmKind).description}
 		confirmLabel={confirmConfig(confirmKind).confirmLabel}
 		destructive={confirmConfig(confirmKind).destructive}
-		isConfirming={isPublishing}
+		isConfirming={isPublishing || isChangingWaiver}
 		onConfirm={handleConfirm}
 	/>
 {/if}
@@ -463,6 +541,12 @@
 	<WaiverVersionHistorySheet
 		bind:open={versionHistoryOpen}
 		workspaceId={currentWorkspace.workspaceId}
+		waiverId={workspaceWaiver?.waiverId ?? null}
+	/>
+	<ActivityRequirementsSheet
+		bind:open={requirementsOpen}
+		workspaceId={currentWorkspace.workspaceId}
+		{isOwner}
 	/>
 {/if}
 
@@ -625,8 +709,17 @@
 				</div>
 			{/if}
 
-			<!-- Right cluster: secondary menu + publish -->
+			<!-- Right cluster: waiver switcher, secondary menu + publish -->
 			<div class="flex shrink-0 items-center gap-1 border-l border-border/80 px-2">
+				{#if currentWorkspace && workspaceWaiver}
+					<WaiverSwitcher
+						workspaceId={currentWorkspace.workspaceId}
+						currentWaiverId={workspaceWaiver.waiverId}
+						{isOwner}
+						onSelect={selectWaiver}
+						onOpenRequirements={() => (requirementsOpen = true)}
+					/>
+				{/if}
 				{#if workspaceWaiver}
 					<DropdownMenu>
 						<DropdownMenuTrigger
@@ -642,6 +735,19 @@
 						</DropdownMenuTrigger>
 						<DropdownMenuContent align="end" class="w-56">
 							<DropdownMenuItem onclick={openVersionHistory}>Version history</DropdownMenuItem>
+							{#if isOwner && !workspaceWaiver.isDefault}
+								<DropdownMenuSeparator />
+								<DropdownMenuItem onclick={handleMakeDefault} disabled={isChangingWaiver}>
+									Make default waiver
+								</DropdownMenuItem>
+								<DropdownMenuItem
+									onclick={() => openConfirm('archive')}
+									disabled={isChangingWaiver}
+									class="text-destructive"
+								>
+									Archive waiver
+								</DropdownMenuItem>
+							{/if}
 						</DropdownMenuContent>
 					</DropdownMenu>
 				{/if}
