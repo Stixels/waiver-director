@@ -163,3 +163,63 @@ export function matchesSearchText(searchText: string, searchQuery: string) {
 		.filter(Boolean)
 		.every((term) => haystack.includes(term));
 }
+
+// Combining a tag filter with a text search filters tag assignments in
+// memory. Convex allows one .paginate() per query, so that path walks the
+// by_tagId index in batches with its own cursor (the _creationTime of the last
+// assignment read) until the page is full, the tag is exhausted, or the scan
+// limit is hit. Without this, a page could come back empty while later
+// assignments still hold matches.
+export const TAG_SEARCH_SCAN_LIMIT = 1000;
+const TAG_SEARCH_BATCH_SIZE = 100;
+const TAG_SCAN_CURSOR_PREFIX = 'tagscan:';
+
+export function parseTagScanCursor(cursor: string | null): number | null {
+	if (!cursor?.startsWith(TAG_SCAN_CURSOR_PREFIX)) return null;
+	const value = Number(cursor.slice(TAG_SCAN_CURSOR_PREFIX.length));
+	return Number.isFinite(value) ? value : null;
+}
+
+export function tagScanCursor(creationTime: number) {
+	return `${TAG_SCAN_CURSOR_PREFIX}${creationTime}`;
+}
+
+export async function collectTaggedMatches<Row extends { _creationTime: number }, Item>(args: {
+	pageSize: number;
+	cursor: string | null;
+	/** Loads up to `limit` assignments created strictly before `before`, newest first. */
+	loadBatch: (before: number | null, limit: number) => Promise<Row[]>;
+	/** Returns the matching record for an assignment, or null to skip it. */
+	resolve: (row: Row) => Promise<Item | null>;
+	scanLimit?: number;
+}): Promise<{ items: Item[]; continueCursor: string; isDone: boolean }> {
+	const scanLimit = args.scanLimit ?? TAG_SEARCH_SCAN_LIMIT;
+	const items: Item[] = [];
+	let before = parseTagScanCursor(args.cursor);
+	let scanned = 0;
+	let isDone = false;
+
+	while (items.length < args.pageSize && scanned < scanLimit) {
+		const requested = Math.min(TAG_SEARCH_BATCH_SIZE, scanLimit - scanned);
+		const batch = await args.loadBatch(before, requested);
+		let consumed = 0;
+		for (const row of batch) {
+			consumed += 1;
+			scanned += 1;
+			before = row._creationTime;
+			const item = await args.resolve(row);
+			if (item !== null) items.push(item);
+			if (items.length >= args.pageSize) break;
+		}
+		if (batch.length < requested && consumed === batch.length) {
+			isDone = true;
+			break;
+		}
+	}
+
+	return {
+		items,
+		continueCursor: before === null ? '' : tagScanCursor(before),
+		isDone
+	};
+}

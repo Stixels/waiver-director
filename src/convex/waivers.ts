@@ -9,6 +9,7 @@ import { requireWorkspaceFeature, workspaceHasBillingFeature } from './lib/billi
 import { upsertSignerCustomer } from './lib/customers';
 import { submissionSearchText } from './lib/submissions';
 import {
+	collectTaggedMatches,
 	getWorkspaceTag,
 	loadSubmissionTags,
 	loadWorkspaceTagMap,
@@ -435,24 +436,32 @@ export const listRecentSubmissions = query({
 				return { submissions: [], continueCursor: '', isDone: true };
 			}
 
-			// Tagged submissions are listed newest-tagged first. A text search is
-			// applied to each page in memory, so filtered pages can be shorter.
-			const assignmentPage = await ctx.db
-				.query('submission_tags')
-				.withIndex('by_tagId', (q) => q.eq('tagId', tag._id))
-				.order('desc')
-				.paginate(args.paginationOpts);
-			const taggedSubmissions = await Promise.all(
-				assignmentPage.page.map((row) => ctx.db.get(row.submissionId))
-			);
-			submissions = taggedSubmissions.filter(
-				(submission): submission is Doc<'waiver_submissions'> =>
-					submission !== null &&
-					submission.workspaceId === args.workspaceId &&
-					(!searchQuery || matchesSearchText(submission.searchText, searchQuery))
-			);
-			continueCursor = assignmentPage.continueCursor;
-			isDone = assignmentPage.isDone;
+			// Tagged submissions are listed newest-tagged first.
+			const result = await collectTaggedMatches({
+				pageSize: Math.max(1, Math.floor(args.paginationOpts.numItems)),
+				cursor: args.paginationOpts.cursor,
+				loadBatch: (before, limit) =>
+					ctx.db
+						.query('submission_tags')
+						.withIndex('by_tagId', (q) =>
+							before === null
+								? q.eq('tagId', tag._id)
+								: q.eq('tagId', tag._id).lt('_creationTime', before)
+						)
+						.order('desc')
+						.take(limit),
+				resolve: async (row) => {
+					const submission = await ctx.db.get(row.submissionId);
+					if (!submission || submission.workspaceId !== args.workspaceId) return null;
+					if (searchQuery && !matchesSearchText(submission.searchText, searchQuery)) {
+						return null;
+					}
+					return submission;
+				}
+			});
+			submissions = result.items;
+			continueCursor = result.continueCursor;
+			isDone = result.isDone;
 		} else {
 			const submissionPage = searchQuery
 				? await ctx.db

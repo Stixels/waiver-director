@@ -408,15 +408,21 @@
 				/>
 			</DataTableShell>
 		{:else if recentSubmissions.length === 0}
-			<DataTableShell>
+			<!-- A tag + search scan can stop before the end of the tag, so keep
+			     pagination reachable whenever more results may exist. -->
+			<DataTableShell
+				footer={submissionPage && !submissionPage.isDone ? submissionsPagination : undefined}
+			>
 				<DataTableEmptyState
 					icon={FileTextIcon}
 					title={searchQuery || tagFilter ? 'No matching submissions' : 'No submissions yet'}
-					description={searchQuery
-						? 'Try a different name, email, or booking number.'
-						: tagFilter
-							? 'No submissions have this tag yet.'
-							: 'Once guests sign the live waiver, records will appear here.'}
+					description={submissionPage && !submissionPage.isDone
+						? 'No matches on this page. Try the next page.'
+						: searchQuery
+							? 'Try a different name, email, or booking number.'
+							: tagFilter
+								? 'No submissions have this tag yet.'
+								: 'Once guests sign the live waiver, records will appear here.'}
 				/>
 			</DataTableShell>
 		{:else}

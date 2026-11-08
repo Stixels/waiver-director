@@ -4,6 +4,7 @@ import { query, type QueryCtx } from './_generated/server';
 import type { Doc, Id } from './_generated/dataModel';
 import { bookingSnapshotValidator } from './lib/bookings';
 import {
+	collectTaggedMatches,
 	getWorkspaceTag,
 	loadCustomerTags,
 	loadWorkspaceTagMap,
@@ -67,7 +68,7 @@ export const listWorkspaceCustomers = query({
 	},
 	returns: v.object({
 		customers: v.array(customerSummaryValue),
-		totalCount: v.number(),
+		totalCount: v.union(v.number(), v.null()),
 		continueCursor: v.string(),
 		isDone: v.boolean()
 	}),
@@ -91,28 +92,34 @@ export const listWorkspaceCustomers = query({
 				return { customers: [], totalCount: 0, continueCursor: '', isDone: true };
 			}
 
-			// Tagged customers are listed newest-tagged first. A text search is
-			// applied to each page in memory, so filtered pages can be shorter.
-			const assignmentPage = await ctx.db
-				.query('customer_tags')
-				.withIndex('by_tagId', (q) => q.eq('tagId', tag._id))
-				.order('desc')
-				.paginate({ ...args.paginationOpts, numItems: pageSize });
-			const taggedCustomers = await Promise.all(
-				assignmentPage.page.map((row) => ctx.db.get(row.customerId))
-			);
-			const matches = taggedCustomers.filter(
-				(customer): customer is Doc<'customers'> =>
-					customer !== null &&
-					customer.workspaceId === args.workspaceId &&
-					(!searchQuery || matchesSearchText(customer.searchText, searchQuery))
-			);
+			// Tagged customers are listed newest-tagged first.
+			const result = await collectTaggedMatches({
+				pageSize,
+				cursor: args.paginationOpts.cursor,
+				loadBatch: (before, limit) =>
+					ctx.db
+						.query('customer_tags')
+						.withIndex('by_tagId', (q) =>
+							before === null
+								? q.eq('tagId', tag._id)
+								: q.eq('tagId', tag._id).lt('_creationTime', before)
+						)
+						.order('desc')
+						.take(limit),
+				resolve: async (row) => {
+					const customer = await ctx.db.get(row.customerId);
+					if (!customer || customer.workspaceId !== args.workspaceId) return null;
+					if (searchQuery && !matchesSearchText(customer.searchText, searchQuery)) return null;
+					return customer;
+				}
+			});
 
 			return {
-				customers: await serializeCustomers(ctx, args.workspaceId, matches),
-				totalCount: tag.customerCount,
-				continueCursor: assignmentPage.continueCursor,
-				isDone: assignmentPage.isDone
+				customers: await serializeCustomers(ctx, args.workspaceId, result.items),
+				// The tag's count no longer describes the list once a search narrows it.
+				totalCount: searchQuery ? null : tag.customerCount,
+				continueCursor: result.continueCursor,
+				isDone: result.isDone
 			};
 		}
 

@@ -476,9 +476,11 @@
 			<UsersRoundIcon class="size-3.5" aria-hidden="true" />
 			{#if isLoadingCustomers && !customerPage}
 				<Skeleton class="h-3 w-10" />
+			{:else if totalCount === null}
+				Filtered
 			{:else}
-				<span class="text-foreground tabular-nums">{totalCount ?? 0}</span>
-				{(totalCount ?? 0) === 1 ? 'customer' : 'customers'}
+				<span class="text-foreground tabular-nums">{totalCount}</span>
+				{totalCount === 1 ? 'customer' : 'customers'}
 			{/if}
 		</span>
 	</div>
@@ -563,15 +565,21 @@
 					/>
 				</DataTableShell>
 			{:else if customers.length === 0}
-				<DataTableShell>
+				<!-- A tag + search scan can stop before the end of the tag, so keep
+				     pagination reachable whenever more results may exist. -->
+				<DataTableShell
+					footer={customerPage && !customerPage.isDone ? customersPagination : undefined}
+				>
 					<DataTableEmptyState
 						icon={UsersRoundIcon}
 						title={searchQuery.trim() || tagFilter ? 'No matching customers' : 'No customers yet'}
-						description={searchQuery.trim()
-							? 'Try a different name or email.'
-							: tagFilter
-								? 'No customers have this tag yet.'
-								: 'Adult signers appear here after they submit a waiver.'}
+						description={customerPage && !customerPage.isDone
+							? 'No matches on this page. Try the next page.'
+							: searchQuery.trim()
+								? 'Try a different name or email.'
+								: tagFilter
+									? 'No customers have this tag yet.'
+									: 'Adult signers appear here after they submit a waiver.'}
 					/>
 				</DataTableShell>
 			{:else}
