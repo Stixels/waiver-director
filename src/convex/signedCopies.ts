@@ -19,7 +19,8 @@ import {
 	formatUtcTimestamp,
 	renderSignedWaiverPdf,
 	signedRecordFingerprint,
-	signedWaiverPdfFileName
+	signedWaiverPdfFileName,
+	type PdfFontFamily
 } from '../lib/domain/signed-waiver-pdf';
 
 const MANUAL_RESEND_COOLDOWN_MS = 60 * 1000;
@@ -106,6 +107,47 @@ async function loadSignedCopyData(
 	};
 }
 
+// Noto fonts (SIL Open Font License) from pinned npm packages. They are only
+// fetched when signed text needs characters the built-in PDF fonts lack, and
+// are subset into each PDF, so a copy stays small.
+const PDF_FONT_URLS: Record<PdfFontFamily, string> = {
+	sans: 'https://cdn.jsdelivr.net/npm/@expo-google-fonts/noto-sans@0.4.2/400Regular/NotoSans_400Regular.ttf',
+	sansBold:
+		'https://cdn.jsdelivr.net/npm/@expo-google-fonts/noto-sans@0.4.2/700Bold/NotoSans_700Bold.ttf',
+	cjk: 'https://cdn.jsdelivr.net/npm/@expo-google-fonts/noto-sans-jp@0.4.4/400Regular/NotoSansJP_400Regular.ttf',
+	korean:
+		'https://cdn.jsdelivr.net/npm/@expo-google-fonts/noto-sans-kr@0.4.4/400Regular/NotoSansKR_400Regular.ttf'
+};
+const PDF_FONT_FETCH_TIMEOUT_MS = 15_000;
+const pdfFontCache = new Map<PdfFontFamily, Promise<Uint8Array | null>>();
+
+/** Loads a font once per warm action runtime. Failures fall back to built-in glyphs. */
+function loadPdfFont(family: PdfFontFamily): Promise<Uint8Array | null> {
+	const cached = pdfFontCache.get(family);
+	if (cached) return cached;
+	const pending = (async () => {
+		let timer: ReturnType<typeof setTimeout> | undefined;
+		try {
+			const response = await Promise.race([
+				fetch(PDF_FONT_URLS[family]),
+				new Promise<never>((_, reject) => {
+					timer = setTimeout(() => reject(new Error('Timed out')), PDF_FONT_FETCH_TIMEOUT_MS);
+				})
+			]);
+			if (!response.ok) throw new Error(`HTTP ${response.status}`);
+			return new Uint8Array(await response.arrayBuffer());
+		} catch (err) {
+			console.warn(`[pdf] Failed to fetch the ${family} font.`, err);
+			pdfFontCache.delete(family);
+			return null;
+		} finally {
+			clearTimeout(timer);
+		}
+	})();
+	pdfFontCache.set(family, pending);
+	return pending;
+}
+
 async function buildSignedCopyPdf(data: SignedCopyData) {
 	const fingerprint = await signedRecordFingerprint({
 		submissionId: data.submissionId,
@@ -118,26 +160,29 @@ async function buildSignedCopyPdf(data: SignedCopyData) {
 		signatureDataUrl: data.signatureDataUrl,
 		submittedAt: data.submittedAt
 	});
-	const pdf = await renderSignedWaiverPdf({
-		submissionId: data.submissionId,
-		workspaceName: data.workspaceName,
-		waiverTitle: data.waiverTitle,
-		versionNumber: data.versionNumber,
-		introText: richTextHtmlToPlainText(data.introCopy),
-		fields: data.fields,
-		answers: data.answers,
-		signerName: data.signerName,
-		signerEmail: data.signerEmail,
-		signerDateOfBirth: data.signerDateOfBirth,
-		minors: data.minors,
-		booking: data.booking,
-		marketingConsent: data.marketingConsent,
-		marketingConsentLabel: data.marketingConsentLabel,
-		signatureDataUrl: data.signatureDataUrl,
-		submittedAt: data.submittedAt,
-		fingerprint,
-		generatedAt: Date.now()
-	});
+	const pdf = await renderSignedWaiverPdf(
+		{
+			submissionId: data.submissionId,
+			workspaceName: data.workspaceName,
+			waiverTitle: data.waiverTitle,
+			versionNumber: data.versionNumber,
+			introText: richTextHtmlToPlainText(data.introCopy),
+			fields: data.fields,
+			answers: data.answers,
+			signerName: data.signerName,
+			signerEmail: data.signerEmail,
+			signerDateOfBirth: data.signerDateOfBirth,
+			minors: data.minors,
+			booking: data.booking,
+			marketingConsent: data.marketingConsent,
+			marketingConsentLabel: data.marketingConsentLabel,
+			signatureDataUrl: data.signatureDataUrl,
+			submittedAt: data.submittedAt,
+			fingerprint,
+			generatedAt: Date.now()
+		},
+		{ loadFont: loadPdfFont }
+	);
 	return {
 		pdf,
 		fileName: signedWaiverPdfFileName({

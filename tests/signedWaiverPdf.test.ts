@@ -3,6 +3,7 @@ import test from 'node:test';
 import { PDFDocument } from 'pdf-lib';
 import {
 	formatSignedAnswer,
+	pdfFontFamiliesFor,
 	renderSignedWaiverPdf,
 	signedRecordFingerprint,
 	signedWaiverPdfFileName,
@@ -125,4 +126,39 @@ test('builds a safe file name', () => {
 		signedWaiverPdfFileName({ signerName: '安', submittedAt: 0 }),
 		'signed-waiver-signer-1970-01-01.pdf'
 	);
+});
+
+test('asks only for the font families the text needs', () => {
+	assert.deepEqual(pdfFontFamiliesFor('Plain café text – “quoted”'), []);
+	assert.deepEqual(pdfFontFamiliesFor('Иван Петров'), ['sans', 'sansBold']);
+	assert.deepEqual(pdfFontFamiliesFor('山田太郎'), ['cjk']);
+	assert.deepEqual(pdfFontFamiliesFor('김민준 and Łukasz'), ['sans', 'sansBold', 'korean']);
+});
+
+test('does not load fonts for plain Latin documents', async () => {
+	const requested: string[] = [];
+	await renderSignedWaiverPdf(input({ signerName: 'Alex Rivera' }), {
+		loadFont: async (family) => {
+			requested.push(family);
+			return null;
+		}
+	});
+	assert.deepEqual(requested, []);
+});
+
+test('still renders when extra fonts cannot be loaded', async () => {
+	const requested: string[] = [];
+	const bytes = await renderSignedWaiverPdf(
+		input({ signerName: '山田太郎', minors: ['Иван Петров'] }),
+		{
+			loadFont: async (family) => {
+				requested.push(family);
+				if (family === 'cjk') throw new Error('offline');
+				return null;
+			}
+		}
+	);
+	assert.deepEqual(requested.sort(), ['cjk', 'sans', 'sansBold']);
+	const loaded = await PDFDocument.load(bytes);
+	assert.ok(loaded.getPageCount() >= 1);
 });
