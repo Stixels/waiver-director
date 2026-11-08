@@ -6,6 +6,7 @@
 	import Building2Icon from '@lucide/svelte/icons/building-2';
 	import MailIcon from '@lucide/svelte/icons/mail';
 	import PaletteIcon from '@lucide/svelte/icons/palette';
+	import Code2Icon from '@lucide/svelte/icons/code-xml';
 	import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
 
 	let { children } = $props();
@@ -30,6 +31,14 @@
 			description: 'Logo and visual identity',
 			icon: PaletteIcon,
 			match: 'branding',
+			tone: 'default' as const
+		},
+		{
+			href: `/app/${page.params.workspaceSlug}/settings/website` as const,
+			label: 'Website widget',
+			description: 'Sign waiver button for your site',
+			icon: Code2Icon,
+			match: 'website',
 			tone: 'default' as const
 		},
 		{

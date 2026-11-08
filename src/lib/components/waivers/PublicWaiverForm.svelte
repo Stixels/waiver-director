@@ -18,6 +18,7 @@
 	import type { WaiverField, WaiverMinor, WaiverTheme } from '$lib/domain/waivers';
 	import { getConvexErrorMessage } from '$lib/utils/convex-errors';
 	import { formatBookingTimestamp } from '$lib/utils/date';
+	import { EMBED_MESSAGE_SOURCE, type EmbedMessage } from '$lib/embed/widget';
 
 	type PublicWaiver = {
 		slug: string;
@@ -45,9 +46,37 @@
 	interface Props {
 		waiver: PublicWaiver;
 		booking?: BookingContext | null;
+		/** Rendered inside the website widget iframe: size to content and report height to the host page. */
+		embed?: boolean;
 	}
 
-	let { waiver, booking = null }: Props = $props();
+	let { waiver, booking = null, embed = false }: Props = $props();
+
+	let rootEl = $state<HTMLDivElement | null>(null);
+
+	function postToHost(message: EmbedMessage) {
+		if (!embed || typeof window === 'undefined' || window.parent === window) return;
+		// Messages carry only layout and completion state, never signer data, so any host may read them.
+		window.parent.postMessage(message, '*');
+	}
+
+	$effect(() => {
+		const el = rootEl;
+		if (!embed || !el || typeof ResizeObserver === 'undefined') return;
+
+		let lastHeight = 0;
+		const report = () => {
+			const height = Math.ceil(el.getBoundingClientRect().height);
+			if (height === lastHeight) return;
+			lastHeight = height;
+			postToHost({ source: EMBED_MESSAGE_SOURCE, type: 'resize', height });
+		};
+
+		const observer = new ResizeObserver(report);
+		observer.observe(el);
+		report();
+		return () => observer.disconnect();
+	});
 
 	const convex = useConvexClient();
 
@@ -116,6 +145,7 @@
 
 			isSubmitted = true;
 			toast.success('Waiver submitted.');
+			postToHost({ source: EMBED_MESSAGE_SOURCE, type: 'submitted' });
 		} catch (error) {
 			submitError = getConvexErrorMessage(error, 'Unable to submit this waiver.');
 		} finally {
@@ -137,7 +167,8 @@
 </script>
 
 <div
-	class="min-h-screen bg-background text-foreground"
+	bind:this={rootEl}
+	class={embed ? 'bg-background text-foreground' : 'min-h-screen bg-background text-foreground'}
 	class:waiver-theme-light={waiver.theme === 'light'}
 	class:waiver-theme-dark={waiver.theme === 'dark'}
 >
