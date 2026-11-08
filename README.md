@@ -38,6 +38,7 @@ src/routes/w/[slug]/          Public waiver signing flow
 src/convex/                   Convex schema, queries, mutations, actions, crons, and HTTP routes
 src/lib/                      Shared app components, config, utilities, and client helpers
 docs/agents/                  Project-specific engineering guidance
+docs/site/                    Product and developer documentation site (Mintlify)
 ```
 
 ## Getting Started
@@ -69,6 +70,13 @@ copied links in a preview stay on that preview rather than pointing at productio
 builds keep the Production-scoped `PUBLIC_APP_URL`. See
 [Vercel preview deployments](docs/operations/vercel-preview-deployments.md) for the deployment
 contract and validation steps.
+
+## Documentation
+
+Product and developer documentation lives in [`docs/site`](docs/site) and is published with
+[Mintlify](https://mintlify.com). Preview it locally with `cd docs/site && npx mint dev`. Update the
+matching page whenever a change affects what users see or do; see
+[Updating these docs](docs/site/developers/updating-docs.mdx).
 
 ## Development Scripts
 
