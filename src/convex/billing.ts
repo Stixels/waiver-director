@@ -264,6 +264,16 @@ function normalizeBillingPayload(eventType: string, data: JsonRecord) {
 	};
 }
 
+// Clerk webhook payloads carry the event creation time (ms) at the top level.
+// Fall back to the billing item's updated_at/created_at when it is missing.
+function billingEventTimestamp(payload: JsonRecord): number | undefined {
+	const data = isRecord(payload.data) ? payload.data : {};
+	const value =
+		firstNumber(payload, [['timestamp']]) ??
+		firstNumber(data, [['updated_at'], ['updatedAt'], ['created_at'], ['createdAt']]);
+	return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
 async function verifySvixSignature(input: {
 	body: string;
 	svixId: string;
@@ -454,6 +464,7 @@ export const applyClerkBillingEvent = internalMutation({
 		currentPeriodEnd: v.optional(v.number()),
 		trialEndsAt: v.optional(v.number()),
 		cancelAtPeriodEnd: v.optional(v.boolean()),
+		eventAt: v.optional(v.number()),
 		receivedAt: v.number()
 	},
 	returns: clerkWebhookResultValue,
@@ -478,6 +489,23 @@ export const applyClerkBillingEvent = internalMutation({
 				query.eq('provider', 'clerk').eq('providerUserId', args.providerUserId)
 			)
 			.unique();
+
+		// Svix retries can deliver an older event after a newer one. Never let a
+		// stale event overwrite a newer entitlement state (for example, a retried
+		// "active" event re-granting Pro after the subscription ended).
+		if (
+			existing &&
+			args.eventAt !== undefined &&
+			existing.lastEventAt !== undefined &&
+			args.eventAt < existing.lastEventAt
+		) {
+			await ctx.db.insert('clerk_billing_webhook_events', {
+				eventId: args.eventId,
+				eventType: args.eventType,
+				processedAt: args.receivedAt
+			});
+			return { status: 'ignored' };
+		}
 
 		if (existing && existing.planSlug !== args.planSlug) {
 			const existingActive =
@@ -511,6 +539,7 @@ export const applyClerkBillingEvent = internalMutation({
 				: {}),
 			lastEventId: args.eventId,
 			lastEventType: args.eventType,
+			...(args.eventAt !== undefined ? { lastEventAt: args.eventAt } : {}),
 			updatedAt: args.receivedAt
 		};
 
@@ -553,6 +582,7 @@ export const verifyAndApplyClerkBillingWebhook = internalAction({
 		if (!eventType.startsWith('subscription')) return { status: 'ignored' };
 
 		const normalized = normalizeBillingPayload(eventType, payload.data);
+		const eventAt = billingEventTimestamp(payload);
 		if (!normalized.providerUserId || normalized.status === 'upcoming')
 			return { status: 'ignored' };
 
@@ -572,6 +602,7 @@ export const verifyAndApplyClerkBillingWebhook = internalAction({
 				...(normalized.cancelAtPeriodEnd !== undefined
 					? { cancelAtPeriodEnd: normalized.cancelAtPeriodEnd }
 					: {}),
+				...(eventAt !== undefined ? { eventAt } : {}),
 				receivedAt: Date.now()
 			}
 		);

@@ -5,6 +5,7 @@ import { getCurrentUser } from './auth';
 import { getWorkspaceMembership } from './workspaces';
 import { sanitizeRichTextHtml } from '../../lib/utils/rich-text';
 import {
+	MAX_ANSWER_LENGTH,
 	MAX_MINOR_NAME_LENGTH,
 	MAX_MINORS,
 	MAX_SELECT_OPTION_LABEL_LENGTH,
@@ -381,6 +382,29 @@ export function validateSubmissionAnswers(
 			}
 		}
 	}
+}
+
+/**
+ * Keep only answers for fields that exist on the signed version, so a public
+ * submitter cannot store arbitrary extra keys or oversized values.
+ */
+export function pickSubmissionAnswers(
+	definition: Pick<WaiverDefinition, 'fields'>,
+	answers: Record<string, string | boolean | null>
+): Record<string, string | boolean | null> {
+	const picked: Record<string, string | boolean | null> = {};
+	for (const field of definition.fields) {
+		if (!Object.prototype.hasOwnProperty.call(answers, field.id)) continue;
+		const answer = answers[field.id];
+		if (typeof answer === 'string' && answer.length > MAX_ANSWER_LENGTH) {
+			throw new ConvexError({
+				code: 'invalid_argument',
+				message: `"${field.label}" must be ${MAX_ANSWER_LENGTH.toLocaleString('en-US')} characters or fewer.`
+			});
+		}
+		picked[field.id] = answer;
+	}
+	return picked;
 }
 
 export function validateMinors(minors: MinorInput[]): MinorInput[] {

@@ -42,6 +42,7 @@ export default defineSchema({
 		primaryWorkspaceSwitchPeriod: v.optional(v.string()),
 		lastEventId: v.optional(v.string()),
 		lastEventType: v.optional(v.string()),
+		lastEventAt: v.optional(v.number()),
 		updatedAt: v.number()
 	})
 		.index('by_userId', ['userId'])

@@ -11,12 +11,14 @@ import { submissionSearchText } from './lib/submissions';
 import { getOwnedWorkspaceLogoUrl } from './lib/workspaces';
 import { marketingConsentLabel } from './lib/marketing';
 import { sanitizeRichTextHtml } from '../lib/utils/rich-text';
+import { MAX_SIGNATURE_DATA_URL_LENGTH } from '../lib/domain/waiver-constraints';
 import {
 	assertWorkspaceRecord,
 	minorInputValidator,
 	normalizeWaiverDefinition,
 	requireWorkspaceMember,
 	validateMinors,
+	pickSubmissionAnswers,
 	validateSubmissionAnswers,
 	waiverDefinitionsEqual,
 	waiverAnswerValueValidator,
@@ -26,6 +28,11 @@ import {
 } from './lib/waivers';
 
 type FunctionCtx = QueryCtx | MutationCtx;
+const MAX_PAGE_SIZE = 100;
+
+function clampPagination<T extends { numItems: number }>(opts: T): T {
+	return { ...opts, numItems: Math.min(MAX_PAGE_SIZE, Math.max(1, Math.floor(opts.numItems))) };
+}
 
 const workspaceWaiverValue = v.object({
 	waiverId: v.id('workspace_waivers'),
@@ -413,12 +420,12 @@ export const listRecentSubmissions = query({
 					.withSearchIndex('search_submissionText', (q) =>
 						q.search('searchText', searchQuery).eq('workspaceId', args.workspaceId)
 					)
-					.paginate(args.paginationOpts)
+					.paginate(clampPagination(args.paginationOpts))
 			: await ctx.db
 					.query('waiver_submissions')
 					.withIndex('by_workspaceId', (q) => q.eq('workspaceId', args.workspaceId))
 					.order('desc')
-					.paginate(args.paginationOpts);
+					.paginate(clampPagination(args.paginationOpts));
 
 		return {
 			submissions: submissionPage.page.map((submission) => ({
@@ -645,14 +652,24 @@ export const submitPublicWaiver = mutation({
 				message: 'Enter a valid date of birth.'
 			});
 		}
-		if (!args.signatureDataUrl.startsWith('data:image/')) {
+		if (!/^data:image\/png;base64,[A-Za-z0-9+/]+={0,2}$/.test(args.signatureDataUrl)) {
 			throw new ConvexError({
 				code: 'invalid_argument',
 				message: 'A drawn signature is required.'
 			});
 		}
+		// This endpoint is public. Oversized signatures bloat every submission
+		// read and can push a workspace's list and dashboard queries past
+		// Convex's per-function read limits.
+		if (args.signatureDataUrl.length > MAX_SIGNATURE_DATA_URL_LENGTH) {
+			throw new ConvexError({
+				code: 'invalid_argument',
+				message: 'The signature image is too large. Clear it and sign again.'
+			});
+		}
 
 		validateSubmissionAnswers(version, args.answers);
+		const answers = pickSubmissionAnswers(version, args.answers);
 		const minors = validateMinors(args.minors);
 		const marketingIntegration = await ctx.db
 			.query('marketing_integrations')
@@ -699,7 +716,7 @@ export const submitPublicWaiver = mutation({
 			}),
 			signerDateOfBirth,
 			signatureDataUrl: args.signatureDataUrl,
-			answers: args.answers,
+			answers,
 			minors,
 			status: 'submitted',
 			marketingConsent,
