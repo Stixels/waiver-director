@@ -122,13 +122,30 @@ const publicBookingWaiverValue = v.object({
 	requiredWaivers: v.array(requiredWaiverLinkValue)
 });
 
+/**
+ * Active waivers only. Archived waivers stay in the table forever for
+ * signed-record integrity, so they are excluded by index instead of being
+ * read and filtered. Legacy rows have no `status` and count as active.
+ */
 async function listWorkspaceWaiverRecords(ctx: FunctionCtx, workspaceId: Id<'workspaces'>) {
-	// Archived waivers stay in the table for signed-record integrity, so allow
-	// headroom beyond the active-waiver limit.
-	return await ctx.db
-		.query('workspace_waivers')
-		.withIndex('by_workspaceId', (q) => q.eq('workspaceId', workspaceId))
-		.take(MAX_WAIVERS_PER_WORKSPACE * 4);
+	// createWorkspaceWaiver caps active waivers at MAX_WAIVERS_PER_WORKSPACE;
+	// the extra headroom only guards against concurrent creates.
+	const limit = MAX_WAIVERS_PER_WORKSPACE * 2;
+	const [active, legacy] = await Promise.all([
+		ctx.db
+			.query('workspace_waivers')
+			.withIndex('by_workspaceId_and_status', (q) =>
+				q.eq('workspaceId', workspaceId).eq('status', 'active')
+			)
+			.take(limit),
+		ctx.db
+			.query('workspace_waivers')
+			.withIndex('by_workspaceId_and_status', (q) =>
+				q.eq('workspaceId', workspaceId).eq('status', undefined)
+			)
+			.take(limit)
+	]);
+	return [...active, ...legacy];
 }
 
 async function getDefaultWaiverRecord(ctx: FunctionCtx, workspaceId: Id<'workspaces'>) {
@@ -168,9 +185,13 @@ async function getBookingRequiredWaivers(ctx: FunctionCtx, booking: Doc<'booking
 			.unique()
 	]);
 	const activeWaivers = waivers.filter(isWaiverActive);
-	const byId = new Map(activeWaivers.map((waiver) => [waiver._id, waiver]));
+	// Only waivers guests can actually sign count, so the primary waiver used
+	// for the waiver gap always matches the first waiver guests are sent to.
+	const signableWaivers = activeWaivers.filter((waiver) => Boolean(waiver.publishedVersionId));
+	const byId = new Map(signableWaivers.map((waiver) => [waiver._id, waiver]));
+	const defaultWaiver = pickDefaultWaiver(activeWaivers);
 	const requiredIds = resolveRequiredWaiverIds({
-		defaultWaiverId: pickDefaultWaiver(activeWaivers)?._id ?? null,
+		defaultWaiverId: defaultWaiver && byId.has(defaultWaiver._id) ? defaultWaiver._id : null,
 		requirementWaiverIds: requirement?.waiverIds ?? null,
 		activeWaiverIds: new Set(byId.keys())
 	});
@@ -1108,6 +1129,16 @@ export const submitPublicWaiver = mutation({
 			}
 		}
 
+		// On a booking that requires several waivers, each guest signs each one.
+		// Only the primary waiver's submission counts as a visit, toward the
+		// waiver gap, and for the follow-up email, so guests are not counted or
+		// emailed once per waiver. Per-waiver coverage is a follow-up (ADR 0002).
+		let isPrimarySubmission = true;
+		if (booking) {
+			const [primaryWaiver] = await getBookingRequiredWaivers(ctx, booking);
+			isPrimarySubmission = !primaryWaiver || primaryWaiver._id === waiver._id;
+		}
+
 		const submittedAt = Date.now();
 		const submissionId = await ctx.db.insert('waiver_submissions', {
 			workspaceId: waiver.workspaceId,
@@ -1140,7 +1171,8 @@ export const submitPublicWaiver = mutation({
 			signerEmail: originalSignerEmail,
 			submittedAt,
 			bookingId: booking?._id ?? null,
-			latestSubmissionId: submissionId
+			latestSubmissionId: submissionId,
+			countVisit: isPrimarySubmission
 		});
 		await ctx.db.patch(submissionId, { customerId });
 
@@ -1159,24 +1191,20 @@ export const submitPublicWaiver = mutation({
 			await ctx.scheduler.runAfter(0, internal.mailchimp.syncContact, { syncId });
 		}
 
-		await ctx.scheduler.runAfter(0, internal.emails.scheduleFollowUpOnSubmission, {
-			workspaceId: waiver.workspaceId,
-			submissionId,
-			signerName,
-			signerEmail: originalSignerEmail,
-			submittedAt
-		});
+		if (isPrimarySubmission) {
+			await ctx.scheduler.runAfter(0, internal.emails.scheduleFollowUpOnSubmission, {
+				workspaceId: waiver.workspaceId,
+				submissionId,
+				signerName,
+				signerEmail: originalSignerEmail,
+				submittedAt
+			});
+		}
 
-		if (booking) {
-			// Only the primary required waiver counts toward the waiver gap, so a
-			// booking that needs two waivers is not double counted when each
-			// participant signs both. Per-waiver coverage is a follow-up (ADR 0002).
-			const [primaryWaiver] = await getBookingRequiredWaivers(ctx, booking);
-			if (!primaryWaiver || primaryWaiver._id === waiver._id) {
-				await ctx.db.patch(booking._id, {
-					signedCount: booking.signedCount + 1 + minors.length
-				});
-			}
+		if (booking && isPrimarySubmission) {
+			await ctx.db.patch(booking._id, {
+				signedCount: booking.signedCount + 1 + minors.length
+			});
 		}
 		return { submissionId };
 	}
