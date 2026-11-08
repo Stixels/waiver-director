@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { ChevronDown } from '@lucide/svelte';
+	import { Minus, Plus } from '@lucide/svelte';
 
 	type Props = {
 		faqs: readonly { id: string; q: string; a: string }[];
@@ -10,7 +10,7 @@
 		title?: string;
 	};
 
-	let { faqs, name, title = 'Frequently asked questions' }: Props = $props();
+	let { faqs, name, title = 'Frequently Asked Questions' }: Props = $props();
 
 	let listEl = $state<HTMLElement | null>(null);
 
@@ -136,18 +136,19 @@
 	});
 </script>
 
-<section class="faq" style="border-color: var(--m-border-soft);">
+<section class="faq">
 	<div class="wrap faq__layout">
-		<div class="faq__intro" data-gsap-copy>
-			<h2 class="marketing-display faq__title">{title}</h2>
-		</div>
+		<h2 class="marketing-display faq__title" data-gsap-copy>{title}</h2>
 
 		<div class="faq__list" data-gsap-copy bind:this={listEl}>
 			{#each faqs as faq (faq.id)}
 				<details class="faq__item" {name}>
 					<summary class="faq__q">
-						{faq.q}
-						<span class="faq__chev" aria-hidden="true"><ChevronDown size={18} /></span>
+						<span class="faq__q-text">{faq.q}</span>
+						<span class="faq__icon" aria-hidden="true">
+							<Plus class="faq__icon-plus" size={16} />
+							<Minus class="faq__icon-minus" size={16} />
+						</span>
 					</summary>
 					<div class="faq__panel">
 						<p class="faq__a">{faq.a}</p>
@@ -159,14 +160,12 @@
 </section>
 
 <style>
-	/* The section carried no atmosphere of its own while both neighbours have
-	   one; this is the same glow recipe the signing line uses, centred to sit
-	   behind the heading. */
+	/* Editorial layout: a large left-aligned heading over full-width rows split
+	   by hairlines, with no card around the list. */
 	.faq {
 		border-top: 1px solid var(--m-border-soft);
 		padding-block: clamp(4rem, 7vw, 6.5rem);
-		background:
-			radial-gradient(circle at 50% 8%, oklch(0.42 0.18 277 / 9%), transparent 34rem), var(--m-bg);
+		background: var(--m-bg);
 	}
 
 	.wrap {
@@ -175,115 +174,108 @@
 		padding-inline: clamp(1.25rem, 4.2vw, 4rem);
 	}
 
-	/* One centred column: the heading sits above the questions rather than
-	   beside them. */
 	.faq__layout {
 		display: grid;
-		gap: clamp(2.25rem, 4vw, 3.25rem);
-		align-items: start;
-	}
-
-	.faq__intro {
-		text-align: center;
+		gap: clamp(2rem, 4vw, 3.5rem);
 	}
 
 	.faq__title {
-		font-size: clamp(2rem, 3.2vw, 2.9rem);
+		margin: 0;
+		font-size: clamp(2.4rem, 5vw, 4rem);
 		text-wrap: balance;
 	}
 
-	/* The rows stay left-aligned inside the centred column — a summary with a
-	   chevron on the end, and an answer to read, both need a left edge. */
 	.faq__list {
-		position: relative;
-		width: 100%;
-		max-width: 46rem;
-		margin-inline: auto;
 		min-width: 0;
-		border: 1px solid var(--m-border-soft);
-		border-radius: 1rem;
-		background: var(--m-card);
-		overflow: hidden;
-	}
-
-	/* The divider motif the CTA, footer, and pricing table all carry. */
-	.faq__list::before {
-		content: '';
-		position: absolute;
-		inset: 0 0 auto 0;
-		height: 1px;
-		background: linear-gradient(90deg, transparent, var(--m-accent-line), transparent);
-		pointer-events: none;
-		z-index: 1;
+		border-top: 1px solid var(--m-border-strong);
 	}
 
 	.faq__item {
-		border-bottom: 1px solid var(--m-border-soft);
-		transition: background 220ms ease;
-	}
-
-	.faq__item:last-child {
-		border-bottom: 0;
-	}
-
-	.faq__item[open] {
-		background: var(--m-accent-soft);
+		border-bottom: 1px solid var(--m-border-strong);
 	}
 
 	.faq__q {
-		display: flex;
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) auto;
 		align-items: center;
-		justify-content: space-between;
 		gap: 1.5rem;
-		padding: 1.2rem clamp(1.1rem, 2.5vw, 1.6rem);
+		min-height: 4.75rem;
+		padding-block: 1.1rem;
 		cursor: pointer;
 		list-style: none;
-		font-size: 1.06rem;
+		font-size: clamp(1.08rem, 1.6vw, 1.32rem);
 		font-weight: 600;
-		letter-spacing: -0.02em;
+		letter-spacing: -0.025em;
+		line-height: 1.35;
 		color: var(--m-text-1);
-		transition: color 160ms ease;
 	}
 
 	.faq__q::-webkit-details-marker {
 		display: none;
 	}
 
-	.faq__q:hover {
-		color: var(--m-accent-text);
+	.faq__q:focus-visible {
+		outline: 2px solid var(--m-accent-text);
+		outline-offset: 4px;
+		border-radius: 0.25rem;
 	}
 
-	.faq__chev {
+	.faq__icon {
 		display: inline-flex;
-		flex: 0 0 auto;
-		color: var(--m-text-3);
+		align-items: center;
+		justify-content: center;
+		width: 2.75rem;
+		height: 2.75rem;
+		border: 1px solid var(--m-border-strong);
+		border-radius: 999px;
+		color: var(--m-text-1);
 		transition:
-			transform 220ms cubic-bezier(0.16, 1, 0.3, 1),
-			color 160ms ease;
+			background 200ms ease,
+			border-color 200ms ease,
+			color 200ms ease;
 	}
 
-	.faq__item[open] .faq__chev {
-		transform: rotate(180deg);
-		color: var(--m-accent-text);
+	.faq__q:hover .faq__icon {
+		border-color: var(--m-accent-border);
+	}
+
+	.faq__item[open] .faq__icon {
+		background: var(--m-accent);
+		border-color: transparent;
+		color: #fff;
+	}
+
+	.faq__icon :global(.faq__icon-minus),
+	.faq__item[open] .faq__icon :global(.faq__icon-plus) {
+		display: none;
+	}
+
+	.faq__item[open] .faq__icon :global(.faq__icon-minus) {
+		display: block;
 	}
 
 	.faq__panel {
 		overflow: hidden;
 	}
 
+	/* Right padding keeps the answer clear of the icon column. */
 	.faq__a {
 		margin: 0;
-		padding: 0 clamp(1.1rem, 2.5vw, 1.6rem) 1.4rem;
-		max-width: 62ch;
+		padding: 0 4.25rem 1.75rem 0;
+		max-width: 68ch;
 		color: var(--m-text-2);
-		font-size: 0.95rem;
+		font-size: 1rem;
 		line-height: 1.75;
 	}
 
+	@media (max-width: 40rem) {
+		.faq__a {
+			padding-right: 0;
+		}
+	}
+
 	@media (prefers-reduced-motion: reduce) {
-		.faq__q,
-		.faq__chev,
-		.faq__item {
+		.faq__icon {
 			transition: none;
 		}
 	}
