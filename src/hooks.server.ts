@@ -47,4 +47,20 @@ const setupConvexClient: Handle = async ({ event, resolve }) => {
 	return resolve(event);
 };
 
-export const handle = sequence(withClerkHandler(), setupConvexClient);
+// Only public waiver pages (`/w/*`) may be framed by other sites, for the website widget.
+// Everything else, including the signed-in app, can only be framed by this origin.
+const frameProtection: Handle = async ({ event, resolve }) => {
+	const response = await resolve(event);
+	const isPublicWaiver = event.url.pathname === '/w' || event.url.pathname.startsWith('/w/');
+	if (!isPublicWaiver && !response.headers.has('content-security-policy')) {
+		try {
+			response.headers.set('Content-Security-Policy', "frame-ancestors 'self'");
+			response.headers.set('X-Frame-Options', 'SAMEORIGIN');
+		} catch {
+			// Some responses (e.g. proxied fetches) have immutable headers; skip them.
+		}
+	}
+	return response;
+};
+
+export const handle = sequence(frameProtection, withClerkHandler(), setupConvexClient);
