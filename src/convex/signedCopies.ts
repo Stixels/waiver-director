@@ -24,6 +24,12 @@ import {
 
 const MANUAL_RESEND_COOLDOWN_MS = 60 * 1000;
 const MANUAL_RESEND_LIMIT_PER_SUBMISSION = 10;
+const AUTO_RECIPIENT_LIMIT = 3;
+const AUTO_RECIPIENT_WINDOW_MS = 24 * 60 * 60 * 1000;
+const AUTO_WORKSPACE_LIMIT = 100;
+const AUTO_WORKSPACE_WINDOW_MS = 60 * 60 * 1000;
+const VERIFY_REPLY_TO_MESSAGE =
+	'Verify a reply-to address under Email identity before turning on signed copy emails.';
 const PDF_EXPORT_UPGRADE_MESSAGE = 'Upgrade to Pro to export signed waiver PDFs.';
 
 type FunctionCtx = QueryCtx | MutationCtx;
@@ -154,17 +160,56 @@ function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
 	return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
 }
 
-async function signedCopyEmailsEnabled(ctx: FunctionCtx, workspaceId: Id<'workspaces'>) {
-	const settings = await ctx.db
+function hasVerifiedReplyTo(settings: Doc<'workspace_email_settings'> | null) {
+	return Boolean(configuredFromEmail() && settings?.replyToEmail && settings.replyToVerifiedAt);
+}
+
+async function getEmailSettings(ctx: FunctionCtx, workspaceId: Id<'workspaces'>) {
+	return await ctx.db
 		.query('workspace_email_settings')
 		.withIndex('by_workspaceId', (q) => q.eq('workspaceId', workspaceId))
 		.unique();
-	return settings?.signedCopyEmailsEnabled ?? true;
+}
+
+export function signedCopyRecipientKey(email: string) {
+	return email.trim().toLowerCase();
 }
 
 /**
- * Called from the signing mutation. Queues the signed copy email when the
- * workspace plan includes PDF export and the owner has not turned it off.
+ * Automatic copies are triggered by the unauthenticated public submit, so cap
+ * them per recipient and per workspace to keep the sending domain from being
+ * used to spam an address. Manual resends count toward both caps too.
+ */
+async function automaticSendAllowed(
+	ctx: MutationCtx,
+	workspaceId: Id<'workspaces'>,
+	recipientKey: string,
+	now: number
+) {
+	const recipientSends = await ctx.db
+		.query('signed_copy_emails')
+		.withIndex('by_workspaceId_and_recipientKey_and_createdAt', (q) =>
+			q
+				.eq('workspaceId', workspaceId)
+				.eq('recipientKey', recipientKey)
+				.gte('createdAt', now - AUTO_RECIPIENT_WINDOW_MS)
+		)
+		.take(AUTO_RECIPIENT_LIMIT);
+	if (recipientSends.length >= AUTO_RECIPIENT_LIMIT) return false;
+
+	const workspaceSends = await ctx.db
+		.query('signed_copy_emails')
+		.withIndex('by_workspaceId_and_createdAt', (q) =>
+			q.eq('workspaceId', workspaceId).gte('createdAt', now - AUTO_WORKSPACE_WINDOW_MS)
+		)
+		.take(AUTO_WORKSPACE_LIMIT);
+	return workspaceSends.length < AUTO_WORKSPACE_LIMIT;
+}
+
+/**
+ * Called from the signing mutation. Automatic copies are opt-in: they are only
+ * queued when the plan includes PDF export, an Owner turned them on, the
+ * workspace has a verified reply-to, and the send limits allow it.
  */
 export async function queueSignedCopyForNewSubmission(
 	ctx: MutationCtx,
@@ -174,14 +219,25 @@ export async function queueSignedCopyForNewSubmission(
 		signerEmail: string;
 	}
 ) {
+	const settings = await getEmailSettings(ctx, args.workspaceId);
+	if (settings?.signedCopyEmailsEnabled !== true || !hasVerifiedReplyTo(settings)) return null;
 	if (!(await workspaceHasBillingFeature(ctx, args.workspaceId, 'pdf_export'))) return null;
-	if (!(await signedCopyEmailsEnabled(ctx, args.workspaceId))) return null;
 
 	const now = Date.now();
+	const recipientKey = signedCopyRecipientKey(args.signerEmail);
+	if (!(await automaticSendAllowed(ctx, args.workspaceId, recipientKey, now))) {
+		console.warn('[EMAIL] Signed copy send limit reached; skipping automatic copy.', {
+			workspaceId: args.workspaceId,
+			submissionId: args.submissionId
+		});
+		return null;
+	}
+
 	const deliveryId = await ctx.db.insert('signed_copy_emails', {
 		workspaceId: args.workspaceId,
 		submissionId: args.submissionId,
 		recipientEmail: args.signerEmail,
+		recipientKey,
 		trigger: 'submission',
 		status: 'queued',
 		createdAt: now,
@@ -290,6 +346,7 @@ export const emailSignedCopy = mutation({
 			workspaceId: args.workspaceId,
 			submissionId: submission._id,
 			recipientEmail: submission.signerEmail,
+			recipientKey: signedCopyRecipientKey(submission.signerEmail),
 			trigger: 'manual',
 			requestedByUserId: user._id,
 			status: 'queued',
@@ -310,10 +367,13 @@ export const setSignedCopyEmailsEnabled = mutation({
 	returns: v.null(),
 	handler: async (ctx, args) => {
 		await requireWorkspaceOwner(ctx, args.workspaceId, 'change signed copy emails');
-		const settings = await ctx.db
-			.query('workspace_email_settings')
-			.withIndex('by_workspaceId', (q) => q.eq('workspaceId', args.workspaceId))
-			.unique();
+		const settings = await getEmailSettings(ctx, args.workspaceId);
+		if (args.enabled) {
+			await requireWorkspaceFeature(ctx, args.workspaceId, 'pdf_export');
+			if (!hasVerifiedReplyTo(settings)) {
+				throw new ConvexError({ code: 'reply_to_required', message: VERIFY_REPLY_TO_MESSAGE });
+			}
+		}
 		const now = Date.now();
 		if (settings) {
 			await ctx.db.patch(settings._id, { signedCopyEmailsEnabled: args.enabled, updatedAt: now });
@@ -338,15 +398,14 @@ export const getSignedCopyDelivery = internalQuery({
 		const [data, canExport, settings] = await Promise.all([
 			loadSignedCopyData(ctx, delivery.workspaceId, delivery.submissionId),
 			workspaceHasBillingFeature(ctx, delivery.workspaceId, 'pdf_export'),
-			ctx.db
-				.query('workspace_email_settings')
-				.withIndex('by_workspaceId', (q) => q.eq('workspaceId', delivery.workspaceId))
-				.unique()
+			getEmailSettings(ctx, delivery.workspaceId)
 		]);
 		return {
 			delivery,
 			data,
 			canExport,
+			automaticCopiesAllowed:
+				settings?.signedCopyEmailsEnabled === true && hasVerifiedReplyTo(settings),
 			replyToEmail:
 				settings?.replyToEmail && settings.replyToVerifiedAt ? settings.replyToEmail : null
 		};
@@ -437,6 +496,10 @@ export const deliverSignedCopyEmail = internalAction({
 		}
 		if (!loaded.canExport) {
 			await mark('blocked', { failureReason: PDF_EXPORT_UPGRADE_MESSAGE });
+			return null;
+		}
+		if (loaded.delivery.trigger === 'submission' && !loaded.automaticCopiesAllowed) {
+			await mark('blocked', { failureReason: 'Automatic signed copy emails are turned off.' });
 			return null;
 		}
 

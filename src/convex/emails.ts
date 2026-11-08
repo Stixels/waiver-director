@@ -277,7 +277,7 @@ export const getWorkspaceEmailSenderSettings = query({
 			pendingReplyToEmail: settings?.pendingReplyToEmail ?? null,
 			verificationCodeExpiresAt: settings?.verificationCodeExpiresAt ?? null,
 			canSendEmails: canSendWorkspaceEmail(settings),
-			signedCopyEmailsEnabled: settings?.signedCopyEmailsEnabled ?? true
+			signedCopyEmailsEnabled: settings?.signedCopyEmailsEnabled === true
 		};
 	}
 });

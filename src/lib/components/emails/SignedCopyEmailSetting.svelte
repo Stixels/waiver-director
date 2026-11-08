@@ -21,7 +21,8 @@
 	const senderSettingsQuery = useProtectedQuery(api.emails.getWorkspaceEmailSenderSettings, () => ({
 		workspaceId
 	}));
-	const enabled = $derived(senderSettingsQuery.data?.signedCopyEmailsEnabled ?? true);
+	const enabled = $derived(senderSettingsQuery.data?.signedCopyEmailsEnabled === true);
+	const hasVerifiedReplyTo = $derived(senderSettingsQuery.data?.canSendEmails === true);
 	let isSaving = $state(false);
 
 	async function setEnabled(next: boolean) {
@@ -46,14 +47,19 @@
 		<input
 			type="checkbox"
 			checked={canExportPdf && enabled}
-			disabled={!canExportPdf || !isOwner || isSaving || senderSettingsQuery.data === undefined}
+			disabled={!canExportPdf ||
+				!isOwner ||
+				isSaving ||
+				senderSettingsQuery.data === undefined ||
+				(!enabled && !hasVerifiedReplyTo)}
 			onchange={(event) => setEnabled(event.currentTarget.checked)}
 		/>
 		<span class="signed-copy-text">
 			<span class="signed-copy-title">Email signers a PDF of their signed waiver</span>
 			<span class="signed-copy-desc">
-				Sent right after signing from your workspace name. Replies go to your verified reply-to
-				address when you have one. You can also download or re-send a copy from any submission.
+				Off by default. When on, signers get the PDF right after signing, sent from your workspace
+				name with replies going to your verified reply-to address. Each address gets at most 3
+				automatic copies a day. You can also download or re-send a copy from any submission.
 			</span>
 		</span>
 	</label>
@@ -63,6 +69,12 @@
 			<span>Signed PDF copies are included with Pro.</span>
 			<Button size="sm" variant="outline" href={upgradeHref}>View plans</Button>
 		</div>
+	{:else if !hasVerifiedReplyTo}
+		<p class="signed-copy-note">
+			{enabled
+				? 'Paused: verify a reply-to address under Email identity to resume sending.'
+				: 'Verify a reply-to address under Email identity first.'}
+		</p>
 	{:else if !isOwner}
 		<p class="signed-copy-note">Only workspace owners can change this setting.</p>
 	{/if}

@@ -291,6 +291,7 @@ export default defineSchema({
 		workspaceId: v.id('workspaces'),
 		submissionId: v.id('waiver_submissions'),
 		recipientEmail: v.string(),
+		recipientKey: v.string(),
 		trigger: v.union(v.literal('submission'), v.literal('manual')),
 		requestedByUserId: v.optional(v.id('users')),
 		status: v.union(
@@ -306,6 +307,12 @@ export default defineSchema({
 		sentAt: v.optional(v.number())
 	})
 		.index('by_workspaceId', ['workspaceId'])
+		.index('by_workspaceId_and_createdAt', ['workspaceId', 'createdAt'])
+		.index('by_workspaceId_and_recipientKey_and_createdAt', [
+			'workspaceId',
+			'recipientKey',
+			'createdAt'
+		])
 		.index('by_submissionId', ['submissionId']),
 
 	email_follow_ups: defineTable({
