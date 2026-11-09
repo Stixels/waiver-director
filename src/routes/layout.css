@@ -133,6 +133,13 @@
 	html {
 		@apply font-sans;
 	}
+	/* Native option lists don't inherit a transparent select background, so
+	   in the dark waiver theme they rendered light text on a white popup. */
+	select option,
+	select optgroup {
+		background-color: var(--background);
+		color: var(--foreground);
+	}
 	::selection {
 		background: color-mix(in oklch, var(--color-primary) 18%, white);
 	}
