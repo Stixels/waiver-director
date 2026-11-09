@@ -4,6 +4,7 @@
 	import { useConvexClient } from 'convex-svelte';
 	import { toast } from 'svelte-sonner';
 	import { api } from '$convex/_generated/api';
+	import { Select } from '$lib/components/ui/select';
 	import SignaturePad from '$lib/components/waivers/SignaturePad.svelte';
 	import WaiverCopySection from '$lib/components/waivers/WaiverCopySection.svelte';
 	import WaiverDocumentShell from '$lib/components/waivers/WaiverDocumentShell.svelte';
@@ -422,22 +423,18 @@
 												</span>
 											</label>
 										{:else if field.type === 'select'}
-											<select
+											<Select
 												id={field.id}
-												class={waiverUnderlineInputClass}
+												inline
 												value={currentStringAnswer(field.id)}
-												required={field.required}
-												onchange={(event) =>
-													setFieldAnswer(
-														field.id,
-														(event.currentTarget as HTMLSelectElement).value
-													)}
-											>
-												<option value="">Select one</option>
-												{#each field.options as option (option.id)}
-													<option value={option.id}>{option.label}</option>
-												{/each}
-											</select>
+												placeholder="Select one"
+												options={field.options.map((option) => ({
+													value: option.id,
+													label: option.label
+												}))}
+												onValueChange={(value) => setFieldAnswer(field.id, value)}
+												class="h-auto rounded-none border-0 border-b border-foreground/20 bg-transparent px-0 py-3 text-base focus-visible:border-foreground focus-visible:ring-0"
+											/>
 										{:else if field.type === 'date'}
 											<input
 												id={field.id}

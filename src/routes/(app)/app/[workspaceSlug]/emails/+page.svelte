@@ -63,6 +63,7 @@
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 	import SlidersHorizontalIcon from '@lucide/svelte/icons/sliders-horizontal';
 	import XIcon from '@lucide/svelte/icons/x';
+	import { Select } from '$lib/components/ui/select';
 
 	const convex = useConvexClient();
 	const appContext = useAppContext();
@@ -563,11 +564,9 @@
 		input.value = String(nextValue);
 	}
 
-	function updateSendAfterUnit(e: Event) {
-		const select = e.currentTarget;
-		if (!(select instanceof HTMLSelectElement)) return;
-		if (!SEND_AFTER_UNITS.includes(select.value as SendAfterUnit)) return;
-		const nextUnit = select.value as SendAfterUnit;
+	function updateSendAfterUnit(value: string) {
+		if (!SEND_AFTER_UNITS.includes(value as SendAfterUnit)) return;
+		const nextUnit = value as SendAfterUnit;
 		sendAfterUnit = nextUnit;
 		sendAfterAmount = clampSendAfterAmount(sendAfterAmount);
 	}
@@ -1803,16 +1802,14 @@
 											aria-invalid={!isSendAfterValid}
 											aria-describedby="send-after-error"
 										/>
-										<select
+										<Select
 											value={sendAfterUnit}
-											onchange={updateSendAfterUnit}
-											class="compose-select"
+											options={SEND_AFTER_UNITS.map((unit) => ({ value: unit, label: unit }))}
+											onValueChange={updateSendAfterUnit}
 											aria-label="Send after unit"
-										>
-											{#each SEND_AFTER_UNITS as unit (unit)}
-												<option value={unit}>{unit}</option>
-											{/each}
-										</select>
+											class="h-6.5 w-auto gap-1 rounded-sm bg-input/20 px-2 text-[0.8125rem] text-muted-foreground hover:text-foreground focus-visible:ring-2"
+											contentClass="w-auto min-w-28"
+										/>
 										<span class="compose-meta-prose">
 											after booking · unlinked waivers unscheduled
 										</span>
@@ -2270,32 +2267,6 @@
 		flex-wrap: wrap;
 		justify-content: flex-end;
 		margin-left: auto;
-	}
-
-	.compose-select {
-		height: 26px;
-		background: color-mix(in srgb, var(--input) 20%, transparent);
-		border: 1px solid var(--input);
-		border-radius: var(--radius-sm);
-		padding: 0 0.45rem;
-		font-size: 0.8125rem;
-		color: var(--muted-foreground);
-		font-family: inherit;
-		outline: none;
-		cursor: pointer;
-		transition:
-			color 130ms ease,
-			border-color 130ms ease;
-	}
-
-	.compose-select:hover {
-		color: var(--foreground);
-		border-color: color-mix(in srgb, var(--border) 150%, transparent);
-	}
-
-	.compose-select:focus-visible {
-		border-color: var(--ring);
-		box-shadow: 0 0 0 2px color-mix(in srgb, var(--ring) 30%, transparent);
 	}
 
 	.compose-meta-prose {
