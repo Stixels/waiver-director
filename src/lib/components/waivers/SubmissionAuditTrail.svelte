@@ -26,7 +26,7 @@
 	}
 </script>
 
-<section class="mx-auto max-w-3xl px-4 pb-10 sm:px-6" aria-labelledby="audit-trail-heading">
+<section class="mx-auto max-w-3xl px-4 py-10 sm:px-6" aria-labelledby="audit-trail-heading">
 	<div class="rounded-xl border border-border bg-background p-4 sm:p-5">
 		<h3
 			id="audit-trail-heading"
