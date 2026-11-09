@@ -19,11 +19,10 @@ import {
 	validateMinors,
 	validateSubmissionAnswers,
 	waiverDefinitionsEqual,
-	waiverAnswerValueValidator,
-	waiverFieldValidator,
 	waiverDefinitionValidator,
 	waiverThemeValidator
 } from './lib/waivers';
+import { waiverAnswerValueValidator, waiverFieldValidator } from './lib/waiverFields';
 
 type FunctionCtx = QueryCtx | MutationCtx;
 

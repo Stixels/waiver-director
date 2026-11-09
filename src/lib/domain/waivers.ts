@@ -14,6 +14,7 @@ import {
 	MAX_CLAUSE_LENGTH,
 	MIN_CLAUSE_LENGTH,
 	isOptionField,
+	normalizeFieldForCompare,
 	type WaiverField,
 	type WaiverFieldType
 } from '$lib/domain/waiver-fields';
@@ -22,7 +23,6 @@ export type {
 	WaiverAnswers,
 	WaiverAnswerValue,
 	WaiverField,
-	WaiverFieldOption,
 	WaiverFieldType
 } from '$lib/domain/waiver-fields';
 export type WaiverTheme = 'light' | 'dark';
@@ -254,38 +254,6 @@ export function isWaiverDefinitionAutosaveable(definition: WaiverDefinition | nu
 	}
 
 	return true;
-}
-
-function normalizeFieldForCompare(field: WaiverField): WaiverField {
-	const label = field.label.trim();
-	switch (field.type) {
-		case 'select':
-		case 'multiselect':
-			return {
-				...field,
-				label,
-				options: field.options.map((option) => ({
-					id: option.id.trim(),
-					label: option.label.trim(),
-					...(option.flagged ? { flagged: true } : {})
-				}))
-			};
-		case 'checkbox':
-			return {
-				id: field.id,
-				type: field.type,
-				label,
-				required: field.required,
-				...(field.flagWhenChecked ? { flagWhenChecked: true } : {})
-			};
-		case 'text':
-		case 'phone':
-			return { ...field, label, placeholder: field.placeholder?.trim() || undefined };
-		case 'initials':
-			return { ...field, label, clause: field.clause.trim() };
-		default:
-			return { ...field, label };
-	}
 }
 
 export function normalizeDefinitionForCompare(definition: WaiverDefinition): WaiverDefinition {

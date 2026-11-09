@@ -2,13 +2,13 @@
 // Keep this module free of `$lib` aliases and runtime imports so Convex and
 // the node test runner can load it directly.
 
-export const MAX_TEXT_ANSWER_LENGTH = 5000;
-export const MAX_SHORT_ANSWER_LENGTH = 200;
+const MAX_TEXT_ANSWER_LENGTH = 5000;
+const MAX_SHORT_ANSWER_LENGTH = 200;
 export const MIN_CLAUSE_LENGTH = 2;
 export const MAX_CLAUSE_LENGTH = 2000;
 export const MAX_INITIALS_LENGTH = 6;
-export const MIN_PHONE_DIGITS = 7;
-export const MAX_PHONE_DIGITS = 15;
+const MIN_PHONE_DIGITS = 7;
+const MAX_PHONE_DIGITS = 15;
 
 export type WaiverFieldOption = {
 	id: string;
@@ -40,7 +40,7 @@ export type WaiverFieldType = WaiverField['type'];
 export type WaiverAnswerValue = string | boolean | null | string[] | Record<string, string>;
 export type WaiverAnswers = Record<string, WaiverAnswerValue>;
 
-export const addressParts = [
+const addressParts = [
 	{ key: 'line1', label: 'Street address', required: true, autocomplete: 'address-line1' },
 	{ key: 'line2', label: 'Apt, suite, unit', required: false, autocomplete: 'address-line2' },
 	{ key: 'city', label: 'City', required: true, autocomplete: 'address-level2' },
@@ -49,7 +49,7 @@ export const addressParts = [
 	{ key: 'country', label: 'Country', required: false, autocomplete: 'country-name' }
 ] as const;
 
-export const emergencyContactParts = [
+const emergencyContactParts = [
 	{ key: 'name', label: 'Contact name', required: true, autocomplete: 'off' },
 	{ key: 'phone', label: 'Contact phone', required: true, autocomplete: 'off' },
 	{ key: 'relationship', label: 'Relationship', required: false, autocomplete: 'off' }
@@ -63,7 +63,7 @@ export function compositeParts(
 	return type === 'address' ? addressParts : emergencyContactParts;
 }
 
-export function countPhoneDigits(value: string): number {
+function countPhoneDigits(value: string): number {
 	return value.replace(/\D/g, '').length;
 }
 
@@ -74,7 +74,7 @@ export function isValidPhone(value: string): boolean {
 	return digits >= MIN_PHONE_DIGITS && digits <= MAX_PHONE_DIGITS;
 }
 
-export function parseNumberAnswer(value: string): number | null {
+function parseNumberAnswer(value: string): number | null {
 	const trimmed = value.trim();
 	// Matches what <input type="number"> accepts: optional sign, leading or
 	// trailing decimal point, and exponent (e.g. "-2", ".5", "3.", "1e3").
@@ -103,13 +103,7 @@ export function isAnswerFlagged(field: WaiverField, value: WaiverAnswerValue | u
 	return false;
 }
 
-export function fieldCanFlag(field: WaiverField): boolean {
-	if (field.type === 'checkbox') return field.flagWhenChecked === true;
-	if (isOptionField(field)) return field.options.some((option) => option.flagged === true);
-	return false;
-}
-
-export type NormalizedAnswersResult =
+type NormalizedAnswersResult =
 	| { ok: true; answers: WaiverAnswers; flaggedFieldIds: string[] }
 	| { ok: false; fieldId: string; message: string };
 
@@ -291,6 +285,39 @@ export function formatAnswerDisplay(
 	}
 	if (typeof value === 'string') return value;
 	return '—';
+}
+
+/** Trimmed, canonical field shape used to compare drafts with published versions. */
+export function normalizeFieldForCompare<T extends WaiverField>(field: T): T {
+	const label = field.label.trim();
+	switch (field.type) {
+		case 'select':
+		case 'multiselect':
+			return {
+				...field,
+				label,
+				options: field.options.map((option) => ({
+					id: option.id.trim(),
+					label: option.label.trim(),
+					...(option.flagged ? { flagged: true } : {})
+				}))
+			};
+		case 'checkbox':
+			return {
+				id: field.id,
+				type: field.type,
+				label,
+				required: field.required,
+				...(field.flagWhenChecked ? { flagWhenChecked: true } : {})
+			} as T;
+		case 'text':
+		case 'phone':
+			return { ...field, label, placeholder: field.placeholder?.trim() || undefined };
+		case 'initials':
+			return { ...field, label, clause: field.clause.trim() };
+		default:
+			return { ...field, label };
+	}
 }
 
 function isRecord(value: WaiverAnswerValue): value is Record<string, string> {

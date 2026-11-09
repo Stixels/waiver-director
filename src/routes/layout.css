@@ -133,8 +133,8 @@
 	html {
 		@apply font-sans;
 	}
-	/* Native option lists don't inherit a transparent select background, so
-	   in the dark waiver theme they rendered light text on a white popup. */
+	/* Native option lists (e.g. the calendar's month/year pickers) don't
+	   inherit a transparent select background; keep them readable in dark. */
 	select option,
 	select optgroup {
 		background-color: var(--background);

@@ -13,9 +13,6 @@
 		options: SelectOption[];
 		placeholder?: string;
 		id?: string;
-		name?: string;
-		required?: boolean;
-		disabled?: boolean;
 		'aria-label'?: string;
 		/** Classes for the trigger button; defaults to the app's input look. */
 		class?: string;
@@ -34,9 +31,6 @@
 		options,
 		placeholder = 'Select one',
 		id,
-		name,
-		required = false,
-		disabled = false,
 		'aria-label': ariaLabel,
 		class: className,
 		contentClass,
@@ -51,9 +45,6 @@
 	type="single"
 	bind:value
 	items={options}
-	{name}
-	{required}
-	{disabled}
 	onValueChange={(next) => onValueChange?.(next)}
 >
 	<SelectPrimitive.Trigger
@@ -61,7 +52,7 @@
 		aria-label={ariaLabel}
 		data-slot="select-trigger"
 		class={cn(
-			'flex h-10 w-full cursor-pointer items-center justify-between gap-2 rounded-md border border-input bg-background px-3 text-left text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 data-placeholder:text-muted-foreground',
+			'flex h-10 w-full cursor-pointer items-center justify-between gap-2 rounded-md border border-input bg-background px-3 text-left text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 data-placeholder:text-muted-foreground',
 			className
 		)}
 	>

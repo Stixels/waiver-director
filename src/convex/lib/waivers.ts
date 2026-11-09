@@ -7,6 +7,7 @@ import { sanitizeRichTextHtml } from '../../lib/utils/rich-text';
 import {
 	MAX_CLAUSE_LENGTH,
 	MIN_CLAUSE_LENGTH,
+	normalizeFieldForCompare,
 	normalizeSubmissionAnswers,
 	type WaiverAnswers
 } from '../../lib/domain/waiver-fields';
@@ -27,8 +28,6 @@ import {
 } from '../../lib/domain/waiver-constraints';
 
 type FunctionCtx = QueryCtx | MutationCtx;
-
-export { waiverAnswerValueValidator, waiverFieldValidator } from './waiverFields';
 
 export const waiverThemeValidator = v.union(v.literal('light'), v.literal('dark'));
 
@@ -291,38 +290,6 @@ export function normalizeWaiverDefinition(definition: WaiverDefinition): WaiverD
 		theme: definition.theme ?? 'dark',
 		fields
 	};
-}
-
-function normalizeFieldForCompare(field: WaiverFieldValue): WaiverFieldValue {
-	const label = field.label.trim();
-	switch (field.type) {
-		case 'select':
-		case 'multiselect':
-			return {
-				...field,
-				label,
-				options: field.options.map((option) => ({
-					id: option.id.trim(),
-					label: option.label.trim(),
-					...(option.flagged ? { flagged: true } : {})
-				}))
-			};
-		case 'checkbox':
-			return {
-				id: field.id,
-				type: field.type,
-				label,
-				required: field.required,
-				...(field.flagWhenChecked ? { flagWhenChecked: true } : {})
-			};
-		case 'text':
-		case 'phone':
-			return { ...field, label, placeholder: field.placeholder?.trim() || undefined };
-		case 'initials':
-			return { ...field, label, clause: field.clause.trim() };
-		default:
-			return { ...field, label };
-	}
 }
 
 function normalizeWaiverDefinitionForCompare(definition: WaiverDefinition): WaiverDefinition {
