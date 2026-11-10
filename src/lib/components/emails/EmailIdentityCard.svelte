@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import { useConvexClient } from 'convex-svelte';
 	import { toast } from 'svelte-sonner';
 	import type { Id } from '$convex/_generated/dataModel';
@@ -196,6 +197,7 @@
 				replyToEmail
 			});
 			verificationCode = '';
+			lastAutoSubmittedCode = '';
 			toast.success('Verification code sent.');
 		} catch (err) {
 			toast.error(getConvexErrorMessage(err, 'Failed to send verification code.'));
@@ -252,10 +254,22 @@
 		replyToEmail = senderSettings?.replyToEmail ?? senderSettings?.pendingReplyToEmail ?? '';
 	}
 
-	function handleAutoVerify() {
-		if (verificationCode.trim().length === 6 && canConfirmReplyToVerification) {
+	// Code most recently auto-submitted from the OTP input. bits-ui calls
+	// `onComplete` from inside an `$effect`, so anything read here becomes a
+	// dependency of that effect. Without `untrack` and this guard, a rejected code
+	// stays in the input, `isConfirmingVerification` flips back to false, the
+	// effect re-runs, and the same wrong code is resubmitted in a loop until the
+	// attempt limit locks the code.
+	let lastAutoSubmittedCode = '';
+
+	function handleAutoVerify(value: string) {
+		untrack(() => {
+			const code = value.trim();
+			if (code.length !== 6 || code === lastAutoSubmittedCode) return;
+			if (!canConfirmReplyToVerification) return;
+			lastAutoSubmittedCode = code;
 			void confirmReplyToEmail();
-		}
+		});
 	}
 </script>
 
