@@ -46,8 +46,13 @@
 		() => ({ keepPreviousData: true })
 	);
 
-	const submission = $derived(submissionQuery.data as Submission | null);
-	const isLoadingSubmission = $derived(submissionQuery.isLoading);
+	// keepPreviousData returns the previously opened submission while the next one
+	// loads; never render one signer's record under another's row.
+	const isSwitchingSubmission = $derived(submissionQuery.isStale);
+	const submission = $derived(
+		isSwitchingSubmission ? null : ((submissionQuery.data ?? null) as Submission | null)
+	);
+	const isLoadingSubmission = $derived(submissionQuery.isLoading || isSwitchingSubmission);
 
 	function formatTimestamp(ts: number) {
 		return new Intl.DateTimeFormat('en-US', { dateStyle: 'long', timeStyle: 'short' }).format(
@@ -97,8 +102,13 @@
 	>
 		{#if isLoadingSubmission}
 			<DialogHeader class="shrink-0 border-b border-border px-6 py-5">
-				<DialogTitle><Skeleton class="h-5 w-48" /></DialogTitle>
-				<DialogDescription><Skeleton class="h-3.5 w-40" /></DialogDescription>
+				<DialogTitle>
+					<span class="sr-only">Loading submission</span>
+					<Skeleton class="h-5 w-48" aria-hidden="true" />
+				</DialogTitle>
+				<DialogDescription>
+					<Skeleton class="h-3.5 w-40" aria-hidden="true" />
+				</DialogDescription>
 			</DialogHeader>
 
 			<div class="min-h-0 flex-1 overflow-y-auto bg-muted/20">
@@ -135,8 +145,13 @@
 				</div>
 			</div>
 		{:else if !submission}
-			<div class="flex flex-1 items-center justify-center">
-				<p class="text-sm text-muted-foreground">Submission not found.</p>
+			<div class="flex flex-1 flex-col items-center justify-center gap-1 px-6 text-center">
+				<DialogTitle class="text-sm font-medium">Submission not found</DialogTitle>
+				<DialogDescription class="text-sm text-muted-foreground">
+					{submissionQuery.error
+						? 'This submission could not be loaded. Try refreshing the page.'
+						: 'It may have been removed or belongs to another workspace.'}
+				</DialogDescription>
 			</div>
 		{:else}
 			<DialogHeader class="shrink-0 border-b border-border p-0">

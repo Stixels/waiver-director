@@ -84,7 +84,9 @@
 									: ''}"
 							>
 								<button
+									type="button"
 									class="min-w-0 flex-1 text-left"
+									aria-pressed={isSelected}
 									onclick={() => (selectedTemplate = template)}
 								>
 									<p class="truncate text-sm font-medium">{template.name}</p>
@@ -97,6 +99,8 @@
 										Load
 									</Button>
 									<button
+										type="button"
+										aria-label={`Delete template ${template.name}`}
 										class="rounded p-1 text-muted-foreground/50 transition-colors hover:bg-destructive/10 hover:text-destructive disabled:opacity-40"
 										onclick={() => onDelete(template)}
 										disabled={deletingTemplateId === template._id}

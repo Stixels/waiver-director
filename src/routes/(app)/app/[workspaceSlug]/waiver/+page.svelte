@@ -39,6 +39,14 @@
 		normalizeDefinitionForCompare,
 		type WaiverDefinition
 	} from '$lib/domain/waivers';
+	import {
+		MAX_SELECT_OPTIONS,
+		MAX_WAIVER_FIELDS,
+		MAX_WAIVER_TITLE_LENGTH,
+		MIN_SELECT_OPTIONS,
+		MIN_WAIVER_FIELD_LABEL_LENGTH,
+		MIN_WAIVER_TITLE_LENGTH
+	} from '$lib/domain/waiver-constraints';
 	import { getConvexErrorMessage } from '$lib/utils/convex-errors';
 	import { billingUpgradeHref } from '$lib/utils/billing';
 	import EllipsisIcon from '@lucide/svelte/icons/ellipsis';
@@ -85,6 +93,8 @@
 
 	// Save state machine for debounced autosave
 	let isSaving = $state(false);
+	let inFlightSave: Promise<void> | null = null;
+	let isLeavingAfterSave = false;
 	let lastSavedAt = $state<number | null>(null);
 	let lastSaveError = $state<string | null>(null);
 	let autosaveTimer: ReturnType<typeof setTimeout> | null = null;
@@ -129,6 +139,12 @@
 	);
 	let lastObservedDraftFingerprint = $state('');
 	const draftCanAutosave = $derived(isWaiverDefinitionAutosaveable(draft));
+	// Human-readable reason the draft cannot autosave, so staff are told what to
+	// fix instead of seeing a permanent "Unsaved changes" state.
+	const draftValidationIssue = $derived.by(() => {
+		if (!draft || draftCanAutosave) return null;
+		return describeDraftValidationIssue(draft);
+	});
 	const publishDisabled = $derived(
 		isPublishing ||
 			isDirty ||
@@ -143,6 +159,7 @@
 		(() => {
 			if (lastSaveError) return 'error';
 			if (isSaving) return 'saving';
+			if (isDirty && draftValidationIssue) return 'invalid';
 			if (isDirty) return 'dirty';
 			if (lastSavedAt) return 'saved';
 			return 'idle';
@@ -150,17 +167,88 @@
 	);
 
 	beforeNavigate((navigation) => {
+		if (isLeavingAfterSave) return;
 		if (!isDirty && !isSaving) return;
 		if (navigation.willUnload) return;
 
-		if (saveState === 'error' || lastSaveError) {
-			toast.message('Autosave failed - your changes may not be saved.');
+		// Edits that cannot be saved (failed autosave or invalid draft) would be
+		// lost, so ask before leaving instead of silently dropping them or
+		// trapping the user on the page.
+		if (lastSaveError || (isDirty && !draftCanAutosave) || convex.disabled) {
+			const reason = lastSaveError
+				? 'Autosave failed and your latest waiver changes are not saved.'
+				: draftValidationIssue
+					? `Your latest waiver changes cannot be saved yet: ${draftValidationIssue}`
+					: 'Your latest waiver changes are not saved.';
+			if (!confirm(`${reason} Leave anyway and discard them?`)) {
+				navigation.cancel();
+			}
 			return;
 		}
 
+		// Otherwise the changes are pending (debounce) or in flight: save them now
+		// and then continue to where the user was going.
 		navigation.cancel();
-		toast.message('Still saving your latest changes. Give it a moment and try again.');
+		const target = navigation.to?.url;
+		if (!target) return;
+		// Browser Back/Forward must be replayed through history, not with goto(),
+		// otherwise the target is pushed as a new entry and the next Back returns here.
+		const historyDelta =
+			navigation.type === 'popstate' && typeof navigation.delta === 'number'
+				? navigation.delta
+				: null;
+		void saveThenNavigate(target, historyDelta);
 	});
+
+	async function saveThenNavigate(target: URL, historyDelta: number | null) {
+		const saved = await flushAndWaitForSave();
+		if (!saved) {
+			toast.error(lastSaveError ?? 'We could not save your latest changes. Please try again.');
+			return;
+		}
+		isLeavingAfterSave = true;
+		if (historyDelta !== null) {
+			// The flag stays set until this page unmounts, so the replayed popstate
+			// passes straight through the guard above.
+			history.go(historyDelta);
+			return;
+		}
+		try {
+			// The target URL comes from SvelteKit's own navigation, so it is already resolved.
+			// eslint-disable-next-line svelte/no-navigation-without-resolve
+			await goto(`${target.pathname}${target.search}${target.hash}`);
+		} finally {
+			isLeavingAfterSave = false;
+		}
+	}
+
+	function describeDraftValidationIssue(definition: WaiverDefinition): string {
+		const title = definition.title.trim();
+		if (title.length < MIN_WAIVER_TITLE_LENGTH || title.length > MAX_WAIVER_TITLE_LENGTH) {
+			return `Waiver title must be ${MIN_WAIVER_TITLE_LENGTH}-${MAX_WAIVER_TITLE_LENGTH} characters.`;
+		}
+		if (definition.fields.length > MAX_WAIVER_FIELDS) {
+			return `Waivers can have at most ${MAX_WAIVER_FIELDS} custom fields.`;
+		}
+		for (const [index, field] of definition.fields.entries()) {
+			const position = `Field ${index + 1}`;
+			if (field.label.trim().length < MIN_WAIVER_FIELD_LABEL_LENGTH) {
+				return `${position} needs a label of at least ${MIN_WAIVER_FIELD_LABEL_LENGTH} characters.`;
+			}
+			if (field.type === 'select') {
+				if (
+					field.options.length < MIN_SELECT_OPTIONS ||
+					field.options.length > MAX_SELECT_OPTIONS
+				) {
+					return `${position} needs ${MIN_SELECT_OPTIONS}-${MAX_SELECT_OPTIONS} options.`;
+				}
+				if (field.options.some((option) => option.label.trim().length === 0)) {
+					return `${position} has an option without a label.`;
+				}
+			}
+		}
+		return 'Fix the highlighted fields to save.';
+	}
 
 	$effect(() => {
 		if (!workspaceWaiver) {
@@ -253,7 +341,16 @@
 		baselineDraft = cloneDefinition(definition);
 	}
 
-	async function runAutosave() {
+	function runAutosave(): Promise<void> {
+		if (inFlightSave) return inFlightSave;
+		const promise = performAutosave().finally(() => {
+			if (inFlightSave === promise) inFlightSave = null;
+		});
+		inFlightSave = promise;
+		return promise;
+	}
+
+	async function performAutosave() {
 		if (!draft || !workspaceWaiver || !currentWorkspace || convex.disabled) return;
 		if (isSaving) return;
 		if (definitionsEqual(draft, baselineDraft)) return;
@@ -302,6 +399,22 @@
 		await runAutosave();
 	}
 
+	/**
+	 * Persist any pending edits, waiting for an in-flight save first so edits made
+	 * while it ran are not skipped. Resolves true when the draft matches the
+	 * saved baseline.
+	 */
+	async function flushAndWaitForSave(): Promise<boolean> {
+		for (let attempt = 0; attempt < 3; attempt += 1) {
+			if (inFlightSave) await inFlightSave;
+			await flushAutosave();
+			if (lastSaveError) return false;
+			if (!isDirty && !isSaving) return true;
+			if (!draftCanAutosave) return false;
+		}
+		return !isDirty && !isSaving && !lastSaveError;
+	}
+
 	async function startTitleEdit() {
 		if (!draft) return;
 		titleDraft = draft.title;
@@ -317,8 +430,11 @@
 			return;
 		}
 		const next = titleDraft.trim();
-		if (next.length > 0) {
+		if (next.length >= MIN_WAIVER_TITLE_LENGTH) {
 			draft.title = next;
+		} else if (next !== draft.title.trim()) {
+			// Keep the previous title rather than saving one the server rejects.
+			toast.error(`Waiver title must be at least ${MIN_WAIVER_TITLE_LENGTH} characters.`);
 		}
 		isEditingTitle = false;
 	}
@@ -406,8 +522,8 @@
 		isPublishing = true;
 
 		// Ensure any pending edits are persisted before publishing.
-		await flushAutosave();
-		if (lastSaveError || isDirty) {
+		const saved = await flushAndWaitForSave();
+		if (!saved || lastSaveError || isDirty) {
 			isPublishing = false;
 			toast.error(
 				lastSaveError ??
@@ -475,6 +591,7 @@
 		copySuccessMessage="Waiver link copied."
 		copyErrorMessage="Unable to copy waiver link."
 		logContext="waiver/qr-dialog"
+		downloadFileName={`${currentWorkspace?.slug ?? 'waiver'}-waiver-qr-code.png`}
 	/>
 {/if}
 
@@ -665,9 +782,9 @@
 		{#if isLoadingProtectedData}
 			<div class="flex flex-1 flex-col lg:flex-row">
 				<aside
-					class="builder-panel w-full shrink-0 border-b border-border/80 bg-card/20 lg:w-96 lg:border-r lg:border-b-0"
+					class="builder-panel flex max-h-[45dvh] w-full shrink-0 flex-col border-b border-border/80 bg-card/20 lg:max-h-none lg:w-96 lg:border-r lg:border-b-0"
 				>
-					<div class="flex h-full min-h-0 flex-col">
+					<div class="flex h-full min-h-0 flex-1 flex-col">
 						<div
 							class="title-bar flex shrink-0 items-center gap-1.5 border-b border-border/80 bg-card/40 px-4 py-2"
 						>
@@ -793,9 +910,9 @@
 			<div class="flex min-h-0 flex-1 flex-col lg:flex-row">
 				<!-- Left panel (edit) -->
 				<aside
-					class="builder-panel w-full shrink-0 border-b border-border/80 bg-card/20 lg:w-96 lg:border-r lg:border-b-0"
+					class="builder-panel flex max-h-[45dvh] w-full shrink-0 flex-col border-b border-border/80 bg-card/20 lg:max-h-none lg:w-96 lg:border-r lg:border-b-0"
 				>
-					<div class="flex h-full min-h-0 flex-col">
+					<div class="flex h-full min-h-0 flex-1 flex-col">
 						<!-- Inline editable title row -->
 						<div
 							class="title-bar flex shrink-0 items-center gap-1.5 border-b border-border/80 bg-card/40 px-4 py-2"
@@ -815,6 +932,7 @@
 											bind:value={titleDraft}
 											maxlength={120}
 											placeholder="Untitled waiver"
+											aria-label="Waiver title"
 											class="title-input"
 											onkeydown={handleTitleKeydown}
 											onblur={commitTitleEdit}
@@ -861,7 +979,7 @@
 							</div>
 						</div>
 
-						<div class="min-h-0 flex-1 overflow-hidden">
+						<div class="flex min-h-0 flex-1 flex-col overflow-hidden">
 							<WaiverBuilderPanel bind:draft />
 						</div>
 					</div>
@@ -879,6 +997,7 @@
 							canEditBranding={currentWorkspace?.role === 'owner'}
 							{saveState}
 							{lastSavedAt}
+							saveIssue={draftValidationIssue}
 						/>
 					{/if}
 				</div>

@@ -117,7 +117,14 @@
 		() => ({ keepPreviousData: true })
 	);
 
-	const searchResults = $derived((searchResultsQuery.data ?? null) as SearchResults | null);
+	// convex-svelte keeps the last result even while the query is skipped
+	// (keepPreviousData), so gate on the active query to avoid showing stale records
+	// after the input is cleared or the dialog is reopened.
+	const searchResults = $derived(
+		open && workspaceId && debouncedSearchInput
+			? ((searchResultsQuery.data ?? null) as SearchResults | null)
+			: null
+	);
 	const customerResults = $derived(searchResults?.customers ?? []);
 	const bookingResults = $derived(searchResults?.bookings ?? []);
 	const submissionResults = $derived(searchResults?.submissions ?? []);

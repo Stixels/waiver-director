@@ -39,13 +39,19 @@
 	});
 </script>
 
-<div class="inline-flex rounded-2xl border border-border bg-white p-3 shadow-sm">
+<div class="inline-flex max-w-full rounded-2xl border border-border bg-white p-3 shadow-sm">
 	{#if dataUrl}
-		<img src={dataUrl} alt="QR code preview" width={size} height={size} class="block rounded-lg" />
+		<img
+			src={dataUrl}
+			alt={`QR code linking to ${text}`}
+			width={size}
+			height={size}
+			class="block h-auto max-w-full rounded-lg"
+		/>
 	{:else}
 		<div
-			class="animate-pulse rounded-lg bg-muted"
-			style={`width:${size}px; height:${size}px;`}
+			class="aspect-square max-w-full animate-pulse rounded-lg bg-muted"
+			style={`width:${size}px;`}
 			aria-hidden="true"
 		></div>
 	{/if}

@@ -1,5 +1,6 @@
 <script lang="ts">
-	import type { ComponentProps } from 'svelte';
+	import { tick, type ComponentProps } from 'svelte';
+	import { toast } from 'svelte-sonner';
 	import { Input } from '$lib/components/ui/input';
 	import { Button } from '$lib/components/ui/button';
 	import {
@@ -26,7 +27,11 @@
 		type WaiverField,
 		type WaiverFieldType
 	} from '$lib/domain/waivers';
-	import { MAX_SELECT_OPTIONS, MAX_WAIVER_FIELDS } from '$lib/domain/waiver-constraints';
+	import {
+		MAX_SELECT_OPTIONS,
+		MAX_WAIVER_FIELDS,
+		MIN_WAIVER_FIELD_LABEL_LENGTH
+	} from '$lib/domain/waiver-constraints';
 
 	interface Props {
 		draft?: WaiverDefinition | null;
@@ -55,15 +60,51 @@
 		return fieldTypes.find((entry) => entry.type === type)?.icon ?? TypeIcon;
 	}
 
+	function fieldLabelError(field: WaiverField): string | null {
+		if (field.label.trim().length >= MIN_WAIVER_FIELD_LABEL_LENGTH) return null;
+		return `Enter a label of at least ${MIN_WAIVER_FIELD_LABEL_LENGTH} characters.`;
+	}
+
+	async function focusInput(id: string) {
+		await tick();
+		const input = document.getElementById(id);
+		if (!(input instanceof HTMLInputElement)) return;
+		input.scrollIntoView({ block: 'nearest' });
+		input.focus();
+		input.select();
+	}
+
 	function addField(type: WaiverFieldType) {
 		if (!draft) return;
 		if (draft.fields.length >= MAX_WAIVER_FIELDS) return;
-		draft.fields.push(createBlankField(type));
+		const field = createBlankField(type);
+		draft.fields.push(field);
+		// Move focus to the new field so it can be renamed straight away.
+		void focusInput(`${field.id}-label`);
 	}
 
 	function removeField(index: number) {
 		if (!draft) return;
-		draft.fields.splice(index, 1);
+		const [removed] = draft.fields.splice(index, 1);
+		if (!removed) return;
+
+		// Deleting is instant, so offer a quick undo instead of a confirmation step.
+		const restored = $state.snapshot(removed) as WaiverField;
+		const label = restored.label.trim() || formatFieldTypeLabel(restored.type);
+		toast(`Deleted "${label}"`, {
+			action: {
+				label: 'Undo',
+				onClick: () => {
+					if (!draft) return;
+					if (draft.fields.some((entry) => entry.id === restored.id)) return;
+					if (draft.fields.length >= MAX_WAIVER_FIELDS) {
+						toast.error(`Waivers can have at most ${MAX_WAIVER_FIELDS} custom fields.`);
+						return;
+					}
+					draft.fields.splice(Math.min(index, draft.fields.length), 0, restored);
+				}
+			}
+		});
 	}
 
 	function reorderFields(fromIndex: number, toIndex: number) {
@@ -99,10 +140,12 @@
 	}
 
 	function addOption(field: Extract<WaiverField, { type: 'select' }>) {
+		if (field.options.length >= MAX_SELECT_OPTIONS) return;
 		field.options.push({
 			id: createOptionId('option'),
 			label: `Option ${field.options.length + 1}`
 		});
+		void focusInput(`${field.id}-option-${field.options.length - 1}`);
 	}
 
 	function removeOption(field: Extract<WaiverField, { type: 'select' }>, optionIndex: number) {
@@ -156,7 +199,7 @@
 </script>
 
 {#if draft}
-	<div class="flex h-full min-h-0 flex-col">
+	<div class="flex h-full min-h-0 flex-1 flex-col">
 		<!-- Header row: Custom fields label + Add button -->
 		<div
 			class="flex shrink-0 items-center justify-between gap-3 border-b border-border/80 px-4 py-2.5"
@@ -216,6 +259,7 @@
 								}
 							})}
 							{@const FieldIcon = getFieldTypeIcon(field.type)}
+							{@const labelError = fieldLabelError(field)}
 							<li
 								{@attach sortable.attach}
 								class="field-row"
@@ -226,7 +270,7 @@
 									type="button"
 									{@attach sortable.attachHandle}
 									class="field-grip"
-									aria-label="Drag to reorder field"
+									aria-label={`Reorder field ${index + 1}: ${field.label.trim() || formatFieldTypeLabel(field.type)}`}
 									title="Drag to reorder"
 								>
 									<GripVerticalIcon class="size-3.5" />
@@ -255,7 +299,7 @@
 											<TooltipTrigger
 												class="field-delete"
 												onclick={() => removeField(index)}
-												aria-label="Delete field"
+												aria-label={`Delete field ${index + 1}: ${field.label.trim() || formatFieldTypeLabel(field.type)}`}
 											>
 												{#snippet child({ props })}
 													<button {...props}>
@@ -276,7 +320,12 @@
 											maxlength={120}
 											placeholder="Label guests will see"
 											class="field-label-input"
+											aria-invalid={labelError ? 'true' : undefined}
+											aria-describedby={labelError ? `${field.id}-label-error` : undefined}
 										/>
+										{#if labelError}
+											<p id={`${field.id}-label-error`} class="field-error">{labelError}</p>
+										{/if}
 									</div>
 
 									{#if field.type === 'select'}
@@ -308,7 +357,7 @@
 																type="button"
 																{@attach optionSortable.attachHandle}
 																class="option-grip"
-																aria-label="Drag to reorder option"
+																aria-label={`Reorder option ${optionIndex + 1}`}
 																title="Drag to reorder"
 															>
 																<GripVerticalIcon class="size-3" />
@@ -319,13 +368,15 @@
 																maxlength={80}
 																class="option-input"
 																placeholder="Option label"
+																aria-label={`Option ${optionIndex + 1}`}
+																aria-invalid={option.label.trim().length === 0 ? 'true' : undefined}
 															/>
 															<button
 																type="button"
 																class="option-remove"
 																disabled={field.options.length === 1}
 																onclick={() => removeOption(field, optionIndex)}
-																aria-label="Remove option"
+																aria-label={`Remove option ${optionIndex + 1}`}
 															>
 																<Trash2Icon class="size-3" />
 															</button>
@@ -547,6 +598,17 @@
 	.field-delete:hover {
 		background: color-mix(in srgb, var(--destructive) 12%, transparent);
 		color: var(--destructive);
+	}
+
+	.field-error {
+		margin-top: 0.25rem;
+		font-size: 0.65rem;
+		line-height: 1.2;
+		color: var(--destructive);
+	}
+
+	.option-row:has(:global(input[aria-invalid='true'])) {
+		border-color: color-mix(in srgb, var(--destructive) 55%, var(--border));
 	}
 
 	.options-card {

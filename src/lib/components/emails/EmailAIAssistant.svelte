@@ -167,8 +167,14 @@
 		{/if}
 	</Button>
 
+	{#if isReviewing}
+		<button type="button" class="ai-result-discard" onclick={cancelActiveReview}>
+			Cancel review
+		</button>
+	{/if}
+
 	{#if errorMessage}
-		<p class="ai-error"><AlertCircleIcon class="size-3.5" /> {errorMessage}</p>
+		<p class="ai-error" role="alert"><AlertCircleIcon class="size-3.5" /> {errorMessage}</p>
 	{/if}
 
 	{#if result}

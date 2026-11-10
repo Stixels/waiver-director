@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { page } from '$app/state';
 	import { api } from '$convex/_generated/api';
 	import { useAppContext } from '$lib/components/app/app-context.svelte';
@@ -19,10 +20,26 @@
 		return `${y}-${m}-${d}`;
 	}
 
-	// Compute today's local-time boundaries once and keep stable
+	// Track the local calendar date so a dashboard left open past midnight (common on
+	// front-desk screens) rolls over to the new day instead of showing yesterday.
+	let todayKey = $state(toDateInputValue(new Date()));
+
+	onMount(() => {
+		const syncToday = () => {
+			const nextKey = toDateInputValue(new Date());
+			if (nextKey !== todayKey) todayKey = nextKey;
+		};
+		const interval = setInterval(syncToday, 60_000);
+		document.addEventListener('visibilitychange', syncToday);
+		return () => {
+			clearInterval(interval);
+			document.removeEventListener('visibilitychange', syncToday);
+		};
+	});
+
+	// Local-time boundaries only change when the calendar date changes.
 	const today = $derived.by(() => {
-		const now = new Date();
-		const [y, m, d] = toDateInputValue(now).split('-').map(Number);
+		const [y, m, d] = todayKey.split('-').map(Number);
 		const start = new Date(y, m - 1, d);
 		const end = new Date(y, m - 1, d + 1);
 		return { startAt: start.getTime(), endAt: end.getTime() };
@@ -30,8 +47,7 @@
 
 	// 14-day window supports the visible 7-day trend plus a prior-week comparison.
 	const trendStartAt = $derived.by(() => {
-		const now = new Date();
-		const [y, m, d] = toDateInputValue(now).split('-').map(Number);
+		const [y, m, d] = todayKey.split('-').map(Number);
 		return new Date(y, m - 1, d - 13).getTime();
 	});
 

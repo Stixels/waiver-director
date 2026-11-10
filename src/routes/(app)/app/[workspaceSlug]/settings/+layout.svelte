@@ -61,11 +61,13 @@
 	<title>{currentWorkspace?.name ?? 'Workspace'} Settings | Waiver Director</title>
 </svelte:head>
 
-<div class="h-full min-h-0 w-full overflow-hidden p-4 sm:p-5">
+<div class="w-full p-4 sm:p-5 md:h-full md:min-h-0 md:overflow-hidden">
 	<div
-		class="-mx-4 grid h-full min-h-0 overflow-hidden border-y sm:-mx-5 md:grid-cols-[calc(15rem+1.25rem)_minmax(0,1fr)]"
+		class="-mx-4 grid border-y sm:-mx-5 md:h-full md:min-h-0 md:grid-cols-[calc(15rem+1.25rem)_minmax(0,1fr)] md:grid-rows-[minmax(0,1fr)] md:overflow-hidden"
 	>
-		<aside class="flex flex-col gap-4 border-b px-5 py-3 md:border-r md:border-b-0">
+		<aside
+			class="flex flex-col gap-4 border-b px-5 py-3 md:min-h-0 md:overflow-y-auto md:border-r md:border-b-0"
+		>
 			<p class="px-2 pb-0.5 text-sm font-semibold">Settings</p>
 			<nav class="flex flex-col gap-0.5" aria-label="Settings sections">
 				{#each sections as section (section.href)}
@@ -101,8 +103,8 @@
 			</nav>
 		</aside>
 
-		<main class="min-w-0 px-5 py-5">
+		<div class="min-w-0 px-5 py-5 md:min-h-0 md:overflow-y-auto">
 			{@render children?.()}
-		</main>
+		</div>
 	</div>
 </div>

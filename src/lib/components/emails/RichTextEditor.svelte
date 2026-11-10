@@ -329,7 +329,20 @@
 			return;
 		}
 
-		editor.chain().focus().extendMarkRange('link').setLink({ href: safeHref }).run();
+		if (editor.state.selection.empty && !editor.isActive('link')) {
+			// No text selected: setLink would silently do nothing, so insert the URL as linked text.
+			editor
+				.chain()
+				.focus()
+				.insertContent({
+					type: 'text',
+					text: safeHref.replace(/^(mailto|tel):/i, ''),
+					marks: [{ type: 'link', attrs: { href: safeHref } }]
+				})
+				.run();
+		} else {
+			editor.chain().focus().extendMarkRange('link').setLink({ href: safeHref }).run();
+		}
 		cancelLinkDialog();
 	}
 
@@ -675,15 +688,19 @@
 			onmousedown={keepToolbarFocus}
 		>
 			<DropdownMenu>
-				<DropdownMenuTrigger class="inline-flex">
-					<button
-						type="button"
-						class="toolbar-select toolbar-select-block"
-						disabled={!editor || disabled}
-					>
-						<span class="toolbar-select-label">{toolbarState.blockShortLabel}</span>
-						<ChevronDownIcon class="size-3" />
-					</button>
+				<DropdownMenuTrigger disabled={!editor || disabled}>
+					{#snippet child({ props })}
+						<button
+							{...props}
+							type="button"
+							class="toolbar-select toolbar-select-block"
+							aria-label="Text style: {toolbarState.blockShortLabel}"
+							title="Text style"
+						>
+							<span class="toolbar-select-label">{toolbarState.blockShortLabel}</span>
+							<ChevronDownIcon class="size-3" />
+						</button>
+					{/snippet}
 				</DropdownMenuTrigger>
 				<DropdownMenuContent align="start" class="w-44">
 					<DropdownMenuItem
@@ -705,23 +722,26 @@
 			</DropdownMenu>
 
 			<DropdownMenu bind:open={alignmentMenuOpen}>
-				<DropdownMenuTrigger class="inline-flex">
-					<button
-						type="button"
-						class="toolbar-button"
-						disabled={!editor || disabled}
-						aria-label="Alignment"
-					>
-						{#if toolbarState.alignment === 'center'}
-							<AlignCenterIcon class="size-3.5" />
-						{:else if toolbarState.alignment === 'right'}
-							<AlignRightIcon class="size-3.5" />
-						{:else if toolbarState.alignment === 'justify'}
-							<AlignJustifyIcon class="size-3.5" />
-						{:else}
-							<AlignLeftIcon class="size-3.5" />
-						{/if}
-					</button>
+				<DropdownMenuTrigger disabled={!editor || disabled}>
+					{#snippet child({ props })}
+						<button
+							{...props}
+							type="button"
+							class="toolbar-button"
+							aria-label="Alignment"
+							title="Alignment"
+						>
+							{#if toolbarState.alignment === 'center'}
+								<AlignCenterIcon class="size-3.5" />
+							{:else if toolbarState.alignment === 'right'}
+								<AlignRightIcon class="size-3.5" />
+							{:else if toolbarState.alignment === 'justify'}
+								<AlignJustifyIcon class="size-3.5" />
+							{:else}
+								<AlignLeftIcon class="size-3.5" />
+							{/if}
+						</button>
+					{/snippet}
 				</DropdownMenuTrigger>
 				<DropdownMenuContent align="start" class="w-40">
 					<DropdownMenuItem
@@ -757,17 +777,21 @@
 			</DropdownMenu>
 
 			<DropdownMenu>
-				<DropdownMenuTrigger class="inline-flex">
-					<button
-						type="button"
-						class="toolbar-select toolbar-select-font"
-						disabled={!editor || disabled}
-					>
-						<span class="toolbar-select-label toolbar-select-label-plain">
-							{toolbarState.fontFamilyLabel}
-						</span>
-						<ChevronDownIcon class="size-3" />
-					</button>
+				<DropdownMenuTrigger disabled={!editor || disabled}>
+					{#snippet child({ props })}
+						<button
+							{...props}
+							type="button"
+							class="toolbar-select toolbar-select-font"
+							aria-label="Font: {toolbarState.fontFamilyLabel}"
+							title="Font"
+						>
+							<span class="toolbar-select-label toolbar-select-label-plain">
+								{toolbarState.fontFamilyLabel}
+							</span>
+							<ChevronDownIcon class="size-3" />
+						</button>
+					{/snippet}
 				</DropdownMenuTrigger>
 				<DropdownMenuContent align="start" class="w-48">
 					{#each FONT_FAMILIES as family (family.label)}
@@ -784,17 +808,21 @@
 			</DropdownMenu>
 
 			<DropdownMenu>
-				<DropdownMenuTrigger class="inline-flex">
-					<button
-						type="button"
-						class="toolbar-select toolbar-select-size"
-						disabled={!editor || disabled}
-					>
-						<span class="toolbar-select-label toolbar-select-label-plain">
-							{toolbarState.fontSizeLabel}
-						</span>
-						<ChevronDownIcon class="size-3" />
-					</button>
+				<DropdownMenuTrigger disabled={!editor || disabled}>
+					{#snippet child({ props })}
+						<button
+							{...props}
+							type="button"
+							class="toolbar-select toolbar-select-size"
+							aria-label="Font size: {toolbarState.fontSizeLabel}"
+							title="Font size"
+						>
+							<span class="toolbar-select-label toolbar-select-label-plain">
+								{toolbarState.fontSizeLabel}
+							</span>
+							<ChevronDownIcon class="size-3" />
+						</button>
+					{/snippet}
 				</DropdownMenuTrigger>
 				<DropdownMenuContent align="start" class="w-32">
 					{#each FONT_SIZES as size (size.label)}

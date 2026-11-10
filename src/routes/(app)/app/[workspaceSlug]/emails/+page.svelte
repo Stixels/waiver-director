@@ -472,6 +472,9 @@
 	beforeNavigate((navigation) => {
 		if (!isDirty && !isSavingEditorContent) return;
 		if (navigation.willUnload) return;
+		// Tab switches and follow-up preview deep links stay on this page, so the
+		// editor state and autosave keep running; don't block or prompt for them.
+		if (navigation.to?.url.pathname === navigation.from?.url.pathname) return;
 
 		if (saveState === 'error' || lastSaveError) {
 			if (
@@ -492,7 +495,30 @@
 		if (convex.disabled) {
 			navigation.cancel();
 			toast.message('Email autosave is unavailable right now.');
+			return;
 		}
+
+		if (!isDirty) return;
+
+		if (!isSendAfterValid) {
+			if (
+				confirm(
+					'Your latest email changes are not saved because the send delay is invalid. Leave anyway?'
+				)
+			) {
+				return;
+			}
+			navigation.cancel();
+			return;
+		}
+
+		// Leaving this page unmounts it and would drop the pending debounced
+		// autosave, so flush the latest changes now instead of losing them.
+		if (autosaveTimer) {
+			clearTimeout(autosaveTimer);
+			autosaveTimer = null;
+		}
+		void persistEditorContent({ showToast: false, showErrorToast: true });
 	});
 
 	$effect(() => {
@@ -553,6 +579,18 @@
 
 	function clampSendAfterAmount(value: unknown) {
 		return Math.trunc(Math.max(1, Number(value) || 1));
+	}
+
+	function handleSendAfterAmountInput(e: Event) {
+		const input = e.currentTarget;
+		if (!(input instanceof HTMLInputElement)) return;
+		const raw = input.value.trim();
+		// Let the field be cleared while typing a new value; it is clamped on blur.
+		if (raw === '' || !Number.isFinite(Number(raw))) {
+			sendAfterAmount = Number.NaN;
+			return;
+		}
+		sanitizeSendAfterAmount(e);
 	}
 
 	function sanitizeSendAfterAmount(e: Event) {
@@ -633,10 +671,13 @@
 		aiReviewOpen = false;
 	}
 
-	async function persistEditorContent(options: { showToast?: boolean } = {}) {
+	async function persistEditorContent(
+		options: { showToast?: boolean; showErrorToast?: boolean } = {}
+	) {
 		if (!currentWorkspace || convex.disabled) return;
 		if (isSavingEditorContent) return;
 		const showToast = options.showToast ?? true;
+		const showErrorToast = options.showErrorToast ?? showToast;
 		const workspaceId = currentWorkspace.workspaceId;
 		const snapshot = currentEditorContentSnapshot();
 		isSavingEditorContent = true;
@@ -659,8 +700,8 @@
 			const message = getConvexErrorMessage(err, 'Failed to save email content.');
 			if (currentWorkspace?.workspaceId === workspaceId) {
 				lastSaveError = message;
-				if (showToast) toast.error(message);
 			}
+			if (showErrorToast) toast.error(message);
 		} finally {
 			if (currentWorkspace?.workspaceId === workspaceId) {
 				isSavingEditorContent = false;
@@ -681,6 +722,7 @@
 
 	async function confirmSaveTemplate() {
 		if (!currentWorkspace || !templateName.trim() || !isSendAfterValid) return;
+		if (isSavingReusableTemplate) return;
 		isSavingReusableTemplate = true;
 		try {
 			await convex.mutation(api.emails.saveEmailTemplate, {
@@ -733,6 +775,8 @@
 	}
 
 	async function deleteTemplate(template: EmailTemplate) {
+		if (deletingTemplateId) return;
+		if (!confirm(`Delete the template "${template.name}"? This cannot be undone.`)) return;
 		deletingTemplateId = template._id;
 		try {
 			await convex.mutation(api.emails.deleteEmailTemplate, { templateId: template._id });
@@ -1797,11 +1841,12 @@
 											type="number"
 											min="1"
 											value={sendAfterAmount}
-											oninput={sanitizeSendAfterAmount}
+											oninput={handleSendAfterAmountInput}
 											onblur={sanitizeSendAfterAmount}
+											aria-label="Send delay amount"
 											class="compose-num h-[26px] w-14 px-1.5 text-center text-sm tabular-nums"
 											aria-invalid={!isSendAfterValid}
-											aria-describedby="send-after-error"
+											aria-describedby={isSendAfterValid ? undefined : 'send-after-error'}
 										/>
 										<select
 											value={sendAfterUnit}
@@ -1818,7 +1863,12 @@
 										</span>
 									</div>
 									<div class="compose-meta-end">
-										<span class="save-indicator shrink-0" data-state={saveState} title={savedLabel}>
+										<span
+											class="save-indicator shrink-0"
+											data-state={saveState}
+											title={savedLabel}
+											role="status"
+										>
 											{#if saveState === 'saving'}
 												<LoaderIcon class="size-3.5 animate-spin" />
 											{:else if saveState === 'error'}
@@ -1850,6 +1900,7 @@
 											onclick={() => (emailPreviewMode = !emailPreviewMode)}
 											class="preview-toggle"
 											data-active={emailPreviewMode}
+											aria-pressed={emailPreviewMode}
 										>
 											<EyeIcon class="size-3" />
 											{emailPreviewMode ? 'Edit' : 'Preview'}
@@ -1967,7 +2018,10 @@
 											type="button"
 											onclick={() => insertVariable(variable.value)}
 											class="var-chip"
-											title={variable.description}
+											disabled={emailPreviewMode}
+											title={emailPreviewMode
+												? 'Switch back to Edit to insert variables'
+												: variable.description}
 										>
 											{variable.label}
 										</button>
@@ -2459,7 +2513,12 @@
 			color 130ms ease;
 	}
 
-	.var-chip:hover {
+	.var-chip:disabled {
+		cursor: not-allowed;
+		opacity: 0.5;
+	}
+
+	.var-chip:hover:not(:disabled) {
 		color: var(--foreground);
 		background: color-mix(in srgb, var(--muted) 70%, transparent);
 		border-color: color-mix(in srgb, var(--border) 140%, transparent);

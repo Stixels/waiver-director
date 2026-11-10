@@ -1,6 +1,9 @@
 <script lang="ts">
 	import type { Id } from '$convex/_generated/dataModel';
+	import { ConvexError } from 'convex/values';
 	import { useConvexClient } from 'convex-svelte';
+	import { onMount, tick } from 'svelte';
+	import { invalidateAll } from '$app/navigation';
 	import { toast } from 'svelte-sonner';
 	import { api } from '$convex/_generated/api';
 	import SignaturePad from '$lib/components/waivers/SignaturePad.svelte';
@@ -15,6 +18,11 @@
 		waiverUnderlineInputClass,
 		waiverUnderlineTextareaClass
 	} from '$lib/components/waivers/waiver-public-form-classes';
+	import {
+		MAX_MINORS,
+		MAX_MINOR_NAME_LENGTH,
+		MIN_MINOR_NAME_LENGTH
+	} from '$lib/domain/waiver-constraints';
 	import type { WaiverField, WaiverMinor, WaiverTheme } from '$lib/domain/waivers';
 	import { getConvexErrorMessage } from '$lib/utils/convex-errors';
 	import { formatBookingTimestamp } from '$lib/utils/date';
@@ -61,13 +69,42 @@
 	let isSubmitting = $state(false);
 	let submitError = $state<string | null>(null);
 	let isSubmitted = $state(false);
+	let isResetting = $state(false);
+	// Latest selectable date of birth. Set on the client so it reflects the signer's local day.
+	let maxDateOfBirth = $state<string | undefined>(undefined);
+	let successHeading = $state<HTMLHeadingElement | null>(null);
+	let submitErrorElement = $state<HTMLParagraphElement | null>(null);
 
-	function addMinor() {
-		minors.push({ _uid: crypto.randomUUID(), fullName: '' });
+	const canAddMinor = $derived(minors.length < MAX_MINORS);
+
+	function localIsoDate(date: Date): string {
+		const year = date.getFullYear();
+		const month = String(date.getMonth() + 1).padStart(2, '0');
+		const day = String(date.getDate()).padStart(2, '0');
+		return `${year}-${month}-${day}`;
 	}
 
-	function removeMinor(index: number) {
+	onMount(() => {
+		maxDateOfBirth = localIsoDate(new Date());
+	});
+
+	async function addMinor() {
+		if (!canAddMinor) return;
+		const uid = crypto.randomUUID();
+		minors.push({ _uid: uid, fullName: '' });
+		await tick();
+		document.getElementById(`minor-name-${uid}`)?.focus();
+	}
+
+	async function removeMinor(index: number) {
 		minors.splice(index, 1);
+		// The focused Remove button is gone; keep keyboard users in the minors section.
+		await tick();
+		const nextMinor = minors[Math.min(index, minors.length - 1)];
+		const nextTarget = nextMinor
+			? document.getElementById(`minor-name-${nextMinor._uid}`)
+			: document.getElementById('add-minor-button');
+		nextTarget?.focus();
 	}
 
 	function setFieldAnswer(fieldId: string, value: string | boolean | null) {
@@ -85,6 +122,7 @@
 
 	async function handleSubmit(event: SubmitEvent) {
 		event.preventDefault();
+		if (isSubmitting) return;
 
 		if (convex.disabled) {
 			submitError = 'The waiver form is still loading. Please try again.';
@@ -93,12 +131,21 @@
 
 		if (!signatureDataUrl || !signatureDataUrl.startsWith('data:image/')) {
 			submitError = 'Please provide a signature.';
+			document
+				.getElementById('signature-pad')
+				?.scrollIntoView({ behavior: 'smooth', block: 'center' });
 			return;
 		}
 
 		isSubmitting = true;
 		submitError = null;
 		const minorsPayload = minors.map((minor) => ({ fullName: minor.fullName }));
+		// Only send answers for fields on the version being signed (drops answers left over
+		// from fields that disappeared after the form refreshed to a newer version).
+		const fieldIds = new Set(waiver.fields.map((field) => field.id));
+		const answersPayload = Object.fromEntries(
+			Object.entries(answers).filter(([fieldId]) => fieldIds.has(fieldId))
+		);
 
 		try {
 			await convex.mutation(api.waivers.submitPublicWaiver, {
@@ -110,17 +157,60 @@
 				signerDateOfBirth,
 				signatureDataUrl,
 				marketingConsent,
-				answers,
+				answers: answersPayload,
 				minors: minorsPayload
 			});
 
 			isSubmitted = true;
 			toast.success('Waiver submitted.');
+			await tick();
+			window.scrollTo({ top: 0 });
+			successHeading?.focus();
 		} catch (error) {
-			submitError = getConvexErrorMessage(error, 'Unable to submit this waiver.');
+			if (isStaleVersionError(error)) {
+				// Refresh to the newly published version in place so the signer keeps
+				// what they've already typed instead of reloading and starting over.
+				try {
+					await invalidateAll();
+					submitError = 'This waiver was just updated. Please review the form and submit again.';
+				} catch {
+					submitError = getConvexErrorMessage(error, 'Unable to submit this waiver.');
+				}
+			} else {
+				submitError = getConvexErrorMessage(error, 'Unable to submit this waiver.');
+			}
+			await tick();
+			submitErrorElement?.scrollIntoView({ behavior: 'smooth', block: 'center' });
 		} finally {
 			isSubmitting = false;
 		}
+	}
+
+	function isStaleVersionError(error: unknown): boolean {
+		return (
+			error instanceof ConvexError &&
+			typeof error.data === 'object' &&
+			error.data !== null &&
+			'code' in error.data &&
+			error.data.code === 'stale_version'
+		);
+	}
+
+	async function signAnother() {
+		if (isResetting) return;
+		isResetting = true;
+		try {
+			// Refresh the booking's signed count so the next signer sees current progress.
+			await invalidateAll();
+		} catch {
+			// Keep going with the existing data; the count is informational only.
+		} finally {
+			isResetting = false;
+		}
+		resetForm();
+		await tick();
+		window.scrollTo({ top: 0 });
+		document.getElementById('signer-name')?.focus();
 	}
 
 	function resetForm() {
@@ -168,17 +258,24 @@
 				<p class="mb-2 text-xs font-bold tracking-[0.2em] text-muted-foreground uppercase">
 					Submission received
 				</p>
-				<h1 class="mb-4 text-3xl font-bold tracking-tight">Waiver complete</h1>
+				<h1
+					bind:this={successHeading}
+					tabindex="-1"
+					class="mb-4 text-3xl font-bold tracking-tight focus:outline-none"
+				>
+					Waiver complete
+				</h1>
 				<p class="max-w-sm text-base leading-relaxed text-muted-foreground">
 					Thank you. Your signed waiver has been recorded for {waiver.workspaceName}.
 				</p>
 				{#if booking}
 					<button
 						type="button"
-						class="mt-8 h-12 bg-foreground px-8 text-sm font-semibold tracking-wide text-background transition-opacity hover:opacity-85"
-						onclick={resetForm}
+						class="mt-8 h-12 bg-foreground px-8 text-sm font-semibold tracking-wide text-background transition-opacity hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-40"
+						onclick={signAnother}
+						disabled={isResetting}
 					>
-						Sign another waiver
+						{isResetting ? 'Loading...' : 'Sign another waiver'}
 					</button>
 				{/if}
 			</div>
@@ -220,7 +317,9 @@
 									class={waiverUnderlineInputClass}
 									bind:value={signerName}
 									required
+									minlength={2}
 									maxlength={120}
+									autocomplete="name"
 								/>
 							</div>
 
@@ -232,6 +331,10 @@
 									class={waiverUnderlineInputClass}
 									bind:value={signerEmail}
 									required
+									maxlength={254}
+									autocomplete="email"
+									autocapitalize="off"
+									spellcheck={false}
 								/>
 							</div>
 
@@ -243,13 +346,25 @@
 									class={waiverUnderlineInputClass}
 									bind:value={signerDateOfBirth}
 									required
+									min="1900-01-01"
+									max={maxDateOfBirth}
+									autocomplete="bday"
 								/>
 							</div>
 						</div>
 
 						<WaiverPublicMinorsBlock>
 							{#snippet headerActions()}
-								<button type="button" class={waiverAddMinorButtonClass} onclick={addMinor}>
+								<button
+									id="add-minor-button"
+									type="button"
+									class={waiverAddMinorButtonClass}
+									onclick={addMinor}
+									disabled={!canAddMinor}
+									title={canAddMinor
+										? undefined
+										: `You can add up to ${MAX_MINORS} minors per waiver.`}
+								>
 									Add minor
 								</button>
 							{/snippet}
@@ -266,21 +381,26 @@
 													</p>
 													<button
 														type="button"
-														class="text-xs text-muted-foreground/60 hover:text-muted-foreground"
+														class="-my-2 -mr-2 min-h-11 px-2 text-xs text-muted-foreground hover:text-foreground"
+														aria-label={`Remove minor ${index + 1}`}
 														onclick={() => removeMinor(index)}
 													>
 														Remove
 													</button>
 												</div>
 
-												<label class={waiverFieldLabelClass} for={`minor-name-${index}`}>
+												<label class={waiverFieldLabelClass} for={`minor-name-${minor._uid}`}>
+													<span class="sr-only">Minor {index + 1}</span>
 													Full name
 												</label>
 												<input
-													id={`minor-name-${index}`}
+													id={`minor-name-${minor._uid}`}
 													class={waiverUnderlineInputClass}
 													bind:value={minor.fullName}
 													required
+													minlength={MIN_MINOR_NAME_LENGTH}
+													maxlength={MAX_MINOR_NAME_LENGTH}
+													autocomplete="off"
 												/>
 											</div>
 										{/each}
@@ -305,7 +425,7 @@
 										{#if field.type === 'text'}
 											<textarea
 												id={field.id}
-												class={waiverUnderlineTextareaClass}
+												class={`${waiverUnderlineTextareaClass} field-sizing-content max-h-64`}
 												rows={1}
 												value={currentStringAnswer(field.id)}
 												placeholder={field.placeholder ?? ''}
@@ -433,12 +553,16 @@
 							<div class="mb-7">
 								<h3 class="text-lg font-semibold tracking-tight">Signature</h3>
 							</div>
-							<SignaturePad bind:value={signatureDataUrl} canvasId="signature-pad" />
+							<SignaturePad
+								bind:value={signatureDataUrl}
+								canvasId="signature-pad"
+								disabled={isSubmitting}
+							/>
 						</div>
 					</WaiverPublicAboutSignerCard>
 
 					{#if submitError}
-						<p class="text-sm text-destructive">
+						<p bind:this={submitErrorElement} class="text-sm text-destructive" role="alert">
 							{submitError}
 						</p>
 					{/if}

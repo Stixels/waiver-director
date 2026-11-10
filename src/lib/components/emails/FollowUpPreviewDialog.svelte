@@ -53,7 +53,10 @@
 	const metaLabelClass =
 		'mb-1 flex items-center gap-1.5 text-[10px] font-semibold tracking-wide text-muted-foreground uppercase';
 
-	let rowLoading = $state<Id<'email_follow_ups'> | null>(null);
+	let rowLoading = $state<{
+		id: Id<'email_follow_ups'>;
+		action: 'send' | 'unschedule';
+	} | null>(null);
 
 	const followUpQuery = useProtectedQuery(
 		api.emails.getFollowUp,
@@ -71,10 +74,20 @@
 		() => ({ keepPreviousData: true })
 	);
 
-	const followUp = $derived((followUpQuery.data ?? null) as FollowUp | null);
+	// keepPreviousData keeps the last follow-up visible while the dialog closes, but
+	// when switching to a different follow-up, never show (or act on) the old one.
+	const followUp = $derived.by(() => {
+		const data = (followUpQuery.data ?? null) as FollowUp | null;
+		if (data && followUpId && data._id !== followUpId) return null;
+		return data;
+	});
 	const editorContent = $derived(editorContentQuery.data ?? null);
 	const senderSettings = $derived(senderSettingsQuery.data ?? null);
-	const isLoading = $derived(followUpQuery.isLoading && !followUp);
+	const isLoading = $derived(
+		!followUp &&
+			(followUpQuery.isLoading ||
+				Boolean(followUpId && followUpQuery.data && followUpQuery.data._id !== followUpId))
+	);
 	const workspaceCanSendEmail = $derived(Boolean(senderSettings?.canSendEmails));
 	const senderUnavailableMessage = $derived(
 		senderSettings?.platformFromEmail
@@ -179,7 +192,8 @@
 			return;
 		}
 
-		rowLoading = followUp._id;
+		if (rowLoading) return;
+		rowLoading = { id: followUp._id, action };
 		try {
 			if (action === 'send') {
 				await convex.mutation(api.emails.sendFollowUpNow, { followUpId: followUp._id });
@@ -340,9 +354,11 @@
 							variant="destructive"
 							size="sm"
 							onclick={() => handleRowAction('unschedule')}
-							disabled={rowLoading === followUp._id}
+							disabled={rowLoading?.id === followUp._id}
 						>
-							Unschedule follow-up
+							{rowLoading?.id === followUp._id && rowLoading.action === 'unschedule'
+								? 'Unscheduling...'
+								: 'Unschedule follow-up'}
 						</Button>
 					{:else}
 						<span></span>
@@ -352,9 +368,11 @@
 							<Button
 								size="sm"
 								onclick={() => handleRowAction('send')}
-								disabled={rowLoading === followUp._id || !workspaceCanSendEmail}
+								disabled={rowLoading?.id === followUp._id || !workspaceCanSendEmail}
 							>
-								{rowLoading === followUp._id ? 'Sending...' : 'Send now'}
+								{rowLoading?.id === followUp._id && rowLoading.action === 'send'
+									? 'Sending...'
+									: 'Send now'}
 							</Button>
 						</span>
 					</div>
