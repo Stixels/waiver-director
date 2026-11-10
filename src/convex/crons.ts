@@ -31,4 +31,11 @@ crons.interval(
 	{}
 );
 
+crons.interval(
+	'prune old webhook deliveries',
+	{ hours: 24 },
+	internal.webhooks.pruneOldWebhookDeliveriesCron,
+	{}
+);
+
 export default crons;

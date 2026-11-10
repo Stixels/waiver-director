@@ -43,6 +43,9 @@ flowchart LR
 | `email_follow_ups`       | Follow-up emails and their delivery status                     |
 | `booking_integrations`   | Booking provider connections                                   |
 | `marketing_integrations` | Mailchimp connections                                          |
+| `webhook_endpoints`      | Owner-configured outbound webhooks (encrypted signing secrets) |
+| `webhook_deliveries`     | Outbound webhook attempts, kept for 30 days                    |
+| `api_keys`               | Workspace API keys for the read API (SHA-256 hashes only)      |
 
 See `src/convex/schema.ts` for the full schema.
 
@@ -54,7 +57,10 @@ See `src/convex/schema.ts` for the full schema.
 | `/bookeo/webhook`        | Bookeo booking change notifications |
 | `/mailchimp/callback`    | Mailchimp OAuth callback            |
 | `/clerk/billing/webhook` | Clerk billing events                |
+| `/api/v1/*`              | Read-only public API (API key auth) |
 
 ## Scheduled jobs
 
-Daily cron jobs in `src/convex/crons.ts` prune expired connection sessions, old Bookeo webhook events, and old marketing contact sync records.
+Daily cron jobs in `src/convex/crons.ts` prune expired connection sessions, old Bookeo webhook events, old marketing contact sync records, and outbound webhook deliveries older than 30 days.
+
+The public API resolves the workspace from the API key alone; request parameters never select a workspace. Outbound webhooks are fanned out by a scheduled mutation after each submission and delivered by an internal action with retries.

@@ -1,0 +1,99 @@
+---
+title: 'Webhooks and API'
+description: 'Send signed events when waivers are signed, and read your data with an API key.'
+---
+
+Open **Settings → Developers** to manage webhooks and API keys. Only Owners can see or change these settings. Use them to connect Waiver Director to Zapier, Make, Google Sheets, a CRM, or your own server.
+
+<Frame caption="Settings → Developers with one active endpoint, one auto-disabled endpoint, and two API keys. Sample data.">
+	<img
+		src="/images/app/settings-developers.png"
+		alt="Developers settings page with a Webhooks section listing endpoints and recent deliveries, and an API keys section listing two keys"
+	/>
+</Frame>
+
+## Webhooks
+
+A webhook endpoint is an `https://` URL that receives a `POST` request each time something happens in your workspace.
+
+1. Paste your endpoint URL (for example, a Zapier **Catch Hook** URL) and select **Add endpoint**.
+2. Copy the **signing secret** that appears. It is shown only once. Use **Roll secret** to replace it later.
+3. Select **Send test** to send a `webhook.test` event and confirm your endpoint responds.
+
+Endpoints must use a public hostname on the default HTTPS port. Before every delivery we look up the hostname and refuse to send if it points at a private or internal address. Redirects are not followed.
+
+### Events
+
+| Event                | When it is sent            |
+| -------------------- | -------------------------- |
+| `submission.created` | A customer signs a waiver. |
+| `webhook.test`       | You select **Send test**.  |
+
+Each request body is JSON:
+
+```json
+{
+	"id": "evt_submission_created_…",
+	"object": "event",
+	"type": "submission.created",
+	"createdAt": "2026-11-08T17:04:12.000Z",
+	"workspace": { "id": "…", "slug": "river-tours" },
+	"data": {
+		"id": "…",
+		"object": "submission",
+		"submittedAt": "2026-11-08T17:04:11.000Z",
+		"signer": { "name": "Alex Rivera", "email": "alex@example.com", "dateOfBirth": "1990-04-12" },
+		"minors": [{ "name": "Sam Rivera" }],
+		"answers": [{ "fieldId": "…", "label": "Emergency contact", "type": "text", "value": "…" }],
+		"marketingConsent": false,
+		"customerId": "…",
+		"waiver": { "versionId": "…", "versionNumber": 3, "title": "Rafting waiver" },
+		"booking": null
+	}
+}
+```
+
+The drawn signature image is never included. Download the signed PDF from the app if you need it.
+
+### Verify the signature
+
+Every request includes a `Waiver-Director-Signature` header in the form `t=<unix seconds>,v1=<hex>`. To verify it, compute an HMAC-SHA256 of `<t>.<raw request body>` with your signing secret and compare it to `v1`. Reject requests whose timestamp is more than five minutes old.
+
+```js
+import { createHmac, timingSafeEqual } from 'node:crypto';
+
+function verify(rawBody, header, secret) {
+	const parts = Object.fromEntries(header.split(',').map((part) => part.split('=')));
+	const expected = createHmac('sha256', secret).update(`${parts.t}.${rawBody}`).digest('hex');
+	const fresh = Math.abs(Date.now() / 1000 - Number(parts.t)) < 300;
+	return fresh && timingSafeEqual(Buffer.from(expected), Buffer.from(parts.v1));
+}
+```
+
+Requests also include `Waiver-Director-Event` (the event type) and `Waiver-Director-Delivery` (a unique delivery id). The event `id` stays the same if an event is resent, so use it to ignore duplicates.
+
+### Retries
+
+Respond with any `2xx` status within 10 seconds. Otherwise the delivery is retried up to five more times over about 11 hours. Open **Recent deliveries** on an endpoint to see the last 30 days of attempts and resend an event. If 15 events in a row fail, the endpoint is disabled automatically; select **Enable** after you fix it.
+
+## API keys
+
+API keys give read-only access to one workspace. Create a key under **API keys**, copy it (it is shown only once), and send it as a Bearer token:
+
+```bash
+curl https://<your-api-base-url>/api/v1/submissions \
+  -H "Authorization: Bearer wd_live_…"
+```
+
+The base URL is shown next to your keys in **Settings → Developers**. Revoke a key at any time; integrations using it stop working immediately.
+
+| Endpoint                      | Returns                                                 |
+| ----------------------------- | ------------------------------------------------------- |
+| `GET /api/v1/workspace`       | The workspace the key belongs to. Useful to test a key. |
+| `GET /api/v1/submissions`     | Signed waivers, newest first.                           |
+| `GET /api/v1/submissions/:id` | One signed waiver.                                      |
+| `GET /api/v1/customers`       | Customers, newest first.                                |
+
+Each key can make up to 120 requests per minute. Past that, requests get a `429` response with a `Retry-After` header saying how many seconds to wait.
+
+List endpoints accept `limit` (1 to 100, default 25) and `cursor`. Responses look like `{ "data": [...], "hasMore": true, "nextCursor": "…" }`; pass `nextCursor` as `cursor` to get the next page. Errors look like `{ "error": { "code": "unauthenticated", "message": "…" } }`.

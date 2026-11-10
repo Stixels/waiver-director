@@ -3,6 +3,12 @@ import { v } from 'convex/values';
 import { billingFeatureValidator } from './lib/billing';
 import { bookingProviderValidator, bookingSnapshotValidator } from './lib/bookings';
 import { marketingIntegrationStatusValidator, marketingProviderValidator } from './lib/marketing';
+import {
+	webhookDeliveryEventTypeValidator,
+	webhookDeliveryStatusValidator,
+	webhookEndpointStatusValidator,
+	webhookEventTypeValidator
+} from './lib/webhookValidators';
 
 export default defineSchema({
 	users: defineTable({
@@ -459,6 +465,67 @@ export default defineSchema({
 			searchField: 'searchText',
 			filterFields: ['workspaceId']
 		}),
+
+	// Owner-configured outbound webhook endpoints. Signing secrets are stored encrypted.
+	webhook_endpoints: defineTable({
+		workspaceId: v.id('workspaces'),
+		url: v.string(),
+		description: v.optional(v.string()),
+		eventTypes: v.array(webhookEventTypeValidator),
+		encryptedSigningSecret: v.string(),
+		signingSecretHint: v.string(),
+		status: webhookEndpointStatusValidator,
+		disabledReason: v.optional(v.string()),
+		consecutiveFailures: v.number(),
+		lastDeliveryAt: v.optional(v.number()),
+		lastDeliveryOk: v.optional(v.boolean()),
+		createdByUserId: v.id('users'),
+		createdAt: v.number(),
+		updatedAt: v.number()
+	}).index('by_workspaceId', ['workspaceId']),
+
+	webhook_deliveries: defineTable({
+		workspaceId: v.id('workspaces'),
+		endpointId: v.id('webhook_endpoints'),
+		eventId: v.string(),
+		eventType: webhookDeliveryEventTypeValidator,
+		payload: v.string(),
+		status: webhookDeliveryStatusValidator,
+		attempts: v.number(),
+		nextAttemptAt: v.optional(v.number()),
+		lastAttemptAt: v.optional(v.number()),
+		lastResponseStatus: v.optional(v.number()),
+		lastError: v.optional(v.string()),
+		createdAt: v.number(),
+		updatedAt: v.number()
+	})
+		.index('by_workspaceId', ['workspaceId'])
+		.index('by_endpointId_and_createdAt', ['endpointId', 'createdAt'])
+		.index('by_createdAt', ['createdAt']),
+
+	// Workspace-scoped API keys for the read-only public API. Only a SHA-256 hash is stored.
+	api_keys: defineTable({
+		workspaceId: v.id('workspaces'),
+		name: v.string(),
+		keyHash: v.string(),
+		keyPrefix: v.string(),
+		createdByUserId: v.id('users'),
+		createdAt: v.number(),
+		lastUsedAt: v.optional(v.number())
+	})
+		.index('by_workspaceId', ['workspaceId'])
+		.index('by_keyHash', ['keyHash']),
+
+	// Fixed-window request counters for the public API, one row per key. Kept apart from api_keys
+	// because it is written on every request.
+	api_rate_limits: defineTable({
+		workspaceId: v.id('workspaces'),
+		apiKeyId: v.id('api_keys'),
+		windowStartedAt: v.number(),
+		requestCount: v.number()
+	})
+		.index('by_workspaceId', ['workspaceId'])
+		.index('by_apiKeyId', ['apiKeyId']),
 
 	booking_webhook_events: defineTable({
 		workspaceId: v.id('workspaces'),

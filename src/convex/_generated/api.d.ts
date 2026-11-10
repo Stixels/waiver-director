@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as apiKeys from "../apiKeys.js";
 import type * as app from "../app.js";
 import type * as billing from "../billing.js";
 import type * as bookings from "../bookings.js";
@@ -25,15 +26,21 @@ import type * as lib_bookings from "../lib/bookings.js";
 import type * as lib_customers from "../lib/customers.js";
 import type * as lib_emailAIRateLimit from "../lib/emailAIRateLimit.js";
 import type * as lib_marketing from "../lib/marketing.js";
+import type * as lib_publicApi from "../lib/publicApi.js";
+import type * as lib_secretBox from "../lib/secretBox.js";
 import type * as lib_submissions from "../lib/submissions.js";
 import type * as lib_waivers from "../lib/waivers.js";
+import type * as lib_webhookValidators from "../lib/webhookValidators.js";
+import type * as lib_webhooks from "../lib/webhooks.js";
 import type * as lib_workspaceHandles from "../lib/workspaceHandles.js";
 import type * as lib_workspaces from "../lib/workspaces.js";
 import type * as mailchimp from "../mailchimp.js";
 import type * as marketingIntegrations from "../marketingIntegrations.js";
+import type * as publicApi from "../publicApi.js";
 import type * as search from "../search.js";
 import type * as users from "../users.js";
 import type * as waivers from "../waivers.js";
+import type * as webhooks from "../webhooks.js";
 import type * as workspaces from "../workspaces.js";
 
 import type {
@@ -43,6 +50,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  apiKeys: typeof apiKeys;
   app: typeof app;
   billing: typeof billing;
   bookings: typeof bookings;
@@ -60,15 +68,21 @@ declare const fullApi: ApiFromModules<{
   "lib/customers": typeof lib_customers;
   "lib/emailAIRateLimit": typeof lib_emailAIRateLimit;
   "lib/marketing": typeof lib_marketing;
+  "lib/publicApi": typeof lib_publicApi;
+  "lib/secretBox": typeof lib_secretBox;
   "lib/submissions": typeof lib_submissions;
   "lib/waivers": typeof lib_waivers;
+  "lib/webhookValidators": typeof lib_webhookValidators;
+  "lib/webhooks": typeof lib_webhooks;
   "lib/workspaceHandles": typeof lib_workspaceHandles;
   "lib/workspaces": typeof lib_workspaces;
   mailchimp: typeof mailchimp;
   marketingIntegrations: typeof marketingIntegrations;
+  publicApi: typeof publicApi;
   search: typeof search;
   users: typeof users;
   waivers: typeof waivers;
+  webhooks: typeof webhooks;
   workspaces: typeof workspaces;
 }>;
 
