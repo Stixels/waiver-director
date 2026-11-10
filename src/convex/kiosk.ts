@@ -4,7 +4,7 @@ import { internal } from './_generated/api';
 import type { Doc, Id } from './_generated/dataModel';
 import { workspaceHasBillingFeature } from './lib/billing';
 import { nextFixedWindowUsage } from './lib/emailAIRateLimit';
-import { requireWorkspaceMember, requireWorkspaceOwner } from './lib/waivers';
+import { requireWorkspaceMember } from './lib/waivers';
 import {
 	KIOSK_DEVICE_LOOKUP_LIMIT,
 	KIOSK_DEVICE_LOOKUP_WINDOW_MS,
@@ -25,7 +25,6 @@ const RATE_LIMIT_RETENTION_MS = 24 * 60 * 60 * 1000;
 const RATE_LIMIT_PRUNE_BATCH_SIZE = 200;
 const MAX_KIOSK_DEVICE_TOKEN_LENGTH = 200;
 const DEVICE_LAST_USED_WRITE_INTERVAL_MS = 60 * 60 * 1000;
-const MAX_DEVICES_REVOKED_PER_CALL = 500;
 
 const kioskLookupResultValue = v.object({
 	lookupToken: v.string(),
@@ -249,27 +248,6 @@ export const createKioskDevice = mutation({
 			createdAt: Date.now()
 		});
 		return { token };
-	}
-});
-
-/** Owner-only: turns off booking lookup on every kiosk device link made so far. */
-export const revokeKioskDevices = mutation({
-	args: { workspaceId: v.id('workspaces') },
-	returns: v.object({ revokedCount: v.number() }),
-	handler: async (ctx, args) => {
-		await requireWorkspaceOwner(ctx, args.workspaceId, 'reset kiosk links');
-		const devices = await ctx.db
-			.query('kiosk_devices')
-			.withIndex('by_workspaceId', (q) => q.eq('workspaceId', args.workspaceId))
-			.take(MAX_DEVICES_REVOKED_PER_CALL);
-		const now = Date.now();
-		let revokedCount = 0;
-		for (const device of devices) {
-			if (device.revokedAt !== undefined) continue;
-			await ctx.db.patch(device._id, { revokedAt: now });
-			revokedCount += 1;
-		}
-		return { revokedCount };
 	}
 });
 

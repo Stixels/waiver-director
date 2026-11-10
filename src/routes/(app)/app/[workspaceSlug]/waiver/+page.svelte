@@ -464,22 +464,6 @@
 		}
 	}
 
-	async function resetKioskLinks() {
-		if (convex.disabled || !currentWorkspace) return;
-		try {
-			const { revokedCount } = await convex.mutation(api.kiosk.revokeKioskDevices, {
-				workspaceId: currentWorkspace.workspaceId
-			});
-			toast.success(
-				revokedCount === 1
-					? 'Booking lookup is off on 1 kiosk. Open kiosk mode again on that tablet.'
-					: `Booking lookup is off on ${revokedCount} kiosks. Open kiosk mode again on each tablet.`
-			);
-		} catch (error) {
-			toast.error(getConvexErrorMessage(error, 'Unable to reset kiosk links.'));
-		}
-	}
-
 	async function copyText(key: string, text: string) {
 		try {
 			copyingKey = key;
@@ -760,11 +744,6 @@
 						</DropdownMenuTrigger>
 						<DropdownMenuContent align="end" class="w-56">
 							<DropdownMenuItem onclick={openVersionHistory}>Version history</DropdownMenuItem>
-							{#if activePublicHref}
-								{#if currentWorkspace?.role === 'owner'}
-									<DropdownMenuItem onclick={resetKioskLinks}>Reset kiosk links</DropdownMenuItem>
-								{/if}
-							{/if}
 						</DropdownMenuContent>
 					</DropdownMenu>
 				{/if}
