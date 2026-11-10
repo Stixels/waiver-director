@@ -17,6 +17,7 @@
 		type SaveState
 	} from '$lib/components/waivers/WaiverBuilderCanvas.svelte';
 	import WaiverBuilderPanel from '$lib/components/waivers/WaiverBuilderPanel.svelte';
+	import WaiverTemplateDialog from '$lib/components/waivers/WaiverTemplateDialog.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import {
@@ -39,6 +40,11 @@
 		normalizeDefinitionForCompare,
 		type WaiverDefinition
 	} from '$lib/domain/waivers';
+	import {
+		buildDefinitionFromTemplate,
+		draftHasContent,
+		type WaiverTemplate
+	} from '$lib/domain/waiver-templates';
 	import { getConvexErrorMessage } from '$lib/utils/convex-errors';
 	import { billingUpgradeHref } from '$lib/utils/billing';
 	import EllipsisIcon from '@lucide/svelte/icons/ellipsis';
@@ -77,6 +83,7 @@
 	let copyingKey = $state<string | null>(null);
 	let copiedKey = $state<string | null>(null);
 	let qrDialogOpen = $state(false);
+	let templateDialogOpen = $state(false);
 
 	// Inline title editing (header pencil)
 	let isEditingTitle = $state(false);
@@ -374,6 +381,23 @@
 		}
 	}
 
+	function openTemplateDialog() {
+		if (!draft) return;
+		templateDialogOpen = true;
+	}
+
+	function applyTemplate(template: WaiverTemplate) {
+		if (!draft) return;
+		cancelTitleEdit();
+		draft = buildDefinitionFromTemplate(template, {
+			businessName: currentWorkspace?.name,
+			theme: draft.theme
+		});
+		toast.success(`${template.name} template applied`, {
+			description: 'It is not legal advice. Have a lawyer review it before you publish.'
+		});
+	}
+
 	function openVersionHistory() {
 		versionHistoryOpen = true;
 	}
@@ -465,6 +489,12 @@
 		workspaceId={currentWorkspace.workspaceId}
 	/>
 {/if}
+
+<WaiverTemplateDialog
+	bind:open={templateDialogOpen}
+	replacesContent={draftHasContent(draft)}
+	onApply={applyTemplate}
+/>
 
 {#if activePublicUrl}
 	<QrCodeDialog
@@ -641,6 +671,9 @@
 							{/snippet}
 						</DropdownMenuTrigger>
 						<DropdownMenuContent align="end" class="w-56">
+							<DropdownMenuItem onclick={openTemplateDialog}>
+								Start from a template
+							</DropdownMenuItem>
 							<DropdownMenuItem onclick={openVersionHistory}>Version history</DropdownMenuItem>
 						</DropdownMenuContent>
 					</DropdownMenu>
@@ -862,7 +895,7 @@
 						</div>
 
 						<div class="min-h-0 flex-1 overflow-hidden">
-							<WaiverBuilderPanel bind:draft />
+							<WaiverBuilderPanel bind:draft onStartFromTemplate={openTemplateDialog} />
 						</div>
 					</div>
 				</aside>
