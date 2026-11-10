@@ -13,6 +13,12 @@
 	import ConfirmDialog from '$lib/components/ui/ConfirmDialog.svelte';
 	import QrCodeDialog from '$lib/components/waivers/QrCodeDialog.svelte';
 	import WaiverVersionHistorySheet from '$lib/components/waivers/WaiverVersionHistorySheet.svelte';
+	import WaiverTranslationsSheet from '$lib/components/waivers/WaiverTranslationsSheet.svelte';
+	import {
+		WAIVER_LOCALE_ENGLISH_NAMES,
+		waiverSourceFingerprint,
+		waiverTranslationStatus
+	} from '$lib/domain/waiver-i18n';
 	import WaiverBuilderCanvas, {
 		type SaveState
 	} from '$lib/components/waivers/WaiverBuilderCanvas.svelte';
@@ -74,6 +80,7 @@
 	let baselineDraft = $state<WaiverDefinition | null>(null);
 	let hydratedWaiverId = $state<WorkspaceWaiverSummary['waiverId'] | null>(null);
 	let versionHistoryOpen = $state(false);
+	let translationsOpen = $state(false);
 	let copyingKey = $state<string | null>(null);
 	let copiedKey = $state<string | null>(null);
 	let qrDialogOpen = $state(false);
@@ -361,13 +368,25 @@
 		openConfirm('publish');
 	}
 
+	// Languages that will not be offered on the next published version.
+	const languagesLeftOut = $derived.by(() => {
+		if (!workspaceWaiver) return [];
+		const fingerprint = waiverSourceFingerprint(workspaceWaiver);
+		return workspaceWaiver.translations
+			.filter((translation) => waiverTranslationStatus(translation, fingerprint) !== 'ready')
+			.map((translation) => WAIVER_LOCALE_ENGLISH_NAMES[translation.locale]);
+	});
+
 	function confirmConfig(kind: ConfirmKind) {
 		switch (kind) {
 			case 'publish':
 				return {
 					title: 'Publish this waiver?',
 					description:
-						'This creates a new published version and makes it the live waiver guests will sign.',
+						'This creates a new published version and makes it the live waiver guests will sign.' +
+						(languagesLeftOut.length > 0
+							? ` ${languagesLeftOut.join(', ')} won't be offered to guests until ${languagesLeftOut.length === 1 ? 'its translation is' : 'those translations are'} updated in Languages.`
+							: ''),
 					confirmLabel: 'Publish waiver',
 					destructive: false
 				};
@@ -463,6 +482,20 @@
 	<WaiverVersionHistorySheet
 		bind:open={versionHistoryOpen}
 		workspaceId={currentWorkspace.workspaceId}
+	/>
+{/if}
+
+{#if currentWorkspace && workspaceWaiver}
+	<WaiverTranslationsSheet
+		bind:open={translationsOpen}
+		workspaceId={currentWorkspace.workspaceId}
+		waiverId={workspaceWaiver.waiverId}
+		workspaceName={currentWorkspace.name}
+		title={workspaceWaiver.title}
+		introCopy={workspaceWaiver.introCopy}
+		fields={workspaceWaiver.fields}
+		defaultLocale={workspaceWaiver.defaultLocale}
+		translations={workspaceWaiver.translations}
 	/>
 {/if}
 
@@ -641,6 +674,9 @@
 							{/snippet}
 						</DropdownMenuTrigger>
 						<DropdownMenuContent align="end" class="w-56">
+							<DropdownMenuItem onclick={() => (translationsOpen = true)}
+								>Languages</DropdownMenuItem
+							>
 							<DropdownMenuItem onclick={openVersionHistory}>Version history</DropdownMenuItem>
 						</DropdownMenuContent>
 					</DropdownMenu>

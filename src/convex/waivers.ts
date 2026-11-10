@@ -24,6 +24,22 @@ import {
 	waiverDefinitionValidator,
 	waiverThemeValidator
 } from './lib/waivers';
+import {
+	localizeWaiver,
+	normalizeWaiverTranslations,
+	resolveSignedLocale,
+	waiverLocaleValidator,
+	waiverTranslationsKey,
+	waiverTranslationValidator
+} from './lib/waiverTranslations';
+import {
+	DEFAULT_WAIVER_LOCALE,
+	localizedMarketingConsentLabel,
+	waiverSourceFingerprint,
+	waiverTranslationStatus,
+	type WaiverLocale,
+	type WaiverTranslation
+} from '../lib/domain/waiver-i18n';
 
 type FunctionCtx = QueryCtx | MutationCtx;
 
@@ -34,6 +50,8 @@ const workspaceWaiverValue = v.object({
 	introCopy: v.string(),
 	theme: waiverThemeValidator,
 	fields: v.array(waiverFieldValidator),
+	defaultLocale: waiverLocaleValidator,
+	translations: v.array(waiverTranslationValidator),
 	publishedVersionId: v.union(v.id('waiver_versions'), v.null()),
 	hasUnpublishedChanges: v.boolean()
 });
@@ -45,6 +63,8 @@ const waiverVersionPreviewValue = v.object({
 	introCopy: v.string(),
 	theme: waiverThemeValidator,
 	fields: v.array(waiverFieldValidator),
+	defaultLocale: waiverLocaleValidator,
+	translations: v.array(waiverTranslationValidator),
 	workspaceName: v.string(),
 	publishedAt: v.number(),
 	isActivePublic: v.boolean()
@@ -59,6 +79,8 @@ const publicWaiverValue = v.object({
 	introCopy: v.string(),
 	theme: waiverThemeValidator,
 	fields: v.array(waiverFieldValidator),
+	defaultLocale: waiverLocaleValidator,
+	translations: v.array(waiverTranslationValidator),
 	marketingOptIn: v.union(
 		v.null(),
 		v.object({ provider: v.literal('mailchimp'), label: v.string() })
@@ -74,6 +96,8 @@ const publicBookingWaiverValue = v.object({
 	introCopy: v.string(),
 	theme: waiverThemeValidator,
 	fields: v.array(waiverFieldValidator),
+	defaultLocale: waiverLocaleValidator,
+	translations: v.array(waiverTranslationValidator),
 	marketingOptIn: v.union(
 		v.null(),
 		v.object({ provider: v.literal('mailchimp'), label: v.string() })
@@ -117,7 +141,7 @@ async function waiverHasUnpublishedChanges(ctx: FunctionCtx, waiver: Doc<'worksp
 		return true;
 	}
 
-	return !waiverDefinitionsEqual(
+	const definitionChanged = !waiverDefinitionsEqual(
 		{
 			title: waiver.title,
 			introCopy: waiver.introCopy,
@@ -131,6 +155,42 @@ async function waiverHasUnpublishedChanges(ctx: FunctionCtx, waiver: Doc<'worksp
 			fields: version.fields
 		}
 	);
+	if (definitionChanged) return true;
+
+	// Translations are compared after the same cleanup publishing applies, so stale
+	// entries for deleted fields do not count as unpublished changes.
+	const defaultLocale = waiver.defaultLocale ?? DEFAULT_WAIVER_LOCALE;
+	return (
+		waiverTranslationsKey(defaultLocale, publishableTranslations(defaultLocale, waiver)) !==
+		waiverTranslationsKey(version.defaultLocale, version.translations)
+	);
+}
+
+/**
+ * Translations that go into a published version: cleaned against the current fields,
+ * and only those whose waiver text is translated and up to date with the primary text.
+ */
+function publishableTranslations(
+	defaultLocale: WaiverLocale,
+	waiver: Pick<Doc<'workspace_waivers'>, 'title' | 'introCopy' | 'fields' | 'translations'>
+): WaiverTranslation[] {
+	const fingerprint = waiverSourceFingerprint(waiver);
+	return normalizeWaiverTranslations(
+		defaultLocale,
+		waiver.fields,
+		(waiver.translations ?? []).filter(
+			(translation) =>
+				translation.locale !== defaultLocale &&
+				waiverTranslationStatus(translation, fingerprint) === 'ready'
+		)
+	);
+}
+
+function sanitizedTranslations(translations: WaiverTranslation[] | undefined) {
+	return (translations ?? []).map((translation) => ({
+		...translation,
+		introCopy: sanitizeRichTextHtml(translation.introCopy)
+	}));
 }
 
 async function workspaceWaiverSummary(ctx: FunctionCtx, waiver: Doc<'workspace_waivers'>) {
@@ -143,6 +203,8 @@ async function workspaceWaiverSummary(ctx: FunctionCtx, waiver: Doc<'workspace_w
 		introCopy: waiver.introCopy,
 		theme: waiver.theme ?? 'dark',
 		fields: waiver.fields,
+		defaultLocale: waiver.defaultLocale ?? DEFAULT_WAIVER_LOCALE,
+		translations: waiver.translations ?? [],
 		publishedVersionId: waiver.publishedVersionId ?? null,
 		hasUnpublishedChanges
 	};
@@ -199,6 +261,40 @@ export const updateWorkspaceWaiver = mutation({
 	}
 });
 
+export const updateWaiverTranslations = mutation({
+	args: {
+		workspaceId: v.id('workspaces'),
+		waiverId: v.id('workspace_waivers'),
+		defaultLocale: waiverLocaleValidator,
+		translations: v.array(waiverTranslationValidator)
+	},
+	returns: v.object({
+		waiverId: v.id('workspace_waivers')
+	}),
+	handler: async (ctx, args) => {
+		await requireWorkspaceMember(ctx, args.workspaceId);
+
+		const waiver = assertWorkspaceRecord(
+			await ctx.db.get(args.waiverId),
+			args.workspaceId,
+			'Workspace waiver not found.'
+		);
+
+		const translations = normalizeWaiverTranslations(
+			args.defaultLocale,
+			waiver.fields,
+			args.translations
+		);
+
+		await ctx.db.patch(waiver._id, {
+			defaultLocale: args.defaultLocale,
+			translations
+		});
+
+		return { waiverId: waiver._id };
+	}
+});
+
 export const publishWorkspaceWaiver = mutation({
 	args: {
 		workspaceId: v.id('workspaces'),
@@ -238,6 +334,8 @@ export const publishWorkspaceWaiver = mutation({
 			introCopy: definition.introCopy,
 			theme: definition.theme ?? 'dark',
 			fields: definition.fields,
+			defaultLocale: waiver.defaultLocale ?? DEFAULT_WAIVER_LOCALE,
+			translations: publishableTranslations(waiver.defaultLocale ?? DEFAULT_WAIVER_LOCALE, waiver),
 			publishedAt: Date.now()
 		});
 
@@ -288,6 +386,8 @@ export const listWaiverVersions = query({
 			introCopy: version.introCopy,
 			theme: version.theme ?? 'dark',
 			fields: version.fields,
+			defaultLocale: version.defaultLocale ?? DEFAULT_WAIVER_LOCALE,
+			translations: version.translations ?? [],
 			workspaceName: workspace.name,
 			publishedAt: version.publishedAt,
 			isActivePublic: waiver.publishedVersionId === version._id
@@ -318,7 +418,8 @@ export const getSubmission = query({
 			minors: v.array(v.string()),
 			booking: v.union(v.null(), bookingSnapshotValidator),
 			marketingConsent: v.boolean(),
-			marketingConsentLabel: v.union(v.string(), v.null())
+			marketingConsentLabel: v.union(v.string(), v.null()),
+			signedLocale: waiverLocaleValidator
 		})
 	),
 	handler: async (ctx, args) => {
@@ -344,6 +445,7 @@ export const getSubmission = query({
 			.query('email_follow_ups')
 			.withIndex('by_submissionId', (q) => q.eq('submissionId', submission._id))
 			.first();
+		const signedLocale = submission.signedLocale ?? version.defaultLocale ?? DEFAULT_WAIVER_LOCALE;
 
 		if (followUp && followUp.workspaceId !== args.workspaceId) {
 			throw new ConvexError({
@@ -367,16 +469,22 @@ export const getSubmission = query({
 			answers: submission.answers,
 			submittedAt: submission.submittedAt,
 			workspaceName: workspace.name,
-			waiver: {
-				title: version.title,
-				introCopy: version.introCopy,
-				theme: version.theme ?? 'dark',
-				fields: version.fields
-			},
+			// The document exactly as the signer read it, in the language they signed.
+			waiver: localizeWaiver(
+				{
+					title: version.title,
+					introCopy: version.introCopy,
+					theme: version.theme ?? 'dark',
+					fields: version.fields
+				},
+				version.translations,
+				signedLocale
+			),
 			minors: submission.minors.map((participant) => participant.fullName),
 			booking: submission.bookingSnapshot ?? null,
 			marketingConsent: submission.marketingConsent ?? false,
-			marketingConsentLabel: submission.marketingConsentLabel ?? null
+			marketingConsentLabel: submission.marketingConsentLabel ?? null,
+			signedLocale
 		};
 	}
 });
@@ -486,6 +594,8 @@ export const getPublicWaiverBySlug = query({
 			introCopy: sanitizeRichTextHtml(version.introCopy),
 			theme: version.theme ?? 'dark',
 			fields: version.fields,
+			defaultLocale: version.defaultLocale ?? DEFAULT_WAIVER_LOCALE,
+			translations: sanitizedTranslations(version.translations),
 			marketingOptIn:
 				marketingIntegration?.status === 'connected' && marketingIntegration.audienceId
 					? { provider: 'mailchimp' as const, label: marketingConsentLabel(workspace.name) }
@@ -549,6 +659,8 @@ export const getPublicWaiverForBooking = query({
 			introCopy: sanitizeRichTextHtml(version.introCopy),
 			theme: version.theme ?? 'dark',
 			fields: version.fields,
+			defaultLocale: version.defaultLocale ?? DEFAULT_WAIVER_LOCALE,
+			translations: sanitizedTranslations(version.translations),
 			marketingOptIn:
 				marketingIntegration?.status === 'connected' && marketingIntegration.audienceId
 					? { provider: 'mailchimp' as const, label: marketingConsentLabel(workspace.name) }
@@ -577,7 +689,8 @@ export const submitPublicWaiver = mutation({
 		signatureDataUrl: v.string(),
 		marketingConsent: v.optional(v.boolean()),
 		answers: v.record(v.string(), waiverAnswerValueValidator),
-		minors: v.array(minorInputValidator)
+		minors: v.array(minorInputValidator),
+		locale: v.optional(v.string())
 	},
 	returns: v.object({
 		submissionId: v.id('waiver_submissions')
@@ -652,6 +765,7 @@ export const submitPublicWaiver = mutation({
 			});
 		}
 
+		const signedLocale = resolveSignedLocale(version, args.locale);
 		validateSubmissionAnswers(version, args.answers);
 		const minors = validateMinors(args.minors);
 		const marketingIntegration = await ctx.db
@@ -664,7 +778,9 @@ export const submitPublicWaiver = mutation({
 			marketingIntegration?.status === 'connected' && marketingIntegration.audienceId
 		);
 		const marketingConsent = marketingEnabled && args.marketingConsent === true;
-		const consentLabel = marketingEnabled ? marketingConsentLabel(workspace.name) : null;
+		const consentLabel = marketingEnabled
+			? localizedMarketingConsentLabel(signedLocale, workspace.name)
+			: null;
 		let booking: Doc<'bookings'> | null = null;
 		const bookingLookupToken = args.bookingLookupToken;
 		if (bookingLookupToken) {
@@ -704,6 +820,7 @@ export const submitPublicWaiver = mutation({
 			status: 'submitted',
 			marketingConsent,
 			...(consentLabel ? { marketingConsentLabel: consentLabel } : {}),
+			signedLocale,
 			submittedAt
 		});
 		const customerId = await upsertSignerCustomer(ctx, {

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { WAIVER_LOCALE_ENGLISH_NAMES } from '$lib/domain/waiver-i18n';
 	import { resolve } from '$app/paths';
 	import type { FunctionReturnType } from 'convex/server';
 	import { api } from '$convex/_generated/api';
@@ -162,6 +163,12 @@
 						<p class="min-w-0 truncate text-xs font-medium text-foreground tabular-nums">
 							{formatTimestamp(submission.submittedAt)}
 						</p>
+						<p
+							class="shrink-0 text-[11px] text-muted-foreground"
+							title="Language the guest read and signed in"
+						>
+							in {WAIVER_LOCALE_ENGLISH_NAMES[submission.signedLocale]}
+						</p>
 					</div>
 
 					{#if submission.customerId}
@@ -272,7 +279,7 @@
 				</div>
 			</DialogHeader>
 
-			<div class="min-h-0 flex-1 overflow-y-auto bg-muted/20">
+			<div class="min-h-0 flex-1 overflow-y-auto bg-muted/20" lang={submission.signedLocale}>
 				<WaiverReadonlyDocument
 					workspaceName={submission.workspaceName}
 					introCopy={submission.waiver.introCopy}

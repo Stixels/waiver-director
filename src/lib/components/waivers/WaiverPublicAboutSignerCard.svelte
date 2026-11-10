@@ -4,14 +4,15 @@
 
 	interface Props {
 		children: Snippet;
+		heading?: string;
 	}
 
-	let { children }: Props = $props();
+	let { children, heading = 'Signer details' }: Props = $props();
 </script>
 
 <section class={waiverSectionCardClass}>
 	<div class="mb-8">
-		<h2 class="text-lg font-semibold tracking-tight">Signer details</h2>
+		<h2 class="text-lg font-semibold tracking-tight">{heading}</h2>
 	</div>
 
 	{@render children()}
