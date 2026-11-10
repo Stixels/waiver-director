@@ -673,3 +673,53 @@ export const currentWorkspaceMembership = query({
 		};
 	}
 });
+
+// Dev/support repair: recreates the default (unpublished) waiver for a workspace whose
+// workspace_waivers row is missing. Internal only; run with
+// `npx convex run workspaces:repairMissingWorkspaceWaiver '{"workspaceSlug":"..."}'`.
+export const repairMissingWorkspaceWaiver = internalMutation({
+	args: { workspaceSlug: v.string() },
+	returns: v.object({
+		status: v.union(v.literal('created'), v.literal('already_exists')),
+		waiverId: v.id('workspace_waivers')
+	}),
+	handler: async (ctx, args) => {
+		const workspace = await ctx.db
+			.query('workspaces')
+			.withIndex('by_slug', (q) => q.eq('slug', args.workspaceSlug))
+			.unique();
+		if (!workspace) {
+			throw new ConvexError({ code: 'not_found', message: 'Workspace not found.' });
+		}
+
+		const existing = await ctx.db
+			.query('workspace_waivers')
+			.withIndex('by_workspaceId', (q) => q.eq('workspaceId', workspace._id))
+			.unique();
+		if (existing) {
+			return { status: 'already_exists' as const, waiverId: existing._id };
+		}
+
+		const baseSlug = createDefaultPublicWaiverSlug(workspace.slug);
+		let publicSlug = baseSlug;
+		for (let attempt = 2; attempt <= 20; attempt += 1) {
+			const taken = await ctx.db
+				.query('workspace_waivers')
+				.withIndex('by_publicSlug', (q) => q.eq('publicSlug', publicSlug))
+				.unique();
+			if (!taken) break;
+			publicSlug = `${baseSlug.slice(0, 60)}-${attempt}`;
+		}
+
+		const definition = createDefaultWaiverDefinition(workspace.name);
+		const waiverId = await ctx.db.insert('workspace_waivers', {
+			workspaceId: workspace._id,
+			publicSlug,
+			title: definition.title,
+			introCopy: definition.introCopy,
+			theme: definition.theme ?? 'dark',
+			fields: definition.fields
+		});
+		return { status: 'created' as const, waiverId };
+	}
+});
