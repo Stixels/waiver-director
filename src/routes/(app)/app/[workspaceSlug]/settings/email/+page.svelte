@@ -5,11 +5,21 @@
 	import { api } from '$convex/_generated/api';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import EmailIdentityCard from '$lib/components/emails/EmailIdentityCard.svelte';
+	import SignedCopyEmailSetting from '$lib/components/emails/SignedCopyEmailSetting.svelte';
+	import { billingUpgradeHref } from '$lib/utils/billing';
 	import SettingsSection from '$lib/components/settings/SettingsSection.svelte';
 
 	const appContext = useAppContext();
 	const currentWorkspace = $derived(
 		appContext.workspaces.find((w) => w.slug === page.params.workspaceSlug) ?? null
+	);
+
+	const canExportPdf = $derived(Boolean(currentWorkspace?.billing.features.pdfExport));
+	const upgradeHref = $derived(
+		billingUpgradeHref(
+			page.params.workspaceSlug ?? '',
+			Boolean(currentWorkspace?.billing.workspaceLimit.isPaused)
+		)
 	);
 
 	const editorContentQuery = useProtectedQuery(api.emails.getEmailEditorContent, () =>
@@ -42,6 +52,18 @@
 			workspaceId={currentWorkspace.workspaceId}
 			workspaceName={currentWorkspace.name}
 			{subjectPreview}
+		/>
+	</SettingsSection>
+
+	<SettingsSection
+		title="Signed copies"
+		description="Give every signer a PDF of the waiver they signed, for their records."
+	>
+		<SignedCopyEmailSetting
+			workspaceId={currentWorkspace.workspaceId}
+			{canExportPdf}
+			isOwner={currentWorkspace.role === 'owner'}
+			{upgradeHref}
 		/>
 	</SettingsSection>
 

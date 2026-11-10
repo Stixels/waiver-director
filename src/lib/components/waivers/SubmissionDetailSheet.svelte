@@ -1,9 +1,13 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
+	import { useConvexClient } from 'convex-svelte';
 	import type { FunctionReturnType } from 'convex/server';
+	import { toast } from 'svelte-sonner';
 	import { api } from '$convex/_generated/api';
 	import type { Id } from '$convex/_generated/dataModel';
+	import { useAppContext } from '$lib/components/app/app-context.svelte';
 	import { useProtectedQuery } from '$lib/components/auth/convex-auth.svelte';
+	import { Button } from '$lib/components/ui/button';
 	import {
 		Dialog,
 		DialogContent,
@@ -13,10 +17,16 @@
 	} from '$lib/components/ui/dialog';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import WaiverReadonlyDocument from '$lib/components/waivers/WaiverReadonlyDocument.svelte';
+	import { billingUpgradeHref } from '$lib/utils/billing';
+	import { getConvexErrorMessage } from '$lib/utils/convex-errors';
 	import { formatBookingTimestamp } from '$lib/utils/date';
 	import { queryString } from '$lib/utils/url';
 	import ArrowRightIcon from '@lucide/svelte/icons/arrow-right';
 	import CalendarClockIcon from '@lucide/svelte/icons/calendar-clock';
+	import DownloadIcon from '@lucide/svelte/icons/download';
+	import LoaderIcon from '@lucide/svelte/icons/loader-circle';
+	import LockKeyholeIcon from '@lucide/svelte/icons/lock-keyhole';
+	import SendIcon from '@lucide/svelte/icons/send';
 	import FileTextIcon from '@lucide/svelte/icons/file-text';
 	import MailIcon from '@lucide/svelte/icons/mail';
 	import TicketIcon from '@lucide/svelte/icons/ticket';
@@ -48,6 +58,64 @@
 
 	const submission = $derived(submissionQuery.data as Submission | null);
 	const isLoadingSubmission = $derived(submissionQuery.isLoading);
+
+	const convex = useConvexClient();
+	const appContext = useAppContext();
+	const currentWorkspace = $derived(
+		appContext.workspaces.find((workspace) => workspace.workspaceId === workspaceId) ?? null
+	);
+	const canExportPdf = $derived(Boolean(currentWorkspace?.billing.features.pdfExport));
+	const isOwner = $derived(currentWorkspace?.role === 'owner');
+	const upgradeHref = $derived(
+		billingUpgradeHref(workspaceSlug, Boolean(currentWorkspace?.billing.workspaceLimit.isPaused))
+	);
+	let isDownloadingPdf = $state(false);
+	let isEmailingCopy = $state(false);
+
+	async function downloadPdf() {
+		if (isDownloadingPdf) return;
+		isDownloadingPdf = true;
+		try {
+			const result = await convex.action(api.signedCopies.exportSubmissionPdf, {
+				workspaceId,
+				submissionId
+			});
+			const url = URL.createObjectURL(new Blob([result.pdf], { type: 'application/pdf' }));
+			const link = document.createElement('a');
+			link.href = url;
+			link.download = result.fileName;
+			document.body.appendChild(link);
+			link.click();
+			link.remove();
+			setTimeout(() => URL.revokeObjectURL(url), 10_000);
+		} catch (err) {
+			toast.error(getConvexErrorMessage(err, 'Could not create the PDF.'));
+		} finally {
+			isDownloadingPdf = false;
+		}
+	}
+
+	async function emailCopy() {
+		if (isEmailingCopy) return;
+		isEmailingCopy = true;
+		try {
+			await convex.mutation(api.signedCopies.emailSignedCopy, { workspaceId, submissionId });
+			toast.success('Signed copy is on its way to the signer.');
+		} catch (err) {
+			toast.error(getConvexErrorMessage(err, 'Could not email the signed copy.'));
+		} finally {
+			isEmailingCopy = false;
+		}
+	}
+
+	function signedCopyStatusText(signedCopy: Submission['signedCopyEmail']) {
+		if (!signedCopy) return null;
+		if (signedCopy.status === 'sent' && signedCopy.sentAt) {
+			return `Copy emailed ${formatTimestamp(signedCopy.sentAt)}`;
+		}
+		if (signedCopy.status === 'queued') return 'Emailing copy…';
+		return 'Copy email not sent';
+	}
 
 	function formatTimestamp(ts: number) {
 		return new Intl.DateTimeFormat('en-US', { dateStyle: 'long', timeStyle: 'short' }).format(
@@ -150,6 +218,51 @@
 						<DialogDescription class="truncate text-xs text-muted-foreground sm:text-right">
 							{submission.signerEmail}
 						</DialogDescription>
+					</div>
+					<div class="mt-3 flex flex-wrap items-center gap-2">
+						{#if canExportPdf}
+							{#if isOwner}
+								<Button
+									size="sm"
+									variant="outline"
+									onclick={downloadPdf}
+									disabled={isDownloadingPdf}
+								>
+									{#if isDownloadingPdf}
+										<LoaderIcon class="animate-spin" aria-hidden="true" />
+									{:else}
+										<DownloadIcon aria-hidden="true" />
+									{/if}
+									Download PDF
+								</Button>
+							{/if}
+							<Button
+								size="sm"
+								variant="outline"
+								onclick={emailCopy}
+								disabled={isEmailingCopy || submission.signedCopyEmail?.status === 'queued'}
+							>
+								{#if isEmailingCopy}
+									<LoaderIcon class="animate-spin" aria-hidden="true" />
+								{:else}
+									<SendIcon aria-hidden="true" />
+								{/if}
+								Email copy to signer
+							</Button>
+							{#if signedCopyStatusText(submission.signedCopyEmail)}
+								<span
+									class="text-[11px] text-muted-foreground"
+									title={submission.signedCopyEmail?.failureReason ?? undefined}
+								>
+									{signedCopyStatusText(submission.signedCopyEmail)}
+								</span>
+							{/if}
+						{:else}
+							<Button size="sm" variant="outline" href={upgradeHref}>
+								<LockKeyholeIcon aria-hidden="true" />
+								Upgrade to export PDF
+							</Button>
+						{/if}
 					</div>
 				</div>
 

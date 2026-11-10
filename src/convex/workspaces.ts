@@ -40,6 +40,7 @@ const WORKSPACE_SCOPED_TABLES = {
 	workspace_logo_uploads: true,
 	workspace_email_settings: true,
 	email_follow_ups: true,
+	signed_copy_emails: true,
 	booking_integrations: true,
 	booking_connection_sessions: true,
 	bookings: true,

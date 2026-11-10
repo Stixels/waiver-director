@@ -10,6 +10,7 @@ import { upsertSignerCustomer } from './lib/customers';
 import { submissionSearchText } from './lib/submissions';
 import { getOwnedWorkspaceLogoUrl } from './lib/workspaces';
 import { marketingConsentLabel } from './lib/marketing';
+import { latestSignedCopyEmail, queueSignedCopyForNewSubmission } from './signedCopies';
 import { sanitizeRichTextHtml } from '../lib/utils/rich-text';
 import {
 	assertWorkspaceRecord,
@@ -318,7 +319,22 @@ export const getSubmission = query({
 			minors: v.array(v.string()),
 			booking: v.union(v.null(), bookingSnapshotValidator),
 			marketingConsent: v.boolean(),
-			marketingConsentLabel: v.union(v.string(), v.null())
+			marketingConsentLabel: v.union(v.string(), v.null()),
+			signedCopyEmail: v.union(
+				v.null(),
+				v.object({
+					status: v.union(
+						v.literal('queued'),
+						v.literal('sent'),
+						v.literal('blocked'),
+						v.literal('failed')
+					),
+					recipientEmail: v.string(),
+					sentAt: v.union(v.number(), v.null()),
+					updatedAt: v.number(),
+					failureReason: v.union(v.string(), v.null())
+				})
+			)
 		})
 	),
 	handler: async (ctx, args) => {
@@ -340,10 +356,13 @@ export const getSubmission = query({
 			});
 		}
 
-		const followUp = await ctx.db
-			.query('email_follow_ups')
-			.withIndex('by_submissionId', (q) => q.eq('submissionId', submission._id))
-			.first();
+		const [followUp, signedCopyEmail] = await Promise.all([
+			ctx.db
+				.query('email_follow_ups')
+				.withIndex('by_submissionId', (q) => q.eq('submissionId', submission._id))
+				.first(),
+			latestSignedCopyEmail(ctx, submission._id)
+		]);
 
 		if (followUp && followUp.workspaceId !== args.workspaceId) {
 			throw new ConvexError({
@@ -376,7 +395,16 @@ export const getSubmission = query({
 			minors: submission.minors.map((participant) => participant.fullName),
 			booking: submission.bookingSnapshot ?? null,
 			marketingConsent: submission.marketingConsent ?? false,
-			marketingConsentLabel: submission.marketingConsentLabel ?? null
+			marketingConsentLabel: submission.marketingConsentLabel ?? null,
+			signedCopyEmail: signedCopyEmail
+				? {
+						status: signedCopyEmail.status,
+						recipientEmail: signedCopyEmail.recipientEmail,
+						sentAt: signedCopyEmail.sentAt ?? null,
+						updatedAt: signedCopyEmail.updatedAt,
+						failureReason: signedCopyEmail.failureReason ?? null
+					}
+				: null
 		};
 	}
 });
@@ -737,6 +765,12 @@ export const submitPublicWaiver = mutation({
 			signerName,
 			signerEmail: originalSignerEmail,
 			submittedAt
+		});
+
+		await queueSignedCopyForNewSubmission(ctx, {
+			workspaceId: waiver.workspaceId,
+			submissionId,
+			signerEmail: originalSignerEmail
 		});
 
 		if (booking) {
