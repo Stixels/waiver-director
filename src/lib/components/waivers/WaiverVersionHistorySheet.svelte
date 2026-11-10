@@ -23,15 +23,16 @@
 	interface Props {
 		open: boolean;
 		workspaceId: Id<'workspaces'>;
+		waiverId?: Id<'workspace_waivers'> | null;
 	}
 
-	let { open = $bindable(), workspaceId }: Props = $props();
+	let { open = $bindable(), workspaceId, waiverId = null }: Props = $props();
 
 	type VersionSummary = FunctionReturnType<typeof api.waivers.listWaiverVersions>[number];
 
 	const versionsQuery = useProtectedQuery(
 		api.waivers.listWaiverVersions,
-		() => ({ workspaceId }),
+		() => (waiverId ? { workspaceId, waiverId } : { workspaceId }),
 		() => ({ keepPreviousData: true })
 	);
 

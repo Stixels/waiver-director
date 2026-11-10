@@ -19,6 +19,9 @@ export async function upsertSignerCustomer(
 		submittedAt: number;
 		bookingId: Id<'bookings'> | null;
 		latestSubmissionId: Id<'waiver_submissions'>;
+		// False for extra waivers signed in the same booking visit, so one visit
+		// that needs several waivers counts once.
+		countVisit?: boolean;
 	}
 ) {
 	const normalizedEmail = normalizeCustomerEmail(args.signerEmail);
@@ -51,7 +54,7 @@ export async function upsertSignerCustomer(
 		} = {
 			firstSeenAt: Math.min(existing.firstSeenAt, args.submittedAt),
 			lastSeenAt: Math.max(existing.lastSeenAt, args.submittedAt),
-			visitCount: existing.visitCount + 1
+			visitCount: existing.visitCount + (args.countVisit === false ? 0 : 1)
 		};
 
 		if (isLatestVisit) {

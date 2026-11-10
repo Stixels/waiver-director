@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Id } from '$convex/_generated/dataModel';
+	import { resolve } from '$app/paths';
 	import { useConvexClient } from 'convex-svelte';
 	import { toast } from 'svelte-sonner';
 	import { api } from '$convex/_generated/api';
@@ -40,14 +41,22 @@
 		participantCount: number;
 		signedCount: number;
 	};
+	type RequiredWaiverLink = { slug: string; title: string; isCurrent: boolean };
 	type MinorFormState = WaiverMinor & { _uid: string };
 
 	interface Props {
 		waiver: PublicWaiver;
 		booking?: BookingContext | null;
+		// Every waiver this booking's activity requires, in order.
+		requiredWaivers?: RequiredWaiverLink[];
 	}
 
-	let { waiver, booking = null }: Props = $props();
+	let { waiver, booking = null, requiredWaivers = [] }: Props = $props();
+
+	const currentRequiredIndex = $derived(requiredWaivers.findIndex((item) => item.isCurrent));
+	const nextRequiredWaiver = $derived(
+		currentRequiredIndex >= 0 ? (requiredWaivers[currentRequiredIndex + 1] ?? null) : null
+	);
 
 	const convex = useConvexClient();
 
@@ -172,6 +181,19 @@
 				<p class="max-w-sm text-base leading-relaxed text-muted-foreground">
 					Thank you. Your signed waiver has been recorded for {waiver.workspaceName}.
 				</p>
+				{#if booking && nextRequiredWaiver}
+					<p class="mt-6 max-w-sm text-sm text-muted-foreground">
+						This booking also needs {nextRequiredWaiver.title}.
+					</p>
+					<a
+						href={resolve(
+							`/w/${nextRequiredWaiver.slug}/b/${booking.lookupToken}` as `/w/${string}/b/${string}`
+						)}
+						class="mt-4 inline-flex h-12 items-center bg-foreground px-8 text-sm font-semibold tracking-wide text-background transition-opacity hover:opacity-85"
+					>
+						Continue to next waiver
+					</a>
+				{/if}
 				{#if booking}
 					<button
 						type="button"
@@ -205,6 +227,32 @@
 								{booking.signedCount} signed of {booking.participantCount} expected
 							</p>
 						</div>
+						{#if requiredWaivers.length > 1}
+							<div class="mt-3 border-t border-border pt-3">
+								<p class="text-xs text-muted-foreground">
+									Each guest signs {requiredWaivers.length} waivers for this activity:
+								</p>
+								<ol class="mt-1.5 space-y-1 text-sm">
+									{#each requiredWaivers as item, index (item.slug)}
+										<li class="flex gap-2">
+											<span class="text-muted-foreground tabular-nums">{index + 1}.</span>
+											{#if item.isCurrent}
+												<span class="font-semibold">{item.title} (this waiver)</span>
+											{:else}
+												<a
+													href={resolve(
+														`/w/${item.slug}/b/${booking.lookupToken}` as `/w/${string}/b/${string}`
+													)}
+													class="underline underline-offset-2"
+												>
+													{item.title}
+												</a>
+											{/if}
+										</li>
+									{/each}
+								</ol>
+							</div>
+						{/if}
 					</section>
 				{/if}
 

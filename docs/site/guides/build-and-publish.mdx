@@ -3,7 +3,7 @@ title: 'Build and publish a waiver'
 description: 'Write your waiver terms, add custom fields, and publish a version customers can sign.'
 ---
 
-Each workspace has one waiver. Open **Waiver** in the sidebar to edit it.
+Open **Waiver** in the sidebar to edit your waivers. Every workspace starts with one **default waiver**; you can add more waivers for activities that need their own terms (see [Multiple waivers](#multiple-waivers)).
 
 <Frame caption="Sample data from a fictional workspace.">
 	<img
@@ -47,3 +47,35 @@ Publishing saves the current draft as a new **published waiver version** and mak
 ## Version history
 
 Open the version history from the waiver page to see every version you have published. Signed submissions always point to the exact version the signer accepted, so older signatures keep their original wording after you republish.
+
+## Multiple waivers
+
+Use the waiver menu next to **Publish** to switch between waivers. Each waiver has its own public link, QR code, drafts, and version history.
+
+Owners can:
+
+- **Create a waiver**: choose **New waiver** in the waiver menu and give it a title.
+- **Change the default waiver**: open the waiver, then choose **Make default waiver** from the **⋯** menu. The default waiver is the one every activity uses unless you set an activity-specific requirement.
+- **Archive a waiver**: choose **Archive waiver** from the **⋯** menu. Its public link stops working and it is removed from activity requirements. Signed submissions and version history are kept. The default waiver can't be archived; make another waiver the default first.
+
+A workspace can have up to 25 active waivers.
+
+### Activity requirements
+
+Choose **Activity requirements** in the waiver menu to pick which waivers each activity needs.
+
+<Frame caption="Sample data from a fictional workspace.">
+	<img
+		src="/images/app/activity-requirements.png"
+		alt="Activity requirements panel listing activities with the waivers each one requires"
+	/>
+</Frame>
+Activities appear once bookings sync from your booking provider, or you can add one by the name it
+has on bookings.
+
+An activity-specific requirement **replaces** the default waiver for that activity; it doesn't add to it. To require the default waiver as well, select it too. Guests who open a booking link see every waiver their activity needs and are taken to the next one after they sign.
+
+<Note>
+	The waiver gap on a booking counts signatures on the first waiver the activity requires. Coverage
+	for each additional waiver isn't tracked separately yet.
+</Note>

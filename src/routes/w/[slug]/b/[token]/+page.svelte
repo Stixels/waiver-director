@@ -15,4 +15,8 @@
 	<title>{waiver.title} | {waiver.booking.activityName}</title>
 </svelte:head>
 
-<PublicWaiverForm {waiver} booking={waiver.booking} />
+<!-- SvelteKit reuses this page when "Continue to next waiver" changes the slug,
+     so remount the form per waiver version to reset its submitted state. -->
+{#key `${waiver.versionId}:${waiver.booking.lookupToken}`}
+	<PublicWaiverForm {waiver} booking={waiver.booking} requiredWaivers={waiver.requiredWaivers} />
+{/key}

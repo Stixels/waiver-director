@@ -102,6 +102,11 @@ export default defineSchema({
 		workspaceId: v.id('workspaces'),
 		publicSlug: v.string(),
 		publishedVersionId: v.optional(v.id('waiver_versions')),
+		// Multiple waivers per workspace. Legacy rows have neither field: they are
+		// active, and the oldest active waiver is the workspace default.
+		isDefault: v.optional(v.boolean()),
+		status: v.optional(v.union(v.literal('active'), v.literal('archived'))),
+		archivedAt: v.optional(v.number()),
 		title: v.string(),
 		introCopy: v.string(),
 		theme: v.optional(v.union(v.literal('light'), v.literal('dark'))),
@@ -142,7 +147,21 @@ export default defineSchema({
 		)
 	})
 		.index('by_workspaceId', ['workspaceId'])
+		.index('by_workspaceId_and_status', ['workspaceId', 'status'])
 		.index('by_publicSlug', ['publicSlug']),
+
+	// Activity-Specific Requirement: replaces the default waiver requirement for
+	// bookings whose activity matches. Keyed by normalized activity name until
+	// bookings carry a provider activity identity.
+	activity_waiver_requirements: defineTable({
+		workspaceId: v.id('workspaces'),
+		activityKey: v.string(),
+		activityName: v.string(),
+		waiverIds: v.array(v.id('workspace_waivers')),
+		updatedAt: v.number()
+	})
+		.index('by_workspaceId', ['workspaceId'])
+		.index('by_workspaceId_and_activityKey', ['workspaceId', 'activityKey']),
 
 	waiver_versions: defineTable({
 		workspaceId: v.id('workspaces'),

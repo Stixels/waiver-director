@@ -17,6 +17,7 @@ import {
 	listWorkspaceMembershipsForUser
 } from './lib/workspaces';
 import { workspaceHandleBase, workspaceHandleCandidate } from './lib/workspaceHandles';
+import { waiverSlugCandidate } from './lib/waiverRequirements';
 
 const WORKSPACE_LOGO_ALLOWED_CONTENT_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp']);
 const WORKSPACE_LOGO_MAX_BYTES = 2 * 1024 * 1024;
@@ -31,6 +32,7 @@ type WorkspaceScopedTableName = {
 const WORKSPACE_SCOPED_TABLES = {
 	workspace_memberships: true,
 	workspace_waivers: true,
+	activity_waiver_requirements: true,
 	waiver_versions: true,
 	customers: true,
 	waiver_submissions: true,
@@ -122,10 +124,35 @@ export const createWorkspace = mutation({
 			status: 'active'
 		});
 
+		// Public waiver slugs share one namespace across workspaces, and extra
+		// waivers use `${workspaceSlug}-${title}`, so the default slug can already
+		// be taken (workspace "acme" waiver "Kids" vs new workspace "acme-kids").
+		const defaultSlugBase = createDefaultPublicWaiverSlug(slug);
+		let publicSlug: string | null = null;
+		for (let attempt = 1; attempt <= 50; attempt++) {
+			const candidate = waiverSlugCandidate(defaultSlugBase, attempt);
+			const taken = await ctx.db
+				.query('workspace_waivers')
+				.withIndex('by_publicSlug', (q) => q.eq('publicSlug', candidate))
+				.first();
+			if (!taken) {
+				publicSlug = candidate;
+				break;
+			}
+		}
+		if (!publicSlug) {
+			throw new ConvexError({
+				code: 'internal_error',
+				message: 'Unable to generate a unique waiver link. Please try again.'
+			});
+		}
+
 		const waiverDefinition = createDefaultWaiverDefinition(name);
 		await ctx.db.insert('workspace_waivers', {
 			workspaceId,
-			publicSlug: createDefaultPublicWaiverSlug(slug),
+			publicSlug,
+			isDefault: true,
+			status: 'active',
 			title: waiverDefinition.title,
 			introCopy: waiverDefinition.introCopy,
 			theme: waiverDefinition.theme ?? 'dark',
