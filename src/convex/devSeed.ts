@@ -5,7 +5,9 @@ import type { Doc, Id } from './_generated/dataModel';
 import { bookingSearchText } from './lib/bookings';
 
 // Dev-only helpers for trying the kiosk and check-in pages without a real booking provider.
-// Internal functions, so they can only be run by someone with deploy access:
+// Internal functions, so they can only be run by someone with deploy access. The slug is
+// optional when the deployment has a single workspace; a wrong slug lists the real ones.
+//   npx convex run devSeed:seedTestBookings            (only workspace in the deployment)
 //   npx convex run devSeed:seedTestBookings '{"workspaceSlug":"my-workspace"}'
 //   npx convex run devSeed:clearTestBookings '{"workspaceSlug":"my-workspace"}'
 
@@ -93,15 +95,27 @@ const SAMPLE_BOOKINGS: SampleBooking[] = [
 	}
 ];
 
-async function requireWorkspaceBySlug(ctx: MutationCtx, slug: string): Promise<Doc<'workspaces'>> {
-	const workspace = await ctx.db
-		.query('workspaces')
-		.withIndex('by_slug', (q) => q.eq('slug', slug))
-		.unique();
-	if (!workspace) {
-		throw new ConvexError({ code: 'not_found', message: `No workspace with slug "${slug}".` });
+async function requireWorkspaceBySlug(
+	ctx: MutationCtx,
+	slug: string | undefined
+): Promise<Doc<'workspaces'>> {
+	if (slug) {
+		const workspace = await ctx.db
+			.query('workspaces')
+			.withIndex('by_slug', (q) => q.eq('slug', slug))
+			.unique();
+		if (workspace) return workspace;
 	}
-	return workspace;
+	// No slug (or a wrong one): use the only workspace if there is just one, otherwise list them.
+	const workspaces = await ctx.db.query('workspaces').take(20);
+	if (!slug && workspaces.length === 1) return workspaces[0];
+	const available = workspaces.map((workspace) => workspace.slug).join(', ') || 'none';
+	throw new ConvexError({
+		code: 'not_found',
+		message: slug
+			? `No workspace with slug "${slug}". Workspaces here: ${available}`
+			: `Pass a workspaceSlug. Workspaces here: ${available}`
+	});
 }
 
 function randomToken(): string {
@@ -120,7 +134,7 @@ function localDateTime(timestamp: number, utcOffsetHours: number): string {
 
 export const seedTestBookings = internalMutation({
 	args: {
-		workspaceSlug: v.string(),
+		workspaceSlug: v.optional(v.string()),
 		/** Your timezone's offset from UTC in hours, e.g. -5 for US Eastern (standard time). */
 		utcOffsetHours: v.optional(v.number())
 	},
@@ -224,7 +238,7 @@ export const seedTestBookings = internalMutation({
 // Deletes only the sample bookings. Signatures made against them are kept (signed records are
 // never changed); they just stop showing under a booking on the Check-in page.
 export const clearTestBookings = internalMutation({
-	args: { workspaceSlug: v.string() },
+	args: { workspaceSlug: v.optional(v.string()) },
 	returns: v.object({ deleted: v.number() }),
 	handler: async (ctx, args) => {
 		const workspace = await requireWorkspaceBySlug(ctx, args.workspaceSlug);
