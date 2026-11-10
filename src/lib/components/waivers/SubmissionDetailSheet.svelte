@@ -3,7 +3,9 @@
 	import type { FunctionReturnType } from 'convex/server';
 	import { api } from '$convex/_generated/api';
 	import type { Id } from '$convex/_generated/dataModel';
+	import { useConvexClient } from 'convex-svelte';
 	import { useProtectedQuery } from '$lib/components/auth/convex-auth.svelte';
+	import TagEditor from '$lib/components/tags/TagEditor.svelte';
 	import {
 		Dialog,
 		DialogContent,
@@ -47,6 +49,16 @@
 	);
 
 	const submission = $derived(submissionQuery.data as Submission | null);
+	const convex = useConvexClient();
+
+	async function setSubmissionTag(tagId: Id<'workspace_tags'>, applied: boolean) {
+		await convex.mutation(api.tags.setSubmissionTag, {
+			workspaceId,
+			submissionId,
+			tagId,
+			applied
+		});
+	}
 	const isLoadingSubmission = $derived(submissionQuery.isLoading);
 
 	function formatTimestamp(ts: number) {
@@ -151,6 +163,12 @@
 							{submission.signerEmail}
 						</DialogDescription>
 					</div>
+					<TagEditor
+						class="mt-2"
+						{workspaceId}
+						tags={submission.tags}
+						onSetTag={setSubmissionTag}
+					/>
 				</div>
 
 				<div class="grid bg-muted/10 sm:grid-cols-[1fr_1.05fr_1.35fr_1.05fr]">

@@ -11,6 +11,9 @@
 	import DataTablePagination from '$lib/components/app/DataTablePagination.svelte';
 	import DataTableShell from '$lib/components/app/DataTableShell.svelte';
 	import { useProtectedQuery } from '$lib/components/auth/convex-auth.svelte';
+	import TagEditor from '$lib/components/tags/TagEditor.svelte';
+	import TagFilter from '$lib/components/tags/TagFilter.svelte';
+	import TagList from '$lib/components/tags/TagList.svelte';
 	import SubmissionDetailSheet from '$lib/components/waivers/SubmissionDetailSheet.svelte';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import {
@@ -25,6 +28,7 @@
 	import { parseConvexId, queryString } from '$lib/utils/url';
 	import { cn } from '$lib/utils';
 	import { onMount } from 'svelte';
+	import { useConvexClient } from 'convex-svelte';
 	import CalendarClockIcon from '@lucide/svelte/icons/calendar-clock';
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 	import MailIcon from '@lucide/svelte/icons/mail';
@@ -56,6 +60,10 @@
 	let detailOpen = $state(false);
 	let selectedSubmissionId = $state<Id<'waiver_submissions'> | null>(null);
 	let now = $state(Date.now());
+	const initialTagFilter = parseConvexId<'workspace_tags'>(page.url.searchParams.get('tag'));
+	let tagFilter = $state<Id<'workspace_tags'> | null>(initialTagFilter);
+	let lastAppliedTagParam: string | null = initialTagFilter;
+	const convex = useConvexClient();
 
 	onMount(() => {
 		const interval = setInterval(() => {
@@ -74,7 +82,8 @@
 							numItems: PAGE_SIZE,
 							cursor
 						},
-						searchQuery
+						searchQuery,
+						tagId: tagFilter ?? undefined
 					}
 				: 'skip',
 		() => ({ keepPreviousData: true })
@@ -95,6 +104,7 @@
 		parseConvexId<'waiver_submissions'>(page.url.searchParams.get('submissionId'))
 	);
 	const searchQueryParam = $derived(page.url.searchParams.get('q')?.trim() ?? '');
+	const tagParam = $derived(parseConvexId<'workspace_tags'>(page.url.searchParams.get('tag')));
 
 	const customerDetailQuery = useProtectedQuery(
 		api.customers.getCustomerDetail,
@@ -134,6 +144,7 @@
 
 		const query = queryString([
 			['q', nextSearchQuery],
+			['tag', tagFilter],
 			['customerId', args.customerId ?? null],
 			['submissionId', args.submissionId ?? null]
 		]);
@@ -168,6 +179,8 @@
 			searchInput = '';
 			searchQuery = '';
 			lastSearchQuery = '';
+			tagFilter = null;
+			lastAppliedTagParam = null;
 		}
 		lastAppliedSearchQuery = isWorkspaceChange ? '' : searchQuery;
 		lastAppliedCustomerId = null;
@@ -347,6 +360,46 @@
 		cursor = customerPage.continueCursor;
 	}
 
+	function selectTagFilter(tagId: Id<'workspace_tags'> | null) {
+		if (tagId === tagFilter) return;
+		tagFilter = tagId;
+		lastAppliedTagParam = tagId;
+		cursor = null;
+		previousCursors = [];
+		selectedCustomerId = null;
+		selectedSubmissionId = null;
+		detailOpen = false;
+		void updateCustomersUrl({
+			searchQuery,
+			customerId: null,
+			submissionId: null,
+			replaceState: true
+		});
+	}
+
+	$effect(() => {
+		if (isClearingWorkspaceUrl) return;
+		if (tagParam === lastAppliedTagParam) return;
+		lastAppliedTagParam = tagParam;
+		tagFilter = tagParam;
+		cursor = null;
+		previousCursors = [];
+	});
+
+	async function setCustomerTag(
+		customerId: Id<'customers'>,
+		tagId: Id<'workspace_tags'>,
+		applied: boolean
+	) {
+		if (!currentWorkspace) return;
+		await convex.mutation(api.tags.setCustomerTag, {
+			workspaceId: currentWorkspace.workspaceId,
+			customerId,
+			tagId,
+			applied
+		});
+	}
+
 	function clearSearch() {
 		if (!searchInput && !searchQuery) return;
 		searchInput = '';
@@ -383,7 +436,7 @@
 {/snippet}
 
 <DataTablePage>
-	<div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+	<div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
 		<div class="relative w-full lg:max-w-md">
 			<SearchIcon
 				class="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground"
@@ -407,16 +460,27 @@
 				</button>
 			{/if}
 		</div>
+		{#if currentWorkspace}
+			<TagFilter
+				workspaceId={currentWorkspace.workspaceId}
+				kind="customer"
+				selectedTagId={tagFilter}
+				canManage={currentWorkspace.role === 'owner'}
+				onSelect={selectTagFilter}
+			/>
+		{/if}
 
 		<span
-			class="inline-flex h-9 w-fit items-center gap-2 rounded-full border border-border bg-card/40 px-3 text-xs font-medium text-muted-foreground"
+			class="inline-flex h-9 w-fit items-center gap-2 rounded-full border border-border bg-card/40 px-3 text-xs font-medium text-muted-foreground lg:ml-auto"
 		>
 			<UsersRoundIcon class="size-3.5" aria-hidden="true" />
 			{#if isLoadingCustomers && !customerPage}
 				<Skeleton class="h-3 w-10" />
+			{:else if totalCount === null}
+				Filtered
 			{:else}
-				<span class="text-foreground tabular-nums">{totalCount ?? 0}</span>
-				{(totalCount ?? 0) === 1 ? 'customer' : 'customers'}
+				<span class="text-foreground tabular-nums">{totalCount}</span>
+				{totalCount === 1 ? 'customer' : 'customers'}
 			{/if}
 		</span>
 	</div>
@@ -501,13 +565,21 @@
 					/>
 				</DataTableShell>
 			{:else if customers.length === 0}
-				<DataTableShell>
+				<!-- A tag + search scan can stop before the end of the tag, so keep
+				     pagination reachable whenever more results may exist. -->
+				<DataTableShell
+					footer={customerPage && !customerPage.isDone ? customersPagination : undefined}
+				>
 					<DataTableEmptyState
 						icon={UsersRoundIcon}
-						title={searchQuery.trim() ? 'No matching customers' : 'No customers yet'}
-						description={searchQuery.trim()
-							? 'Try a different name or email.'
-							: 'Adult signers appear here after they submit a waiver.'}
+						title={searchQuery.trim() || tagFilter ? 'No matching customers' : 'No customers yet'}
+						description={customerPage && !customerPage.isDone
+							? 'No matches on this page. Try the next page.'
+							: searchQuery.trim()
+								? 'Try a different name or email.'
+								: tagFilter
+									? 'No customers have this tag yet.'
+									: 'Adult signers appear here after they submit a waiver.'}
 					/>
 				</DataTableShell>
 			{:else}
@@ -551,6 +623,7 @@
 								<p class="mt-0.5 truncate text-xs text-muted-foreground">
 									{customer.primaryEmail}
 								</p>
+								<TagList tags={customer.tags} class="mt-1.5" />
 							</div>
 							<div class="hidden text-right sm:block">
 								<p class="text-sm font-semibold tabular-nums">
@@ -639,6 +712,7 @@
 												<p class="mt-0.5 truncate text-xs text-muted-foreground">
 													{customer.primaryEmail}
 												</p>
+												<TagList tags={customer.tags} class="mt-1.5" />
 											</div>
 										</div>
 									</TableCell>
@@ -743,6 +817,13 @@
 								{tier.label}
 							</span>
 						</div>
+
+						<TagEditor
+							workspaceId={currentWorkspace!.workspaceId}
+							tags={selectedCustomerDetail.customer.tags}
+							onSetTag={(tagId, applied) =>
+								setCustomerTag(selectedCustomerDetail.customer.customerId, tagId, applied)}
+						/>
 
 						<dl class="space-y-2 border-t border-border pt-3 text-sm">
 							<div class="flex items-baseline justify-between gap-3">

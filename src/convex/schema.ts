@@ -3,6 +3,7 @@ import { v } from 'convex/values';
 import { billingFeatureValidator } from './lib/billing';
 import { bookingProviderValidator, bookingSnapshotValidator } from './lib/bookings';
 import { marketingIntegrationStatusValidator, marketingProviderValidator } from './lib/marketing';
+import { tagColorValidator } from './lib/tags';
 
 export default defineSchema({
 	users: defineTable({
@@ -244,6 +245,43 @@ export default defineSchema({
 			searchField: 'searchText',
 			filterFields: ['workspaceId']
 		}),
+
+	workspace_tags: defineTable({
+		workspaceId: v.id('workspaces'),
+		name: v.string(),
+		normalizedName: v.string(),
+		color: tagColorValidator,
+		customerCount: v.number(),
+		submissionCount: v.number(),
+		createdByUserId: v.id('users'),
+		createdAt: v.number()
+	})
+		.index('by_workspaceId', ['workspaceId'])
+		.index('by_workspaceId_and_normalizedName', ['workspaceId', 'normalizedName']),
+
+	// Tag assignments live in their own tables so tagging never rewrites a
+	// signed waiver_submissions record.
+	customer_tags: defineTable({
+		workspaceId: v.id('workspaces'),
+		tagId: v.id('workspace_tags'),
+		customerId: v.id('customers'),
+		createdByUserId: v.id('users'),
+		createdAt: v.number()
+	})
+		.index('by_workspaceId', ['workspaceId'])
+		.index('by_tagId', ['tagId'])
+		.index('by_customerId_and_tagId', ['customerId', 'tagId']),
+
+	submission_tags: defineTable({
+		workspaceId: v.id('workspaces'),
+		tagId: v.id('workspace_tags'),
+		submissionId: v.id('waiver_submissions'),
+		createdByUserId: v.id('users'),
+		createdAt: v.number()
+	})
+		.index('by_workspaceId', ['workspaceId'])
+		.index('by_tagId', ['tagId'])
+		.index('by_submissionId_and_tagId', ['submissionId', 'tagId']),
 
 	email_editor_content: defineTable({
 		workspaceId: v.id('workspaces'),

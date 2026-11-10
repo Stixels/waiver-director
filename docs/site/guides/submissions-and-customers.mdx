@@ -12,7 +12,7 @@ description: 'Review signed waivers and each customer’s visit history.'
 	/>
 </Frame>
 
-**Submissions** lists every signed waiver in the workspace, newest first. Search by customer, activity, or booking number. Open a submission to see:
+**Submissions** lists every signed waiver in the workspace, newest first. Search by customer, activity, or booking number, or filter by [tag](#tags). Open a submission to see:
 
 - Signer details and the time they signed
 - Custom field answers
@@ -35,7 +35,7 @@ description: 'Review signed waivers and each customer’s visit history.'
 
 ## Customers
 
-**Customers** groups signers by email address. Search by name or email, then select a customer to see their waiver visit history across all of their submissions in this workspace.
+**Customers** groups signers by email address. Search by name or email, or filter by [tag](#tags), then select a customer to see their waiver visit history across all of their submissions in this workspace.
 
 <Frame caption="The customer list with visit counts, and one customer's details and visit history on the right. Sample data from a test workspace.">
 	<img
@@ -45,3 +45,20 @@ description: 'Review signed waivers and each customer’s visit history.'
 </Frame>
 
 Customers are scoped to one workspace. The same person signing for two of your workspaces appears separately in each.
+
+## Tags
+
+Tags are short labels, such as _VIP_, _Birthday party_, or _Medical follow-up_, that you add to customers and submissions so you can find and group them later.
+
+- **Add a tag:** Select a customer, or open a submission, then choose **Add tag**. Pick an existing tag or type a new name and press Enter to create it. Each tag gets a color automatically.
+- **Remove a tag:** Select the **×** on the tag.
+- **Filter by tag:** On **Customers** or **Submissions**, open the **All tags** menu next to the search box and choose a tag. The list shows only records with that tag, most recently tagged first, and the menu shows how many records use each tag. You can combine a tag filter with a search.
+
+Customer tags and submission tags are separate: tagging a customer does not tag their submissions, and the reverse. Tags belong to one workspace.
+
+<Info>
+	Tags are stored alongside a submission, not inside it. Adding or removing a tag never changes the
+	signed waiver.
+</Info>
+
+Owners can also change a tag's color (select the color dot in the **All tags** menu) or delete a tag (select the trash icon). Deleting a tag removes it from every customer and submission. A workspace can have up to 100 tags, and each customer or submission up to 20.
