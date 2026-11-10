@@ -10,6 +10,12 @@ import {
 	MIN_WAIVER_FIELD_LABEL_LENGTH,
 	MIN_WAIVER_TITLE_LENGTH
 } from '$lib/domain/waiver-constraints';
+import {
+	findFirstConditionProblem,
+	type WaiverFieldCondition
+} from '$lib/domain/waiver-conditions';
+
+export type { WaiverFieldCondition } from '$lib/domain/waiver-conditions';
 
 export type WaiverFieldType = 'text' | 'checkbox' | 'select' | 'date';
 export type WaiverTheme = 'light' | 'dark';
@@ -20,6 +26,7 @@ export type WaiverField =
 			type: 'text';
 			label: string;
 			required: boolean;
+			visibleWhen?: WaiverFieldCondition;
 			placeholder?: string;
 	  }
 	| {
@@ -27,12 +34,14 @@ export type WaiverField =
 			type: 'checkbox';
 			label: string;
 			required: boolean;
+			visibleWhen?: WaiverFieldCondition;
 	  }
 	| {
 			id: string;
 			type: 'select';
 			label: string;
 			required: boolean;
+			visibleWhen?: WaiverFieldCondition;
 			options: Array<{
 				id: string;
 				label: string;
@@ -43,6 +52,7 @@ export type WaiverField =
 			type: 'date';
 			label: string;
 			required: boolean;
+			visibleWhen?: WaiverFieldCondition;
 	  };
 
 export type WaiverDefinition = {
@@ -154,14 +164,16 @@ export function cloneDefinition(definition: WaiverDefinition): WaiverDefinition 
 		introCopy: sanitizeRichTextHtml(definition.introCopy),
 		theme: definition.theme ?? 'dark',
 		fields: definition.fields.map((field) => {
+			const visibleWhen = field.visibleWhen ? { visibleWhen: { ...field.visibleWhen } } : {};
 			if (field.type === 'select') {
 				return {
 					...field,
+					...visibleWhen,
 					options: field.options.map((option) => ({ ...option }))
 				};
 			}
 
-			return { ...field };
+			return { ...field, ...visibleWhen };
 		})
 	};
 }
@@ -205,7 +217,7 @@ export function isWaiverDefinitionAutosaveable(definition: WaiverDefinition | nu
 		}
 	}
 
-	return true;
+	return findFirstConditionProblem(definition.fields) === null;
 }
 
 export function normalizeDefinitionForCompare(definition: WaiverDefinition): WaiverDefinition {

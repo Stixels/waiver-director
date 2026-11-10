@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { describeCondition } from '$lib/domain/waiver-conditions';
 	import { onMount, tick } from 'svelte';
 	import { Editor } from '@tiptap/core';
 	import Link from '@tiptap/extension-link';
@@ -670,7 +671,14 @@
 					{#if fields.length > 0}
 						<WaiverPublicAdditionalInfoSection>
 							{#each fields as field (field.id)}
-								<WaiverFieldDisplay {field} preview />
+								<div>
+									<WaiverFieldDisplay {field} preview />
+									{#if field.visibleWhen}
+										<p class="mt-1.5 text-[11px] text-muted-foreground">
+											{describeCondition(fields, field.visibleWhen)}
+										</p>
+									{/if}
+								</div>
 							{/each}
 						</WaiverPublicAdditionalInfoSection>
 					{/if}

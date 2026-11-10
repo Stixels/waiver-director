@@ -18,6 +18,8 @@
 	import SquareCheckIcon from '@lucide/svelte/icons/square-check';
 	import ChevronsUpDownIcon from '@lucide/svelte/icons/chevrons-up-down';
 	import CalendarIcon from '@lucide/svelte/icons/calendar';
+	import GitBranchIcon from '@lucide/svelte/icons/git-branch';
+	import XIcon from '@lucide/svelte/icons/x';
 	import {
 		createBlankField,
 		createOptionId,
@@ -27,6 +29,11 @@
 		type WaiverFieldType
 	} from '$lib/domain/waivers';
 	import { MAX_SELECT_OPTIONS, MAX_WAIVER_FIELDS } from '$lib/domain/waiver-constraints';
+	import {
+		getConditionProblem,
+		isConditionSourceType,
+		type WaiverConditionOperator
+	} from '$lib/domain/waiver-conditions';
 
 	interface Props {
 		draft?: WaiverDefinition | null;
@@ -63,7 +70,62 @@
 
 	function removeField(index: number) {
 		if (!draft) return;
-		draft.fields.splice(index, 1);
+		const [removed] = draft.fields.splice(index, 1);
+		if (!removed) return;
+		// Conditions that pointed at the deleted field can never be satisfied.
+		for (const field of draft.fields) {
+			if (field.visibleWhen?.fieldId === removed.id) {
+				delete field.visibleWhen;
+			}
+		}
+	}
+
+	function conditionSources(index: number): WaiverField[] {
+		if (!draft) return [];
+		return draft.fields.slice(0, index).filter((entry) => isConditionSourceType(entry.type));
+	}
+
+	function defaultConditionValue(source: WaiverField): string | boolean {
+		if (source.type === 'select') {
+			return source.options[0]?.id ?? '';
+		}
+		return true;
+	}
+
+	function addCondition(field: WaiverField, index: number) {
+		const sources = conditionSources(index);
+		const source = sources[sources.length - 1];
+		if (!source) return;
+		field.visibleWhen = {
+			fieldId: source.id,
+			operator: 'equals',
+			value: defaultConditionValue(source)
+		};
+	}
+
+	function removeCondition(field: WaiverField) {
+		delete field.visibleWhen;
+	}
+
+	function setConditionSource(field: WaiverField, sourceId: string) {
+		const source = draft?.fields.find((entry) => entry.id === sourceId);
+		if (!source || !field.visibleWhen) return;
+		field.visibleWhen = {
+			fieldId: source.id,
+			operator: field.visibleWhen.operator,
+			value: defaultConditionValue(source)
+		};
+	}
+
+	function setConditionOperator(field: WaiverField, operator: string) {
+		if (!field.visibleWhen) return;
+		if (operator !== 'equals' && operator !== 'not_equals') return;
+		field.visibleWhen.operator = operator satisfies WaiverConditionOperator;
+	}
+
+	function setConditionValue(field: WaiverField, source: WaiverField | undefined, raw: string) {
+		if (!field.visibleWhen) return;
+		field.visibleWhen.value = source?.type === 'checkbox' ? raw === 'true' : raw;
 	}
 
 	function reorderFields(fromIndex: number, toIndex: number) {
@@ -106,7 +168,13 @@
 	}
 
 	function removeOption(field: Extract<WaiverField, { type: 'select' }>, optionIndex: number) {
-		field.options.splice(optionIndex, 1);
+		const [removed] = field.options.splice(optionIndex, 1);
+		if (!removed || !draft) return;
+		for (const entry of draft.fields) {
+			if (entry.visibleWhen?.fieldId === field.id && entry.visibleWhen.value === removed.id) {
+				delete entry.visibleWhen;
+			}
+		}
 	}
 
 	function reorderOptions(fieldId: string, fromIndex: number, toIndex: number) {
@@ -216,6 +284,7 @@
 								}
 							})}
 							{@const FieldIcon = getFieldTypeIcon(field.type)}
+							{@const sources = conditionSources(index)}
 							<li
 								{@attach sortable.attach}
 								class="field-row"
@@ -343,6 +412,90 @@
 												<span>Add option</span>
 											</button>
 										</div>
+									{/if}
+
+									{#if field.visibleWhen}
+										{@const condition = field.visibleWhen}
+										{@const source = draft.fields.find((entry) => entry.id === condition.fieldId)}
+										{@const problem = getConditionProblem(draft.fields, index)}
+										<div class="options-card condition-card mt-2" class:has-problem={!!problem}>
+											<div class="flex items-center justify-between gap-2">
+												<p class="options-label">Show only when</p>
+												<button
+													type="button"
+													class="condition-remove"
+													onclick={() => removeCondition(field)}
+													aria-label="Remove condition"
+													title="Remove condition"
+												>
+													<XIcon class="size-3" />
+												</button>
+											</div>
+											<div class="condition-grid mt-1.5">
+												<select
+													class="condition-select"
+													aria-label="Field this depends on"
+													value={condition.fieldId}
+													onchange={(event) => setConditionSource(field, event.currentTarget.value)}
+												>
+													{#if !source}
+														<option value={condition.fieldId} disabled>Deleted field</option>
+													{:else if !sources.some((entry) => entry.id === source.id)}
+														<option value={source.id} disabled>{source.label}</option>
+													{/if}
+													{#each sources as entry (entry.id)}
+														<option value={entry.id}>{entry.label}</option>
+													{/each}
+												</select>
+												<div class="condition-row">
+													<select
+														class="condition-select condition-operator"
+														aria-label="Condition"
+														value={condition.operator}
+														onchange={(event) =>
+															setConditionOperator(field, event.currentTarget.value)}
+													>
+														<option value="equals">is</option>
+														<option value="not_equals">is not</option>
+													</select>
+													<select
+														class="condition-select"
+														aria-label="Answer"
+														value={String(condition.value)}
+														onchange={(event) =>
+															setConditionValue(field, source, event.currentTarget.value)}
+													>
+														{#if source?.type === 'select'}
+															{#if !source.options.some((option) => option.id === condition.value)}
+																<option value={String(condition.value)} disabled
+																	>Deleted option</option
+																>
+															{/if}
+															{#each source.options as option (option.id)}
+																<option value={option.id}>{option.label}</option>
+															{/each}
+														{:else}
+															<option value="true">checked</option>
+															<option value="false">unchecked</option>
+														{/if}
+													</select>
+												</div>
+											</div>
+											{#if problem}
+												<p class="condition-hint is-problem">{problem}</p>
+											{:else if field.required}
+												<p class="condition-hint">Required only while shown.</p>
+											{/if}
+										</div>
+									{:else if sources.length > 0}
+										<button
+											type="button"
+											class="add-option-btn"
+											onclick={() => addCondition(field, index)}
+										>
+											<GitBranchIcon class="size-3" />
+											<span>Add condition</span>
+										</button>
 									{/if}
 								</div>
 							</li>
@@ -721,6 +874,67 @@
 	.add-option-btn:disabled {
 		opacity: 0.45;
 		cursor: not-allowed;
+	}
+
+	.condition-card.has-problem {
+		border-color: color-mix(in srgb, var(--destructive) 45%, var(--border));
+	}
+
+	.condition-grid {
+		display: grid;
+		gap: 0.3rem;
+	}
+
+	.condition-row {
+		display: grid;
+		grid-template-columns: auto minmax(0, 1fr);
+		gap: 0.3rem;
+	}
+
+	.condition-select {
+		height: 1.7rem;
+		min-width: 0;
+		width: 100%;
+		padding: 0 0.4rem;
+		border-radius: var(--radius-md);
+		border: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
+		background: color-mix(in srgb, var(--background) 55%, transparent);
+		font-size: 0.75rem;
+		color: var(--foreground);
+	}
+
+	.condition-select:focus-visible {
+		outline: none;
+		border-color: color-mix(in srgb, var(--primary) 55%, var(--border));
+	}
+
+	.condition-operator {
+		width: auto;
+	}
+
+	.condition-remove {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 1.25rem;
+		height: 1.25rem;
+		border-radius: var(--radius-sm);
+		color: color-mix(in srgb, var(--muted-foreground) 70%, transparent);
+	}
+
+	.condition-remove:hover {
+		background: color-mix(in srgb, var(--destructive) 12%, transparent);
+		color: var(--destructive);
+	}
+
+	.condition-hint {
+		margin-top: 0.35rem;
+		font-size: 0.62rem;
+		color: var(--muted-foreground);
+	}
+
+	.condition-hint.is-problem {
+		color: var(--destructive);
 	}
 
 	.add-option-btn:focus-visible {

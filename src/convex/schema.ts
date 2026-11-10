@@ -1,5 +1,6 @@
 import { defineSchema, defineTable } from 'convex/server';
 import { v } from 'convex/values';
+import { waiverFieldConditionValidator } from './lib/waiverConditionValidator';
 import { billingFeatureValidator } from './lib/billing';
 import { bookingProviderValidator, bookingSnapshotValidator } from './lib/bookings';
 import { marketingIntegrationStatusValidator, marketingProviderValidator } from './lib/marketing';
@@ -112,19 +113,22 @@ export default defineSchema({
 					type: v.literal('text'),
 					label: v.string(),
 					required: v.boolean(),
+					visibleWhen: v.optional(waiverFieldConditionValidator),
 					placeholder: v.optional(v.string())
 				}),
 				v.object({
 					id: v.string(),
 					type: v.literal('checkbox'),
 					label: v.string(),
-					required: v.boolean()
+					required: v.boolean(),
+					visibleWhen: v.optional(waiverFieldConditionValidator)
 				}),
 				v.object({
 					id: v.string(),
 					type: v.literal('select'),
 					label: v.string(),
 					required: v.boolean(),
+					visibleWhen: v.optional(waiverFieldConditionValidator),
 					options: v.array(
 						v.object({
 							id: v.string(),
@@ -136,7 +140,8 @@ export default defineSchema({
 					id: v.string(),
 					type: v.literal('date'),
 					label: v.string(),
-					required: v.boolean()
+					required: v.boolean(),
+					visibleWhen: v.optional(waiverFieldConditionValidator)
 				})
 			)
 		)
@@ -158,19 +163,22 @@ export default defineSchema({
 					type: v.literal('text'),
 					label: v.string(),
 					required: v.boolean(),
+					visibleWhen: v.optional(waiverFieldConditionValidator),
 					placeholder: v.optional(v.string())
 				}),
 				v.object({
 					id: v.string(),
 					type: v.literal('checkbox'),
 					label: v.string(),
-					required: v.boolean()
+					required: v.boolean(),
+					visibleWhen: v.optional(waiverFieldConditionValidator)
 				}),
 				v.object({
 					id: v.string(),
 					type: v.literal('select'),
 					label: v.string(),
 					required: v.boolean(),
+					visibleWhen: v.optional(waiverFieldConditionValidator),
 					options: v.array(
 						v.object({
 							id: v.string(),
@@ -182,7 +190,8 @@ export default defineSchema({
 					id: v.string(),
 					type: v.literal('date'),
 					label: v.string(),
-					required: v.boolean()
+					required: v.boolean(),
+					visibleWhen: v.optional(waiverFieldConditionValidator)
 				})
 			)
 		),

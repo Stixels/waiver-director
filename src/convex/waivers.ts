@@ -652,7 +652,7 @@ export const submitPublicWaiver = mutation({
 			});
 		}
 
-		validateSubmissionAnswers(version, args.answers);
+		const answers = validateSubmissionAnswers(version, args.answers);
 		const minors = validateMinors(args.minors);
 		const marketingIntegration = await ctx.db
 			.query('marketing_integrations')
@@ -699,7 +699,7 @@ export const submitPublicWaiver = mutation({
 			}),
 			signerDateOfBirth,
 			signatureDataUrl: args.signatureDataUrl,
-			answers: args.answers,
+			answers,
 			minors,
 			status: 'submitted',
 			marketingConsent,
