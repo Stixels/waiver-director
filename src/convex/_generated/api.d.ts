@@ -15,6 +15,7 @@ import type * as checkIns from "../checkIns.js";
 import type * as crons from "../crons.js";
 import type * as customers from "../customers.js";
 import type * as dashboard from "../dashboard.js";
+import type * as devSeed from "../devSeed.js";
 import type * as emailAI from "../emailAI.js";
 import type * as emails from "../emails.js";
 import type * as http from "../http.js";
@@ -53,6 +54,7 @@ declare const fullApi: ApiFromModules<{
   crons: typeof crons;
   customers: typeof customers;
   dashboard: typeof dashboard;
+  devSeed: typeof devSeed;
   emailAI: typeof emailAI;
   emails: typeof emails;
   http: typeof http;
