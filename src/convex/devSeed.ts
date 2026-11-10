@@ -5,14 +5,15 @@ import type { Doc, Id } from './_generated/dataModel';
 import { bookingSearchText } from './lib/bookings';
 
 // Dev-only helpers for trying the kiosk and check-in pages without a real booking provider.
-// Internal functions, so they can only be run by someone with deploy access. The slug is
-// optional when the deployment has a single workspace; a wrong slug lists the real ones.
+// Internal functions, so they can only be run by someone with deploy access. Without a
+// workspaceSlug they seed (or clear) every workspace in the deployment.
 //   npx convex run devSeed:seedTestBookings            (only workspace in the deployment)
 //   npx convex run devSeed:seedTestBookings '{"workspaceSlug":"my-workspace"}'
 //   npx convex run devSeed:clearTestBookings '{"workspaceSlug":"my-workspace"}'
 
 const TEST_BOOKING_PREFIX = 'TEST-';
 const HOUR_MS = 60 * 60 * 1000;
+const MAX_WORKSPACES = 50;
 
 type SampleBooking = {
 	number: string;
@@ -95,26 +96,25 @@ const SAMPLE_BOOKINGS: SampleBooking[] = [
 	}
 ];
 
-async function requireWorkspaceBySlug(
+/** With a slug: that workspace. Without one: every workspace in this (dev) deployment. */
+async function resolveWorkspaces(
 	ctx: MutationCtx,
 	slug: string | undefined
-): Promise<Doc<'workspaces'>> {
-	if (slug) {
-		const workspace = await ctx.db
-			.query('workspaces')
-			.withIndex('by_slug', (q) => q.eq('slug', slug))
-			.unique();
-		if (workspace) return workspace;
+): Promise<Doc<'workspaces'>[]> {
+	if (!slug) {
+		return await ctx.db.query('workspaces').take(MAX_WORKSPACES);
 	}
-	// No slug (or a wrong one): use the only workspace if there is just one, otherwise list them.
-	const workspaces = await ctx.db.query('workspaces').take(20);
-	if (!slug && workspaces.length === 1) return workspaces[0];
-	const available = workspaces.map((workspace) => workspace.slug).join(', ') || 'none';
+	const workspace = await ctx.db
+		.query('workspaces')
+		.withIndex('by_slug', (q) => q.eq('slug', slug))
+		.unique();
+	if (workspace) return [workspace];
+	const available = (await ctx.db.query('workspaces').take(MAX_WORKSPACES))
+		.map((candidate) => candidate.slug)
+		.join(', ');
 	throw new ConvexError({
 		code: 'not_found',
-		message: slug
-			? `No workspace with slug "${slug}". Workspaces here: ${available}`
-			: `Pass a workspaceSlug. Workspaces here: ${available}`
+		message: `No workspace with slug "${slug}". Workspaces here: ${available || 'none'}`
 	});
 }
 
@@ -139,94 +139,25 @@ export const seedTestBookings = internalMutation({
 		utcOffsetHours: v.optional(v.number())
 	},
 	returns: v.object({
+		workspaces: v.array(v.string()),
 		created: v.number(),
 		updated: v.number(),
 		bookingNumbers: v.array(v.string()),
 		emails: v.array(v.string())
 	}),
 	handler: async (ctx, args) => {
-		const workspace = await requireWorkspaceBySlug(ctx, args.workspaceSlug);
+		const workspaces = await resolveWorkspaces(ctx, args.workspaceSlug);
 		const utcOffsetHours = args.utcOffsetHours ?? -5;
 		const now = Date.now();
-		const halfHour = HOUR_MS / 2;
-		const baseTime = Math.round(now / halfHour) * halfHour;
-
-		// Bookings must belong to a booking integration. Reuse an existing one, otherwise add a
-		// disconnected placeholder so nothing tries to sync with a real provider.
-		const existingIntegration = await ctx.db
-			.query('booking_integrations')
-			.withIndex('by_workspaceId', (q) => q.eq('workspaceId', workspace._id))
-			.first();
-		const integration: Pick<
-			Doc<'booking_integrations'>,
-			'_id' | 'provider'
-		> = existingIntegration ??
-		(await (async () => {
-			const integrationId: Id<'booking_integrations'> = await ctx.db.insert(
-				'booking_integrations',
-				{
-					workspaceId: workspace._id,
-					provider: 'bookeo',
-					status: 'disconnected',
-					permissions: [],
-					disconnectedAt: now,
-					updatedAt: now
-				}
-			);
-			return { _id: integrationId, provider: 'bookeo' as const };
-		})());
-
 		let created = 0;
 		let updated = 0;
-		for (const sample of SAMPLE_BOOKINGS) {
-			const providerBookingId = `${TEST_BOOKING_PREFIX}${sample.number}`;
-			const startAt = baseTime + sample.startsInHours * HOUR_MS;
-			const endAt = startAt + sample.durationHours * HOUR_MS;
-			const startTime = localDateTime(startAt, utcOffsetHours);
-			const fields = {
-				workspaceId: workspace._id,
-				integrationId: integration._id,
-				provider: integration.provider,
-				providerBookingId,
-				searchText: bookingSearchText({
-					providerBookingId,
-					activityName: sample.activityName,
-					leadCustomerName: sample.leadCustomerName,
-					leadCustomerEmail: sample.leadCustomerEmail
-				}),
-				status: sample.status ?? ('active' as const),
-				activityName: sample.activityName,
-				startTime,
-				endTime: localDateTime(endAt, utcOffsetHours),
-				startAt,
-				endAt,
-				serviceDate: startTime.slice(0, 10),
-				leadCustomerName: sample.leadCustomerName,
-				leadCustomerEmail: sample.leadCustomerEmail,
-				participantCount: sample.participantCount,
-				updatedAt: now
-			};
-
-			const existing = await ctx.db
-				.query('bookings')
-				.withIndex('by_workspaceId_and_provider_and_providerBookingId', (q) =>
-					q
-						.eq('workspaceId', workspace._id)
-						.eq('provider', integration.provider)
-						.eq('providerBookingId', providerBookingId)
-				)
-				.unique();
-			if (existing) {
-				// Re-running moves the sample bookings relative to "now" again.
-				await ctx.db.patch(existing._id, fields);
-				updated += 1;
-			} else {
-				await ctx.db.insert('bookings', { ...fields, lookupToken: randomToken(), signedCount: 0 });
-				created += 1;
-			}
+		for (const workspace of workspaces) {
+			const result = await seedWorkspace(ctx, workspace, utcOffsetHours, now);
+			created += result.created;
+			updated += result.updated;
 		}
-
 		return {
+			workspaces: workspaces.map((workspace) => workspace.slug),
 			created,
 			updated,
 			bookingNumbers: SAMPLE_BOOKINGS.map((sample) => `${TEST_BOOKING_PREFIX}${sample.number}`),
@@ -235,26 +166,109 @@ export const seedTestBookings = internalMutation({
 	}
 });
 
+async function seedWorkspace(
+	ctx: MutationCtx,
+	workspace: Doc<'workspaces'>,
+	utcOffsetHours: number,
+	now: number
+): Promise<{ created: number; updated: number }> {
+	const halfHour = HOUR_MS / 2;
+	const baseTime = Math.round(now / halfHour) * halfHour;
+
+	// Bookings must belong to a booking integration. Reuse an existing one, otherwise add a
+	// disconnected placeholder so nothing tries to sync with a real provider.
+	const existingIntegration = await ctx.db
+		.query('booking_integrations')
+		.withIndex('by_workspaceId', (q) => q.eq('workspaceId', workspace._id))
+		.first();
+	const integration: Pick<Doc<'booking_integrations'>, '_id' | 'provider'> = existingIntegration ??
+	(await (async () => {
+		const integrationId: Id<'booking_integrations'> = await ctx.db.insert('booking_integrations', {
+			workspaceId: workspace._id,
+			provider: 'bookeo',
+			status: 'disconnected',
+			permissions: [],
+			disconnectedAt: now,
+			updatedAt: now
+		});
+		return { _id: integrationId, provider: 'bookeo' as const };
+	})());
+
+	let created = 0;
+	let updated = 0;
+	for (const sample of SAMPLE_BOOKINGS) {
+		const providerBookingId = `${TEST_BOOKING_PREFIX}${sample.number}`;
+		const startAt = baseTime + sample.startsInHours * HOUR_MS;
+		const endAt = startAt + sample.durationHours * HOUR_MS;
+		const startTime = localDateTime(startAt, utcOffsetHours);
+		const fields = {
+			workspaceId: workspace._id,
+			integrationId: integration._id,
+			provider: integration.provider,
+			providerBookingId,
+			searchText: bookingSearchText({
+				providerBookingId,
+				activityName: sample.activityName,
+				leadCustomerName: sample.leadCustomerName,
+				leadCustomerEmail: sample.leadCustomerEmail
+			}),
+			status: sample.status ?? ('active' as const),
+			activityName: sample.activityName,
+			startTime,
+			endTime: localDateTime(endAt, utcOffsetHours),
+			startAt,
+			endAt,
+			serviceDate: startTime.slice(0, 10),
+			leadCustomerName: sample.leadCustomerName,
+			leadCustomerEmail: sample.leadCustomerEmail,
+			participantCount: sample.participantCount,
+			updatedAt: now
+		};
+
+		const existing = await ctx.db
+			.query('bookings')
+			.withIndex('by_workspaceId_and_provider_and_providerBookingId', (q) =>
+				q
+					.eq('workspaceId', workspace._id)
+					.eq('provider', integration.provider)
+					.eq('providerBookingId', providerBookingId)
+			)
+			.unique();
+		if (existing) {
+			// Re-running moves the sample bookings relative to "now" again.
+			await ctx.db.patch(existing._id, fields);
+			updated += 1;
+		} else {
+			await ctx.db.insert('bookings', { ...fields, lookupToken: randomToken(), signedCount: 0 });
+			created += 1;
+		}
+	}
+
+	return { created, updated };
+}
+
 // Deletes only the sample bookings. Signatures made against them are kept (signed records are
 // never changed); they just stop showing under a booking on the Check-in page.
 export const clearTestBookings = internalMutation({
 	args: { workspaceSlug: v.optional(v.string()) },
 	returns: v.object({ deleted: v.number() }),
 	handler: async (ctx, args) => {
-		const workspace = await requireWorkspaceBySlug(ctx, args.workspaceSlug);
+		const workspaces = await resolveWorkspaces(ctx, args.workspaceSlug);
 		let deleted = 0;
-		for (const sample of SAMPLE_BOOKINGS) {
-			const matches = await ctx.db
-				.query('bookings')
-				.withIndex('by_workspaceId_and_providerBookingId', (q) =>
-					q
-						.eq('workspaceId', workspace._id)
-						.eq('providerBookingId', `${TEST_BOOKING_PREFIX}${sample.number}`)
-				)
-				.take(10);
-			for (const booking of matches) {
-				await ctx.db.delete(booking._id);
-				deleted += 1;
+		for (const workspace of workspaces) {
+			for (const sample of SAMPLE_BOOKINGS) {
+				const matches = await ctx.db
+					.query('bookings')
+					.withIndex('by_workspaceId_and_providerBookingId', (q) =>
+						q
+							.eq('workspaceId', workspace._id)
+							.eq('providerBookingId', `${TEST_BOOKING_PREFIX}${sample.number}`)
+					)
+					.take(10);
+				for (const booking of matches) {
+					await ctx.db.delete(booking._id);
+					deleted += 1;
+				}
 			}
 		}
 		return { deleted };
