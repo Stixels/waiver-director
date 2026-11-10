@@ -464,15 +464,6 @@
 		}
 	}
 
-	async function copyKioskLink() {
-		try {
-			const url = await createKioskUrl();
-			if (url) await copyText('kiosk', url);
-		} catch (error) {
-			toast.error(getConvexErrorMessage(error, 'Unable to create a kiosk link.'));
-		}
-	}
-
 	async function resetKioskLinks() {
 		if (convex.disabled || !currentWorkspace) return;
 		try {
@@ -770,9 +761,6 @@
 						<DropdownMenuContent align="end" class="w-56">
 							<DropdownMenuItem onclick={openVersionHistory}>Version history</DropdownMenuItem>
 							{#if activePublicHref}
-								<DropdownMenuItem onclick={copyKioskLink}
-									>Copy kiosk link for a tablet</DropdownMenuItem
-								>
 								{#if currentWorkspace?.role === 'owner'}
 									<DropdownMenuItem onclick={resetKioskLinks}>Reset kiosk links</DropdownMenuItem>
 								{/if}
