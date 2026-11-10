@@ -18,6 +18,7 @@
 	import SquareCheckIcon from '@lucide/svelte/icons/square-check';
 	import ChevronsUpDownIcon from '@lucide/svelte/icons/chevrons-up-down';
 	import CalendarIcon from '@lucide/svelte/icons/calendar';
+	import SparklesIcon from '@lucide/svelte/icons/sparkles';
 	import {
 		createBlankField,
 		createOptionId,
@@ -30,9 +31,10 @@
 
 	interface Props {
 		draft?: WaiverDefinition | null;
+		onGenerateWithAI?: () => void;
 	}
 
-	let { draft = $bindable(null) }: Props = $props();
+	let { draft = $bindable(null), onGenerateWithAI }: Props = $props();
 
 	type DragEndHandlerEvent = Parameters<
 		NonNullable<ComponentProps<typeof DragDropProvider>['onDragEnd']>
@@ -204,6 +206,18 @@
 						Use <span class="font-medium text-foreground/80">Add field</span> to collect extra info before
 						the signature.
 					</p>
+					{#if onGenerateWithAI}
+						<Button
+							type="button"
+							variant="outline"
+							size="sm"
+							class="mt-4 h-7 gap-1.5 text-xs"
+							onclick={onGenerateWithAI}
+						>
+							<SparklesIcon class="size-3.5" />
+							Generate with AI
+						</Button>
+					{/if}
 				</div>
 			{:else}
 				<DragDropProvider onDragEnd={handleFieldDragEnd}>
