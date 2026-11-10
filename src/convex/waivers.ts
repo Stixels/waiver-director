@@ -16,6 +16,7 @@ import {
 	assertWorkspaceRecord,
 	minorInputValidator,
 	normalizeWaiverDefinition,
+	ensureDefaultWorkspaceWaiver,
 	requireWorkspaceMember,
 	validateMinors,
 	validateSubmissionAnswers,
@@ -166,6 +167,26 @@ export const getWorkspaceWaiver = query({
 		}
 
 		return await workspaceWaiverSummary(ctx, waiver);
+	}
+});
+
+// Recreates the default unpublished waiver if this workspace's waiver row is missing, so
+// the Waiver page can recover instead of getting stuck. No-op when the waiver exists.
+export const ensureWorkspaceWaiver = mutation({
+	args: {
+		workspaceId: v.id('workspaces')
+	},
+	returns: v.object({
+		waiverId: v.id('workspace_waivers'),
+		created: v.boolean()
+	}),
+	handler: async (ctx, args) => {
+		await requireWorkspaceMember(ctx, args.workspaceId);
+		const workspace = await ctx.db.get(args.workspaceId);
+		if (!workspace || workspace.status !== 'active') {
+			throw new ConvexError({ code: 'not_found', message: 'Workspace not found.' });
+		}
+		return await ensureDefaultWorkspaceWaiver(ctx, workspace);
 	}
 });
 

@@ -5,8 +5,7 @@ import type { MutationCtx } from './_generated/server';
 import type { Doc, Id, TableNames } from './_generated/dataModel';
 import { getCurrentUser } from './lib/auth';
 import {
-	createDefaultPublicWaiverSlug,
-	createDefaultWaiverDefinition,
+	ensureDefaultWorkspaceWaiver,
 	requireWorkspaceMember,
 	requireWorkspaceOwner
 } from './lib/waivers';
@@ -126,15 +125,7 @@ export const createWorkspace = mutation({
 			status: 'active'
 		});
 
-		const waiverDefinition = createDefaultWaiverDefinition(name);
-		await ctx.db.insert('workspace_waivers', {
-			workspaceId,
-			publicSlug: createDefaultPublicWaiverSlug(slug),
-			title: waiverDefinition.title,
-			introCopy: waiverDefinition.introCopy,
-			theme: waiverDefinition.theme ?? 'dark',
-			fields: waiverDefinition.fields
-		});
+		await ensureDefaultWorkspaceWaiver(ctx, { _id: workspaceId, name, slug });
 
 		if (!user.defaultWorkspaceId) {
 			await ctx.db.patch('users', user._id, {
@@ -674,8 +665,8 @@ export const currentWorkspaceMembership = query({
 	}
 });
 
-// Dev/support repair: recreates the default (unpublished) waiver for a workspace whose
-// workspace_waivers row is missing. Internal only; run with
+// Support repair for a workspace whose waiver row is missing. The Waiver page also calls
+// waivers:ensureWorkspaceWaiver on its own; this is for fixing it from the CLI:
 // `npx convex run workspaces:repairMissingWorkspaceWaiver '{"workspaceSlug":"..."}'`.
 export const repairMissingWorkspaceWaiver = internalMutation({
 	args: { workspaceSlug: v.string() },
@@ -692,34 +683,7 @@ export const repairMissingWorkspaceWaiver = internalMutation({
 			throw new ConvexError({ code: 'not_found', message: 'Workspace not found.' });
 		}
 
-		const existing = await ctx.db
-			.query('workspace_waivers')
-			.withIndex('by_workspaceId', (q) => q.eq('workspaceId', workspace._id))
-			.unique();
-		if (existing) {
-			return { status: 'already_exists' as const, waiverId: existing._id };
-		}
-
-		const baseSlug = createDefaultPublicWaiverSlug(workspace.slug);
-		let publicSlug = baseSlug;
-		for (let attempt = 2; attempt <= 20; attempt += 1) {
-			const taken = await ctx.db
-				.query('workspace_waivers')
-				.withIndex('by_publicSlug', (q) => q.eq('publicSlug', publicSlug))
-				.unique();
-			if (!taken) break;
-			publicSlug = `${baseSlug.slice(0, 60)}-${attempt}`;
-		}
-
-		const definition = createDefaultWaiverDefinition(workspace.name);
-		const waiverId = await ctx.db.insert('workspace_waivers', {
-			workspaceId: workspace._id,
-			publicSlug,
-			title: definition.title,
-			introCopy: definition.introCopy,
-			theme: definition.theme ?? 'dark',
-			fields: definition.fields
-		});
-		return { status: 'created' as const, waiverId };
+		const { waiverId, created } = await ensureDefaultWorkspaceWaiver(ctx, workspace);
+		return { status: created ? ('created' as const) : ('already_exists' as const), waiverId };
 	}
 });

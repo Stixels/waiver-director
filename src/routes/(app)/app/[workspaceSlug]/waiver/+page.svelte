@@ -4,6 +4,7 @@
 	import { page } from '$app/state';
 	import { onMount, tick, untrack } from 'svelte';
 	import type { FunctionReturnType } from 'convex/server';
+	import { ConvexError } from 'convex/values';
 	import { useConvexClient } from 'convex-svelte';
 	import { toast } from 'svelte-sonner';
 	import { api } from '$convex/_generated/api';
@@ -71,6 +72,44 @@
 
 	const workspaceWaiver = $derived((waiverQuery.data ?? null) as WorkspaceWaiverSummary | null);
 	const isLoadingProtectedData = $derived(appContext.isLoading || waiverQuery.isLoading);
+
+	// Every workspace should have one waiver row. If it's missing, recreate the default
+	// (unpublished) waiver once automatically, with a button as a fallback.
+	const isWaiverMissing = $derived(isWaiverNotFoundError(waiverQuery.error));
+	let isRestoringWaiver = $state(false);
+	let autoRestoreAttemptedFor = $state<string | null>(null);
+
+	$effect(() => {
+		const workspaceId = currentWorkspace?.workspaceId;
+		if (!workspaceId || !isWaiverMissing) return;
+		untrack(() => {
+			if (autoRestoreAttemptedFor === workspaceId) return;
+			autoRestoreAttemptedFor = workspaceId;
+			void restoreMissingWaiver();
+		});
+	});
+
+	function isWaiverNotFoundError(error: unknown): boolean {
+		if (!error) return false;
+		if (error instanceof ConvexError) {
+			const data = error.data as { code?: unknown } | null;
+			return typeof data === 'object' && data !== null && data.code === 'not_found';
+		}
+		return error instanceof Error && error.message.includes('Workspace waiver not found');
+	}
+
+	async function restoreMissingWaiver() {
+		const workspaceId = currentWorkspace?.workspaceId;
+		if (!workspaceId || isRestoringWaiver) return;
+		isRestoringWaiver = true;
+		try {
+			await convex.mutation(api.waivers.ensureWorkspaceWaiver, { workspaceId });
+		} catch (error) {
+			toast.error(getConvexErrorMessage(error, 'Unable to set up the waiver.'));
+		} finally {
+			isRestoringWaiver = false;
+		}
+	}
 
 	let draft = $state<WaiverDefinition | null>(null);
 	let baselineDraft = $state<WaiverDefinition | null>(null);
@@ -876,10 +915,22 @@
 				<div
 					class="w-full max-w-md rounded-2xl border border-dashed border-border bg-muted/10 px-6 py-14 text-center"
 				>
-					<p class="text-base font-semibold tracking-tight">Waiver unavailable</p>
-					<p class="mt-1 text-sm text-muted-foreground">
-						This workspace is missing its waiver record.
-					</p>
+					{#if isRestoringWaiver}
+						<p class="text-base font-semibold tracking-tight">Setting up your waiver…</p>
+						<p class="mt-1 text-sm text-muted-foreground">This only takes a moment.</p>
+					{:else}
+						<p class="text-base font-semibold tracking-tight">Waiver unavailable</p>
+						<p class="mt-1 text-sm text-muted-foreground">
+							{isWaiverMissing
+								? "This workspace doesn't have a waiver yet."
+								: "We couldn't load this workspace's waiver."}
+						</p>
+						{#if isWaiverMissing}
+							<Button class="mt-5" onclick={() => void restoreMissingWaiver()}>
+								Create waiver
+							</Button>
+						{/if}
+					{/if}
 				</div>
 			</div>
 		{:else if workspaceWaiver}

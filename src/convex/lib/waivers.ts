@@ -126,6 +126,52 @@ export function createDefaultPublicWaiverSlug(workspaceSlug: string): string {
 	return normalizePublicSlug(`${workspaceSlug}-waiver`);
 }
 
+/**
+ * Returns the workspace's waiver row, creating the default unpublished waiver when it is
+ * missing. Every workspace is expected to have exactly one; this keeps the Waiver page
+ * usable if that row was never written or was removed.
+ */
+export async function ensureDefaultWorkspaceWaiver(
+	ctx: MutationCtx,
+	workspace: Pick<Doc<'workspaces'>, '_id' | 'name' | 'slug'>
+): Promise<{ waiverId: Id<'workspace_waivers'>; created: boolean }> {
+	const existing = await ctx.db
+		.query('workspace_waivers')
+		.withIndex('by_workspaceId', (q) => q.eq('workspaceId', workspace._id))
+		.unique();
+	if (existing) {
+		return { waiverId: existing._id, created: false };
+	}
+
+	const baseSlug = createDefaultPublicWaiverSlug(workspace.slug);
+	let publicSlug = baseSlug;
+	for (let attempt = 2; ; attempt += 1) {
+		const taken = await ctx.db
+			.query('workspace_waivers')
+			.withIndex('by_publicSlug', (q) => q.eq('publicSlug', publicSlug))
+			.unique();
+		if (!taken) break;
+		if (attempt > 20) {
+			throw new ConvexError({
+				code: 'internal_error',
+				message: 'Unable to generate a unique waiver link. Please try again.'
+			});
+		}
+		publicSlug = normalizePublicSlug(`${baseSlug.slice(0, 58)}-${attempt}`);
+	}
+
+	const definition = createDefaultWaiverDefinition(workspace.name);
+	const waiverId = await ctx.db.insert('workspace_waivers', {
+		workspaceId: workspace._id,
+		publicSlug,
+		title: definition.title,
+		introCopy: definition.introCopy,
+		theme: definition.theme ?? 'dark',
+		fields: definition.fields
+	});
+	return { waiverId, created: true };
+}
+
 export async function requireWorkspaceMember(
 	ctx: FunctionCtx,
 	workspaceId: Id<'workspaces'>
