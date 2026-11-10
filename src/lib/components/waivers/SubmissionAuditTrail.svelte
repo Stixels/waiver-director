@@ -26,7 +26,7 @@
 	}
 </script>
 
-<section class="mx-auto max-w-3xl px-4 pb-10 sm:px-6" aria-labelledby="audit-trail-heading">
+<section class="mx-auto max-w-3xl px-4 py-10 sm:px-6" aria-labelledby="audit-trail-heading">
 	<div class="rounded-xl border border-border bg-background p-4 sm:p-5">
 		<h3
 			id="audit-trail-heading"
@@ -45,7 +45,7 @@
 				<dt class={rowLabelClass}>Received by server</dt>
 				<dd class={rowValueClass}>{formatTimestamp(audit.receivedAt)}</dd>
 
-				<dt class={rowLabelClass}>IP address (reported)</dt>
+				<dt class={rowLabelClass}>IP address</dt>
 				<dd class={rowValueClass}>{audit.ipAddress ?? 'Not recorded'}</dd>
 
 				{#if audit.forwardedFor && audit.forwardedFor !== audit.ipAddress}
@@ -73,9 +73,8 @@
 				<dd class={rowValueClass}>{formatTimestamp(audit.clientSignatureCompletedAt)}</dd>
 			</dl>
 			<p class="mt-4 text-[11px] leading-relaxed text-muted-foreground">
-				Waiver Director computes the hashes and the server time itself. IP address and device are
-				read from the request headers and are not independently verified. Form opened and signature
-				times are reported by the signer's browser.
+				Waiver Director records the server time, IP address and hashes itself. Device / browser,
+				form opened and signature drawn are reported by the signer's browser.
 			</p>
 		{/if}
 	</div>

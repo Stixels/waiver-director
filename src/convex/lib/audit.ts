@@ -99,13 +99,13 @@ export function normalizeForwardedFor(value: string | null | undefined): string 
 }
 
 /**
- * Best-effort client IP from request headers: the last `x-forwarded-for` hop,
- * which is the address appended by the nearest proxy. Earlier hops, and headers
- * such as `x-real-ip`, can be set by the client and are ignored.
+ * Client IP from the last `x-forwarded-for` hop, which Convex's HTTP edge
+ * appends with the address it saw. Earlier hops, and headers such as
+ * `x-real-ip`, can be set by the client and are ignored. The raw chain is
+ * stored separately.
  *
- * Convex does not document whether its HTTP edge sets or overwrites
- * `x-forwarded-for`, so this value is stored and shown as reported by request
- * headers, not as independently verified. The raw chain is stored separately.
+ * Verified on a dev deployment (2026-11-09): a request sent with a spoofed
+ * `X-Forwarded-For: 1.2.3.4` header was recorded with the caller's real IP.
  */
 export function clientIpFromHeaders(headers: { get(name: string): string | null }): string | null {
 	const forwardedFor = headers.get('x-forwarded-for');

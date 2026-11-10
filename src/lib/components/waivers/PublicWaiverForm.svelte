@@ -213,7 +213,7 @@
 				{#if booking}
 					<button
 						type="button"
-						class="mt-8 h-12 bg-foreground px-8 text-sm font-semibold tracking-wide text-background transition-opacity hover:opacity-85"
+						class="mt-8 h-12 rounded-2xl bg-foreground px-8 text-sm font-semibold tracking-wide text-background transition-opacity hover:opacity-85"
 						onclick={resetForm}
 					>
 						Sign another waiver
@@ -505,7 +505,7 @@
 					<div class="pb-16">
 						<button
 							type="submit"
-							class="h-12 w-full bg-foreground text-sm font-semibold tracking-wide text-background transition-opacity hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-40"
+							class="h-12 w-full rounded-2xl bg-foreground text-sm font-semibold tracking-wide text-background transition-opacity hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-40"
 							disabled={isSubmitting}
 						>
 							{isSubmitting ? 'Submitting...' : 'Submit waiver'}

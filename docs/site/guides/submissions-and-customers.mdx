@@ -33,7 +33,8 @@ description: 'Review signed waivers and each customer’s visit history.'
 Below the signed document, each submission shows an **Audit trail** you can point to if a signature is ever disputed:
 
 - **Received by server**: when Waiver Director recorded the signature.
-- **IP address (reported)** and **Device / browser**: read from the signer's request headers. Waiver Director records them automatically, but cannot independently verify them.
+- **IP address**: the address the signature came from, recorded by the server. The signer can't change it.
+- **Device / browser**: the browser and device the signer's browser reported.
 - **Document hash**: a SHA-256 fingerprint of the exact waiver version the signer saw. Two submissions with the same document hash signed identical text.
 - **Record hash**: a SHA-256 fingerprint of the signed record (signer details, answers, minors, and signature). Any later change to the record would no longer match it.
 - **Form opened** and **Signature drawn**: times reported by the signer's browser, for context.
