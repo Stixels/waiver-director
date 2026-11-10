@@ -74,9 +74,10 @@
 	const isLoadingProtectedData = $derived(appContext.isLoading || waiverQuery.isLoading);
 
 	// Every workspace should have one waiver row. If it's missing, recreate the default
-	// (unpublished) waiver once automatically, with a button as a fallback.
+	// (unpublished) waiver automatically, once per page load.
 	const isWaiverMissing = $derived(isWaiverNotFoundError(waiverQuery.error));
 	let isRestoringWaiver = $state(false);
+	let waiverRestoreFailed = $state(false);
 	let autoRestoreAttemptedFor = $state<string | null>(null);
 
 	$effect(() => {
@@ -102,9 +103,11 @@
 		const workspaceId = currentWorkspace?.workspaceId;
 		if (!workspaceId || isRestoringWaiver) return;
 		isRestoringWaiver = true;
+		waiverRestoreFailed = false;
 		try {
 			await convex.mutation(api.waivers.ensureWorkspaceWaiver, { workspaceId });
 		} catch (error) {
+			waiverRestoreFailed = true;
 			toast.error(getConvexErrorMessage(error, 'Unable to set up the waiver.'));
 		} finally {
 			isRestoringWaiver = false;
@@ -915,21 +918,14 @@
 				<div
 					class="w-full max-w-md rounded-2xl border border-dashed border-border bg-muted/10 px-6 py-14 text-center"
 				>
-					{#if isRestoringWaiver}
+					{#if isRestoringWaiver || (isWaiverMissing && !waiverRestoreFailed)}
 						<p class="text-base font-semibold tracking-tight">Setting up your waiver…</p>
 						<p class="mt-1 text-sm text-muted-foreground">This only takes a moment.</p>
 					{:else}
 						<p class="text-base font-semibold tracking-tight">Waiver unavailable</p>
 						<p class="mt-1 text-sm text-muted-foreground">
-							{isWaiverMissing
-								? "This workspace doesn't have a waiver yet."
-								: "We couldn't load this workspace's waiver."}
+							We couldn't load this workspace's waiver. Try refreshing the page.
 						</p>
-						{#if isWaiverMissing}
-							<Button class="mt-5" onclick={() => void restoreMissingWaiver()}>
-								Create waiver
-							</Button>
-						{/if}
 					{/if}
 				</div>
 			</div>
