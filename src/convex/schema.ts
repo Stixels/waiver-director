@@ -282,9 +282,6 @@ export default defineSchema({
 		verificationCodeHash: v.optional(v.string()),
 		verificationCodeExpiresAt: v.optional(v.number()),
 		verificationCodeSentAt: v.optional(v.number()),
-		// When the last verification email send was reserved. Cancel does not
-		// clear it, so it rate-limits sends even across cancel-then-resend.
-		verificationSendReservedAt: v.optional(v.number()),
 		verificationAttempts: v.number(),
 		updatedAt: v.number()
 	}).index('by_workspaceId', ['workspaceId']),
@@ -307,7 +304,6 @@ export default defineSchema({
 			v.literal('failed')
 		),
 		scheduledFunctionId: v.optional(v.id('_scheduled_functions')),
-		deliveryClaimedAt: v.optional(v.number()),
 		sentAt: v.optional(v.number()),
 		sentSubject: v.optional(v.string()),
 		sentBodyHtml: v.optional(v.string()),

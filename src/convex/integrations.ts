@@ -1221,7 +1221,7 @@ export const upsertProviderBooking = internalMutation({
 			participantCount: v.number()
 		})
 	},
-	returns: v.union(v.id('bookings'), v.null()),
+	returns: v.id('bookings'),
 	handler: async (ctx, args) => {
 		const integration = await ctx.db.get(args.integrationId);
 		if (!integration) {
@@ -1230,9 +1230,6 @@ export const upsertProviderBooking = internalMutation({
 				message: 'Integration not found.'
 			});
 		}
-		// A sync or webhook job that was already queued when the owner disconnected
-		// must not keep writing bookings into the workspace.
-		if (integration.status === 'disconnected') return null;
 
 		const now = Date.now();
 		const existing = await ctx.db
