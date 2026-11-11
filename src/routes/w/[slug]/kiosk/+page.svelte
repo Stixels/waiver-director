@@ -8,6 +8,7 @@
 	import { api } from '$convex/_generated/api';
 	import PublicWaiverForm from '$lib/components/waivers/PublicWaiverForm.svelte';
 	import WaiverDocumentShell from '$lib/components/waivers/WaiverDocumentShell.svelte';
+	import QrCodePreview from '$lib/components/waivers/QrCodePreview.svelte';
 	import {
 		KIOSK_DEVICE_PARAM,
 		KIOSK_IDLE_TIMEOUT_MS,
@@ -34,6 +35,7 @@
 		| { name: 'home' }
 		| { name: 'lookup' }
 		| { name: 'walk-in' }
+		| { name: 'booking-choice'; waiver: BookingWaiverData; signingUrl: string }
 		| { name: 'booking'; waiver: BookingWaiverData }
 		| { name: 'submitted' };
 
@@ -169,8 +171,12 @@
 				lookupError = 'That booking is no longer available. Please ask staff for help.';
 				return;
 			}
-			sessionKey += 1;
-			await goTo({ name: 'booking', waiver: bookingWaiver });
+			// Let the group either scan a QR code to sign on their own phones or sign right here.
+			const signingUrl = new URL(
+				resolve('/w/[slug]/b/[token]', { slug: waiver.slug, token: result.lookupToken }),
+				window.location.origin
+			).toString();
+			await goTo({ name: 'booking-choice', waiver: bookingWaiver, signingUrl });
 		} catch (error) {
 			if (forSession !== sessionKey) return;
 			lookupError = getConvexErrorMessage(error, 'Unable to open this booking.');
@@ -441,6 +447,42 @@
 								</button>
 							</div>
 						{/if}
+					</div>
+				{:else if screen.name === 'booking-choice'}
+					{@const choice = screen}
+					{@const start = formatBookingTimestamp(choice.waiver.booking.startTime, {
+						dateStyle: 'medium',
+						timeStyle: 'short'
+					})}
+					<div class="py-6">
+						<button type="button" class={backButtonClass} onclick={resetKiosk}>Back</button>
+						<div class="mt-6 flex flex-col items-center text-center">
+							<p class="mb-2 text-xs font-bold tracking-[0.2em] text-muted-foreground uppercase">
+								{choice.waiver.booking.activityName}{start ? ` · ${start}` : ''}
+							</p>
+							<h1 class="mb-3 text-2xl font-bold tracking-tight sm:text-3xl">
+								Everyone in your group signs
+							</h1>
+							<p class="mb-8 max-w-md text-base text-muted-foreground">
+								Scan this code to sign on your own phone, or sign here on this tablet.
+							</p>
+							<QrCodePreview text={choice.signingUrl} size={240} />
+							<p class="mt-3 mb-8 text-sm text-muted-foreground">
+								Each person can scan it. Every signature is added to this booking.
+							</p>
+							<div class="grid w-full max-w-md gap-4">
+								<button
+									type="button"
+									class={primaryButtonClass}
+									onclick={() => {
+										sessionKey += 1;
+										void goTo({ name: 'booking', waiver: choice.waiver });
+									}}
+								>
+									Sign on this tablet
+								</button>
+							</div>
+						</div>
 					</div>
 				{:else if screen.name === 'submitted'}
 					<div class="flex flex-col items-center py-20 text-center" role="status">
