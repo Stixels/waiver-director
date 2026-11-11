@@ -13,9 +13,8 @@ import {
 	KIOSK_MAX_RESULTS,
 	KIOSK_WORKSPACE_LOOKUP_LIMIT,
 	KIOSK_WORKSPACE_LOOKUP_WINDOW_MS,
-	isWithinKioskLookupWindow,
+	isPlausibleKioskLocalDate,
 	kioskLeadFirstName,
-	kioskServiceDateRange,
 	parseKioskLookupQuery
 } from '../lib/domain/kiosk';
 
@@ -111,7 +110,7 @@ async function consumeLookupQuota(
  * page. Quotas are keyed per device, with a much higher workspace-wide backstop, so knowing the
  * public waiver slug is not enough to exhaust lookup for a real front-desk kiosk.
  *
- * Results are limited to active bookings inside the kiosk lookup window and expose only the
+ * Results are limited to active bookings on the kiosk's current day and expose only the
  * activity, start time, the lead's first name, and the booking waiver token that is already
  * shareable among people on that booking. No roster, email, or customer history is returned.
  */
@@ -119,7 +118,9 @@ export const lookupBookings = mutation({
 	args: {
 		slug: v.string(),
 		deviceToken: v.optional(v.string()),
-		query: v.string()
+		query: v.string(),
+		/** The kiosk device's calendar date (YYYY-MM-DD); only bookings on that day are matched. */
+		localDate: v.string()
 	},
 	returns: kioskLookupValue,
 	handler: async (ctx, args) => {
@@ -144,6 +145,12 @@ export const lookupBookings = mutation({
 		if (!device) return { status: 'device_required' as const };
 
 		const now = Date.now();
+		if (!isPlausibleKioskLocalDate(args.localDate, now)) {
+			return {
+				status: 'invalid' as const,
+				message: "This tablet's date looks wrong. Check its date and time settings."
+			};
+		}
 		const deviceDecision = await consumeLookupQuota(
 			ctx,
 			workspace._id,
@@ -202,22 +209,20 @@ export const lookupBookings = mutation({
 				)
 				.take(MAX_CANDIDATE_BOOKINGS);
 		} else {
-			const { from, to } = kioskServiceDateRange(now);
 			candidates = await ctx.db
 				.query('bookings')
 				.withIndex('by_workspaceId_and_leadCustomerEmail_and_serviceDate', (q) =>
 					q
 						.eq('workspaceId', workspace._id)
 						.eq('leadCustomerEmail', parsed.value)
-						.gte('serviceDate', from)
-						.lte('serviceDate', to)
+						.eq('serviceDate', args.localDate)
 				)
 				.take(MAX_CANDIDATE_BOOKINGS);
 		}
 
 		const results = candidates
 			.filter((booking) => booking.status === 'active')
-			.filter((booking) => isWithinKioskLookupWindow(booking.startAt, now))
+			.filter((booking) => booking.serviceDate === args.localDate)
 			.sort((a, b) => (a.startAt ?? 0) - (b.startAt ?? 0))
 			.slice(0, KIOSK_MAX_RESULTS)
 			.map((booking) => ({

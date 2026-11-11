@@ -13,7 +13,8 @@
 		KIOSK_IDLE_TIMEOUT_MS,
 		KIOSK_IDLE_WARNING_MS,
 		KIOSK_SUBMITTED_RESET_MS,
-		kioskDeviceStorageKey
+		kioskDeviceStorageKey,
+		kioskLocalDate
 	} from '$lib/domain/kiosk';
 	import { getConvexErrorMessage } from '$lib/utils/convex-errors';
 	import { formatBookingTimestamp } from '$lib/utils/date';
@@ -125,7 +126,8 @@
 			const result = await convex.mutation(api.kiosk.lookupBookings, {
 				slug: waiver.slug,
 				...(deviceToken ? { deviceToken } : {}),
-				query: lookupQuery
+				query: lookupQuery,
+				localDate: kioskLocalDate()
 			});
 			if (forSession !== sessionKey) return;
 			if (result.status === 'ok') {
@@ -362,8 +364,7 @@
 							Find your booking
 						</h1>
 						<p class="mb-8 text-base text-muted-foreground">
-							Enter your booking number or the email used to book. Only bookings from the last few
-							hours through tomorrow are shown.
+							Enter your booking number or the email used to book. Only today's bookings are shown.
 						</p>
 						<form class="space-y-4" onsubmit={handleLookup} autocomplete="off">
 							<label class="sr-only" for="kiosk-lookup">Booking number or email</label>
@@ -391,7 +392,7 @@
 							<div class="mt-8" aria-live="polite">
 								{#if lookupResults.length === 0}
 									<p class="text-base text-muted-foreground">
-										No upcoming booking matched. Check the number or email, or sign as a walk-in.
+										No booking for today matched. Check the number or email, or sign as a walk-in.
 									</p>
 								{:else}
 									<p

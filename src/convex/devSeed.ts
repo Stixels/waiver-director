@@ -74,7 +74,7 @@ const SAMPLE_BOOKINGS: SampleBooking[] = [
 		participantCount: 2
 	},
 	{
-		// Outside the kiosk search window (more than 36 hours out): should NOT be found.
+		// Not today: should NOT be found on the kiosk.
 		number: '1006',
 		activityName: 'Family ATV Ride',
 		startsInHours: 72,

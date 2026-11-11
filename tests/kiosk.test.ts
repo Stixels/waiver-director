@@ -1,11 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
-	KIOSK_LOOKAHEAD_MS,
-	KIOSK_LOOKBACK_MS,
-	isWithinKioskLookupWindow,
+	isPlausibleKioskLocalDate,
 	kioskLeadFirstName,
-	kioskServiceDateRange,
+	kioskLocalDate,
 	parseKioskLookupQuery
 } from '../src/lib/domain/kiosk.ts';
 
@@ -24,19 +22,18 @@ test('parses booking numbers and rejects short or empty entries', () => {
 	assert.equal(parseKioskLookupQuery('x'.repeat(121)).kind, 'invalid');
 });
 
-test('limits lookups to recently started and near-term bookings', () => {
-	const now = Date.UTC(2026, 10, 8, 12);
-	assert.equal(isWithinKioskLookupWindow(now, now), true);
-	assert.equal(isWithinKioskLookupWindow(now - KIOSK_LOOKBACK_MS, now), true);
-	assert.equal(isWithinKioskLookupWindow(now - KIOSK_LOOKBACK_MS - 1, now), false);
-	assert.equal(isWithinKioskLookupWindow(now + KIOSK_LOOKAHEAD_MS, now), true);
-	assert.equal(isWithinKioskLookupWindow(now + KIOSK_LOOKAHEAD_MS + 1, now), false);
-	assert.equal(isWithinKioskLookupWindow(undefined, now), false);
+test('formats the kiosk device local date', () => {
+	assert.equal(kioskLocalDate(new Date(2026, 10, 8, 23, 59)), '2026-11-08');
+	assert.equal(kioskLocalDate(new Date(2026, 0, 5, 0, 1)), '2026-01-05');
 });
 
-test('service date range covers every timezone around the window', () => {
-	const now = Date.UTC(2026, 10, 8, 1);
-	assert.deepEqual(kioskServiceDateRange(now), { from: '2026-11-06', to: '2026-11-10' });
+test('accepts only a date that is "today" in some timezone', () => {
+	const now = Date.UTC(2026, 10, 8, 1); // 01:00 UTC: still Nov 7 in the Americas
+	assert.equal(isPlausibleKioskLocalDate('2026-11-07', now), true);
+	assert.equal(isPlausibleKioskLocalDate('2026-11-08', now), true);
+	assert.equal(isPlausibleKioskLocalDate('2026-11-06', now), false);
+	assert.equal(isPlausibleKioskLocalDate('2026-11-09', now), false);
+	assert.equal(isPlausibleKioskLocalDate('11/08/2026', now), false);
 });
 
 test('shows only the lead first name', () => {

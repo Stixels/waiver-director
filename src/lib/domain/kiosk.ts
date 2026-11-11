@@ -1,12 +1,8 @@
 /**
  * Shared kiosk rules for the public kiosk entry (see docs/adr/0001-public-kiosk-entry.md).
- * Used by both the Convex lookup and the kiosk page so the window and timers stay in sync.
+ * Used by both the Convex lookup and the kiosk page so the lookup rules and timers stay in sync.
  */
 
-/** Bookings that started up to this long ago can still be found at the kiosk. */
-export const KIOSK_LOOKBACK_MS = 3 * 60 * 60 * 1000;
-/** Bookings starting up to this far ahead can be found at the kiosk. */
-export const KIOSK_LOOKAHEAD_MS = 36 * 60 * 60 * 1000;
 /** Maximum lookup results shown on the kiosk. */
 export const KIOSK_MAX_RESULTS = 5;
 
@@ -66,23 +62,26 @@ export function parseKioskLookupQuery(raw: string): KioskLookupQuery {
 	return { kind: 'bookingNumber', value: bookingNumber };
 }
 
-export function isWithinKioskLookupWindow(startAt: number | undefined, now: number): boolean {
-	if (typeof startAt !== 'number' || !Number.isFinite(startAt)) return false;
-	return startAt >= now - KIOSK_LOOKBACK_MS && startAt <= now + KIOSK_LOOKAHEAD_MS;
+/** The kiosk device's own calendar date (YYYY-MM-DD). Lookup only matches bookings on this day. */
+export function kioskLocalDate(date: Date = new Date()): string {
+	const month = String(date.getMonth() + 1).padStart(2, '0');
+	const day = String(date.getDate()).padStart(2, '0');
+	return `${date.getFullYear()}-${month}-${day}`;
+}
+
+/**
+ * True when `localDate` is a real "today" somewhere on Earth (UTC-12 to UTC+14) at `now`, so a
+ * kiosk can't ask for some other day's bookings by sending a different date.
+ */
+export function isPlausibleKioskLocalDate(localDate: string, now: number): boolean {
+	if (!/^\d{4}-\d{2}-\d{2}$/.test(localDate)) return false;
+	const hourMs = 60 * 60 * 1000;
+	const toDate = (value: number) => new Date(value).toISOString().slice(0, 10);
+	return localDate >= toDate(now - 12 * hourMs) && localDate <= toDate(now + 14 * hourMs);
 }
 
 /** Only the lead's first name is shown so a lookup never reveals a full customer identity. */
 export function kioskLeadFirstName(leadCustomerName: string | undefined | null): string | null {
 	const first = leadCustomerName?.trim().split(/\s+/)[0] ?? '';
 	return first.length > 0 ? first : null;
-}
-
-/** UTC calendar dates that can contain a booking inside the lookup window (any timezone). */
-export function kioskServiceDateRange(now: number): { from: string; to: string } {
-	const dayMs = 24 * 60 * 60 * 1000;
-	const toDate = (value: number) => new Date(value).toISOString().slice(0, 10);
-	return {
-		from: toDate(now - KIOSK_LOOKBACK_MS - dayMs),
-		to: toDate(now + KIOSK_LOOKAHEAD_MS + dayMs)
-	};
 }
