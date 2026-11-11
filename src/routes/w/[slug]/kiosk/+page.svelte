@@ -46,6 +46,9 @@
 	// Booking lookup only works on a device opened from the Waiver page (see ADR 0001 and
 	// kiosk.lookupBookings). Without a device token the kiosk offers walk-in signing only.
 	let deviceToken = $state<string | null>(null);
+	// The token lives in localStorage, so it is only known after mount. Until then, render neither
+	// the booking button nor the "lookup is off" note, so a registered tablet never flashes them.
+	let deviceChecked = $state(false);
 	// Bumped on every reset and every new signing session, so the signing form remounts with empty
 	// state and a blank signature. Async work captures it and drops its result if it changed, so a
 	// slow response from the previous guest can't reopen their booking or screen after a reset.
@@ -249,6 +252,7 @@
 		} else {
 			deviceToken = readStoredDeviceToken();
 		}
+		deviceChecked = true;
 
 		ticker = setInterval(() => {
 			now = Date.now();
@@ -323,12 +327,15 @@
 							{waiver.workspaceName}
 						</p>
 						<h1 class="mb-4 text-3xl font-bold tracking-tight sm:text-4xl">Sign your waiver</h1>
-						<p class="mb-10 max-w-md text-base leading-relaxed text-muted-foreground">
+						<p
+							class="mb-10 max-w-md text-base leading-relaxed text-muted-foreground"
+							class:invisible={!deviceChecked}
+						>
 							{deviceToken
 								? 'Booked ahead? Find your booking so your waiver is attached to it. Otherwise, sign as a walk-in.'
 								: 'Tap below to read and sign your waiver.'}
 						</p>
-						<div class="grid w-full max-w-md gap-4">
+						<div class="grid w-full max-w-md gap-4" class:invisible={!deviceChecked}>
 							{#if deviceToken}
 								<button
 									type="button"
@@ -356,7 +363,7 @@
 						>
 							Toggle full screen
 						</button>
-						{#if !deviceToken}
+						{#if deviceChecked && !deviceToken}
 							<p class="mt-3 max-w-sm text-xs text-muted-foreground/60">
 								Booking lookup is off on this device. Staff can turn it on by opening the kiosk from
 								the Waiver page in Waiver Director.

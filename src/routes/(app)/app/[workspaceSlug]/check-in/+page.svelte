@@ -39,7 +39,7 @@
 	type RosterPerson = RosterBooking['people'][number];
 
 	let selectedDate = $state(toDateInputValue(new Date()));
-	let selectedDateValue = $state<DateValue | undefined>();
+	const selectedDateValue = $derived<DateValue | undefined>(dateValueFromString(selectedDate));
 	let dateCalendarOpen = $state(false);
 	let searchQuery = $state('');
 	// Optimistic arrival state keyed by `${submissionId}:${participantIndex}`.
@@ -122,17 +122,12 @@
 		}
 	] as const);
 
-	$effect(() => {
-		if (selectedDateValue?.toString() === selectedDate) return;
-		selectedDateValue = dateValueFromString(selectedDate);
-	});
-
-	$effect(() => {
-		const nextDate = selectedDateValue?.toString();
+	function selectCalendarDate(value: DateValue | undefined) {
+		const nextDate = value?.toString();
 		if (!nextDate || nextDate === selectedDate) return;
 		selectedDate = nextDate;
 		dateCalendarOpen = false;
-	});
+	}
 
 	function normalize(value?: string | null) {
 		return value?.trim().toLowerCase().replace(/\s+/g, ' ') ?? '';
@@ -326,7 +321,9 @@
 				<PopoverContent align="end" class="w-auto p-0">
 					<Calendar
 						type="single"
-						bind:value={selectedDateValue}
+						value={selectedDateValue}
+						onValueChange={selectCalendarDate}
+						preventDeselect
 						class="rounded-md border shadow-sm"
 						captionLayout="dropdown"
 						weekdayFormat="narrow"
