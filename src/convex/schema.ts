@@ -481,5 +481,58 @@ export default defineSchema({
 		.index('by_workspaceId', ['workspaceId'])
 		.index('by_integrationId', ['integrationId'])
 		.index('by_integrationId_and_messageId', ['integrationId', 'messageId'])
-		.index('by_status_and_receivedAt', ['status', 'receivedAt'])
+		.index('by_status_and_receivedAt', ['status', 'receivedAt']),
+
+	// Fixed-window counters for the public kiosk booking lookup. Identifier scopes are hashed.
+	kiosk_lookup_rate_limits: defineTable({
+		workspaceId: v.id('workspaces'),
+		scopeKey: v.string(),
+		windowStartedAt: v.number(),
+		requestCount: v.number(),
+		updatedAt: v.number()
+	})
+		.index('by_workspaceId', ['workspaceId'])
+		.index('by_workspaceId_and_scopeKey', ['workspaceId', 'scopeKey'])
+		.index('by_updatedAt', ['updatedAt']),
+
+	// Operational front-desk arrival marks. Kept separate from the immutable signed
+	// submission; participantIndex 0 is the adult signer, 1..n are submission.minors.
+	participant_check_ins: defineTable({
+		workspaceId: v.id('workspaces'),
+		submissionId: v.id('waiver_submissions'),
+		participantIndex: v.number(),
+		checkedInAt: v.number(),
+		checkedInByUserId: v.id('users')
+	})
+		.index('by_workspaceId', ['workspaceId'])
+		.index('by_submissionId_and_participantIndex', ['submissionId', 'participantIndex']),
+
+	// Small per-submission copy of who a signed submission covers, so the check-in roster
+	// never has to read full signed records (signature images make those large).
+	// Written once at signing time; the signed submission stays the source of truth.
+	submission_rosters: defineTable({
+		workspaceId: v.id('workspaces'),
+		submissionId: v.id('waiver_submissions'),
+		bookingId: v.optional(v.id('bookings')),
+		submittedAt: v.number(),
+		signerName: v.string(),
+		minorNames: v.array(v.string())
+	})
+		.index('by_workspaceId', ['workspaceId'])
+		.index('by_submissionId', ['submissionId'])
+		.index('by_workspaceId_and_bookingId_and_submittedAt', [
+			'workspaceId',
+			'bookingId',
+			'submittedAt'
+		]),
+
+	// Front-desk devices allowed to use kiosk booking lookup. Only a hash of the token is stored.
+	kiosk_devices: defineTable({
+		workspaceId: v.id('workspaces'),
+		tokenHash: v.string(),
+		createdByUserId: v.id('users'),
+		createdAt: v.number()
+	})
+		.index('by_workspaceId', ['workspaceId'])
+		.index('by_tokenHash', ['tokenHash'])
 });

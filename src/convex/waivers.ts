@@ -8,6 +8,7 @@ import { bookingSnapshot, bookingSnapshotValidator } from './lib/bookings';
 import { requireWorkspaceFeature, workspaceHasBillingFeature } from './lib/billing';
 import { upsertSignerCustomer } from './lib/customers';
 import { submissionSearchText } from './lib/submissions';
+import { rosterSummaryFromSubmission } from './lib/checkIns';
 import { getOwnedWorkspaceLogoUrl } from './lib/workspaces';
 import { marketingConsentLabel } from './lib/marketing';
 import { sanitizeRichTextHtml } from '../lib/utils/rich-text';
@@ -15,6 +16,7 @@ import {
 	assertWorkspaceRecord,
 	minorInputValidator,
 	normalizeWaiverDefinition,
+	ensureDefaultWorkspaceWaiver,
 	requireWorkspaceMember,
 	validateMinors,
 	validateSubmissionAnswers,
@@ -165,6 +167,26 @@ export const getWorkspaceWaiver = query({
 		}
 
 		return await workspaceWaiverSummary(ctx, waiver);
+	}
+});
+
+// Recreates the default unpublished waiver if this workspace's waiver row is missing, so
+// the Waiver page can recover instead of getting stuck. No-op when the waiver exists.
+export const ensureWorkspaceWaiver = mutation({
+	args: {
+		workspaceId: v.id('workspaces')
+	},
+	returns: v.object({
+		waiverId: v.id('workspace_waivers'),
+		created: v.boolean()
+	}),
+	handler: async (ctx, args) => {
+		await requireWorkspaceMember(ctx, args.workspaceId);
+		const workspace = await ctx.db.get(args.workspaceId);
+		if (!workspace || workspace.status !== 'active') {
+			throw new ConvexError({ code: 'not_found', message: 'Workspace not found.' });
+		}
+		return await ensureDefaultWorkspaceWaiver(ctx, workspace);
 	}
 });
 
@@ -715,6 +737,13 @@ export const submitPublicWaiver = mutation({
 			latestSubmissionId: submissionId
 		});
 		await ctx.db.patch(submissionId, { customerId });
+		await ctx.db.insert('submission_rosters', {
+			workspaceId: waiver.workspaceId,
+			submissionId,
+			...(booking ? { bookingId: booking._id } : {}),
+			submittedAt,
+			...rosterSummaryFromSubmission({ signerName, minors })
+		});
 
 		if (marketingConsent && marketingIntegration?.audienceId) {
 			const syncId = await ctx.db.insert('marketing_contact_syncs', {

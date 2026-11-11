@@ -4,6 +4,7 @@
 	import { page } from '$app/state';
 	import { onMount, tick, untrack } from 'svelte';
 	import type { FunctionReturnType } from 'convex/server';
+	import { ConvexError } from 'convex/values';
 	import { useConvexClient } from 'convex-svelte';
 	import { toast } from 'svelte-sonner';
 	import { api } from '$convex/_generated/api';
@@ -47,6 +48,8 @@
 	import ExternalLinkIcon from '@lucide/svelte/icons/external-link';
 	import CheckIcon from '@lucide/svelte/icons/check';
 	import QrCodeIcon from '@lucide/svelte/icons/qr-code';
+	import TabletSmartphoneIcon from '@lucide/svelte/icons/tablet-smartphone';
+	import { KIOSK_DEVICE_PARAM } from '$lib/domain/kiosk';
 	import UploadCloudIcon from '@lucide/svelte/icons/cloud-upload';
 	import Pencil from '@lucide/svelte/icons/pencil';
 	import XIcon from '@lucide/svelte/icons/x';
@@ -69,6 +72,47 @@
 
 	const workspaceWaiver = $derived((waiverQuery.data ?? null) as WorkspaceWaiverSummary | null);
 	const isLoadingProtectedData = $derived(appContext.isLoading || waiverQuery.isLoading);
+
+	// Every workspace should have one waiver row. If it's missing, recreate the default
+	// (unpublished) waiver automatically, once per page load.
+	const isWaiverMissing = $derived(isWaiverNotFoundError(waiverQuery.error));
+	let isRestoringWaiver = $state(false);
+	let waiverRestoreFailed = $state(false);
+	let autoRestoreAttemptedFor = $state<string | null>(null);
+
+	$effect(() => {
+		const workspaceId = currentWorkspace?.workspaceId;
+		if (!workspaceId || !isWaiverMissing) return;
+		untrack(() => {
+			if (autoRestoreAttemptedFor === workspaceId) return;
+			autoRestoreAttemptedFor = workspaceId;
+			void restoreMissingWaiver();
+		});
+	});
+
+	function isWaiverNotFoundError(error: unknown): boolean {
+		if (!error) return false;
+		if (error instanceof ConvexError) {
+			const data = error.data as { code?: unknown } | null;
+			return typeof data === 'object' && data !== null && data.code === 'not_found';
+		}
+		return error instanceof Error && error.message.includes('Workspace waiver not found');
+	}
+
+	async function restoreMissingWaiver() {
+		const workspaceId = currentWorkspace?.workspaceId;
+		if (!workspaceId || isRestoringWaiver) return;
+		isRestoringWaiver = true;
+		waiverRestoreFailed = false;
+		try {
+			await convex.mutation(api.waivers.ensureWorkspaceWaiver, { workspaceId });
+		} catch (error) {
+			waiverRestoreFailed = true;
+			toast.error(getConvexErrorMessage(error, 'Unable to set up the waiver.'));
+		} finally {
+			isRestoringWaiver = false;
+		}
+	}
 
 	let draft = $state<WaiverDefinition | null>(null);
 	let baselineDraft = $state<WaiverDefinition | null>(null);
@@ -378,6 +422,48 @@
 		versionHistoryOpen = true;
 	}
 
+	let isOpeningKiosk = $state(false);
+
+	// Each call registers a new kiosk device, which is what lets that device use booking lookup.
+	async function createKioskUrl(): Promise<string | null> {
+		if (convex.disabled || !currentWorkspace || !workspaceWaiver) return null;
+		const { token } = await convex.mutation(api.kiosk.createKioskDevice, {
+			workspaceId: currentWorkspace.workspaceId
+		});
+		const baseUrl = publicEnv.appUrl || window.location.origin;
+		const url = new URL(
+			resolve(`/w/${workspaceWaiver.publicSlug}/kiosk` as `/w/${string}/kiosk`),
+			baseUrl
+		);
+		url.searchParams.set(KIOSK_DEVICE_PARAM, token);
+		return url.toString();
+	}
+
+	async function openKiosk() {
+		if (isOpeningKiosk) return;
+		isOpeningKiosk = true;
+		// Open the tab synchronously so popup blockers allow it, then point it at the kiosk.
+		const kioskWindow = window.open('about:blank', '_blank');
+		try {
+			const url = await createKioskUrl();
+			if (!url) {
+				kioskWindow?.close();
+				return;
+			}
+			if (kioskWindow) {
+				kioskWindow.opener = null;
+				kioskWindow.location.href = url;
+			} else {
+				window.location.href = url;
+			}
+		} catch (error) {
+			kioskWindow?.close();
+			toast.error(getConvexErrorMessage(error, 'Unable to open kiosk mode.'));
+		} finally {
+			isOpeningKiosk = false;
+		}
+	}
+
 	async function copyText(key: string, text: string) {
 		try {
 			copyingKey = key;
@@ -606,6 +692,22 @@
 							</TooltipTrigger>
 							<TooltipContent side="bottom" sideOffset={4}>Show QR code</TooltipContent>
 						</Tooltip>
+
+						<Tooltip>
+							<TooltipTrigger
+								class="topbar-icon-btn"
+								aria-label="Open kiosk mode"
+								onclick={openKiosk}
+								disabled={isOpeningKiosk}
+							>
+								{#snippet child({ props })}
+									<button {...props}>
+										<TabletSmartphoneIcon class="size-3.5" />
+									</button>
+								{/snippet}
+							</TooltipTrigger>
+							<TooltipContent side="bottom" sideOffset={4}>Open kiosk mode</TooltipContent>
+						</Tooltip>
 					</div>
 				</div>
 			{:else}
@@ -783,10 +885,15 @@
 				<div
 					class="w-full max-w-md rounded-2xl border border-dashed border-border bg-muted/10 px-6 py-14 text-center"
 				>
-					<p class="text-base font-semibold tracking-tight">Waiver unavailable</p>
-					<p class="mt-1 text-sm text-muted-foreground">
-						This workspace is missing its waiver record.
-					</p>
+					{#if isRestoringWaiver || (isWaiverMissing && !waiverRestoreFailed)}
+						<p class="text-base font-semibold tracking-tight">Setting up your waiver…</p>
+						<p class="mt-1 text-sm text-muted-foreground">This only takes a moment.</p>
+					{:else}
+						<p class="text-base font-semibold tracking-tight">Waiver unavailable</p>
+						<p class="mt-1 text-sm text-muted-foreground">
+							We couldn't load this workspace's waiver. Try refreshing the page.
+						</p>
+					{/if}
 				</div>
 			</div>
 		{:else if workspaceWaiver}

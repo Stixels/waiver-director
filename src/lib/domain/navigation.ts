@@ -1,5 +1,6 @@
 import LayoutDashboardIcon from '@lucide/svelte/icons/layout-dashboard';
 import CalendarCheckIcon from '@lucide/svelte/icons/calendar-check';
+import UserCheckIcon from '@lucide/svelte/icons/user-check';
 import ScrollTextIcon from '@lucide/svelte/icons/scroll-text';
 import UsersRoundIcon from '@lucide/svelte/icons/users-round';
 import LayersIcon from '@lucide/svelte/icons/layers';
@@ -23,6 +24,12 @@ export const appMainNavItems = [
 		href: '/app/[workspaceSlug]/bookings',
 		icon: CalendarCheckIcon,
 		description: 'Provider-synced and manual session groups.'
+	},
+	{
+		label: 'Check-in',
+		href: '/app/[workspaceSlug]/check-in',
+		icon: UserCheckIcon,
+		description: 'Mark arrivals and spot unsigned guests for the day.'
 	},
 	{
 		label: 'Submissions',

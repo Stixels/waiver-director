@@ -42,6 +42,7 @@
 						"pages": [
 							"guides/dashboard",
 							"guides/bookings",
+							"guides/check-in",
 							"guides/submissions-and-customers",
 							"guides/follow-up-emails",
 							"guides/analytics"

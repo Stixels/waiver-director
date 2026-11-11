@@ -31,18 +31,21 @@ flowchart LR
 
 ## Main data model
 
-| Table                    | Holds                                                          |
-| ------------------------ | -------------------------------------------------------------- |
-| `workspaces`             | Workspace identity, handle, and status                         |
-| `workspace_memberships`  | User membership and role (`owner` or `staff`) per workspace    |
-| `workspace_waivers`      | The editable waiver draft and its public slug                  |
-| `waiver_versions`        | Frozen published versions                                      |
-| `waiver_submissions`     | Immutable signed submissions with answers and booking snapshot |
-| `customers`              | Workspace-scoped signers, keyed by normalized email            |
-| `bookings`               | Provider bookings synced from Bookeo                           |
-| `email_follow_ups`       | Follow-up emails and their delivery status                     |
-| `booking_integrations`   | Booking provider connections                                   |
-| `marketing_integrations` | Mailchimp connections                                          |
+| Table                    | Holds                                                                           |
+| ------------------------ | ------------------------------------------------------------------------------- |
+| `workspaces`             | Workspace identity, handle, and status                                          |
+| `workspace_memberships`  | User membership and role (`owner` or `staff`) per workspace                     |
+| `workspace_waivers`      | The editable waiver draft and its public slug                                   |
+| `waiver_versions`        | Frozen published versions                                                       |
+| `waiver_submissions`     | Immutable signed submissions with answers and booking snapshot                  |
+| `customers`              | Workspace-scoped signers, keyed by normalized email                             |
+| `bookings`               | Provider bookings synced from Bookeo                                            |
+| `participant_check_ins`  | Front-desk arrival marks per signed participant (not part of the signed record) |
+| `submission_rosters`     | Small copy of who each signed submission covers, read by the check-in roster    |
+| `kiosk_devices`          | Front-desk tablets allowed to use kiosk booking lookup (token hash only)        |
+| `email_follow_ups`       | Follow-up emails and their delivery status                                      |
+| `booking_integrations`   | Booking provider connections                                                    |
+| `marketing_integrations` | Mailchimp connections                                                           |
 
 See `src/convex/schema.ts` for the full schema.
 
@@ -57,4 +60,14 @@ See `src/convex/schema.ts` for the full schema.
 
 ## Scheduled jobs
 
-Daily cron jobs in `src/convex/crons.ts` prune expired connection sessions, old Bookeo webhook events, and old marketing contact sync records.
+Daily cron jobs in `src/convex/crons.ts` prune expired connection sessions, old Bookeo webhook events, old marketing contact sync records, and stale kiosk lookup rate-limit counters.
+
+## One-time backfills
+
+The check-in roster reads `submission_rosters`, a small per-submission list of signer and minor names written at signing time. After deploying the check-in feature to a deployment that already has signed submissions, run this once to create rows for older submissions:
+
+```sh
+npx convex run checkIns:backfillSubmissionRosters '{}'
+```
+
+It is safe to run again; submissions that already have a row are skipped.

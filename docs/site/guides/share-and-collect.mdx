@@ -31,6 +31,64 @@ Once your waiver is published, the **Waiver** page gives you several ways to sha
 ></iframe>
 ```
 
+## Kiosk mode
+
+**Open kiosk mode** opens a full-screen signing station for a tablet or computer at your front desk. Guests don't need an account, and no one needs to stay signed in on the device.
+
+### Set up a kiosk tablet
+
+1. On the tablet, sign in to Waiver Director and open the **Waiver** page.
+2. Select **Open kiosk mode** (the tablet icon). The kiosk opens in a new tab.
+3. Sign out of Waiver Director in the other tab if you like. The kiosk keeps working.
+
+Opening the kiosk this way registers that tablet, which is what turns on booking lookup there.
+
+Anyone can open your waiver link followed by `/kiosk`, but without a registered device they can only sign as a walk-in.
+
+### What guests see
+
+<Frame caption="Sample data from a fictional workspace.">
+	<img
+		src="/images/app/kiosk-start.png"
+		alt="Kiosk start screen with I have a booking and Sign as a walk-in buttons"
+	/>
+</Frame>
+
+From the kiosk start screen, a guest can:
+
+- **I have a booking**: enter their booking number or the email they booked with. The kiosk shows only active bookings for today (the tablet's date), with just the activity, start time, and the lead's first name. The guest's signature is attached to the booking they choose. After they pick their booking, the kiosk shows a QR code the whole group can scan to sign on their own phones, or they can tap **Sign on this tablet**.
+- **Sign as a walk-in**: sign the waiver without a booking.
+
+<Frame caption="Lookup shows only today's bookings. Sample data.">
+	<img
+		src="/images/app/kiosk-lookup-results.png"
+		alt="Kiosk booking lookup showing two of today's bookings for the same email"
+	/>
+</Frame>
+
+<Frame caption="After choosing a booking: scan to sign on a phone, or sign on the tablet. Sample data.">
+	<img
+		src="/images/app/kiosk-booking-qr.png"
+		alt="Kiosk screen with a QR code for the booking and a Sign on this tablet button"
+	/>
+</Frame>
+
+To protect each guest's details on a shared device, the kiosk:
+
+- Returns to the start screen 10 seconds after a waiver is submitted, or when the guest taps **Done**.
+- Asks "Still there?" after about 75 seconds without a tap or keystroke, and clears the form 15 seconds later.
+- Turns off browser autofill, so one guest's name and email are never suggested to the next.
+- Limits how many booking searches each kiosk can make in a few minutes. If the limit is reached, guests can still sign as walk-ins.
+
+<Frame caption="Sample data from a fictional workspace.">
+	<img
+		src="/images/app/kiosk-idle-warning.png"
+		alt="Still there? warning shown before the kiosk clears the form"
+	/>
+</Frame>
+
+Use **Toggle full screen** on the start screen to hide the browser bar. For a locked-down device, also turn on your tablet's guided access or kiosk setting.
+
 ## Booking links
 
 Each synced booking has its own waiver link. Signatures made through a booking link are attached to that booking automatically, which keeps its [waiver gap](/concepts#waiver-gap) up to date. Copy a booking link from the booking's detail panel on the **Bookings** page and share it with the people on that booking.

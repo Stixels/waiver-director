@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Id } from '$convex/_generated/dataModel';
+	import { onDestroy } from 'svelte';
 	import { useConvexClient } from 'convex-svelte';
 	import { toast } from 'svelte-sonner';
 	import { api } from '$convex/_generated/api';
@@ -45,11 +46,22 @@
 	interface Props {
 		waiver: PublicWaiver;
 		booking?: BookingContext | null;
+		/** Shared-device mode: disables browser autofill so one guest's details never suggest to the next. */
+		kiosk?: boolean;
+		/** Called after a successful submission instead of showing the built-in confirmation. */
+		onSubmitted?: () => void;
 	}
 
-	let { waiver, booking = null }: Props = $props();
+	let { waiver, booking = null, kiosk = false, onSubmitted }: Props = $props();
+	const autocompleteAttr = $derived(kiosk ? 'off' : undefined);
 
 	const convex = useConvexClient();
+	// A kiosk remounts this form on every reset. A submission that resolves after that belongs to
+	// the previous guest, so it must not drive the parent's screen.
+	let isDestroyed = false;
+	onDestroy(() => {
+		isDestroyed = true;
+	});
 
 	let signerName = $state('');
 	let signerEmail = $state('');
@@ -114,6 +126,10 @@
 				minors: minorsPayload
 			});
 
+			if (onSubmitted) {
+				if (!isDestroyed) onSubmitted();
+				return;
+			}
 			isSubmitted = true;
 			toast.success('Waiver submitted.');
 		} catch (error) {
@@ -210,7 +226,7 @@
 
 				<WaiverCopySection introCopy={waiver.introCopy} />
 
-				<form onsubmit={handleSubmit} class="space-y-6">
+				<form onsubmit={handleSubmit} class="space-y-6" autocomplete={autocompleteAttr}>
 					<WaiverPublicAboutSignerCard>
 						<div class="space-y-6">
 							<div>
@@ -219,6 +235,7 @@
 									id="signer-name"
 									class={waiverUnderlineInputClass}
 									bind:value={signerName}
+									autocomplete={kiosk ? 'off' : 'name'}
 									required
 									maxlength={120}
 								/>
@@ -231,6 +248,7 @@
 									type="email"
 									class={waiverUnderlineInputClass}
 									bind:value={signerEmail}
+									autocomplete={kiosk ? 'off' : 'email'}
 									required
 								/>
 							</div>

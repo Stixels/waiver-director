@@ -5,8 +5,7 @@ import type { MutationCtx } from './_generated/server';
 import type { Doc, Id, TableNames } from './_generated/dataModel';
 import { getCurrentUser } from './lib/auth';
 import {
-	createDefaultPublicWaiverSlug,
-	createDefaultWaiverDefinition,
+	ensureDefaultWorkspaceWaiver,
 	requireWorkspaceMember,
 	requireWorkspaceOwner
 } from './lib/waivers';
@@ -46,7 +45,11 @@ const WORKSPACE_SCOPED_TABLES = {
 	booking_webhook_events: true,
 	marketing_integrations: true,
 	marketing_connection_sessions: true,
-	marketing_contact_syncs: true
+	marketing_contact_syncs: true,
+	kiosk_lookup_rate_limits: true,
+	participant_check_ins: true,
+	submission_rosters: true,
+	kiosk_devices: true
 } as const satisfies Record<WorkspaceScopedTableName, true>;
 type WorkspaceCleanupTableName = keyof typeof WORKSPACE_SCOPED_TABLES;
 const WORKSPACE_CLEANUP_TABLE_NAMES = Object.keys(
@@ -122,15 +125,7 @@ export const createWorkspace = mutation({
 			status: 'active'
 		});
 
-		const waiverDefinition = createDefaultWaiverDefinition(name);
-		await ctx.db.insert('workspace_waivers', {
-			workspaceId,
-			publicSlug: createDefaultPublicWaiverSlug(slug),
-			title: waiverDefinition.title,
-			introCopy: waiverDefinition.introCopy,
-			theme: waiverDefinition.theme ?? 'dark',
-			fields: waiverDefinition.fields
-		});
+		await ensureDefaultWorkspaceWaiver(ctx, { _id: workspaceId, name, slug });
 
 		if (!user.defaultWorkspaceId) {
 			await ctx.db.patch('users', user._id, {
