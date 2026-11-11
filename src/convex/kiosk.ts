@@ -23,7 +23,6 @@ const MAX_CANDIDATE_BOOKINGS = 25;
 const RATE_LIMIT_RETENTION_MS = 24 * 60 * 60 * 1000;
 const RATE_LIMIT_PRUNE_BATCH_SIZE = 200;
 const MAX_KIOSK_DEVICE_TOKEN_LENGTH = 200;
-const DEVICE_LAST_USED_WRITE_INTERVAL_MS = 60 * 60 * 1000;
 
 const kioskLookupResultValue = v.object({
 	lookupToken: v.string(),
@@ -164,9 +163,6 @@ export const lookupBookings = mutation({
 				status: 'rate_limited' as const,
 				retryAfterSeconds: deviceDecision.retryAfterSeconds
 			};
-		}
-		if (!device.lastUsedAt || now - device.lastUsedAt > DEVICE_LAST_USED_WRITE_INTERVAL_MS) {
-			await ctx.db.patch(device._id, { lastUsedAt: now });
 		}
 
 		const workspaceDecision = await consumeLookupQuota(

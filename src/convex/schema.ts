@@ -500,15 +500,12 @@ export default defineSchema({
 	participant_check_ins: defineTable({
 		workspaceId: v.id('workspaces'),
 		submissionId: v.id('waiver_submissions'),
-		bookingId: v.optional(v.id('bookings')),
 		participantIndex: v.number(),
 		checkedInAt: v.number(),
 		checkedInByUserId: v.id('users')
 	})
 		.index('by_workspaceId', ['workspaceId'])
-		.index('by_workspaceId_and_checkedInAt', ['workspaceId', 'checkedInAt'])
-		.index('by_submissionId_and_participantIndex', ['submissionId', 'participantIndex'])
-		.index('by_bookingId', ['bookingId']),
+		.index('by_submissionId_and_participantIndex', ['submissionId', 'participantIndex']),
 
 	// Small per-submission copy of who a signed submission covers, so the check-in roster
 	// never has to read full signed records (signature images make those large).
@@ -523,7 +520,6 @@ export default defineSchema({
 	})
 		.index('by_workspaceId', ['workspaceId'])
 		.index('by_submissionId', ['submissionId'])
-		.index('by_bookingId_and_submittedAt', ['bookingId', 'submittedAt'])
 		.index('by_workspaceId_and_bookingId_and_submittedAt', [
 			'workspaceId',
 			'bookingId',
@@ -535,8 +531,7 @@ export default defineSchema({
 		workspaceId: v.id('workspaces'),
 		tokenHash: v.string(),
 		createdByUserId: v.id('users'),
-		createdAt: v.number(),
-		lastUsedAt: v.optional(v.number())
+		createdAt: v.number()
 	})
 		.index('by_workspaceId', ['workspaceId'])
 		.index('by_tokenHash', ['tokenHash'])

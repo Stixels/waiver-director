@@ -115,12 +115,12 @@ export const getDayRoster = query({
 
 		const bookings = await Promise.all(
 			dayBookings.slice(0, MAX_ROSTER_BOOKINGS).map(async (booking) => {
-				const rows = (
-					await ctx.db
-						.query('submission_rosters')
-						.withIndex('by_bookingId_and_submittedAt', (q) => q.eq('bookingId', booking._id))
-						.take(MAX_ROSTER_SUBMISSIONS_PER_BOOKING)
-				).filter((row) => row.workspaceId === args.workspaceId);
+				const rows = await ctx.db
+					.query('submission_rosters')
+					.withIndex('by_workspaceId_and_bookingId_and_submittedAt', (q) =>
+						q.eq('workspaceId', args.workspaceId).eq('bookingId', booking._id)
+					)
+					.take(MAX_ROSTER_SUBMISSIONS_PER_BOOKING);
 				const people = (
 					await Promise.all(rows.map((row) => rosterPeopleWithCheckIns(ctx, row)))
 				).flat();
@@ -225,7 +225,6 @@ export const setParticipantArrived = mutation({
 		await ctx.db.insert('participant_check_ins', {
 			workspaceId: args.workspaceId,
 			submissionId: submission._id,
-			bookingId: submission.bookingId,
 			participantIndex: args.participantIndex,
 			checkedInAt,
 			checkedInByUserId: user._id
