@@ -41,6 +41,8 @@ flowchart LR
 | `customers`              | Workspace-scoped signers, keyed by normalized email                             |
 | `bookings`               | Provider bookings synced from Bookeo                                            |
 | `participant_check_ins`  | Front-desk arrival marks per signed participant (not part of the signed record) |
+| `submission_rosters`     | Small copy of who each signed submission covers, read by the check-in roster    |
+| `kiosk_devices`          | Front-desk tablets allowed to use kiosk booking lookup (token hash only)        |
 | `email_follow_ups`       | Follow-up emails and their delivery status                                      |
 | `booking_integrations`   | Booking provider connections                                                    |
 | `marketing_integrations` | Mailchimp connections                                                           |
@@ -69,3 +71,14 @@ npx convex run checkIns:backfillSubmissionRosters '{}'
 ```
 
 It is safe to run again; submissions that already have a row are skipped.
+
+## Sample bookings for local testing
+
+To try the kiosk and the **Check-in** page without a real Bookeo account, seed a few sample bookings into a development deployment. They are numbered `TEST-1001` to `TEST-1007` and placed around the current time: some today, one tomorrow, one later in the week, and one canceled.
+
+```sh
+npx convex run devSeed:seedTestBookings '{"workspaceSlug":"your-workspace"}'
+npx convex run devSeed:clearTestBookings '{"workspaceSlug":"your-workspace"}'
+```
+
+Leave out `workspaceSlug` to seed every workspace in the deployment. Run the seed again to move the bookings relative to the current time. These are internal functions, so only someone with deploy access can run them.

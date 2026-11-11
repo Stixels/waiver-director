@@ -536,8 +536,7 @@ export default defineSchema({
 		tokenHash: v.string(),
 		createdByUserId: v.id('users'),
 		createdAt: v.number(),
-		lastUsedAt: v.optional(v.number()),
-		revokedAt: v.optional(v.number())
+		lastUsedAt: v.optional(v.number())
 	})
 		.index('by_workspaceId', ['workspaceId'])
 		.index('by_tokenHash', ['tokenHash'])

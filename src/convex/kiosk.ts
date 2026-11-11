@@ -67,7 +67,7 @@ async function getActiveKioskDevice(
 		.query('kiosk_devices')
 		.withIndex('by_tokenHash', (q) => q.eq('tokenHash', tokenHash))
 		.unique();
-	if (!match || match.workspaceId !== workspaceId || match.revokedAt !== undefined) return null;
+	if (!match || match.workspaceId !== workspaceId) return null;
 	return match;
 }
 
@@ -237,8 +237,8 @@ export const lookupBookings = mutation({
 });
 
 /**
- * Creates a kiosk device link for the signed-in member. Each call makes a new device with its
- * own lookup budget; only the token's hash is stored, so the link is shown once.
+ * Registers a kiosk device for the signed-in member (used by Open kiosk mode on the Waiver page).
+ * Each call makes a new device with its own lookup budget. Only the token's hash is stored.
  */
 export const createKioskDevice = mutation({
 	args: { workspaceId: v.id('workspaces') },
