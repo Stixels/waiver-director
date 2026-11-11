@@ -470,6 +470,9 @@
 							<p class="mt-3 mb-8 text-sm text-muted-foreground">
 								Each person can scan it. Every signature is added to this booking.
 							</p>
+							<p class="-mt-5 mb-8 text-sm text-muted-foreground">
+								Under 18? A parent or guardian signs and adds you as a minor.
+							</p>
 							<div class="grid w-full max-w-md gap-4">
 								<button
 									type="button"
