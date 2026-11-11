@@ -664,26 +664,3 @@ export const currentWorkspaceMembership = query({
 		};
 	}
 });
-
-// Support repair for a workspace whose waiver row is missing. The Waiver page also calls
-// waivers:ensureWorkspaceWaiver on its own; this is for fixing it from the CLI:
-// `npx convex run workspaces:repairMissingWorkspaceWaiver '{"workspaceSlug":"..."}'`.
-export const repairMissingWorkspaceWaiver = internalMutation({
-	args: { workspaceSlug: v.string() },
-	returns: v.object({
-		status: v.union(v.literal('created'), v.literal('already_exists')),
-		waiverId: v.id('workspace_waivers')
-	}),
-	handler: async (ctx, args) => {
-		const workspace = await ctx.db
-			.query('workspaces')
-			.withIndex('by_slug', (q) => q.eq('slug', args.workspaceSlug))
-			.unique();
-		if (!workspace) {
-			throw new ConvexError({ code: 'not_found', message: 'Workspace not found.' });
-		}
-
-		const { waiverId, created } = await ensureDefaultWorkspaceWaiver(ctx, workspace);
-		return { status: created ? ('created' as const) : ('already_exists' as const), waiverId };
-	}
-});
