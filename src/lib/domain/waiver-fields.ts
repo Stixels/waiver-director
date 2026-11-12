@@ -2,7 +2,7 @@
 // Keep this module free of `$lib` aliases and runtime imports so Convex and
 // the node test runner can load it directly.
 
-const MAX_TEXT_ANSWER_LENGTH = 5000;
+export const MAX_TEXT_ANSWER_LENGTH = 5000;
 const MAX_SHORT_ANSWER_LENGTH = 200;
 export const MIN_CLAUSE_LENGTH = 2;
 export const MAX_CLAUSE_LENGTH = 2000;
@@ -72,6 +72,17 @@ export function isValidPhone(value: string): boolean {
 	if (!/^\+?[0-9\s().-]+$/.test(trimmed)) return false;
 	const digits = countPhoneDigits(trimmed);
 	return digits >= MIN_PHONE_DIGITS && digits <= MAX_PHONE_DIGITS;
+}
+
+/** True for a real calendar date in YYYY-MM-DD form (rejects e.g. 2024-02-31). */
+function isValidIsoDate(value: string): boolean {
+	const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+	if (!match) return false;
+	const [year, month, day] = match.slice(1).map(Number);
+	const date = new Date(Date.UTC(year, month - 1, day));
+	return (
+		date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day
+	);
 }
 
 function parseNumberAnswer(value: string): number | null {
@@ -217,7 +228,7 @@ export function normalizeSubmissionAnswers(
 						return fail(field, `Please choose a valid option for "${field.label}".`);
 					}
 				} else if (field.type === 'date') {
-					if (!/^\d{4}-\d{2}-\d{2}$/.test(text) || Number.isNaN(Date.parse(text))) {
+					if (!isValidIsoDate(text)) {
 						return fail(field, `Enter a valid date for "${field.label}".`);
 					}
 				} else if (field.type === 'phone') {
@@ -235,7 +246,9 @@ export function normalizeSubmissionAnswers(
 					if (field.max !== undefined && parsed > field.max) {
 						return fail(field, `"${field.label}" must be at most ${field.max}.`);
 					}
-					normalized = String(parsed);
+					// Keep what the signer typed so the signed record matches it exactly;
+					// String(parsed) would round long numbers like IDs.
+					normalized = text;
 					break;
 				} else if (field.type === 'initials') {
 					if (text.length > MAX_INITIALS_LENGTH || !/^[\p{L}][\p{L}.\s'-]*$/u.test(text)) {

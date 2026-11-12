@@ -124,11 +124,12 @@ test('formats composite and multi-select answers for display', () => {
 
 test('accepts every number form the browser number input allows', () => {
 	for (const [raw, stored] of [
-		['.5', '0.5'],
-		['1e2', '100'],
-		['3.', '3'],
-		['+42', '42'],
-		['0.25e1', '2.5']
+		['.5', '.5'],
+		['1e2', '1e2'],
+		['3.', '3.'],
+		['+42', '+42'],
+		['0.25e1', '0.25e1'],
+		[' 7 ', '7']
 	]) {
 		const result = normalizeSubmissionAnswers(fields, { ...validAnswers, age: raw });
 		assert.equal(result.ok, true, `${raw} should be accepted`);
@@ -138,4 +139,25 @@ test('accepts every number form the browser number input allows', () => {
 		const result = normalizeSubmissionAnswers(fields, { ...validAnswers, age: raw });
 		assert.equal(result.ok, false, `${raw} should be rejected`);
 	}
+});
+
+test('stores long numbers exactly as typed', () => {
+	const result = normalizeSubmissionAnswers(
+		[{ id: 'member', type: 'number', label: 'Member number', required: true }],
+		{ member: '12345678901234567890' }
+	);
+	assert.equal(result.ok, true);
+	if (result.ok) assert.equal(result.answers.member, '12345678901234567890');
+});
+
+test('rejects impossible calendar dates', () => {
+	const dateFields: WaiverField[] = [
+		{ id: 'visit', type: 'date', label: 'Visit date', required: true }
+	];
+	for (const raw of ['2024-02-31', '2023-02-29', '2024-13-01', '2024-00-10']) {
+		const result = normalizeSubmissionAnswers(dateFields, { visit: raw });
+		assert.equal(result.ok, false, `${raw} should be rejected`);
+	}
+	const leapDay = normalizeSubmissionAnswers(dateFields, { visit: '2024-02-29' });
+	assert.equal(leapDay.ok, true);
 });

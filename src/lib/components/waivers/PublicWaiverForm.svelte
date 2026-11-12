@@ -25,8 +25,9 @@
 		WaiverTheme
 	} from '$lib/domain/waivers';
 	import {
-		MAX_INITIALS_LENGTH,
 		compositeParts,
+		MAX_INITIALS_LENGTH,
+		MAX_TEXT_ANSWER_LENGTH,
 		normalizeSubmissionAnswers
 	} from '$lib/domain/waiver-fields';
 	import { getConvexErrorMessage } from '$lib/utils/convex-errors';
@@ -373,6 +374,7 @@
 												value={currentStringAnswer(field.id)}
 												placeholder={field.placeholder ?? ''}
 												required={field.required}
+												maxlength={MAX_TEXT_ANSWER_LENGTH}
 												oninput={(event) =>
 													setFieldAnswer(
 														field.id,
@@ -523,7 +525,15 @@
 												{#each compositeParts(field.type) as part, partIndex (part.key)}
 													{@const inputId = partIndex === 0 ? field.id : `${field.id}-${part.key}`}
 													<div>
-														<label class="sr-only" for={inputId}>{part.label}</label>
+														<label
+															class="mt-3 block text-[11px] font-medium tracking-wide text-muted-foreground uppercase"
+															for={inputId}
+														>
+															{part.label}
+															{#if field.required && part.required}
+																<span class="text-foreground/40">*</span>
+															{/if}
+														</label>
 														<input
 															id={inputId}
 															type={part.key === 'phone' ? 'tel' : 'text'}
@@ -532,7 +542,6 @@
 																? (part.autocomplete as FullAutoFill)
 																: undefined}
 															class={waiverUnderlineInputClass}
-															placeholder={`${part.label}${field.required && part.required ? ' *' : ''}`}
 															value={currentPart(field.id, part.key)}
 															required={field.required && part.required}
 															maxlength={200}
@@ -624,7 +633,7 @@
 					</WaiverPublicAboutSignerCard>
 
 					{#if submitError}
-						<p class="text-sm text-destructive">
+						<p class="text-sm text-destructive" role="alert">
 							{submitError}
 						</p>
 					{/if}
