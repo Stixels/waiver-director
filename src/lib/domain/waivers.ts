@@ -50,6 +50,8 @@ export type WaiverDefinition = {
 	introCopy: string;
 	fields: WaiverField[];
 	theme: WaiverTheme;
+	/** Ask for each minor's date of birth and check they are under 18. */
+	collectMinorDateOfBirth: boolean;
 };
 
 export type WorkspaceWaiverRecord = WaiverDefinition & {
@@ -145,7 +147,8 @@ export function createBlankDefinition(title = 'New waiver'): WaiverDefinition {
 		title,
 		introCopy: '<p></p>',
 		fields: [],
-		theme: 'dark'
+		theme: 'dark',
+		collectMinorDateOfBirth: false
 	};
 }
 
@@ -154,6 +157,7 @@ export function cloneDefinition(definition: WaiverDefinition): WaiverDefinition 
 		title: definition.title,
 		introCopy: sanitizeRichTextHtml(definition.introCopy),
 		theme: definition.theme ?? 'dark',
+		collectMinorDateOfBirth: definition.collectMinorDateOfBirth ?? false,
 		fields: definition.fields.map((field) => {
 			if (field.type === 'select') {
 				return {
@@ -214,6 +218,7 @@ export function normalizeDefinitionForCompare(definition: WaiverDefinition): Wai
 		title: definition.title.trim(),
 		introCopy: sanitizeRichTextHtml(definition.introCopy),
 		theme: definition.theme ?? 'dark',
+		collectMinorDateOfBirth: definition.collectMinorDateOfBirth ?? false,
 		fields: definition.fields.map((field) => {
 			if (field.type === 'select') {
 				return {

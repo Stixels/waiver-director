@@ -106,6 +106,8 @@ export default defineSchema({
 		title: v.string(),
 		introCopy: v.string(),
 		theme: v.optional(v.union(v.literal('light'), v.literal('dark'))),
+		// Ask for each minor's date of birth and check they are under 18. Missing means off.
+		collectMinorDateOfBirth: v.optional(v.boolean()),
 		fields: v.array(
 			v.union(
 				v.object({
@@ -152,6 +154,8 @@ export default defineSchema({
 		title: v.string(),
 		introCopy: v.string(),
 		theme: v.optional(v.union(v.literal('light'), v.literal('dark'))),
+		// Ask for each minor's date of birth and check they are under 18. Missing means off.
+		collectMinorDateOfBirth: v.optional(v.boolean()),
 		fields: v.array(
 			v.union(
 				v.object({

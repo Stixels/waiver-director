@@ -26,6 +26,7 @@
 		title: string;
 		introCopy: string;
 		theme: WaiverTheme;
+		collectMinorDateOfBirth: boolean;
 		fields: WaiverField[];
 		marketingOptIn: { provider: 'mailchimp'; label: string } | null;
 	};
@@ -118,10 +119,11 @@
 
 		isSubmitting = true;
 		submitError = null;
-		const minorsPayload = minors.map((minor) => ({
-			fullName: minor.fullName,
-			dateOfBirth: minor.dateOfBirth ?? ''
-		}));
+		const minorsPayload = minors.map((minor) =>
+			waiver.collectMinorDateOfBirth
+				? { fullName: minor.fullName, dateOfBirth: minor.dateOfBirth ?? '' }
+				: { fullName: minor.fullName }
+		);
 
 		try {
 			await postSubmission({
@@ -311,19 +313,21 @@
 													required
 												/>
 
-												<label class={`${waiverFieldLabelClass} mt-4`} for={`minor-dob-${index}`}>
-													Date of birth
-												</label>
-												<input
-													id={`minor-dob-${index}`}
-													type="date"
-													class={waiverUnderlineInputClass}
-													bind:value={minor.dateOfBirth}
-													min={minorBirthDateBounds(todayIsoDate()).min}
-													max={todayIsoDate()}
-													title="Minors must be under 18"
-													required
-												/>
+												{#if waiver.collectMinorDateOfBirth}
+													<label class={`${waiverFieldLabelClass} mt-4`} for={`minor-dob-${index}`}>
+														Date of birth
+													</label>
+													<input
+														id={`minor-dob-${index}`}
+														type="date"
+														class={waiverUnderlineInputClass}
+														bind:value={minor.dateOfBirth}
+														min={minorBirthDateBounds(todayIsoDate()).min}
+														max={todayIsoDate()}
+														title="Minors must be under 18"
+														required
+													/>
+												{/if}
 											</div>
 										{/each}
 									</div>

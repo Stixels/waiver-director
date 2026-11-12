@@ -43,3 +43,8 @@ export function isMinorBirthDate(dateOfBirth: string, today: string): boolean {
 	const { min, max } = minorBirthDateBounds(today);
 	return dateOfBirth >= min && dateOfBirth <= max;
 }
+
+/** Whether a stored waiver or version asks for each minor's date of birth. Off for older records. */
+export function collectsMinorDateOfBirth(record: { collectMinorDateOfBirth?: boolean }): boolean {
+	return record.collectMinorDateOfBirth ?? false;
+}
