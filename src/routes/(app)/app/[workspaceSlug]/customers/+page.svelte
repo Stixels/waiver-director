@@ -433,9 +433,6 @@
 		</div>
 
 		<div class="flex flex-wrap items-center gap-2">
-			{#if isOwner}
-				<ExportCsvButton label="Export CSV" buildCsv={buildCustomerExport} />
-			{/if}
 			<span
 				class="inline-flex h-9 w-fit items-center gap-2 rounded-full border border-border bg-card/40 px-3 text-xs font-medium text-muted-foreground"
 			>
@@ -447,6 +444,9 @@
 					{(totalCount ?? 0) === 1 ? 'customer' : 'customers'}
 				{/if}
 			</span>
+			{#if isOwner}
+				<ExportCsvButton label="Export CSV" buildCsv={buildCustomerExport} />
+			{/if}
 		</div>
 	</div>
 
