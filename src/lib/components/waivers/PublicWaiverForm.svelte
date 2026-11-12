@@ -30,6 +30,7 @@
 		MAX_TEXT_ANSWER_LENGTH,
 		normalizeSubmissionAnswers
 	} from '$lib/domain/waiver-fields';
+	import { MIN_MINOR_NAME_LENGTH } from '$lib/domain/waiver-constraints';
 	import { getConvexErrorMessage } from '$lib/utils/convex-errors';
 	import { formatBookingTimestamp } from '$lib/utils/date';
 
@@ -80,6 +81,44 @@
 		if (fieldErrors[fieldId]) delete fieldErrors[fieldId];
 	}
 
+	// Mirrors the server's signer checks in submitPublicWaiver; the server stays the source of truth.
+	const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+	/** Errors keyed by input id, in the order the inputs appear on the page. */
+	function collectFormErrors(): Record<string, string> {
+		const errors: Record<string, string> = {};
+		const name = signerName.trim();
+		if (name.length < 2) errors['signer-name'] = 'Please enter your full name.';
+		if (!EMAIL_PATTERN.test(signerEmail.trim())) {
+			errors['signer-email'] = signerEmail.trim()
+				? 'Enter a valid email address.'
+				: 'Please enter your email.';
+		}
+		const dob = signerDateOfBirth.trim();
+		if (!/^\d{4}-\d{2}-\d{2}$/.test(dob) || Number.isNaN(Date.parse(dob))) {
+			errors['signer-dob'] = dob
+				? 'Enter a valid date of birth.'
+				: 'Please enter your date of birth.';
+		}
+		minors.forEach((minor, index) => {
+			if (minor.fullName.trim().length < MIN_MINOR_NAME_LENGTH) {
+				errors[`minor-name-${index}`] = "Please enter this minor's full name.";
+			}
+		});
+		for (const field of waiver.fields) {
+			const result = normalizeSubmissionAnswers([field], { [field.id]: answers[field.id] });
+			if (!result.ok) errors[field.id] = result.hint;
+		}
+		if (!signatureDataUrl || !signatureDataUrl.startsWith('data:image/')) {
+			errors['signature-pad'] = 'Please sign above.';
+		}
+		return errors;
+	}
+
+	$effect(() => {
+		if (signatureDataUrl) clearFieldError('signature-pad');
+	});
+
 	function errorAttrs(fieldId: string) {
 		return fieldErrors[fieldId]
 			? { 'aria-invalid': 'true' as const, 'aria-describedby': `${fieldId}-error` }
@@ -92,6 +131,10 @@
 	}
 
 	function removeMinor(index: number) {
+		// Minor error keys are index-based, so drop them rather than let them shift.
+		for (const key of Object.keys(fieldErrors)) {
+			if (key.startsWith('minor-name-')) delete fieldErrors[key];
+		}
 		minors.splice(index, 1);
 	}
 
@@ -150,22 +193,15 @@
 			return;
 		}
 
-		// Check each question on its own so every problem shows under its question.
-		const nextFieldErrors: Record<string, string> = {};
-		for (const field of waiver.fields) {
-			const result = normalizeSubmissionAnswers([field], { [field.id]: answers[field.id] });
-			if (!result.ok) nextFieldErrors[field.id] = result.message;
-		}
+		// Check everything up front so each problem shows right under its own input.
+		const nextFieldErrors = collectFormErrors();
 		fieldErrors = nextFieldErrors;
-		const firstInvalid = waiver.fields.find((field) => nextFieldErrors[field.id]);
-		if (firstInvalid) {
-			submitError = 'Please fix the highlighted questions above.';
-			document.getElementById(firstInvalid.id)?.focus();
-			return;
-		}
-
-		if (!signatureDataUrl || !signatureDataUrl.startsWith('data:image/')) {
-			submitError = 'Please provide a signature.';
+		const firstInvalidId = Object.keys(nextFieldErrors)[0];
+		if (firstInvalidId) {
+			submitError = 'Please fix the highlighted fields above.';
+			const target = document.getElementById(firstInvalidId);
+			target?.focus({ preventScroll: true });
+			target?.scrollIntoView({ block: 'center', behavior: 'smooth' });
 			return;
 		}
 
@@ -291,40 +327,55 @@
 
 				<WaiverCopySection introCopy={waiver.introCopy} />
 
-				<form onsubmit={handleSubmit} class="space-y-6">
+				{#snippet inlineError(id: string)}
+					{#if fieldErrors[id]}
+						<p id={`${id}-error`} class="mt-2 text-sm text-destructive">{fieldErrors[id]}</p>
+					{/if}
+				{/snippet}
+
+				<form onsubmit={handleSubmit} class="space-y-6" novalidate>
 					<WaiverPublicAboutSignerCard>
 						<div class="space-y-6">
 							<div>
 								<label class={waiverFieldLabelClass} for="signer-name">Full name</label>
 								<input
 									id="signer-name"
+									{...errorAttrs('signer-name')}
+									oninput={() => clearFieldError('signer-name')}
 									class={waiverUnderlineInputClass}
 									bind:value={signerName}
 									required
 									maxlength={120}
 								/>
+								{@render inlineError('signer-name')}
 							</div>
 
 							<div>
 								<label class={waiverFieldLabelClass} for="signer-email">Email</label>
 								<input
 									id="signer-email"
+									{...errorAttrs('signer-email')}
+									oninput={() => clearFieldError('signer-email')}
 									type="email"
 									class={waiverUnderlineInputClass}
 									bind:value={signerEmail}
 									required
 								/>
+								{@render inlineError('signer-email')}
 							</div>
 
 							<div>
 								<label class={waiverFieldLabelClass} for="signer-dob">Date of birth</label>
 								<input
 									id="signer-dob"
+									{...errorAttrs('signer-dob')}
+									oninput={() => clearFieldError('signer-dob')}
 									type="date"
 									class={waiverUnderlineInputClass}
 									bind:value={signerDateOfBirth}
 									required
 								/>
+								{@render inlineError('signer-dob')}
 							</div>
 						</div>
 
@@ -359,10 +410,13 @@
 												</label>
 												<input
 													id={`minor-name-${index}`}
+													{...errorAttrs(`minor-name-${index}`)}
 													class={waiverUnderlineInputClass}
 													bind:value={minor.fullName}
+													oninput={() => clearFieldError(`minor-name-${index}`)}
 													required
 												/>
+												{@render inlineError(`minor-name-${index}`)}
 											</div>
 										{/each}
 									</div>
@@ -621,11 +675,7 @@
 												</div>
 											</div>
 										{/if}
-										{#if fieldErrors[field.id]}
-											<p id={`${field.id}-error`} class="mt-2 text-sm text-destructive">
-												{fieldErrors[field.id]}
-											</p>
-										{/if}
+										{@render inlineError(field.id)}
 									</div>
 								{/each}
 							</WaiverPublicAdditionalInfoSection>
@@ -673,6 +723,7 @@
 								<h3 class="text-lg font-semibold tracking-tight">Signature</h3>
 							</div>
 							<SignaturePad bind:value={signatureDataUrl} canvasId="signature-pad" />
+							{@render inlineError('signature-pad')}
 						</div>
 					</WaiverPublicAboutSignerCard>
 

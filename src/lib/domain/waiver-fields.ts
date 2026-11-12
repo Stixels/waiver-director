@@ -116,10 +116,18 @@ export function isAnswerFlagged(field: WaiverField, value: WaiverAnswerValue | u
 
 type NormalizedAnswersResult =
 	| { ok: true; answers: WaiverAnswers; flaggedFieldIds: string[] }
-	| { ok: false; fieldId: string; message: string };
+	| { ok: false; fieldId: string; message: string; hint: string };
 
-function fail(field: WaiverField, message: string): NormalizedAnswersResult {
-	return { ok: false, fieldId: field.id, message };
+/**
+ * `message` names the question (used by the server and form-level errors);
+ * `hint` is the short version shown directly under the question.
+ */
+function fail(field: WaiverField, message: string, hint: string): NormalizedAnswersResult {
+	return { ok: false, fieldId: field.id, message, hint };
+}
+
+function emptyHint(field: WaiverField): string {
+	return field.type === 'select' ? 'Please choose an option.' : 'Please answer this question.';
 }
 
 function stringAnswer(value: WaiverAnswerValue | undefined): string {
@@ -146,27 +154,43 @@ export function normalizeSubmissionAnswers(
 		switch (field.type) {
 			case 'checkbox': {
 				if (value !== undefined && value !== null && typeof value !== 'boolean') {
-					return fail(field, `Please answer "${field.label}".`);
+					return fail(field, `Please answer "${field.label}".`, 'Please answer this question.');
 				}
 				if (field.required && value !== true) {
-					return fail(field, `Please accept "${field.label}".`);
+					return fail(
+						field,
+						`Please accept "${field.label}".`,
+						'Please check this box to continue.'
+					);
 				}
 				normalized = value === true;
 				break;
 			}
 			case 'multiselect': {
 				if (value !== undefined && value !== null && !Array.isArray(value)) {
-					return fail(field, `Please choose valid options for "${field.label}".`);
+					return fail(
+						field,
+						`Please choose valid options for "${field.label}".`,
+						'Please choose from the listed options.'
+					);
 				}
 				const selected = Array.isArray(value) ? value.map((entry) => String(entry).trim()) : [];
 				const unique = field.options
 					.map((option) => option.id)
 					.filter((optionId) => selected.includes(optionId));
 				if (unique.length !== new Set(selected.filter(Boolean)).size) {
-					return fail(field, `Please choose valid options for "${field.label}".`);
+					return fail(
+						field,
+						`Please choose valid options for "${field.label}".`,
+						'Please choose from the listed options.'
+					);
 				}
 				if (field.required && unique.length === 0) {
-					return fail(field, `Please choose at least one option for "${field.label}".`);
+					return fail(
+						field,
+						`Please choose at least one option for "${field.label}".`,
+						'Please choose at least one option.'
+					);
 				}
 				normalized = unique;
 				break;
@@ -178,7 +202,7 @@ export function normalizeSubmissionAnswers(
 					value !== null &&
 					(typeof value !== 'object' || Array.isArray(value))
 				) {
-					return fail(field, `Please complete "${field.label}".`);
+					return fail(field, `Please complete "${field.label}".`, emptyHint(field));
 				}
 				const parts = compositeParts(field.type);
 				const record = (value ?? {}) as Record<string, unknown>;
@@ -188,7 +212,11 @@ export function normalizeSubmissionAnswers(
 					const partValue = typeof record[part.key] === 'string' ? record[part.key] : '';
 					const trimmed = (partValue as string).trim();
 					if (trimmed.length > MAX_SHORT_ANSWER_LENGTH) {
-						return fail(field, `"${part.label}" in "${field.label}" is too long.`);
+						return fail(
+							field,
+							`"${part.label}" in "${field.label}" is too long.`,
+							`${part.label} is too long.`
+						);
 					}
 					if (trimmed) {
 						result[part.key] = trimmed;
@@ -198,53 +226,77 @@ export function normalizeSubmissionAnswers(
 				if (field.required || anyFilled) {
 					const missing = parts.find((part) => part.required && !result[part.key]);
 					if (missing) {
-						return fail(field, `Please add "${missing.label}" for "${field.label}".`);
+						return fail(
+							field,
+							`Please add "${missing.label}" for "${field.label}".`,
+							`Please add ${missing.label.toLowerCase()}.`
+						);
 					}
 				}
 				if (field.type === 'emergency_contact' && result.phone && !isValidPhone(result.phone)) {
-					return fail(field, `Enter a valid phone number for "${field.label}".`);
+					return fail(
+						field,
+						`Enter a valid phone number for "${field.label}".`,
+						'Enter a valid phone number.'
+					);
 				}
 				normalized = anyFilled ? result : null;
 				break;
 			}
 			default: {
 				if (value !== undefined && value !== null && typeof value !== 'string') {
-					return fail(field, `Please complete "${field.label}".`);
+					return fail(field, `Please complete "${field.label}".`, emptyHint(field));
 				}
 				const text = stringAnswer(value);
 				if (field.required && text.length === 0) {
-					return fail(field, `Please complete "${field.label}".`);
+					return fail(field, `Please complete "${field.label}".`, emptyHint(field));
 				}
 				if (text.length === 0) {
 					normalized = null;
 					break;
 				}
 				if (text.length > MAX_TEXT_ANSWER_LENGTH) {
-					return fail(field, `"${field.label}" is too long.`);
+					return fail(field, `"${field.label}" is too long.`, 'This answer is too long.');
 				}
 
 				if (field.type === 'select') {
 					if (!field.options.some((option) => option.id === text)) {
-						return fail(field, `Please choose a valid option for "${field.label}".`);
+						return fail(
+							field,
+							`Please choose a valid option for "${field.label}".`,
+							'Please choose from the listed options.'
+						);
 					}
 				} else if (field.type === 'date') {
 					if (!isValidIsoDate(text)) {
-						return fail(field, `Enter a valid date for "${field.label}".`);
+						return fail(field, `Enter a valid date for "${field.label}".`, 'Enter a valid date.');
 					}
 				} else if (field.type === 'phone') {
 					if (!isValidPhone(text)) {
-						return fail(field, `Enter a valid phone number for "${field.label}".`);
+						return fail(
+							field,
+							`Enter a valid phone number for "${field.label}".`,
+							'Enter a valid phone number.'
+						);
 					}
 				} else if (field.type === 'number') {
 					const parsed = parseNumberAnswer(text);
 					if (parsed === null) {
-						return fail(field, `Enter a number for "${field.label}".`);
+						return fail(field, `Enter a number for "${field.label}".`, 'Enter a number.');
 					}
 					if (field.min !== undefined && parsed < field.min) {
-						return fail(field, `"${field.label}" must be at least ${field.min}.`);
+						return fail(
+							field,
+							`"${field.label}" must be at least ${field.min}.`,
+							`Must be at least ${field.min}.`
+						);
 					}
 					if (field.max !== undefined && parsed > field.max) {
-						return fail(field, `"${field.label}" must be at most ${field.max}.`);
+						return fail(
+							field,
+							`"${field.label}" must be at most ${field.max}.`,
+							`Must be at most ${field.max}.`
+						);
 					}
 					// Keep what the signer typed so the signed record matches it exactly;
 					// String(parsed) would round long numbers like IDs.
@@ -252,7 +304,7 @@ export function normalizeSubmissionAnswers(
 					break;
 				} else if (field.type === 'initials') {
 					if (text.length > MAX_INITIALS_LENGTH || !/^[\p{L}][\p{L}.\s'-]*$/u.test(text)) {
-						return fail(field, `Enter your initials for "${field.label}".`);
+						return fail(field, `Enter your initials for "${field.label}".`, 'Enter your initials.');
 					}
 					normalized = text.toUpperCase();
 					break;

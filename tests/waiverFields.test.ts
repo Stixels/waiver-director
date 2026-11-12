@@ -170,3 +170,42 @@ test('stores initials in uppercase', () => {
 	assert.equal(result.ok, true);
 	if (result.ok) assert.equal(result.answers.init, 'JV');
 });
+
+test('gives a short hint without the question name for inline errors', () => {
+	const cases: Array<[WaiverField, unknown, string]> = [
+		[
+			{
+				id: 'pick',
+				type: 'select',
+				label: 'Pick one',
+				required: true,
+				options: [{ id: 'a', label: 'A' }]
+			},
+			'',
+			'Please choose an option.'
+		],
+		[
+			{ id: 'ph', type: 'phone', label: 'Phone', required: true },
+			'12',
+			'Enter a valid phone number.'
+		],
+		[
+			{ id: 'n', type: 'number', label: 'Weight', required: true, min: 50 },
+			'20',
+			'Must be at least 50.'
+		],
+		[
+			{ id: 'addr', type: 'address', label: 'Home', required: true },
+			{ city: 'X' },
+			'Please add street address.'
+		]
+	];
+	for (const [field, value, hint] of cases) {
+		const result = normalizeSubmissionAnswers([field], { [field.id]: value as never });
+		assert.equal(result.ok, false);
+		if (!result.ok) {
+			assert.equal(result.hint, hint);
+			assert.ok(result.message.includes(field.label), 'full message still names the question');
+		}
+	}
+});
