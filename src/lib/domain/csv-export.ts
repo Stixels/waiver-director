@@ -164,7 +164,10 @@ export async function collectAllPages<T>(
 	for (let pageIndex = 0; pageIndex < maxPages; pageIndex += 1) {
 		const endCursor = pendingEnds.at(-1) ?? null;
 		const result = await fetchPage(cursor, endCursor);
-		if (result.pageStatus === 'SplitRequired' && result.splitCursor) {
+		if (result.pageStatus === 'SplitRequired') {
+			// Without a split point the page may be incomplete and cannot be
+			// re-read in halves, so fail rather than export missing rows.
+			if (!result.splitCursor) throw new Error('Export stopped: a page could not be read in full.');
 			pendingEnds.push(result.splitCursor);
 			continue;
 		}

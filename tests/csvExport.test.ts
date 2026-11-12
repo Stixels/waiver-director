@@ -184,6 +184,19 @@ test('re-reads a SplitRequired page as two bounded halves', async () => {
 	]);
 });
 
+test('fails the export when a SplitRequired page has no split point', async () => {
+	await assert.rejects(
+		collectAllPages<number>(async () => ({
+			page: [1],
+			isDone: false,
+			continueCursor: 'c2',
+			pageStatus: 'SplitRequired',
+			splitCursor: null
+		})),
+		/could not be read in full/
+	);
+});
+
 test('names export files by workspace, kind, and date', () => {
 	assert.equal(
 		exportFilename('atlas', 'customers', new Date(Date.UTC(2026, 10, 8))),
