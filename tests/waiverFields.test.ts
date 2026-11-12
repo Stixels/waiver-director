@@ -161,3 +161,12 @@ test('rejects impossible calendar dates', () => {
 	const leapDay = normalizeSubmissionAnswers(dateFields, { visit: '2024-02-29' });
 	assert.equal(leapDay.ok, true);
 });
+
+test('stores initials in uppercase', () => {
+	const result = normalizeSubmissionAnswers(
+		[{ id: 'init', type: 'initials', label: 'Initials', required: true, clause: 'I agree.' }],
+		{ init: 'jv' }
+	);
+	assert.equal(result.ok, true);
+	if (result.ok) assert.equal(result.answers.init, 'JV');
+});

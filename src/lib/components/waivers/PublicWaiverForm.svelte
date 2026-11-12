@@ -74,6 +74,17 @@
 	let minors = $state<MinorFormState[]>([]);
 	let isSubmitting = $state(false);
 	let submitError = $state<string | null>(null);
+	let fieldErrors = $state<Record<string, string>>({});
+
+	function clearFieldError(fieldId: string) {
+		if (fieldErrors[fieldId]) delete fieldErrors[fieldId];
+	}
+
+	function errorAttrs(fieldId: string) {
+		return fieldErrors[fieldId]
+			? { 'aria-invalid': 'true' as const, 'aria-describedby': `${fieldId}-error` }
+			: {};
+	}
 	let isSubmitted = $state(false);
 
 	function addMinor() {
@@ -92,6 +103,7 @@
 	]);
 
 	function setFieldAnswer(fieldId: string, value: WaiverAnswerValue) {
+		clearFieldError(fieldId);
 		answers[fieldId] = value;
 	}
 
@@ -101,6 +113,7 @@
 	}
 
 	function toggleSelection(fieldId: string, optionId: string, checked: boolean) {
+		clearFieldError(fieldId);
 		const current = currentSelections(fieldId).filter((entry) => entry !== optionId);
 		answers[fieldId] = checked ? [...current, optionId] : current;
 	}
@@ -114,6 +127,7 @@
 	}
 
 	function setPart(fieldId: string, key: string, partValue: string) {
+		clearFieldError(fieldId);
 		const value = answers[fieldId];
 		const current = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
 		answers[fieldId] = { ...current, [key]: partValue };
@@ -133,6 +147,20 @@
 
 		if (convex.disabled) {
 			submitError = 'The waiver form is still loading. Please try again.';
+			return;
+		}
+
+		// Check each question on its own so every problem shows under its question.
+		const nextFieldErrors: Record<string, string> = {};
+		for (const field of waiver.fields) {
+			const result = normalizeSubmissionAnswers([field], { [field.id]: answers[field.id] });
+			if (!result.ok) nextFieldErrors[field.id] = result.message;
+		}
+		fieldErrors = nextFieldErrors;
+		const firstInvalid = waiver.fields.find((field) => nextFieldErrors[field.id]);
+		if (firstInvalid) {
+			submitError = 'Please fix the highlighted questions above.';
+			document.getElementById(firstInvalid.id)?.focus();
 			return;
 		}
 
@@ -181,6 +209,7 @@
 		signerDateOfBirth = '';
 		signatureDataUrl = '';
 		answers = {};
+		fieldErrors = {};
 		marketingConsent = false;
 		minors = [];
 		submitError = null;
@@ -369,6 +398,7 @@
 										{#if field.type === 'text'}
 											<textarea
 												id={field.id}
+												{...errorAttrs(field.id)}
 												class={waiverUnderlineTextareaClass}
 												rows={1}
 												value={currentStringAnswer(field.id)}
@@ -407,6 +437,7 @@
 												</span>
 												<input
 													id={field.id}
+													{...errorAttrs(field.id)}
 													type="checkbox"
 													class="sr-only"
 													checked={currentBooleanAnswer(field.id)}
@@ -427,6 +458,8 @@
 										{:else if field.type === 'select'}
 											<Select
 												id={field.id}
+												aria-invalid={fieldErrors[field.id] ? 'true' : undefined}
+												aria-describedby={fieldErrors[field.id] ? `${field.id}-error` : undefined}
 												inline
 												value={currentStringAnswer(field.id)}
 												placeholder="Select one"
@@ -440,6 +473,7 @@
 										{:else if field.type === 'date'}
 											<input
 												id={field.id}
+												{...errorAttrs(field.id)}
 												type="date"
 												class={waiverUnderlineInputClass}
 												value={currentStringAnswer(field.id)}
@@ -450,6 +484,7 @@
 										{:else if field.type === 'phone'}
 											<input
 												id={field.id}
+												{...errorAttrs(field.id)}
 												type="tel"
 												inputmode="tel"
 												autocomplete="tel"
@@ -464,6 +499,7 @@
 										{:else if field.type === 'number'}
 											<input
 												id={field.id}
+												{...errorAttrs(field.id)}
 												type="number"
 												inputmode="decimal"
 												step="any"
@@ -506,6 +542,7 @@
 														</span>
 														<input
 															id={optionIndex === 0 ? field.id : `${field.id}-${option.id}`}
+															{...errorAttrs(field.id)}
 															type="checkbox"
 															class="sr-only"
 															{checked}
@@ -536,6 +573,7 @@
 														</label>
 														<input
 															id={inputId}
+															{...errorAttrs(field.id)}
 															type={part.key === 'phone' ? 'tel' : 'text'}
 															inputmode={part.key === 'phone' ? 'tel' : undefined}
 															autocomplete={field.type === 'address'
@@ -567,6 +605,7 @@
 													</label>
 													<input
 														id={field.id}
+														{...errorAttrs(field.id)}
 														class={`${waiverUnderlineInputClass} max-w-28 py-1 text-center font-semibold tracking-widest uppercase`}
 														autocomplete="off"
 														autocapitalize="characters"
@@ -581,6 +620,11 @@
 													/>
 												</div>
 											</div>
+										{/if}
+										{#if fieldErrors[field.id]}
+											<p id={`${field.id}-error`} class="mt-2 text-sm text-destructive">
+												{fieldErrors[field.id]}
+											</p>
 										{/if}
 									</div>
 								{/each}

@@ -14,6 +14,8 @@
 		placeholder?: string;
 		id?: string;
 		'aria-label'?: string;
+		'aria-describedby'?: string;
+		'aria-invalid'?: boolean | 'true' | 'false';
 		/** Classes for the trigger button; defaults to the app's input look. */
 		class?: string;
 		contentClass?: string;
@@ -32,6 +34,8 @@
 		placeholder = 'Select one',
 		id,
 		'aria-label': ariaLabel,
+		'aria-describedby': ariaDescribedby,
+		'aria-invalid': ariaInvalid,
 		class: className,
 		contentClass,
 		inline = false,
@@ -50,6 +54,8 @@
 	<SelectPrimitive.Trigger
 		{id}
 		aria-label={ariaLabel}
+		aria-describedby={ariaDescribedby}
+		aria-invalid={ariaInvalid}
 		data-slot="select-trigger"
 		class={cn(
 			'flex h-10 w-full cursor-pointer items-center justify-between gap-2 rounded-md border border-input bg-background px-3 text-left text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 data-placeholder:text-muted-foreground',

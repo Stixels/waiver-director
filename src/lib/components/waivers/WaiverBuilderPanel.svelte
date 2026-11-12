@@ -34,7 +34,7 @@
 		type WaiverFieldType
 	} from '$lib/domain/waivers';
 	import { MAX_SELECT_OPTIONS, MAX_WAIVER_FIELDS } from '$lib/domain/waiver-constraints';
-	import { MAX_CLAUSE_LENGTH, isOptionField } from '$lib/domain/waiver-fields';
+	import { MAX_CLAUSE_LENGTH, MIN_CLAUSE_LENGTH, isOptionField } from '$lib/domain/waiver-fields';
 
 	type OptionField = Extract<WaiverField, { type: 'select' | 'multiselect' }>;
 
@@ -151,6 +151,10 @@
 		} else {
 			delete field.flagWhenChecked;
 		}
+	}
+
+	function hasInvalidLimits(field: Extract<WaiverField, { type: 'number' }>): boolean {
+		return field.min !== undefined && field.max !== undefined && field.min > field.max;
 	}
 
 	function setNumberLimit(
@@ -358,6 +362,10 @@
 													step="any"
 													value={field.min ?? ''}
 													class="option-input"
+													aria-invalid={hasInvalidLimits(field) ? 'true' : undefined}
+													aria-describedby={hasInvalidLimits(field)
+														? `${field.id}-limits-error`
+														: undefined}
 													placeholder="None"
 													oninput={(event) =>
 														setNumberLimit(
@@ -374,6 +382,10 @@
 													step="any"
 													value={field.max ?? ''}
 													class="option-input"
+													aria-invalid={hasInvalidLimits(field) ? 'true' : undefined}
+													aria-describedby={hasInvalidLimits(field)
+														? `${field.id}-limits-error`
+														: undefined}
 													placeholder="None"
 													oninput={(event) =>
 														setNumberLimit(
@@ -384,6 +396,11 @@
 												/>
 											</label>
 										</div>
+										{#if hasInvalidLimits(field)}
+											<p id={`${field.id}-limits-error`} class="mt-1.5 text-xs text-destructive">
+												Min can't be more than Max. Changes won't save until this is fixed.
+											</p>
+										{/if}
 									{:else if field.type === 'initials'}
 										<div class="mt-2">
 											<label for={`${field.id}-clause`} class="options-label">
@@ -396,7 +413,20 @@
 												maxlength={MAX_CLAUSE_LENGTH}
 												bind:value={field.clause}
 												placeholder="Text the signer must initial"
+												aria-invalid={field.clause.trim().length < MIN_CLAUSE_LENGTH
+													? 'true'
+													: undefined}
+												aria-describedby={field.clause.trim().length < MIN_CLAUSE_LENGTH
+													? `${field.id}-clause-error`
+													: undefined}
 											></textarea>
+											{#if field.clause.trim().length < MIN_CLAUSE_LENGTH}
+												<p id={`${field.id}-clause-error`} class="mt-1.5 text-xs text-destructive">
+													Add the clause signers will initial. Changes won't save until it has at
+													least
+													{MIN_CLAUSE_LENGTH} characters.
+												</p>
+											{/if}
 										</div>
 									{/if}
 

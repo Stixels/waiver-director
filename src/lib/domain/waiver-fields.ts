@@ -254,6 +254,8 @@ export function normalizeSubmissionAnswers(
 					if (text.length > MAX_INITIALS_LENGTH || !/^[\p{L}][\p{L}.\s'-]*$/u.test(text)) {
 						return fail(field, `Enter your initials for "${field.label}".`);
 					}
+					normalized = text.toUpperCase();
+					break;
 				}
 				normalized = text;
 			}
