@@ -89,12 +89,14 @@ export function buildSubmissionsCsv(rows: SubmissionExportRow[]): string {
 	}
 
 	// Every emitted header must be unique, including generated " (n)" suffixes.
-	const usedHeaders = new Set<string>(SUBMISSION_BASE_HEADERS);
+	// Uniqueness is checked on the escaped cell, so labels like "=Notes" and
+	// "'=Notes" (which both escape to '=Notes) still get separate headers.
+	const usedHeaders = new Set<string>(SUBMISSION_BASE_HEADERS.map(escapeCsvCell));
 	const fieldHeaders = fieldOrder.map((fieldId) => {
 		const label = fieldLabels.get(fieldId)?.trim() || fieldId;
 		let header = label;
-		for (let n = 2; usedHeaders.has(header); n += 1) header = `${label} (${n})`;
-		usedHeaders.add(header);
+		for (let n = 2; usedHeaders.has(escapeCsvCell(header)); n += 1) header = `${label} (${n})`;
+		usedHeaders.add(escapeCsvCell(header));
 		return header;
 	});
 

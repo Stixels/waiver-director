@@ -109,6 +109,19 @@ test('submissions CSV never repeats a header, even against generated suffixes', 
 	assert.deepEqual(header.slice(-3), ['Notes', 'Notes (2)', 'Notes (3)']);
 });
 
+test('submissions CSV keeps headers unique after formula escaping', () => {
+	const csv = buildSubmissionsCsv([
+		submission({
+			answers: [
+				{ fieldId: 'a', label: '=Notes', value: '1' },
+				{ fieldId: 'b', label: "'=Notes", value: '2' }
+			]
+		})
+	]);
+	const header = csv.split('\r\n')[0].split(',');
+	assert.deepEqual(header.slice(-2), ["'=Notes", "'=Notes (2)"]);
+});
+
 test('customers CSV includes one row per customer', () => {
 	const csv = buildCustomersCsv([
 		{
