@@ -10,40 +10,22 @@ import {
 	MIN_WAIVER_FIELD_LABEL_LENGTH,
 	MIN_WAIVER_TITLE_LENGTH
 } from '$lib/domain/waiver-constraints';
+import {
+	MAX_CLAUSE_LENGTH,
+	MIN_CLAUSE_LENGTH,
+	isOptionField,
+	normalizeFieldForCompare,
+	type WaiverField,
+	type WaiverFieldType
+} from '$lib/domain/waiver-fields';
 
-export type WaiverFieldType = 'text' | 'checkbox' | 'select' | 'date';
+export type {
+	WaiverAnswers,
+	WaiverAnswerValue,
+	WaiverField,
+	WaiverFieldType
+} from '$lib/domain/waiver-fields';
 export type WaiverTheme = 'light' | 'dark';
-
-export type WaiverField =
-	| {
-			id: string;
-			type: 'text';
-			label: string;
-			required: boolean;
-			placeholder?: string;
-	  }
-	| {
-			id: string;
-			type: 'checkbox';
-			label: string;
-			required: boolean;
-	  }
-	| {
-			id: string;
-			type: 'select';
-			label: string;
-			required: boolean;
-			options: Array<{
-				id: string;
-				label: string;
-			}>;
-	  }
-	| {
-			id: string;
-			type: 'date';
-			label: string;
-			required: boolean;
-	  };
 
 export type WaiverDefinition = {
 	title: string;
@@ -80,7 +62,13 @@ export const waiverFieldTypeOptions: Array<{
 	{ value: 'text', label: 'Text' },
 	{ value: 'checkbox', label: 'Checkbox' },
 	{ value: 'select', label: 'Dropdown' },
-	{ value: 'date', label: 'Date' }
+	{ value: 'multiselect', label: 'Multi-select' },
+	{ value: 'date', label: 'Date' },
+	{ value: 'phone', label: 'Phone' },
+	{ value: 'number', label: 'Number' },
+	{ value: 'address', label: 'Address' },
+	{ value: 'emergency_contact', label: 'Emergency contact' },
+	{ value: 'initials', label: 'Initials' }
 ];
 
 export function createFieldId(prefix = 'field'): string {
@@ -129,12 +117,59 @@ export function createBlankField(type: WaiverFieldType): WaiverField {
 					{ id: createOptionId('option-b'), label: 'Option B' }
 				]
 			};
+		case 'multiselect':
+			return {
+				id,
+				type,
+				label: 'Choose all that apply',
+				required: false,
+				options: [
+					{ id: createOptionId('option-a'), label: 'Option A' },
+					{ id: createOptionId('option-b'), label: 'Option B' }
+				]
+			};
 		case 'date':
 			return {
 				id,
 				type,
 				label: 'Date',
 				required: false
+			};
+		case 'phone':
+			return {
+				id,
+				type,
+				label: 'Phone number',
+				required: false
+			};
+		case 'number':
+			return {
+				id,
+				type,
+				label: 'Number',
+				required: false
+			};
+		case 'address':
+			return {
+				id,
+				type,
+				label: 'Home address',
+				required: false
+			};
+		case 'emergency_contact':
+			return {
+				id,
+				type,
+				label: 'Emergency contact',
+				required: true
+			};
+		case 'initials':
+			return {
+				id,
+				type,
+				label: 'Assumption of risk',
+				required: true,
+				clause: 'I understand this activity carries inherent risks and I voluntarily accept them.'
 			};
 	}
 }
@@ -154,7 +189,7 @@ export function cloneDefinition(definition: WaiverDefinition): WaiverDefinition 
 		introCopy: sanitizeRichTextHtml(definition.introCopy),
 		theme: definition.theme ?? 'dark',
 		fields: definition.fields.map((field) => {
-			if (field.type === 'select') {
+			if (isOptionField(field)) {
 				return {
 					...field,
 					options: field.options.map((option) => ({ ...option }))
@@ -188,7 +223,20 @@ export function isWaiverDefinitionAutosaveable(definition: WaiverDefinition | nu
 			return false;
 		}
 
-		if (field.type === 'select') {
+		if (field.type === 'initials') {
+			const clause = field.clause.trim();
+			if (clause.length < MIN_CLAUSE_LENGTH || clause.length > MAX_CLAUSE_LENGTH) return false;
+		}
+
+		if (field.type === 'number') {
+			if (field.min !== undefined && !Number.isFinite(field.min)) return false;
+			if (field.max !== undefined && !Number.isFinite(field.max)) return false;
+			if (field.min !== undefined && field.max !== undefined && field.min > field.max) {
+				return false;
+			}
+		}
+
+		if (isOptionField(field)) {
 			if (field.options.length < MIN_SELECT_OPTIONS || field.options.length > MAX_SELECT_OPTIONS) {
 				return false;
 			}
@@ -213,31 +261,7 @@ export function normalizeDefinitionForCompare(definition: WaiverDefinition): Wai
 		title: definition.title.trim(),
 		introCopy: sanitizeRichTextHtml(definition.introCopy),
 		theme: definition.theme ?? 'dark',
-		fields: definition.fields.map((field) => {
-			if (field.type === 'select') {
-				return {
-					...field,
-					label: field.label.trim(),
-					options: field.options.map((option) => ({
-						id: option.id.trim(),
-						label: option.label.trim()
-					}))
-				};
-			}
-
-			if ('placeholder' in field) {
-				return {
-					...field,
-					label: field.label.trim(),
-					placeholder: field.placeholder?.trim() || undefined
-				};
-			}
-
-			return {
-				...field,
-				label: field.label.trim()
-			};
-		})
+		fields: definition.fields.map(normalizeFieldForCompare)
 	};
 }
 

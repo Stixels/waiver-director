@@ -25,6 +25,7 @@
 	import { queryString } from '$lib/utils/url';
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 	import FileTextIcon from '@lucide/svelte/icons/file-text';
+	import FlagIcon from '@lucide/svelte/icons/flag';
 	import SearchIcon from '@lucide/svelte/icons/search';
 	import XIcon from '@lucide/svelte/icons/x';
 
@@ -394,6 +395,17 @@
 							<div class="min-w-0 flex-1">
 								<div class="flex min-w-0 items-center gap-2">
 									<p class="truncate text-sm font-medium">{submission.signerName}</p>
+									{#if submission.flaggedCount > 0}
+										<span
+											class="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-amber-700 tabular-nums dark:text-amber-400"
+											title="{submission.flaggedCount} flagged {submission.flaggedCount === 1
+												? 'answer'
+												: 'answers'}"
+										>
+											<FlagIcon class="size-2.5" aria-hidden="true" />
+											Flagged
+										</span>
+									{/if}
 									{#if submission.minorCount > 0}
 										<span
 											class="inline-flex shrink-0 items-center rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-muted-foreground tabular-nums"
@@ -482,6 +494,17 @@
 								<TableCell class="px-4 py-3">
 									<div class="flex min-w-0 items-center gap-2">
 										<p class="truncate text-sm font-medium">{submission.signerName}</p>
+										{#if submission.flaggedCount > 0}
+											<span
+												class="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-amber-700 tabular-nums dark:text-amber-400"
+												title="{submission.flaggedCount} flagged {submission.flaggedCount === 1
+													? 'answer'
+													: 'answers'}"
+											>
+												<FlagIcon class="size-2.5" aria-hidden="true" />
+												Flagged
+											</span>
+										{/if}
 										{#if submission.minorCount > 0}
 											<span
 												class="inline-flex shrink-0 items-center rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-muted-foreground tabular-nums"

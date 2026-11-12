@@ -26,14 +26,43 @@ You can also choose a light or dark theme for the public waiver page.
 
 ### Custom field types
 
-| Type     | Use it for                                                   |
-| -------- | ------------------------------------------------------------ |
-| Text     | Free-form answers, such as an emergency contact              |
-| Checkbox | Agreements or yes/no questions                               |
-| Dropdown | One choice from a list, such as "How did you hear about us?" |
-| Date     | Dates, such as a date of a previous visit                    |
+| Type              | Use it for                                                                 |
+| ----------------- | -------------------------------------------------------------------------- |
+| Text              | Free-form answers                                                          |
+| Checkbox          | Agreements or yes/no questions                                             |
+| Dropdown          | One choice from a list, such as "How did you hear about us?"               |
+| Multi-select      | Any number of choices from a list, such as allergies                       |
+| Date              | Dates, such as a date of a previous visit                                  |
+| Phone             | A phone number, checked for a valid number of digits                       |
+| Number            | Numeric answers such as age, height, or weight, with optional min and max  |
+| Address           | Street, city, state or province, postal code, and country                  |
+| Emergency contact | The contact's name, phone number, and relationship to the signer           |
+| Initials          | A clause the signer must initial on its own, such as an assumption of risk |
 
 Any field can be marked required. Dropdown answers feed into [analytics](/guides/analytics).
+
+<Frame caption="Field settings for each type, with flagged options shown in orange. Sample data from a fictional workspace.">
+	<img
+		src="/images/app/waiver-field-settings.png"
+		alt="Custom fields panel showing phone, number with min and max, dropdown and multi-select options with flag icons, address, emergency contact, initials clause, and a checkbox set to flag the signer"
+	/>
+</Frame>
+
+### Flag answers for review
+
+Some answers need a second look before a guest takes part, such as "Yes" to a medical question. To flag them:
+
+- On a **Dropdown** or **Multi-select** field, select the flag icon next to each option that should flag the signer.
+- On a **Checkbox** field, turn on **Flag signer when checked**.
+
+When a signer gives a flagged answer, the submission shows a **Flagged** badge in the submissions list, and the opened submission lists the flagged questions at the top and highlights each flagged answer. Flags are saved with the published version, so changing them later does not change submissions that were already signed.
+
+<Frame caption="A signed submission with two flagged answers. Sample data from a fictional workspace.">
+	<img
+		src="/images/app/submission-flagged-answers.png"
+		alt="Signed submission where the medical conditions answer and the experience answer are highlighted as flagged for review"
+	/>
+</Frame>
 
 ## Publish
 
