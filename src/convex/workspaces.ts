@@ -130,6 +130,7 @@ export const createWorkspace = mutation({
 			introCopy: waiverDefinition.introCopy,
 			theme: waiverDefinition.theme ?? 'dark',
 			minimumSignerAge: waiverDefinition.minimumSignerAge,
+			collectMinorDateOfBirth: waiverDefinition.collectMinorDateOfBirth ?? false,
 			fields: waiverDefinition.fields
 		});
 

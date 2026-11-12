@@ -108,6 +108,8 @@ export default defineSchema({
 		theme: v.optional(v.union(v.literal('light'), v.literal('dark'))),
 		// Optional so waivers and versions saved before this setting default to 18.
 		minimumSignerAge: v.optional(v.number()),
+		// Ask for each minor's date of birth and check they are under 18. Missing means off.
+		collectMinorDateOfBirth: v.optional(v.boolean()),
 		fields: v.array(
 			v.union(
 				v.object({
@@ -156,6 +158,8 @@ export default defineSchema({
 		theme: v.optional(v.union(v.literal('light'), v.literal('dark'))),
 		// Optional so waivers and versions saved before this setting default to 18.
 		minimumSignerAge: v.optional(v.number()),
+		// Ask for each minor's date of birth and check they are under 18. Missing means off.
+		collectMinorDateOfBirth: v.optional(v.boolean()),
 		fields: v.array(
 			v.union(
 				v.object({

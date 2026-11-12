@@ -25,6 +25,7 @@ import { sanitizeRichTextHtml } from '../lib/utils/rich-text';
 import {
 	assertWorkspaceRecord,
 	minimumSignerAgeOf,
+	collectsMinorDateOfBirth,
 	minorInputValidator,
 	normalizeWaiverDefinition,
 	requireWorkspaceMember,
@@ -47,6 +48,7 @@ const workspaceWaiverValue = v.object({
 	introCopy: v.string(),
 	theme: waiverThemeValidator,
 	minimumSignerAge: v.number(),
+	collectMinorDateOfBirth: v.boolean(),
 	fields: v.array(waiverFieldValidator),
 	publishedVersionId: v.union(v.id('waiver_versions'), v.null()),
 	hasUnpublishedChanges: v.boolean()
@@ -59,6 +61,7 @@ const waiverVersionPreviewValue = v.object({
 	introCopy: v.string(),
 	theme: waiverThemeValidator,
 	minimumSignerAge: v.number(),
+	collectMinorDateOfBirth: v.boolean(),
 	fields: v.array(waiverFieldValidator),
 	workspaceName: v.string(),
 	publishedAt: v.number(),
@@ -74,6 +77,7 @@ const publicWaiverValue = v.object({
 	introCopy: v.string(),
 	theme: waiverThemeValidator,
 	minimumSignerAge: v.number(),
+	collectMinorDateOfBirth: v.boolean(),
 	fields: v.array(waiverFieldValidator),
 	marketingOptIn: v.union(
 		v.null(),
@@ -90,6 +94,7 @@ const publicBookingWaiverValue = v.object({
 	introCopy: v.string(),
 	theme: waiverThemeValidator,
 	minimumSignerAge: v.number(),
+	collectMinorDateOfBirth: v.boolean(),
 	fields: v.array(waiverFieldValidator),
 	marketingOptIn: v.union(
 		v.null(),
@@ -140,6 +145,7 @@ async function waiverHasUnpublishedChanges(ctx: FunctionCtx, waiver: Doc<'worksp
 			introCopy: waiver.introCopy,
 			theme: waiver.theme,
 			minimumSignerAge: waiver.minimumSignerAge,
+			collectMinorDateOfBirth: waiver.collectMinorDateOfBirth,
 			fields: waiver.fields
 		},
 		{
@@ -147,6 +153,7 @@ async function waiverHasUnpublishedChanges(ctx: FunctionCtx, waiver: Doc<'worksp
 			introCopy: version.introCopy,
 			theme: version.theme,
 			minimumSignerAge: version.minimumSignerAge,
+			collectMinorDateOfBirth: version.collectMinorDateOfBirth,
 			fields: version.fields
 		}
 	);
@@ -162,6 +169,7 @@ async function workspaceWaiverSummary(ctx: FunctionCtx, waiver: Doc<'workspace_w
 		introCopy: waiver.introCopy,
 		theme: waiver.theme ?? 'dark',
 		minimumSignerAge: minimumSignerAgeOf(waiver),
+		collectMinorDateOfBirth: collectsMinorDateOfBirth(waiver),
 		fields: waiver.fields,
 		publishedVersionId: waiver.publishedVersionId ?? null,
 		hasUnpublishedChanges
@@ -213,6 +221,7 @@ export const updateWorkspaceWaiver = mutation({
 			introCopy: definition.introCopy,
 			theme: definition.theme ?? 'dark',
 			minimumSignerAge: definition.minimumSignerAge,
+			collectMinorDateOfBirth: definition.collectMinorDateOfBirth ?? false,
 			fields: definition.fields
 		});
 
@@ -243,6 +252,7 @@ export const publishWorkspaceWaiver = mutation({
 			introCopy: waiver.introCopy,
 			theme: waiver.theme,
 			minimumSignerAge: waiver.minimumSignerAge,
+			collectMinorDateOfBirth: waiver.collectMinorDateOfBirth,
 			fields: waiver.fields
 		});
 		const publishedVersionId = waiver.publishedVersionId ?? null;
@@ -260,6 +270,7 @@ export const publishWorkspaceWaiver = mutation({
 			introCopy: definition.introCopy,
 			theme: definition.theme ?? 'dark',
 			minimumSignerAge: definition.minimumSignerAge,
+			collectMinorDateOfBirth: definition.collectMinorDateOfBirth ?? false,
 			fields: definition.fields,
 			publishedAt: Date.now()
 		});
@@ -311,6 +322,7 @@ export const listWaiverVersions = query({
 			introCopy: version.introCopy,
 			theme: version.theme ?? 'dark',
 			minimumSignerAge: minimumSignerAgeOf(version),
+			collectMinorDateOfBirth: collectsMinorDateOfBirth(version),
 			fields: version.fields,
 			workspaceName: workspace.name,
 			publishedAt: version.publishedAt,
@@ -522,6 +534,7 @@ export const getPublicWaiverBySlug = query({
 			introCopy: sanitizeRichTextHtml(version.introCopy),
 			theme: version.theme ?? 'dark',
 			minimumSignerAge: minimumSignerAgeOf(version),
+			collectMinorDateOfBirth: collectsMinorDateOfBirth(version),
 			fields: version.fields,
 			marketingOptIn:
 				marketingIntegration?.status === 'connected' && marketingIntegration.audienceId
@@ -586,6 +599,7 @@ export const getPublicWaiverForBooking = query({
 			introCopy: sanitizeRichTextHtml(version.introCopy),
 			theme: version.theme ?? 'dark',
 			minimumSignerAge: minimumSignerAgeOf(version),
+			collectMinorDateOfBirth: collectsMinorDateOfBirth(version),
 			fields: version.fields,
 			marketingOptIn:
 				marketingIntegration?.status === 'connected' && marketingIntegration.audienceId
@@ -695,7 +709,9 @@ export const submitPublicWaiver = internalMutation({
 		}
 
 		validateSubmissionAnswers(version, args.answers);
-		const minors = validateMinors(args.minors);
+		const minors = validateMinors(args.minors, {
+			requireDateOfBirth: collectsMinorDateOfBirth(version)
+		});
 		const marketingIntegration = await ctx.db
 			.query('marketing_integrations')
 			.withIndex('by_workspaceId_and_provider', (q) =>

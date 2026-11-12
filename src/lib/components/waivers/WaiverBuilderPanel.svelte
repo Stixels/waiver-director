@@ -386,6 +386,28 @@
 				</p>
 			{/if}
 		</div>
+
+		<!-- Minors: optionally ask for each minor's date of birth and check they are under 18. -->
+		<div class="shrink-0 border-t border-border/80 px-4 py-3">
+			<label class="flex cursor-pointer items-center justify-between gap-3">
+				<span class="min-w-0">
+					<span class="panel-section-label block">Minor date of birth</span>
+					<span class="block text-[10.5px] leading-tight text-muted-foreground/65">
+						Ask for each minor's date of birth and check they're under 18.
+					</span>
+				</span>
+				<span class="required-switch shrink-0">
+					<input
+						id="collect-minor-date-of-birth"
+						type="checkbox"
+						bind:checked={draft.collectMinorDateOfBirth}
+					/>
+					<span class="switch-track">
+						<span class="switch-thumb"></span>
+					</span>
+				</span>
+			</label>
+		</div>
 	</div>
 {:else}
 	<div

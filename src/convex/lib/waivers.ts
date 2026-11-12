@@ -27,6 +27,7 @@ import {
 	isValidIsoDate,
 	isValidMinimumSignerAge
 } from '../../lib/domain/waiver-constraints';
+export { collectsMinorDateOfBirth } from '../../lib/domain/waiver-constraints';
 
 type FunctionCtx = QueryCtx | MutationCtx;
 
@@ -71,6 +72,7 @@ export const waiverDefinitionValidator = v.object({
 	introCopy: v.string(),
 	theme: v.optional(waiverThemeValidator),
 	minimumSignerAge: v.optional(v.number()),
+	collectMinorDateOfBirth: v.optional(v.boolean()),
 	fields: v.array(waiverFieldValidator)
 });
 
@@ -86,6 +88,7 @@ export type WaiverDefinition = {
 	introCopy: string;
 	theme?: 'light' | 'dark';
 	minimumSignerAge?: number;
+	collectMinorDateOfBirth?: boolean;
 	fields: Array<
 		| {
 				id: string;
@@ -132,6 +135,7 @@ export function createDefaultWaiverDefinition(workspaceName: string): WaiverDefi
 		introCopy: '<p></p>',
 		theme: 'dark',
 		minimumSignerAge: DEFAULT_MINIMUM_SIGNER_AGE,
+		collectMinorDateOfBirth: false,
 		fields: []
 	});
 }
@@ -325,6 +329,7 @@ export function normalizeWaiverDefinition(definition: WaiverDefinition): WaiverD
 		introCopy,
 		theme: definition.theme ?? 'dark',
 		minimumSignerAge,
+		collectMinorDateOfBirth: definition.collectMinorDateOfBirth ?? false,
 		fields
 	};
 }
@@ -335,6 +340,7 @@ function normalizeWaiverDefinitionForCompare(definition: WaiverDefinition): Waiv
 		introCopy: sanitizeRichTextHtml(definition.introCopy),
 		theme: definition.theme ?? 'dark',
 		minimumSignerAge: definition.minimumSignerAge ?? DEFAULT_MINIMUM_SIGNER_AGE,
+		collectMinorDateOfBirth: definition.collectMinorDateOfBirth ?? false,
 		fields: definition.fields.map((field) => {
 			if (field.type === 'select') {
 				return {
@@ -407,7 +413,15 @@ export function validateSubmissionAnswers(
 	}
 }
 
-export function validateMinors(minors: MinorInput[]): MinorInput[] {
+/**
+ * Checks minor names, and when `requireDateOfBirth` is on, each minor's date of
+ * birth and that they are under 18. When it is off, any date of birth sent is
+ * dropped so unchecked dates are never stored.
+ */
+export function validateMinors(
+	minors: MinorInput[],
+	{ requireDateOfBirth }: { requireDateOfBirth: boolean }
+): MinorInput[] {
 	if (minors.length === 0) {
 		return [];
 	}
@@ -426,6 +440,9 @@ export function validateMinors(minors: MinorInput[]): MinorInput[] {
 				code: 'invalid_argument',
 				message: `Each minor name must be between ${MIN_MINOR_NAME_LENGTH} and ${MAX_MINOR_NAME_LENGTH} characters.`
 			});
+		}
+		if (!requireDateOfBirth) {
+			return { fullName };
 		}
 		const dateOfBirth = minor.dateOfBirth?.trim();
 		if (!dateOfBirth) {
