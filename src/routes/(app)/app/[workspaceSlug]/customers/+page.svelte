@@ -50,10 +50,10 @@
 		const workspace = currentWorkspace;
 		if (!workspace) throw new Error('Workspace not loaded yet.');
 		const rows = await collectAllPages(
-			(cursor) =>
+			(cursor, endCursor) =>
 				convex.query(api.exports.exportCustomersPage, {
 					workspaceId: workspace.workspaceId,
-					paginationOpts: { numItems: 200, cursor }
+					paginationOpts: { numItems: 200, cursor, endCursor }
 				}),
 			onProgress
 		);

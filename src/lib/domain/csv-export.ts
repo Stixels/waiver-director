@@ -6,7 +6,7 @@ type CsvCell = string | number | null | undefined;
 // Spreadsheet apps evaluate cells that start with these characters as
 // formulas. Signer-entered text must never run as a formula when an Owner
 // opens the export, so such cells are prefixed with a single quote.
-const FORMULA_PREFIXES = new Set(['=', '+', '-', '@', '\t', '\r']);
+const FORMULA_PREFIXES = new Set(['=', '+', '-', '@', '\t', '\r', '\n']);
 
 export function escapeCsvCell(value: CsvCell): string {
 	if (value === null || value === undefined) return '';
@@ -88,13 +88,14 @@ export function buildSubmissionsCsv(rows: SubmissionExportRow[]): string {
 		}
 	}
 
-	const usedHeaders = new Map<string, number>();
-	for (const header of SUBMISSION_BASE_HEADERS) usedHeaders.set(header, 1);
+	// Every emitted header must be unique, including generated " (n)" suffixes.
+	const usedHeaders = new Set<string>(SUBMISSION_BASE_HEADERS);
 	const fieldHeaders = fieldOrder.map((fieldId) => {
 		const label = fieldLabels.get(fieldId)?.trim() || fieldId;
-		const seen = usedHeaders.get(label) ?? 0;
-		usedHeaders.set(label, seen + 1);
-		return seen === 0 ? label : `${label} (${seen + 1})`;
+		let header = label;
+		for (let n = 2; usedHeaders.has(header); n += 1) header = `${label} (${n})`;
+		usedHeaders.add(header);
+		return header;
 	});
 
 	const body = rows.map((row) => {
@@ -135,20 +136,43 @@ export function buildCustomersCsv(rows: CustomerExportRow[]): string {
 	);
 }
 
-type ExportPage<T> = { page: T[]; isDone: boolean; continueCursor: string };
+type ExportPage<T> = {
+	page: T[];
+	isDone: boolean;
+	continueCursor: string;
+	pageStatus?: 'SplitRecommended' | 'SplitRequired' | null;
+	splitCursor?: string | null;
+};
 
-/** Reads every page from a cursor-paginated query, in order. */
+/**
+ * Reads every page from a cursor-paginated query, in order. A page marked
+ * `SplitRequired` may be missing rows (for example when it hit the bytes-read
+ * cap), so it is discarded and re-read as the two bounded halves Convex
+ * suggests: (cursor, splitCursor] and then (splitCursor, end].
+ */
 export async function collectAllPages<T>(
-	fetchPage: (cursor: string | null) => Promise<ExportPage<T>>,
+	fetchPage: (cursor: string | null, endCursor: string | null) => Promise<ExportPage<T>>,
 	onProgress?: (rowCount: number) => void,
 	maxPages = 10_000
 ): Promise<T[]> {
 	const rows: T[] = [];
 	let cursor: string | null = null;
+	// End cursors of bounded ranges still to read; the last one is current.
+	const pendingEnds: string[] = [];
 	for (let pageIndex = 0; pageIndex < maxPages; pageIndex += 1) {
-		const result = await fetchPage(cursor);
+		const endCursor = pendingEnds.at(-1) ?? null;
+		const result = await fetchPage(cursor, endCursor);
+		if (result.pageStatus === 'SplitRequired' && result.splitCursor) {
+			pendingEnds.push(result.splitCursor);
+			continue;
+		}
 		rows.push(...result.page);
 		onProgress?.(rows.length);
+		if (endCursor !== null) {
+			cursor = endCursor;
+			pendingEnds.pop();
+			continue;
+		}
 		if (result.isDone) return rows;
 		cursor = result.continueCursor;
 	}

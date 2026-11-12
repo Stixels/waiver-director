@@ -25,6 +25,7 @@ test('neutralizes spreadsheet formulas in text cells', () => {
 	assert.equal(escapeCsvCell('+1 555'), "'+1 555");
 	assert.equal(escapeCsvCell('-2'), "'-2");
 	assert.equal(escapeCsvCell('@SUM(A1)'), "'@SUM(A1)");
+	assert.equal(escapeCsvCell('\n=1+2'), `"'\n=1+2"`);
 	assert.equal(escapeCsvCell(-2), '-2');
 });
 
@@ -94,6 +95,20 @@ test('submissions CSV disambiguates duplicate labels', () => {
 	assert.deepEqual(header.slice(-3), ['Notes', 'Notes (2)', 'Signer name (2)']);
 });
 
+test('submissions CSV never repeats a header, even against generated suffixes', () => {
+	const csv = buildSubmissionsCsv([
+		submission({
+			answers: [
+				{ fieldId: 'a', label: 'Notes', value: '1' },
+				{ fieldId: 'b', label: 'Notes (2)', value: '2' },
+				{ fieldId: 'c', label: 'Notes', value: '3' }
+			]
+		})
+	]);
+	const header = csv.split('\r\n')[0].split(',');
+	assert.deepEqual(header.slice(-3), ['Notes', 'Notes (2)', 'Notes (3)']);
+});
+
 test('customers CSV includes one row per customer', () => {
 	const csv = buildCustomersCsv([
 		{
@@ -124,6 +139,36 @@ test('collects every page in order', async () => {
 	);
 	assert.deepEqual(rows, [1, 2, 3]);
 	assert.deepEqual(progress, [2, 3]);
+});
+
+test('re-reads a SplitRequired page as two bounded halves', async () => {
+	const calls: Array<[string | null, string | null]> = [];
+	const rows = await collectAllPages<number>(async (cursor, endCursor) => {
+		calls.push([cursor, endCursor]);
+		if (cursor === null && endCursor === null) {
+			// Possibly incomplete page: must be discarded, not kept.
+			return {
+				page: [1],
+				isDone: false,
+				continueCursor: 'c2',
+				pageStatus: 'SplitRequired',
+				splitCursor: 's1'
+			};
+		}
+		if (cursor === null && endCursor === 's1') {
+			return { page: [1, 2], isDone: false, continueCursor: 's1' };
+		}
+		if (cursor === 's1' && endCursor === null) {
+			return { page: [3], isDone: true, continueCursor: 'end' };
+		}
+		throw new Error(`unexpected range ${cursor}..${endCursor}`);
+	});
+	assert.deepEqual(rows, [1, 2, 3]);
+	assert.deepEqual(calls, [
+		[null, null],
+		[null, 's1'],
+		['s1', null]
+	]);
 });
 
 test('names export files by workspace, kind, and date', () => {

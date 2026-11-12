@@ -7,8 +7,9 @@ import { requireWorkspaceOwner } from './lib/waivers';
 
 // Exports are fetched page by page by the client and assembled into a CSV in
 // the browser. Submission docs carry signature data URLs, so pages are also
-// capped by bytes read: Convex returns a partial page and the client follows
-// continueCursor, which keeps every query inside the per-query read limit.
+// capped by bytes read so every query stays inside the per-query read limit.
+// When a capped page comes back as SplitRequired, the client re-reads it as two
+// bounded halves (see collectAllPages).
 const MAX_EXPORT_PAGE_SIZE = 200;
 const MAX_EXPORT_PAGE_BYTES = 4 * 1024 * 1024;
 
