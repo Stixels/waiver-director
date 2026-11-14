@@ -18,7 +18,15 @@ import {
 	MIN_WAIVER_FIELD_LABEL_LENGTH,
 	MIN_WAIVER_TITLE_LENGTH
 } from '../../lib/domain/waiver-constraints';
-import { isMinorBirthDate, isValidIsoDate } from '../../lib/domain/waiver-constraints';
+import {
+	DEFAULT_MINIMUM_SIGNER_AGE,
+	MAX_MINIMUM_SIGNER_AGE,
+	MIN_MINIMUM_SIGNER_AGE,
+	isMinorBirthDate,
+	isSignerBirthDate,
+	isValidIsoDate,
+	isValidMinimumSignerAge
+} from '../../lib/domain/waiver-constraints';
 export { collectsMinorDateOfBirth } from '../../lib/domain/waiver-constraints';
 
 type FunctionCtx = QueryCtx | MutationCtx;
@@ -63,6 +71,7 @@ export const waiverDefinitionValidator = v.object({
 	title: v.string(),
 	introCopy: v.string(),
 	theme: v.optional(waiverThemeValidator),
+	minimumSignerAge: v.optional(v.number()),
 	collectMinorDateOfBirth: v.optional(v.boolean()),
 	fields: v.array(waiverFieldValidator)
 });
@@ -78,6 +87,7 @@ export type WaiverDefinition = {
 	title: string;
 	introCopy: string;
 	theme?: 'light' | 'dark';
+	minimumSignerAge?: number;
 	collectMinorDateOfBirth?: boolean;
 	fields: Array<
 		| {
@@ -124,6 +134,7 @@ export function createDefaultWaiverDefinition(workspaceName: string): WaiverDefi
 		title: `${workspaceName} Waiver`,
 		introCopy: '<p></p>',
 		theme: 'dark',
+		minimumSignerAge: DEFAULT_MINIMUM_SIGNER_AGE,
 		collectMinorDateOfBirth: false,
 		fields: []
 	});
@@ -305,10 +316,19 @@ export function normalizeWaiverDefinition(definition: WaiverDefinition): WaiverD
 		};
 	});
 
+	const minimumSignerAge = definition.minimumSignerAge ?? DEFAULT_MINIMUM_SIGNER_AGE;
+	if (!isValidMinimumSignerAge(minimumSignerAge)) {
+		throw new ConvexError({
+			code: 'invalid_argument',
+			message: `Minimum signer age must be a whole number from ${MIN_MINIMUM_SIGNER_AGE} to ${MAX_MINIMUM_SIGNER_AGE}.`
+		});
+	}
+
 	return {
 		title,
 		introCopy,
 		theme: definition.theme ?? 'dark',
+		minimumSignerAge,
 		collectMinorDateOfBirth: definition.collectMinorDateOfBirth ?? false,
 		fields
 	};
@@ -319,6 +339,7 @@ function normalizeWaiverDefinitionForCompare(definition: WaiverDefinition): Waiv
 		title: definition.title.trim(),
 		introCopy: sanitizeRichTextHtml(definition.introCopy),
 		theme: definition.theme ?? 'dark',
+		minimumSignerAge: definition.minimumSignerAge ?? DEFAULT_MINIMUM_SIGNER_AGE,
 		collectMinorDateOfBirth: definition.collectMinorDateOfBirth ?? false,
 		fields: definition.fields.map((field) => {
 			if (field.type === 'select') {
@@ -446,6 +467,33 @@ export function validateMinors(
 		}
 		return { fullName, dateOfBirth };
 	});
+}
+
+/** Minimum signer age for a stored waiver or version; older records default to 18. */
+export function minimumSignerAgeOf(record: { minimumSignerAge?: number }): number {
+	return record.minimumSignerAge ?? DEFAULT_MINIMUM_SIGNER_AGE;
+}
+
+/**
+ * Checks the signer's date of birth on the server. Returns the trimmed date or
+ * throws when it is invalid or makes the signer younger than `minimumAge`.
+ */
+export function validateSignerDateOfBirth(value: string, minimumAge: number): string {
+	const dateOfBirth = value.trim();
+	if (!isValidIsoDate(dateOfBirth)) {
+		throw new ConvexError({
+			code: 'invalid_argument',
+			message: 'Enter a valid date of birth.'
+		});
+	}
+	// Same one-day tolerance either side of UTC as minors, for the signer's local day.
+	if (!signingDaysAroundUtc().some((today) => isSignerBirthDate(dateOfBirth, today, minimumAge))) {
+		throw new ConvexError({
+			code: 'invalid_argument',
+			message: `You must be at least ${minimumAge} to sign this waiver. Guests under 18 can be added as minors by an adult who signs.`
+		});
+	}
+	return dateOfBirth;
 }
 
 function signingDaysAroundUtc() {
