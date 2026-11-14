@@ -8,7 +8,9 @@ import {
 	MIN_SELECT_OPTION_LABEL_LENGTH,
 	MIN_SELECT_OPTIONS,
 	MIN_WAIVER_FIELD_LABEL_LENGTH,
-	MIN_WAIVER_TITLE_LENGTH
+	MIN_WAIVER_TITLE_LENGTH,
+	DEFAULT_MINIMUM_SIGNER_AGE,
+	isValidMinimumSignerAge
 } from '$lib/domain/waiver-constraints';
 
 export type WaiverFieldType = 'text' | 'checkbox' | 'select' | 'date';
@@ -50,6 +52,9 @@ export type WaiverDefinition = {
 	introCopy: string;
 	fields: WaiverField[];
 	theme: WaiverTheme;
+	minimumSignerAge: number;
+	/** Ask for each minor's date of birth and check they are under 18. */
+	collectMinorDateOfBirth: boolean;
 };
 
 export type WorkspaceWaiverRecord = WaiverDefinition & {
@@ -71,6 +76,7 @@ export type PublicWaiverRecord = {
 
 export type WaiverMinor = {
 	fullName: string;
+	dateOfBirth?: string;
 };
 
 export const waiverFieldTypeOptions: Array<{
@@ -144,7 +150,9 @@ export function createBlankDefinition(title = 'New waiver'): WaiverDefinition {
 		title,
 		introCopy: '<p></p>',
 		fields: [],
-		theme: 'dark'
+		theme: 'dark',
+		minimumSignerAge: DEFAULT_MINIMUM_SIGNER_AGE,
+		collectMinorDateOfBirth: false
 	};
 }
 
@@ -153,6 +161,8 @@ export function cloneDefinition(definition: WaiverDefinition): WaiverDefinition 
 		title: definition.title,
 		introCopy: sanitizeRichTextHtml(definition.introCopy),
 		theme: definition.theme ?? 'dark',
+		minimumSignerAge: definition.minimumSignerAge ?? DEFAULT_MINIMUM_SIGNER_AGE,
+		collectMinorDateOfBirth: definition.collectMinorDateOfBirth ?? false,
 		fields: definition.fields.map((field) => {
 			if (field.type === 'select') {
 				return {
@@ -178,6 +188,7 @@ export function isWaiverDefinitionAutosaveable(definition: WaiverDefinition | nu
 		return false;
 	}
 	if (definition.fields.length > MAX_WAIVER_FIELDS) return false;
+	if (!isValidMinimumSignerAge(definition.minimumSignerAge)) return false;
 
 	for (const field of definition.fields) {
 		const label = field.label.trim();
@@ -213,6 +224,8 @@ export function normalizeDefinitionForCompare(definition: WaiverDefinition): Wai
 		title: definition.title.trim(),
 		introCopy: sanitizeRichTextHtml(definition.introCopy),
 		theme: definition.theme ?? 'dark',
+		minimumSignerAge: definition.minimumSignerAge ?? DEFAULT_MINIMUM_SIGNER_AGE,
+		collectMinorDateOfBirth: definition.collectMinorDateOfBirth ?? false,
 		fields: definition.fields.map((field) => {
 			if (field.type === 'select') {
 				return {

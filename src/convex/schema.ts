@@ -3,6 +3,7 @@ import { v } from 'convex/values';
 import { billingFeatureValidator } from './lib/billing';
 import { bookingProviderValidator, bookingSnapshotValidator } from './lib/bookings';
 import { marketingIntegrationStatusValidator, marketingProviderValidator } from './lib/marketing';
+import { submissionAuditValidator } from './lib/submissionAudit';
 
 export default defineSchema({
 	users: defineTable({
@@ -42,6 +43,7 @@ export default defineSchema({
 		primaryWorkspaceSwitchPeriod: v.optional(v.string()),
 		lastEventId: v.optional(v.string()),
 		lastEventType: v.optional(v.string()),
+		lastEventAt: v.optional(v.number()),
 		updatedAt: v.number()
 	})
 		.index('by_userId', ['userId'])
@@ -105,6 +107,10 @@ export default defineSchema({
 		title: v.string(),
 		introCopy: v.string(),
 		theme: v.optional(v.union(v.literal('light'), v.literal('dark'))),
+		// Optional so waivers and versions saved before this setting default to 18.
+		minimumSignerAge: v.optional(v.number()),
+		// Ask for each minor's date of birth and check they are under 18. Missing means off.
+		collectMinorDateOfBirth: v.optional(v.boolean()),
 		fields: v.array(
 			v.union(
 				v.object({
@@ -151,6 +157,10 @@ export default defineSchema({
 		title: v.string(),
 		introCopy: v.string(),
 		theme: v.optional(v.union(v.literal('light'), v.literal('dark'))),
+		// Optional so waivers and versions saved before this setting default to 18.
+		minimumSignerAge: v.optional(v.number()),
+		// Ask for each minor's date of birth and check they are under 18. Missing means off.
+		collectMinorDateOfBirth: v.optional(v.boolean()),
 		fields: v.array(
 			v.union(
 				v.object({
@@ -227,13 +237,17 @@ export default defineSchema({
 		answers: v.record(v.string(), v.union(v.string(), v.boolean(), v.null())),
 		minors: v.array(
 			v.object({
-				fullName: v.string()
+				fullName: v.string(),
+				// Optional so submissions signed before minor DOB capture stay valid.
+				dateOfBirth: v.optional(v.string())
 			})
 		),
 		status: v.union(v.literal('submitted')),
 		marketingConsent: v.optional(v.boolean()),
 		marketingConsentLabel: v.optional(v.string()),
-		submittedAt: v.number()
+		submittedAt: v.number(),
+		// Optional so submissions signed before audit capture stay valid.
+		audit: v.optional(submissionAuditValidator)
 	})
 		.index('by_workspaceId', ['workspaceId'])
 		.index('by_workspaceId_and_submittedAt', ['workspaceId', 'submittedAt'])
@@ -282,6 +296,9 @@ export default defineSchema({
 		verificationCodeHash: v.optional(v.string()),
 		verificationCodeExpiresAt: v.optional(v.number()),
 		verificationCodeSentAt: v.optional(v.number()),
+		// Last time a code send was attempted. Kept across cancel and failed sends so
+		// the resend cooldown cannot be skipped.
+		verificationSendReservedAt: v.optional(v.number()),
 		verificationAttempts: v.number(),
 		updatedAt: v.number()
 	}).index('by_workspaceId', ['workspaceId']),
@@ -310,6 +327,9 @@ export default defineSchema({
 		sentFrom: v.optional(v.string()),
 		sentReplyTo: v.optional(v.string()),
 		resendMessageId: v.optional(v.string()),
+		// Set when a delivery action claims this follow-up, so only one action
+		// at a time can call Resend for it. Cleared when it is marked sent/failed.
+		deliveryClaimedAt: v.optional(v.number()),
 		failedAt: v.optional(v.number()),
 		failureReason: v.optional(v.string()),
 		unscheduledAt: v.optional(v.number())

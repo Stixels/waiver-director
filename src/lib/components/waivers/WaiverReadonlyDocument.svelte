@@ -23,6 +23,8 @@
 		signerEmail?: string;
 		signerDateOfBirth?: string;
 		minors?: string[];
+		/** Parallel to `minors`; null for submissions signed before minor DOB capture. */
+		minorDatesOfBirth?: Array<string | null>;
 		answers?: Record<string, string | boolean | null>;
 		marketingConsent?: boolean;
 		marketingConsentLabel?: string | null;
@@ -40,6 +42,7 @@
 		signerEmail = '',
 		signerDateOfBirth = '',
 		minors = [],
+		minorDatesOfBirth = [],
 		answers = {},
 		marketingConsent = false,
 		marketingConsentLabel = null,
@@ -119,6 +122,11 @@
 									<div>
 										<div class={waiverFieldLabelClass}>Minor {index + 1}</div>
 										<div class={`${waiverUnderlineInputClass} cursor-default`}>{name}</div>
+										{#if minorDatesOfBirth[index]}
+											<p class="mt-2 text-xs text-muted-foreground">
+												Born {formatDob(minorDatesOfBirth[index] ?? '')}
+											</p>
+										{/if}
 									</div>
 								{/each}
 							</div>
