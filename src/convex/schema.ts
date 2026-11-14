@@ -430,6 +430,9 @@ export default defineSchema({
 		lookupToken: v.string(),
 		searchText: v.string(),
 		status: v.union(v.literal('active'), v.literal('canceled')),
+		// When the provider data behind `status` was read. Syncs and webhooks
+		// finish in any order, so older data must not replace a newer status.
+		statusObservedAt: v.optional(v.number()),
 		activityName: v.string(),
 		startTime: v.optional(v.string()),
 		endTime: v.optional(v.string()),

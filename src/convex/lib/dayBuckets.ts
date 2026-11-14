@@ -14,8 +14,9 @@ const MAX_DAY_MS = 26 * 60 * 60 * 1000;
  * the server cannot know the viewer's time zone and a fixed 24-hour step
  * drifts by an hour across a daylight saving change. When `provided` is
  * missing or does not describe the same range, the boundaries fall back to
- * 24-hour steps that still end exactly at `endAt`, so every bucket key the
- * server builds lines up with the ones it reads back.
+ * 24-hour steps counted back from `endAt`. Anchoring on the end keeps the most
+ * recent days exact when the range crosses a daylight saving change; the
+ * first day absorbs the extra or missing hour.
  */
 export function resolveDayBoundaries(
 	startAt: number,
@@ -27,9 +28,9 @@ export function resolveDayBoundaries(
 	}
 
 	const dayCount = Math.max(1, Math.round((endAt - startAt) / DAY_MS));
-	const boundaries: number[] = [];
-	for (let index = 0; index < dayCount; index += 1) {
-		boundaries.push(startAt + index * DAY_MS);
+	const boundaries: number[] = [startAt];
+	for (let index = 1; index < dayCount; index += 1) {
+		boundaries.push(endAt - (dayCount - index) * DAY_MS);
 	}
 	boundaries.push(endAt);
 	return boundaries;
@@ -64,4 +65,36 @@ export function dayIndexFor(boundaries: number[], epochMs: number): number {
 /** Number of whole local days the boundaries cover. */
 export function dayCount(boundaries: number[]): number {
 	return boundaries.length - 1;
+}
+
+/**
+ * Splits the customers who signed on each day into new (first seen that day)
+ * and returning (first seen on an earlier day). A customer missing from
+ * `firstSeenAtByCustomerId` was first seen before the loaded window.
+ */
+export function customerActivityByDay(
+	boundaries: number[],
+	submissions: Array<{ customerId?: string; submittedAt: number }>,
+	firstSeenAtByCustomerId: Map<string, number>
+): Array<{ newCustomers: number; returningCustomers: number }> {
+	const days = Array.from({ length: dayCount(boundaries) }, () => ({
+		newCustomerIds: new Set<string>(),
+		returningCustomerIds: new Set<string>()
+	}));
+	for (const submission of submissions) {
+		if (!submission.customerId) continue;
+		const day = dayIndexFor(boundaries, submission.submittedAt);
+		if (day < 0) continue;
+
+		const firstSeenAt = firstSeenAtByCustomerId.get(submission.customerId);
+		if (firstSeenAt === undefined || firstSeenAt < boundaries[day]) {
+			days[day].returningCustomerIds.add(submission.customerId);
+		} else if (firstSeenAt < boundaries[day + 1]) {
+			days[day].newCustomerIds.add(submission.customerId);
+		}
+	}
+	return days.map((day) => ({
+		newCustomers: day.newCustomerIds.size,
+		returningCustomers: day.returningCustomerIds.size
+	}));
 }

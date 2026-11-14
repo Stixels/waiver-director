@@ -3,7 +3,7 @@
 	import { BarChart } from 'layerchart';
 	import { cubicInOut } from 'svelte/easing';
 
-	type TrendPoint = { dayLabel: string; dayStartAt: number; count: number };
+	type TrendPoint = { dayStartAt: number; count: number };
 
 	let {
 		data = [],
@@ -15,8 +15,8 @@
 		color: string;
 	} = $props();
 
-	// Weekday labels are formatted here, in the viewer's time zone, rather than
-	// on the server (which runs in UTC and can label a day as the one before).
+	// Weekday labels are formatted here because only the browser knows the
+	// viewer's time zone.
 	const points = $derived(
 		(data ?? []).map((point) => ({
 			...point,

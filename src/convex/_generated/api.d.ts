@@ -23,6 +23,7 @@ import type * as lib_billing from "../lib/billing.js";
 import type * as lib_bookingSignatures from "../lib/bookingSignatures.js";
 import type * as lib_bookings from "../lib/bookings.js";
 import type * as lib_customers from "../lib/customers.js";
+import type * as lib_dayBuckets from "../lib/dayBuckets.js";
 import type * as lib_emailAIRateLimit from "../lib/emailAIRateLimit.js";
 import type * as lib_marketing from "../lib/marketing.js";
 import type * as lib_submissions from "../lib/submissions.js";
@@ -58,6 +59,7 @@ declare const fullApi: ApiFromModules<{
   "lib/bookingSignatures": typeof lib_bookingSignatures;
   "lib/bookings": typeof lib_bookings;
   "lib/customers": typeof lib_customers;
+  "lib/dayBuckets": typeof lib_dayBuckets;
   "lib/emailAIRateLimit": typeof lib_emailAIRateLimit;
   "lib/marketing": typeof lib_marketing;
   "lib/submissions": typeof lib_submissions;

@@ -32,9 +32,9 @@ const BOOKEO_UPCOMING_IMPORT_MONTHS = 12;
 const BOOKEO_FETCH_TIMEOUT_MS = 20_000;
 const BOOKEO_SYNC_MAX_PAGES = 200;
 // Only one sync runs per integration at a time. A sync that never reported
-// back (for example it hit the action time limit) stops blocking new ones
-// after this long.
-const BOOKEO_SYNC_LOCK_TTL_MS = 30 * 60 * 1000;
+// back (for example it hit the 10-minute action time limit) stops blocking
+// new ones after this long.
+const BOOKEO_SYNC_LOCK_TTL_MS = 15 * 60 * 1000;
 const CONNECTION_SESSION_RETENTION_MS = 7 * DAY_MS;
 const BOOKEO_WEBHOOK_SUCCESS_RETENTION_MS = 7 * DAY_MS;
 const BOOKEO_WEBHOOK_FAILED_RETENTION_MS = 30 * DAY_MS;
@@ -495,6 +495,7 @@ async function syncBookeoWindow(
 	let totalPages: number;
 
 	do {
+		const observedAt = Date.now();
 		const response = (await bookeoFetch(
 			args.apiKey,
 			bookeoListBookingsPath({
@@ -517,6 +518,7 @@ async function syncBookeoWindow(
 			await ctx.runMutation(internal.integrations.upsertProviderBooking, {
 				integrationId: args.integrationId,
 				lookupToken: token(),
+				observedAt,
 				booking: normalized
 			});
 		}
@@ -1132,7 +1134,9 @@ export const markBookeoSyncStarted = internalMutation({
 	args: {
 		integrationId: v.id('booking_integrations')
 	},
-	returns: v.boolean(),
+	// The time the sync lock was taken, which identifies this sync when it
+	// finishes, or null when the sync must not run.
+	returns: v.union(v.number(), v.null()),
 	handler: async (ctx, args) => {
 		const integration = await ctx.db.get(args.integrationId);
 		if (!integration) {
@@ -1142,7 +1146,7 @@ export const markBookeoSyncStarted = internalMutation({
 			});
 		}
 		if (integration.status === 'disconnected' || !integration.encryptedApiKey) {
-			return false;
+			return null;
 		}
 
 		const now = Date.now();
@@ -1156,8 +1160,15 @@ export const markBookeoSyncStarted = internalMutation({
 			// is about, so queue one more sync for when it finishes.
 			if (!integration.resyncRequested) {
 				await ctx.db.patch(integration._id, { resyncRequested: true });
+				// If the running sync dies without reporting back, nothing else
+				// would start the queued sync.
+				await ctx.scheduler.runAt(
+					integration.syncStartedAt + BOOKEO_SYNC_LOCK_TTL_MS,
+					internal.integrations.recoverStalledBookeoSync,
+					{ integrationId: integration._id, syncStartedAt: integration.syncStartedAt }
+				);
 			}
-			return false;
+			return null;
 		}
 
 		await ctx.db.patch(integration._id, {
@@ -1167,13 +1178,43 @@ export const markBookeoSyncStarted = internalMutation({
 			resyncRequested: undefined,
 			updatedAt: now
 		});
-		return true;
+		return now;
+	}
+});
+
+export const recoverStalledBookeoSync = internalMutation({
+	args: {
+		integrationId: v.id('booking_integrations'),
+		syncStartedAt: v.number()
+	},
+	returns: v.null(),
+	handler: async (ctx, args) => {
+		const integration = await ctx.db.get(args.integrationId);
+		// A sync that finished released the lock and started the queued sync itself.
+		if (
+			!integration ||
+			integration.syncStartedAt !== args.syncStartedAt ||
+			!integration.resyncRequested
+		) {
+			return null;
+		}
+
+		await ctx.db.patch(integration._id, {
+			syncStartedAt: undefined,
+			resyncRequested: undefined
+		});
+		await ctx.scheduler.runAfter(0, internal.integrations.syncBookeoIntegration, {
+			integrationId: args.integrationId,
+			syncType: 'repair'
+		});
+		return null;
 	}
 });
 
 export const markBookeoSyncFinished = internalMutation({
 	args: {
 		integrationId: v.id('booking_integrations'),
+		syncStartedAt: v.number(),
 		status: v.union(v.literal('succeeded'), v.literal('failed')),
 		errorMessage: v.optional(v.string())
 	},
@@ -1182,6 +1223,11 @@ export const markBookeoSyncFinished = internalMutation({
 		const now = Date.now();
 		const integration = await ctx.db.get(args.integrationId);
 		if (!integration || integration.status === 'disconnected') {
+			return null;
+		}
+		// The integration was reconnected, or the lock expired and another sync
+		// took it. That sync owns the status and the lock now.
+		if (integration.syncStartedAt !== args.syncStartedAt) {
 			return null;
 		}
 
@@ -1207,6 +1253,8 @@ export const upsertProviderBooking = internalMutation({
 	args: {
 		integrationId: v.id('booking_integrations'),
 		lookupToken: v.string(),
+		// When this booking data was read from the provider.
+		observedAt: v.number(),
 		booking: v.object({
 			providerBookingId: v.string(),
 			status: v.union(v.literal('active'), v.literal('canceled')),
@@ -1267,6 +1315,13 @@ export const upsertProviderBooking = internalMutation({
 				};
 		const leadCustomerName = incoming.leadCustomerName ?? existing?.leadCustomerName;
 		const leadCustomerEmail = incoming.leadCustomerEmail ?? existing?.leadCustomerEmail;
+		// A sync page fetched before a cancellation, or an earlier webhook that
+		// finishes late, must not bring the booking back.
+		const statusIsStale =
+			existing?.statusObservedAt !== undefined && args.observedAt < existing.statusObservedAt;
+		const statusFields = statusIsStale
+			? { status: existing.status, statusObservedAt: existing.statusObservedAt }
+			: { status: incoming.status, statusObservedAt: args.observedAt };
 		const bookingFields = {
 			workspaceId: integration.workspaceId,
 			integrationId: integration._id,
@@ -1278,7 +1333,7 @@ export const upsertProviderBooking = internalMutation({
 				leadCustomerName,
 				leadCustomerEmail
 			}),
-			status: args.booking.status,
+			...statusFields,
 			activityName,
 			...timeFields,
 			leadCustomerName,
@@ -1306,7 +1361,9 @@ export const upsertProviderBooking = internalMutation({
 export const cancelProviderBooking = internalMutation({
 	args: {
 		integrationId: v.id('booking_integrations'),
-		providerBookingId: v.string()
+		providerBookingId: v.string(),
+		// When the delete notification was received.
+		observedAt: v.number()
 	},
 	returns: v.boolean(),
 	handler: async (ctx, args) => {
@@ -1324,9 +1381,12 @@ export const cancelProviderBooking = internalMutation({
 			.unique();
 		if (!existing) return false;
 
-		if (existing.status !== 'canceled') {
-			await ctx.db.patch(existing._id, { status: 'canceled', updatedAt: Date.now() });
-		}
+		// A deleted booking never comes back in Bookeo, so the delete always wins.
+		await ctx.db.patch(existing._id, {
+			status: 'canceled',
+			statusObservedAt: Math.max(args.observedAt, existing.statusObservedAt ?? 0),
+			...(existing.status !== 'canceled' ? { updatedAt: Date.now() } : {})
+		});
 		return true;
 	}
 });
@@ -1395,6 +1455,7 @@ export const getWebhookEvent = internalQuery({
 			integrationId: v.id('booking_integrations'),
 			eventType: v.string(),
 			itemId: v.string(),
+			receivedAt: v.number(),
 			rawBody: v.string()
 		})
 	),
@@ -1406,6 +1467,7 @@ export const getWebhookEvent = internalQuery({
 			integrationId: event.integrationId,
 			eventType: event.eventType,
 			itemId: event.itemId,
+			receivedAt: event.receivedAt,
 			rawBody: event.rawBody
 		};
 	}
@@ -1439,6 +1501,7 @@ export const processBookeoWebhookEvent = internalAction({
 			integrationId: Id<'booking_integrations'>;
 			eventType: string;
 			itemId: string;
+			receivedAt: number;
 			rawBody: string;
 		} | null = await ctx.runQuery(internal.integrations.getWebhookEvent, args);
 		if (!event) return null;
@@ -1452,7 +1515,11 @@ export const processBookeoWebhookEvent = internalAction({
 			if (!normalized && event.eventType === 'deleted' && event.itemId !== 'unknown') {
 				const canceled: boolean = await ctx.runMutation(
 					internal.integrations.cancelProviderBooking,
-					{ integrationId: event.integrationId, providerBookingId: event.itemId }
+					{
+						integrationId: event.integrationId,
+						providerBookingId: event.itemId,
+						observedAt: event.receivedAt
+					}
 				);
 				await ctx.runMutation(internal.integrations.markWebhookEvent, {
 					eventId: args.eventId,
@@ -1475,6 +1542,7 @@ export const processBookeoWebhookEvent = internalAction({
 			await ctx.runMutation(internal.integrations.upsertProviderBooking, {
 				integrationId: event.integrationId,
 				lookupToken: token(),
+				observedAt: event.receivedAt,
 				booking: normalized
 			});
 			await ctx.runMutation(internal.integrations.markWebhookEvent, {
@@ -1520,13 +1588,13 @@ export const syncBookeoIntegration = internalAction({
 		if (!canSync) return null;
 
 		const range = initialSyncRange();
-		const syncStarted: boolean = await ctx.runMutation(
+		const syncStartedAt: number | null = await ctx.runMutation(
 			internal.integrations.markBookeoSyncStarted,
 			{
 				integrationId: args.integrationId
 			}
 		);
-		if (!syncStarted) return null;
+		if (syncStartedAt === null) return null;
 
 		try {
 			const apiKey = await decryptSecret(integration.encryptedApiKey);
@@ -1540,11 +1608,13 @@ export const syncBookeoIntegration = internalAction({
 			}
 			await ctx.runMutation(internal.integrations.markBookeoSyncFinished, {
 				integrationId: args.integrationId,
+				syncStartedAt,
 				status: 'succeeded'
 			});
 		} catch (error) {
 			await ctx.runMutation(internal.integrations.markBookeoSyncFinished, {
 				integrationId: args.integrationId,
+				syncStartedAt,
 				status: 'failed',
 				errorMessage: error instanceof Error ? error.message : 'Unable to sync Bookeo bookings.'
 			});

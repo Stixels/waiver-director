@@ -35,8 +35,12 @@ const activityDateFormat = new Intl.DateTimeFormat('en-US', {
  * (for example `2026-01-05T19:00:00-08:00`). Converting that to an instant and
  * formatting it in the server's or viewer's time zone can move the date to the
  * next or previous day, so the local calendar date is read straight from the
- * string when it has one. Both the sent email and the in-app preview use this,
- * so they always agree.
+ * string when it has one.
+ *
+ * Without a usable booking start time there is no venue time zone to go by, so
+ * the signing date is formatted in UTC. Both the sent email (formatted on the
+ * server) and the in-app preview (formatted in the browser) use this, so they
+ * always agree.
  */
 export function formatFollowUpActivityDate(
 	bookingStartTime: string | null | undefined,
@@ -51,7 +55,5 @@ export function formatFollowUpActivityDate(
 	}
 
 	const parsed = bookingStartTime ? Date.parse(bookingStartTime) : Number.NaN;
-	return new Intl.DateTimeFormat('en-US', { dateStyle: 'long' }).format(
-		new Date(Number.isNaN(parsed) ? submittedAt : parsed)
-	);
+	return activityDateFormat.format(new Date(Number.isNaN(parsed) ? submittedAt : parsed));
 }

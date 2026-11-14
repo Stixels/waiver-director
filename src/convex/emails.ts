@@ -1095,15 +1095,8 @@ export const markFollowUpBlocked = internalMutation({
 	}
 });
 
-function resolveVariables(template: string, vars: FollowUpTemplateVariables): string {
-	return resolveTemplateVariables(template, vars);
-}
-
-function resolveHtmlVariables(
-	template: string,
-	vars: { signerName: string; bookingId: string; businessName: string; activityDate: string }
-): string {
-	return resolveVariables(template, {
+function resolveHtmlVariables(template: string, vars: FollowUpTemplateVariables): string {
+	return resolveTemplateVariables(template, {
 		signerName: escapeHtml(vars.signerName),
 		bookingId: escapeHtml(vars.bookingId),
 		businessName: escapeHtml(vars.businessName),
@@ -1111,11 +1104,8 @@ function resolveHtmlVariables(
 	});
 }
 
-function plainTextTemplateWithVariables(
-	template: string,
-	vars: { signerName: string; bookingId: string; businessName: string; activityDate: string }
-): string {
-	return resolveVariables(richTextHtmlToPlainText(template), vars).trim();
+function plainTextTemplateWithVariables(template: string, vars: FollowUpTemplateVariables): string {
+	return resolveTemplateVariables(richTextHtmlToPlainText(template), vars).trim();
 }
 
 function mergeInlineStyleAttributes(attributes: string | undefined, styles: string): string {
@@ -1256,7 +1246,7 @@ export const deliverFollowUpEmail = internalAction({
 		};
 		const subjectTemplate = followUp.subjectTemplate ?? template.subject;
 		const bodyTemplate = sanitizeRichTextHtml(followUp.bodyTemplate ?? template.body);
-		const subject = resolveVariables(subjectTemplate, vars);
+		const subject = resolveTemplateVariables(subjectTemplate, vars);
 		const bodyHtml = resolveHtmlVariables(bodyTemplate, vars);
 		const bodyText = plainTextTemplateWithVariables(bodyTemplate, vars);
 

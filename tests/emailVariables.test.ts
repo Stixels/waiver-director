@@ -44,3 +44,10 @@ test('falls back to the submission time when there is no booking start', () => {
 	assert.equal(formatFollowUpActivityDate(undefined, submittedAt), 'July 4, 2026');
 	assert.equal(formatFollowUpActivityDate('not a date', submittedAt), 'July 4, 2026');
 });
+
+test('formats the fallback date in UTC wherever it runs', () => {
+	// 6pm in Los Angeles on Jan 5. The server and every browser must agree.
+	const submittedAt = Date.UTC(2026, 0, 6, 2);
+	assert.equal(formatFollowUpActivityDate(null, submittedAt), 'January 6, 2026');
+	assert.equal(formatFollowUpActivityDate(undefined, Date.UTC(2026, 0, 5, 23)), 'January 5, 2026');
+});

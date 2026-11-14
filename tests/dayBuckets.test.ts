@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
 	DAY_MS,
+	customerActivityByDay,
 	dayCount,
 	dayIndexFor,
 	isValidDayBoundaries,
@@ -49,4 +50,46 @@ test('falls back to 24h steps that end exactly at the range end', () => {
 	assert.equal(boundaries[0], start);
 	assert.equal(boundaries[boundaries.length - 1], end);
 	assert.equal(dayIndexFor(boundaries, end - 1), 29);
+});
+
+test('fallback keeps the most recent days exact across spring-forward', () => {
+	// 14 local days in America/Los_Angeles ending Mar 15, 2026. Mar 8 is 23 hours long.
+	const start = Date.UTC(2026, 2, 1, 8);
+	const todayStart = Date.UTC(2026, 2, 14, 7);
+	const end = Date.UTC(2026, 2, 15, 7);
+	const boundaries = resolveDayBoundaries(start, end);
+	assert.equal(dayCount(boundaries), 14);
+	assert.equal(boundaries[0], start);
+	assert.equal(boundaries[13], todayStart);
+	assert.equal(dayIndexFor(boundaries, todayStart), 13);
+	assert.equal(dayIndexFor(boundaries, start), 0);
+});
+
+test('splits customers into new and returning per day', () => {
+	const firstSeenAt = new Map([
+		['new-nov1', nov1 + HOUR_MS],
+		['new-oct31', oct31 + HOUR_MS],
+		['seen-later', nov2 + HOUR_MS]
+	]);
+	const activity = customerActivityByDay(
+		dstBoundaries,
+		[
+			{ customerId: 'new-nov1', submittedAt: nov1 + HOUR_MS },
+			// A second signature on the same day counts the customer once.
+			{ customerId: 'new-nov1', submittedAt: nov1 + 2 * HOUR_MS },
+			{ customerId: 'new-oct31', submittedAt: nov1 + HOUR_MS },
+			// Not in the map: first seen before the loaded window.
+			{ customerId: 'long-time', submittedAt: nov1 + HOUR_MS },
+			// First seen after the day they are listed under: not counted.
+			{ customerId: 'seen-later', submittedAt: nov1 + HOUR_MS },
+			{ submittedAt: nov1 + HOUR_MS },
+			{ customerId: 'new-oct31', submittedAt: nov3 }
+		],
+		firstSeenAt
+	);
+	assert.deepEqual(activity, [
+		{ newCustomers: 0, returningCustomers: 0 },
+		{ newCustomers: 1, returningCustomers: 2 },
+		{ newCustomers: 0, returningCustomers: 0 }
+	]);
 });
