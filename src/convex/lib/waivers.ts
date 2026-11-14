@@ -19,6 +19,16 @@ import {
 	MIN_WAIVER_FIELD_LABEL_LENGTH,
 	MIN_WAIVER_TITLE_LENGTH
 } from '../../lib/domain/waiver-constraints';
+import {
+	DEFAULT_MINIMUM_SIGNER_AGE,
+	MAX_MINIMUM_SIGNER_AGE,
+	MIN_MINIMUM_SIGNER_AGE,
+	isMinorBirthDate,
+	isSignerBirthDate,
+	isValidIsoDate,
+	isValidMinimumSignerAge
+} from '../../lib/domain/waiver-constraints';
+export { collectsMinorDateOfBirth } from '../../lib/domain/waiver-constraints';
 
 type FunctionCtx = QueryCtx | MutationCtx;
 
@@ -62,19 +72,24 @@ export const waiverDefinitionValidator = v.object({
 	title: v.string(),
 	introCopy: v.string(),
 	theme: v.optional(waiverThemeValidator),
+	minimumSignerAge: v.optional(v.number()),
+	collectMinorDateOfBirth: v.optional(v.boolean()),
 	fields: v.array(waiverFieldValidator)
 });
 
 export const waiverAnswerValueValidator = v.union(v.string(), v.boolean(), v.null());
 
 export const minorInputValidator = v.object({
-	fullName: v.string()
+	fullName: v.string(),
+	dateOfBirth: v.optional(v.string())
 });
 
 export type WaiverDefinition = {
 	title: string;
 	introCopy: string;
 	theme?: 'light' | 'dark';
+	minimumSignerAge?: number;
+	collectMinorDateOfBirth?: boolean;
 	fields: Array<
 		| {
 				id: string;
@@ -110,6 +125,7 @@ export type WaiverDefinition = {
 
 export type MinorInput = {
 	fullName: string;
+	dateOfBirth?: string;
 };
 
 const PUBLIC_SLUG_REGEX = /^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])$/;
@@ -119,6 +135,8 @@ export function createDefaultWaiverDefinition(workspaceName: string): WaiverDefi
 		title: `${workspaceName} Waiver`,
 		introCopy: '<p></p>',
 		theme: 'dark',
+		minimumSignerAge: DEFAULT_MINIMUM_SIGNER_AGE,
+		collectMinorDateOfBirth: false,
 		fields: []
 	});
 }
@@ -299,10 +317,20 @@ export function normalizeWaiverDefinition(definition: WaiverDefinition): WaiverD
 		};
 	});
 
+	const minimumSignerAge = definition.minimumSignerAge ?? DEFAULT_MINIMUM_SIGNER_AGE;
+	if (!isValidMinimumSignerAge(minimumSignerAge)) {
+		throw new ConvexError({
+			code: 'invalid_argument',
+			message: `Minimum signer age must be a whole number from ${MIN_MINIMUM_SIGNER_AGE} to ${MAX_MINIMUM_SIGNER_AGE}.`
+		});
+	}
+
 	return {
 		title,
 		introCopy,
 		theme: definition.theme ?? 'dark',
+		minimumSignerAge,
+		collectMinorDateOfBirth: definition.collectMinorDateOfBirth ?? false,
 		fields
 	};
 }
@@ -312,6 +340,8 @@ function normalizeWaiverDefinitionForCompare(definition: WaiverDefinition): Waiv
 		title: definition.title.trim(),
 		introCopy: sanitizeRichTextHtml(definition.introCopy),
 		theme: definition.theme ?? 'dark',
+		minimumSignerAge: definition.minimumSignerAge ?? DEFAULT_MINIMUM_SIGNER_AGE,
+		collectMinorDateOfBirth: definition.collectMinorDateOfBirth ?? false,
 		fields: definition.fields.map((field) => {
 			if (field.type === 'select') {
 				return {
@@ -407,7 +437,15 @@ export function pickSubmissionAnswers(
 	return picked;
 }
 
-export function validateMinors(minors: MinorInput[]): MinorInput[] {
+/**
+ * Checks minor names, and when `requireDateOfBirth` is on, each minor's date of
+ * birth and that they are under 18. When it is off, any date of birth sent is
+ * dropped so unchecked dates are never stored.
+ */
+export function validateMinors(
+	minors: MinorInput[],
+	{ requireDateOfBirth }: { requireDateOfBirth: boolean }
+): MinorInput[] {
 	if (minors.length === 0) {
 		return [];
 	}
@@ -427,8 +465,65 @@ export function validateMinors(minors: MinorInput[]): MinorInput[] {
 				message: `Each minor name must be between ${MIN_MINOR_NAME_LENGTH} and ${MAX_MINOR_NAME_LENGTH} characters.`
 			});
 		}
-		return { fullName };
+		if (!requireDateOfBirth) {
+			return { fullName };
+		}
+		const dateOfBirth = minor.dateOfBirth?.trim();
+		if (!dateOfBirth) {
+			throw new ConvexError({
+				code: 'invalid_argument',
+				message: 'Enter a date of birth for each minor.'
+			});
+		}
+		if (!isValidIsoDate(dateOfBirth)) {
+			throw new ConvexError({
+				code: 'invalid_argument',
+				message: 'Enter a valid date of birth for each minor.'
+			});
+		}
+		// The signer's calendar day may be a day either side of UTC, so accept the
+		// date if it is a minor's birth date on any of those days.
+		if (!signingDaysAroundUtc().some((today) => isMinorBirthDate(dateOfBirth, today))) {
+			throw new ConvexError({
+				code: 'invalid_argument',
+				message: `Each minor must be under 18. Check ${fullName}'s date of birth.`
+			});
+		}
+		return { fullName, dateOfBirth };
 	});
+}
+
+/** Minimum signer age for a stored waiver or version; older records default to 18. */
+export function minimumSignerAgeOf(record: { minimumSignerAge?: number }): number {
+	return record.minimumSignerAge ?? DEFAULT_MINIMUM_SIGNER_AGE;
+}
+
+/**
+ * Checks the signer's date of birth on the server. Returns the trimmed date or
+ * throws when it is invalid or makes the signer younger than `minimumAge`.
+ */
+export function validateSignerDateOfBirth(value: string, minimumAge: number): string {
+	const dateOfBirth = value.trim();
+	if (!isValidIsoDate(dateOfBirth)) {
+		throw new ConvexError({
+			code: 'invalid_argument',
+			message: 'Enter a valid date of birth.'
+		});
+	}
+	// Same one-day tolerance either side of UTC as minors, for the signer's local day.
+	if (!signingDaysAroundUtc().some((today) => isSignerBirthDate(dateOfBirth, today, minimumAge))) {
+		throw new ConvexError({
+			code: 'invalid_argument',
+			message: `You must be at least ${minimumAge} to sign this waiver. Guests under 18 can be added as minors by an adult who signs.`
+		});
+	}
+	return dateOfBirth;
+}
+
+function signingDaysAroundUtc() {
+	const dayMs = 24 * 60 * 60 * 1000;
+	const now = Date.now();
+	return [now - dayMs, now, now + dayMs].map((ms) => new Date(ms).toISOString().slice(0, 10));
 }
 
 export function normalizePublicSlug(value: string): string {

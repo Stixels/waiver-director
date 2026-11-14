@@ -12,6 +12,7 @@
 		DialogTitle
 	} from '$lib/components/ui/dialog';
 	import { Skeleton } from '$lib/components/ui/skeleton';
+	import SubmissionAuditTrail from '$lib/components/waivers/SubmissionAuditTrail.svelte';
 	import WaiverReadonlyDocument from '$lib/components/waivers/WaiverReadonlyDocument.svelte';
 	import { formatBookingTimestamp } from '$lib/utils/date';
 	import { queryString } from '$lib/utils/url';
@@ -282,12 +283,14 @@
 					signerEmail={submission.signerEmail}
 					signerDateOfBirth={submission.signerDateOfBirth}
 					minors={submission.minors}
+					minorDatesOfBirth={submission.minorDetails.map((minor) => minor.dateOfBirth)}
 					answers={submission.answers}
 					marketingConsent={submission.marketingConsent}
 					marketingConsentLabel={submission.marketingConsentLabel}
 					signatureDataUrl={submission.signatureDataUrl}
 					submittedAt={submission.submittedAt}
 				/>
+				<SubmissionAuditTrail audit={submission.audit} />
 			</div>
 		{/if}
 	</DialogContent>

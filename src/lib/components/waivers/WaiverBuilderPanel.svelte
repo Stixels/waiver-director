@@ -26,7 +26,13 @@
 		type WaiverField,
 		type WaiverFieldType
 	} from '$lib/domain/waivers';
-	import { MAX_SELECT_OPTIONS, MAX_WAIVER_FIELDS } from '$lib/domain/waiver-constraints';
+	import {
+		MAX_MINIMUM_SIGNER_AGE,
+		MAX_SELECT_OPTIONS,
+		MAX_WAIVER_FIELDS,
+		MIN_MINIMUM_SIGNER_AGE,
+		isValidMinimumSignerAge
+	} from '$lib/domain/waiver-constraints';
 
 	interface Props {
 		draft?: WaiverDefinition | null;
@@ -350,6 +356,57 @@
 					</ul>
 				</DragDropProvider>
 			{/if}
+		</div>
+
+		<!-- Signer age: who can sign for themselves. Younger people are added as minors. -->
+		<div class="shrink-0 border-t border-border/80 px-4 py-3">
+			<div class="flex items-center justify-between gap-3">
+				<div class="min-w-0">
+					<label class="panel-section-label" for="minimum-signer-age">Minimum signer age</label>
+					<p class="text-[10.5px] leading-tight text-muted-foreground/65">
+						Signers must be at least this age. Only guests under 18 can be added as minors.
+					</p>
+				</div>
+				<Input
+					id="minimum-signer-age"
+					type="number"
+					inputmode="numeric"
+					min={MIN_MINIMUM_SIGNER_AGE}
+					max={MAX_MINIMUM_SIGNER_AGE}
+					step={1}
+					class="field-label-input w-16 shrink-0 text-center"
+					aria-invalid={!isValidMinimumSignerAge(draft.minimumSignerAge)}
+					bind:value={draft.minimumSignerAge}
+				/>
+			</div>
+			{#if !isValidMinimumSignerAge(draft.minimumSignerAge)}
+				<p class="mt-1.5 text-[10.5px] leading-tight text-destructive">
+					Enter a whole number from {MIN_MINIMUM_SIGNER_AGE} to {MAX_MINIMUM_SIGNER_AGE}. Changes
+					won't save until it's fixed.
+				</p>
+			{/if}
+		</div>
+
+		<!-- Minors: optionally ask for each minor's date of birth and check they are under 18. -->
+		<div class="shrink-0 border-t border-border/80 px-4 py-3">
+			<label class="flex cursor-pointer items-center justify-between gap-3">
+				<span class="min-w-0">
+					<span class="panel-section-label block">Minor date of birth</span>
+					<span class="block text-[10.5px] leading-tight text-muted-foreground/65">
+						Ask for each minor's date of birth and check they're under 18.
+					</span>
+				</span>
+				<span class="required-switch shrink-0">
+					<input
+						id="collect-minor-date-of-birth"
+						type="checkbox"
+						bind:checked={draft.collectMinorDateOfBirth}
+					/>
+					<span class="switch-track">
+						<span class="switch-thumb"></span>
+					</span>
+				</span>
+			</label>
 		</div>
 	</div>
 {:else}

@@ -1,7 +1,10 @@
 import { httpRouter } from 'convex/server';
+import type { FunctionArgs } from 'convex/server';
 import { httpAction } from './_generated/server';
 import { internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
+import { ConvexError } from 'convex/values';
+import { clientIpFromHeaders, normalizeForwardedFor, normalizeUserAgent } from './lib/audit';
 
 const http = httpRouter();
 
@@ -158,6 +161,96 @@ http.route({
 		}
 
 		return new Response(result.status, { status: 200 });
+	})
+});
+
+// Public waiver signing. Runs as an HTTP action (not a client mutation) so the
+// signer's IP address and user agent come from the request itself and are
+// recorded in the submission's audit trail.
+const PUBLIC_SUBMIT_CORS_HEADERS = {
+	'Access-Control-Allow-Origin': '*',
+	'Access-Control-Allow-Methods': 'POST, OPTIONS',
+	'Access-Control-Allow-Headers': 'Content-Type',
+	'Access-Control-Max-Age': '86400',
+	Vary: 'Origin'
+};
+
+function publicSubmitJson(body: unknown, status: number) {
+	return new Response(JSON.stringify(body), {
+		status,
+		headers: { ...PUBLIC_SUBMIT_CORS_HEADERS, 'Content-Type': 'application/json' }
+	});
+}
+
+http.route({
+	path: '/waivers/submit',
+	method: 'OPTIONS',
+	handler: httpAction(async () => {
+		return new Response(null, { status: 204, headers: PUBLIC_SUBMIT_CORS_HEADERS });
+	})
+});
+
+http.route({
+	path: '/waivers/submit',
+	method: 'POST',
+	handler: httpAction(async (ctx, request) => {
+		let payload: Record<string, unknown>;
+		try {
+			const parsed: unknown = await request.json();
+			if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+				throw new Error('Expected a JSON object.');
+			}
+			payload = parsed as Record<string, unknown>;
+		} catch {
+			return publicSubmitJson(
+				{ code: 'invalid_argument', message: 'Invalid waiver submission.' },
+				400
+			);
+		}
+
+		// Never let the client supply audit request metadata.
+		delete payload.request;
+
+		try {
+			const result = await ctx.runMutation(internal.waivers.submitPublicWaiver, {
+				// Shape is enforced by the mutation's argument validator.
+				...(payload as Omit<FunctionArgs<typeof internal.waivers.submitPublicWaiver>, 'request'>),
+				request: {
+					ipAddress: clientIpFromHeaders(request.headers),
+					forwardedFor: normalizeForwardedFor(request.headers.get('x-forwarded-for')),
+					userAgent: normalizeUserAgent(request.headers.get('user-agent'))
+				}
+			});
+			return publicSubmitJson(result, 200);
+		} catch (error) {
+			if (error instanceof ConvexError) {
+				const data = error.data as { code?: unknown; message?: unknown } | string;
+				const code =
+					typeof data === 'object' && typeof data.code === 'string' ? data.code : 'error';
+				const message =
+					typeof data === 'object' && typeof data.message === 'string'
+						? data.message
+						: typeof data === 'string'
+							? data
+							: 'Unable to submit this waiver.';
+				return publicSubmitJson({ code, message }, code === 'not_found' ? 404 : 400);
+			}
+			if (
+				error instanceof Error &&
+				(error.name === 'ArgumentValidationError' ||
+					error.message.includes('ArgumentValidationError'))
+			) {
+				return publicSubmitJson(
+					{ code: 'invalid_argument', message: 'Invalid waiver submission.' },
+					400
+				);
+			}
+			console.error('[waivers/submit] unexpected submission error', error);
+			return publicSubmitJson(
+				{ code: 'internal_error', message: 'Unable to submit this waiver.' },
+				500
+			);
+		}
 	})
 });
 
