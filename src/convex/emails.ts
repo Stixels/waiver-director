@@ -1028,6 +1028,7 @@ export const getTemplateForWorkspace = internalQuery({
 
 		return {
 			workspaceName: workspace?.name ?? '',
+			workspaceTimeZone: workspace?.timeZone ?? null,
 			subject: editorContent?.subject ?? DEFAULT_SUBJECT,
 			body: editorContent?.body ?? DEFAULT_BODY,
 			sendAfterAmount: editorContent?.sendAfterAmount ?? DEFAULT_SEND_AFTER_AMOUNT,
@@ -1235,7 +1236,8 @@ export const deliverFollowUpEmail = internalAction({
 			: '';
 		const activityDate = formatFollowUpActivityDate(
 			followUp.bookingStartTime,
-			followUp.submittedAt
+			followUp.submittedAt,
+			template.workspaceTimeZone
 		);
 
 		const vars = {

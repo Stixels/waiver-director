@@ -26,6 +26,7 @@ const workspaceSummaryValue = v.object({
 	workspaceId: v.id('workspaces'),
 	name: v.string(),
 	slug: v.string(),
+	timeZone: v.union(v.string(), v.null()),
 	role: v.union(v.literal('owner'), v.literal('staff')),
 	status: v.union(v.literal('active'), v.literal('invited'), v.literal('suspended')),
 	billing: v.object({
@@ -272,6 +273,7 @@ export const current = query({
 				workspaceId: workspace._id,
 				name: workspace.name,
 				slug: workspace.slug,
+				timeZone: workspace.timeZone ?? null,
 				role: membership.role,
 				status: membership.status,
 				billing: {

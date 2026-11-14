@@ -4,6 +4,7 @@
 	import { api } from '$convex/_generated/api';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
+	import { deviceTimeZone } from '$lib/utils/time-zone';
 	import ArrowRightIcon from '@lucide/svelte/icons/arrow-right';
 	import Building2Icon from '@lucide/svelte/icons/building-2';
 	import CheckIcon from '@lucide/svelte/icons/check';
@@ -79,8 +80,10 @@
 				throw new Error('Workspace creation is still loading. Please try again.');
 			}
 
+			const timeZone = deviceTimeZone();
 			const result = await convex.mutation(api.workspaces.createWorkspace, {
-				name: trimmedName
+				name: trimmedName,
+				...(timeZone ? { timeZone } : {})
 			});
 
 			if (onCreated) {

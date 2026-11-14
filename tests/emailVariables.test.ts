@@ -51,3 +51,23 @@ test('formats the fallback date in UTC wherever it runs', () => {
 	assert.equal(formatFollowUpActivityDate(null, submittedAt), 'January 6, 2026');
 	assert.equal(formatFollowUpActivityDate(undefined, Date.UTC(2026, 0, 5, 23)), 'January 5, 2026');
 });
+
+test('formats the fallback date in the workspace time zone', () => {
+	// 6pm in Los Angeles on Jan 5 is already Jan 6 in UTC.
+	const submittedAt = Date.UTC(2026, 0, 6, 2);
+	assert.equal(
+		formatFollowUpActivityDate(null, submittedAt, 'America/Los_Angeles'),
+		'January 5, 2026'
+	);
+	assert.equal(
+		formatFollowUpActivityDate(null, submittedAt, 'Australia/Sydney'),
+		'January 6, 2026'
+	);
+	// An unknown zone falls back to UTC instead of failing the email.
+	assert.equal(formatFollowUpActivityDate(null, submittedAt, 'Not/A_Zone'), 'January 6, 2026');
+	// A booking's own local date wins over the workspace zone.
+	assert.equal(
+		formatFollowUpActivityDate('2026-01-05T19:00:00-08:00', submittedAt, 'Australia/Sydney'),
+		'January 5, 2026'
+	);
+});

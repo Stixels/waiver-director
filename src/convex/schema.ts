@@ -61,6 +61,9 @@ export default defineSchema({
 		createdByUserId: v.optional(v.id('users')),
 		customerCount: v.number(),
 		logoStorageId: v.optional(v.id('_storage')),
+		// IANA name such as "America/Los_Angeles". Used for dates that have no
+		// booking to take a local date from.
+		timeZone: v.optional(v.string()),
 		archivedAt: v.optional(v.number())
 	})
 		.index('by_slug', ['slug'])

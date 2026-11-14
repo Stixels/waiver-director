@@ -17,6 +17,7 @@ import {
 	listWorkspaceMembershipsForUser
 } from './lib/workspaces';
 import { workspaceHandleBase, workspaceHandleCandidate } from './lib/workspaceHandles';
+import { isValidTimeZone } from '../lib/utils/time-zone';
 
 const WORKSPACE_LOGO_ALLOWED_CONTENT_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp']);
 const WORKSPACE_LOGO_MAX_BYTES = 2 * 1024 * 1024;
@@ -61,7 +62,9 @@ const MAX_WORKSPACE_HANDLE_ATTEMPTS = 1000;
 
 export const createWorkspace = mutation({
 	args: {
-		name: v.string()
+		name: v.string(),
+		// The creator's browser time zone, as a starting value they can change.
+		timeZone: v.optional(v.string())
 	},
 	returns: v.object({
 		workspaceId: v.id('workspaces'),
@@ -112,7 +115,8 @@ export const createWorkspace = mutation({
 			slug,
 			status: 'active',
 			createdByUserId: user._id,
-			customerCount: 0
+			customerCount: 0,
+			...(args.timeZone && isValidTimeZone(args.timeZone) ? { timeZone: args.timeZone } : {})
 		});
 
 		await ctx.db.insert('workspace_memberships', {
@@ -199,12 +203,14 @@ export const listCurrentUserWorkspaces = query({
 export const updateWorkspace = mutation({
 	args: {
 		workspaceId: v.id('workspaces'),
-		name: v.optional(v.string())
+		name: v.optional(v.string()),
+		timeZone: v.optional(v.string())
 	},
 	returns: v.object({
 		workspaceId: v.id('workspaces'),
 		name: v.string(),
-		slug: v.string()
+		slug: v.string(),
+		timeZone: v.union(v.string(), v.null())
 	}),
 	handler: async (ctx, args) => {
 		await requireWorkspaceOwner(ctx, args.workspaceId, 'change workspace settings');
@@ -214,7 +220,17 @@ export const updateWorkspace = mutation({
 			throw new ConvexError({ code: 'not_found', message: 'Workspace not found.' });
 		}
 
-		const patch: { name?: string } = {};
+		const patch: { name?: string; timeZone?: string } = {};
+
+		if (args.timeZone !== undefined) {
+			if (!isValidTimeZone(args.timeZone)) {
+				throw new ConvexError({
+					code: 'invalid_argument',
+					message: 'Choose a time zone from the list.'
+				});
+			}
+			if (args.timeZone !== workspace.timeZone) patch.timeZone = args.timeZone;
+		}
 
 		if (args.name !== undefined) {
 			const name = args.name.trim();
@@ -239,7 +255,8 @@ export const updateWorkspace = mutation({
 		return {
 			workspaceId: next._id,
 			name: next.name,
-			slug: next.slug
+			slug: next.slug,
+			timeZone: next.timeZone ?? null
 		};
 	}
 });

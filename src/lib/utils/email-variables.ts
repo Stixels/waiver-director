@@ -28,6 +28,15 @@ const activityDateFormat = new Intl.DateTimeFormat('en-US', {
 	timeZone: 'UTC'
 });
 
+function activityDateFormatIn(timeZone: string | null | undefined): Intl.DateTimeFormat {
+	if (!timeZone) return activityDateFormat;
+	try {
+		return new Intl.DateTimeFormat('en-US', { dateStyle: 'long', timeZone });
+	} catch {
+		return activityDateFormat;
+	}
+}
+
 /**
  * Formats the `{{activity_date}}` value for a follow-up.
  *
@@ -37,14 +46,15 @@ const activityDateFormat = new Intl.DateTimeFormat('en-US', {
  * next or previous day, so the local calendar date is read straight from the
  * string when it has one.
  *
- * Without a usable booking start time there is no venue time zone to go by, so
- * the signing date is formatted in UTC. Both the sent email (formatted on the
- * server) and the in-app preview (formatted in the browser) use this, so they
- * always agree.
+ * Without a usable booking start time, the signing date is formatted in the
+ * workspace's time zone, or in UTC when the workspace has none. Both the sent
+ * email (formatted on the server) and the in-app preview (formatted in the
+ * browser) use this, so they always agree.
  */
 export function formatFollowUpActivityDate(
 	bookingStartTime: string | null | undefined,
-	submittedAt: number
+	submittedAt: number,
+	workspaceTimeZone?: string | null
 ): string {
 	const localDate = bookingStartTime?.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s]|$)/);
 	if (localDate) {
@@ -55,5 +65,7 @@ export function formatFollowUpActivityDate(
 	}
 
 	const parsed = bookingStartTime ? Date.parse(bookingStartTime) : Number.NaN;
-	return activityDateFormat.format(new Date(Number.isNaN(parsed) ? submittedAt : parsed));
+	return activityDateFormatIn(workspaceTimeZone).format(
+		new Date(Number.isNaN(parsed) ? submittedAt : parsed)
+	);
 }
