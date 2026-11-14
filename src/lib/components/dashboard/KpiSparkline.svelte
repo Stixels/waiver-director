@@ -33,7 +33,7 @@
 	const yDomain = $derived([0, Math.ceil(maxCount * 1.15)]);
 </script>
 
-<div class="h-16 min-w-0" aria-label={`${label} trend for the last 7 days`}>
+<div class="h-16 min-w-0" role="img" aria-label={`${label} trend for the last 7 days`}>
 	{#if points.length > 1 && hasSignal}
 		<ChartContainer config={chartConfig} class="h-full w-full overflow-visible">
 			<BarChart

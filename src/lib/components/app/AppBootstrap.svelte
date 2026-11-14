@@ -131,6 +131,12 @@
 	});
 
 	async function retryEnsureUser() {
+		// Clearing ensureError only retries the user bootstrap mutation; a failed
+		// app.current query would otherwise leave "Try again" doing nothing.
+		if (!ensureError && appQuery.error) {
+			window.location.reload();
+			return;
+		}
 		ensureError = null;
 		await tick();
 	}

@@ -30,6 +30,7 @@
 	import { cn } from '$lib/utils';
 	import { parseDate, type DateValue } from '@internationalized/date';
 	import { onMount } from 'svelte';
+	import CircleAlertIcon from '@lucide/svelte/icons/circle-alert';
 	import ChevronLeftIcon from '@lucide/svelte/icons/chevron-left';
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 	import CalendarDaysIcon from '@lucide/svelte/icons/calendar-days';
@@ -82,7 +83,8 @@
 	});
 
 	const dayRange = $derived(dayRangeForDate(selectedDate));
-	const isToday = $derived(selectedDate === toDateInputValue(new Date()));
+	// Derive from the ticking `now` so "Today" (and Hide done) stay correct past midnight.
+	const isToday = $derived(selectedDate === toDateInputValue(new Date(now)));
 	const bookingsQuery = useProtectedQuery(
 		api.bookings.listWorkspaceBookings,
 		() =>
@@ -109,12 +111,28 @@
 	type BookingPage = FunctionReturnType<typeof api.bookings.listWorkspaceBookings>;
 	type Booking = BookingPage['bookings'][number];
 
-	const bookingPage = $derived((bookingsQuery.data ?? null) as BookingPage | null);
+	// keepPreviousData keeps the previous workspace's rows on screen while the new
+	// workspace loads; treat that as loading so rows from another workspace are
+	// never shown (or clickable) under this workspace.
+	let dataWorkspaceId = $state<string | null>(null);
+	$effect(() => {
+		if (bookingsQuery.data !== undefined && !bookingsQuery.isStale) {
+			dataWorkspaceId = currentWorkspace?.workspaceId ?? null;
+		}
+	});
+	const isWorkspaceDataStale = $derived(
+		bookingsQuery.isStale &&
+			dataWorkspaceId !== null &&
+			dataWorkspaceId !== currentWorkspace?.workspaceId
+	);
+	const bookingPage = $derived(
+		(isWorkspaceDataStale ? null : (bookingsQuery.data ?? null)) as BookingPage | null
+	);
 	const bookings = $derived(bookingPage?.bookings ?? []);
 	const summary = $derived(bookingPage?.summary ?? null);
 	const publicSlug = $derived(waiverQuery.data?.publicSlug ?? null);
 	const isLoading = $derived(
-		bookingsQuery.isLoading || waiverQuery.isLoading || appContext.isLoading
+		bookingsQuery.isLoading || waiverQuery.isLoading || appContext.isLoading || isWorkspaceDataStale
 	);
 	const currentPage = $derived((bookingPage?.pageIndex ?? pageIndex) + 1);
 	const isInitialLoading = $derived(isLoading && !bookingPage);
@@ -421,7 +439,7 @@
 		if (Number.isNaN(startAt)) return null;
 		const endAt = booking.endTime ? Date.parse(booking.endTime) : startAt + 1 * 60 * 60 * 1000;
 		const diffMs = startAt - now;
-		const diffMinutes = Math.round(diffMs / 60_000);
+		const diffMinutes = Math.max(1, Math.round(diffMs / 60_000));
 
 		if (now >= startAt && now <= endAt) return { label: 'Now', tone: 'now' };
 		if (now > endAt) return { label: 'Done', tone: 'past' };
@@ -585,7 +603,7 @@
 				{/if}
 				<div
 					class="grid h-10 w-full grid-cols-4 items-center rounded-lg border border-input bg-card/50 p-0.5 shadow-xs lg:inline-flex lg:w-auto"
-					role="tablist"
+					role="group"
 					aria-label="Filter bookings by status"
 				>
 					{#each STATUS_FILTERS as filter (filter.value)}
@@ -593,8 +611,7 @@
 						{@const filterCount = statusFilterCount(filter.value)}
 						<button
 							type="button"
-							role="tab"
-							aria-selected={active}
+							aria-pressed={active}
 							onclick={() => setStatusFilter(filter.value)}
 							class={cn(
 								'inline-flex h-9 items-center justify-center rounded-md px-1.5 text-xs font-medium whitespace-nowrap transition-all focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none lg:h-8 lg:px-3',
@@ -681,6 +698,14 @@
 					icon={CalendarOffIcon}
 					title="Workspace not found"
 					description="Choose a workspace to review bookings."
+				/>
+			</DataTableShell>
+		{:else if bookingsQuery.error && !bookingPage}
+			<DataTableShell>
+				<DataTableEmptyState
+					icon={CircleAlertIcon}
+					title="Unable to load bookings"
+					description="Something went wrong while loading bookings. Try refreshing the page."
 				/>
 			</DataTableShell>
 		{:else if bookings.length === 0}

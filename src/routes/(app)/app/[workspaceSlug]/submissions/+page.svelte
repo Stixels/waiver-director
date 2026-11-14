@@ -26,6 +26,7 @@
 	import { useConvexClient } from 'convex-svelte';
 	import { buildSubmissionsCsv, collectAllPages, exportFilename } from '$lib/domain/csv-export';
 	import { queryString } from '$lib/utils/url';
+	import CircleAlertIcon from '@lucide/svelte/icons/circle-alert';
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 	import FileTextIcon from '@lucide/svelte/icons/file-text';
 	import SearchIcon from '@lucide/svelte/icons/search';
@@ -88,9 +89,27 @@
 
 	type SubmissionPage = FunctionReturnType<typeof api.waivers.listRecentSubmissions>;
 	type RecentSubmission = SubmissionPage['submissions'][number];
-	const submissionPage = $derived((submissionsQuery.data ?? null) as SubmissionPage | null);
+	// keepPreviousData keeps the previous workspace's rows on screen while the new
+	// workspace loads; treat that as loading so rows from another workspace are
+	// never shown (or clickable) under this workspace.
+	let dataWorkspaceId = $state<string | null>(null);
+	$effect(() => {
+		if (submissionsQuery.data !== undefined && !submissionsQuery.isStale) {
+			dataWorkspaceId = currentWorkspace?.workspaceId ?? null;
+		}
+	});
+	const isWorkspaceDataStale = $derived(
+		submissionsQuery.isStale &&
+			dataWorkspaceId !== null &&
+			dataWorkspaceId !== currentWorkspace?.workspaceId
+	);
+	const submissionPage = $derived(
+		(isWorkspaceDataStale ? null : (submissionsQuery.data ?? null)) as SubmissionPage | null
+	);
 	const recentSubmissions = $derived((submissionPage?.submissions ?? []) as RecentSubmission[]);
-	const isLoadingSubmissions = $derived(submissionsQuery.isLoading || appContext.isLoading);
+	const isLoadingSubmissions = $derived(
+		submissionsQuery.isLoading || appContext.isLoading || isWorkspaceDataStale
+	);
 	const searchQueryParam = $derived(page.url.searchParams.get('q')?.trim() ?? '');
 	const submissionIdParam = $derived(
 		page.url.searchParams.get('submissionId') as Id<'waiver_submissions'> | null
@@ -398,6 +417,14 @@
 					icon={FileTextIcon}
 					title="Workspace not found"
 					description="Choose a workspace to review submissions."
+				/>
+			</DataTableShell>
+		{:else if submissionsQuery.error && !submissionPage}
+			<DataTableShell>
+				<DataTableEmptyState
+					icon={CircleAlertIcon}
+					title="Unable to load submissions"
+					description="Something went wrong while loading submissions. Try refreshing the page."
 				/>
 			</DataTableShell>
 		{:else if recentSubmissions.length === 0}

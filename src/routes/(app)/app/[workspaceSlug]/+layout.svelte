@@ -23,6 +23,8 @@
 	let isDesktop = $state(false);
 
 	const DESKTOP_BREAKPOINT_QUERY = '(min-width: 1024px)';
+	const SIDEBAR_COLLAPSED_STORAGE_KEY = 'wd:sidebar-collapsed';
+	let hasRestoredSidebarState = false;
 	const isRouteNavigating = $derived(
 		Boolean(navigating.to?.url && navigating.to.url.pathname !== page.url.pathname)
 	);
@@ -31,7 +33,25 @@
 		mobileNavOpen = false;
 	}
 
+	// Remember the collapsed sidebar per browser so it doesn't re-expand on every reload.
+	$effect(() => {
+		const collapsed = sidebarCollapsed;
+		if (!hasRestoredSidebarState) return;
+		try {
+			localStorage.setItem(SIDEBAR_COLLAPSED_STORAGE_KEY, collapsed ? '1' : '0');
+		} catch {
+			// Storage can be unavailable (private mode, blocked site data).
+		}
+	});
+
 	onMount(() => {
+		try {
+			sidebarCollapsed = localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY) === '1';
+		} catch {
+			// Fall back to the expanded default.
+		}
+		hasRestoredSidebarState = true;
+
 		const mql = window.matchMedia(DESKTOP_BREAKPOINT_QUERY);
 		const sync = () => {
 			isDesktop = mql.matches;

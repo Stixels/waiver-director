@@ -5,7 +5,7 @@
 	type FooterEntry =
 		| {
 				label: string;
-				href: '/pricing' | '/features' | '/privacy' | '/terms';
+				href: '/pricing' | '/features' | '/features#integrations' | '/privacy' | '/terms';
 		  }
 		| { label: string; roadmap: true };
 
@@ -22,8 +22,8 @@
 		{
 			title: 'Integrations',
 			entries: [
-				{ label: 'Bookeo', href: '/features' },
-				{ label: 'Mailchimp', href: '/features' },
+				{ label: 'Bookeo', href: '/features#integrations' },
+				{ label: 'Mailchimp', href: '/features#integrations' },
 				{ label: 'Xola', roadmap: true },
 				{ label: 'Constant Contact', roadmap: true }
 			] as const

@@ -48,7 +48,12 @@
 	{/if}
 
 	{#if field.type === 'checkbox'}
-		<div class="flex items-center gap-3" role="checkbox" aria-checked={value === true}>
+		<div
+			class="flex items-center gap-3"
+			role="checkbox"
+			aria-checked={value === true}
+			aria-readonly="true"
+		>
 			<span
 				class="flex h-5 w-5 shrink-0 items-center justify-center border border-foreground/25 bg-transparent"
 				class:bg-foreground={!preview && value === true}

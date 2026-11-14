@@ -27,6 +27,9 @@
 	let hasAttemptedSubmit = $state(false);
 	let submitError = $state<string | null>(null);
 	let isSuccess = $state(false);
+	// Set once the mutation succeeds so a failure in `onCreated` (e.g. navigation) can be
+	// retried without creating a second workspace.
+	let createdWorkspace = $state<CreatedWorkspace | null>(null);
 
 	const trimmedName = $derived(name.trim());
 	const nameValid = $derived(trimmedName.length >= 2 && trimmedName.length <= 80);
@@ -79,9 +82,12 @@
 				throw new Error('Workspace creation is still loading. Please try again.');
 			}
 
-			const result = await convex.mutation(api.workspaces.createWorkspace, {
-				name: trimmedName
-			});
+			const result =
+				createdWorkspace ??
+				(await convex.mutation(api.workspaces.createWorkspace, {
+					name: trimmedName
+				}));
+			createdWorkspace = result;
 
 			if (onCreated) {
 				await new Promise((resolveDelay) => window.setTimeout(resolveDelay, 250));
@@ -149,7 +155,7 @@
 				required
 				minlength={2}
 				maxlength={80}
-				disabled={isSubmitting || isSuccess}
+				disabled={isSubmitting || isSuccess || createdWorkspace !== null}
 				aria-invalid={hasAttemptedSubmit && !nameValid}
 				aria-describedby="workspace-name-hint"
 				autofocus={autoFocusName}
@@ -182,7 +188,7 @@
 	<Button
 		type="submit"
 		class="h-11 w-full rounded-lg text-sm font-semibold md:text-sm"
-		disabled={!canSubmit}
+		disabled={isSubmitting || isSuccess}
 	>
 		{#if isSuccess}
 			<CheckIcon class="size-5" aria-hidden="true" />

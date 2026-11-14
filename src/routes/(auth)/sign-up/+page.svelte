@@ -20,6 +20,7 @@
 	} from '$lib/components/marketing/auth/auth-form-classes';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
+	import PasswordInput from '$lib/components/marketing/auth/PasswordInput.svelte';
 
 	const features = [
 		{
@@ -56,6 +57,8 @@
 	let isAwaitingVerification = $state(false);
 	const redirectTo = $derived(page.url.searchParams.get('redirectTo'));
 	const postAuthRedirectUrl = $derived(getSafePostAuthRedirectHref(redirectTo));
+	// Carry the post-auth destination across sign-in / sign-up links.
+	const redirectQuery = $derived(redirectTo ? `?redirectTo=${encodeURIComponent(redirectTo)}` : '');
 
 	const canSubmitEmailSignUp = $derived(Boolean(email.trim() && password && passwordConfirm));
 
@@ -376,6 +379,7 @@
 								type="button"
 								variant="outline"
 								class="h-14 w-full rounded-xl border-(--m-border-strong) text-base font-semibold shadow-none"
+								disabled={isSubmitting}
 								onclick={restartSignUp}
 							>
 								Use a different email
@@ -388,13 +392,13 @@
 							{/if}
 
 							{#if submitError}
-								<p class="text-center text-sm text-destructive" role="status">{submitError}</p>
+								<p class="text-center text-sm text-destructive" role="alert">{submitError}</p>
 							{/if}
 
 							<p class="text-center text-sm text-muted-foreground">
 								Already have an account?
 								<a
-									href={resolve('/sign-in')}
+									href={resolve(`/sign-in${redirectQuery}` as '/sign-in')}
 									class="font-semibold text-primary transition-[filter] hover:brightness-125"
 								>
 									Sign in
@@ -428,10 +432,9 @@
 						/>
 
 						<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
-							<Input
+							<PasswordInput
 								id="sign-up-password"
 								name="password"
-								type="password"
 								autocomplete="new-password"
 								placeholder="Password"
 								aria-label="Password"
@@ -439,10 +442,9 @@
 								class={`${inputClass} min-w-0`}
 								bind:value={password}
 							/>
-							<Input
+							<PasswordInput
 								id="sign-up-password-confirm"
 								name="password_confirm"
-								type="password"
 								autocomplete="new-password"
 								placeholder="Confirm password"
 								aria-label="Confirm password"
@@ -477,13 +479,13 @@
 							<GoogleAuthButton disabled={isSubmitting} onclick={handleGoogleSignUp} />
 
 							{#if submitError}
-								<p class="text-center text-sm text-destructive" role="status">{submitError}</p>
+								<p class="text-center text-sm text-destructive" role="alert">{submitError}</p>
 							{/if}
 
 							<p class="text-center text-sm text-muted-foreground">
 								Already have an account?
 								<a
-									href={resolve('/sign-in')}
+									href={resolve(`/sign-in${redirectQuery}` as '/sign-in')}
 									class="font-semibold text-primary transition-[filter] hover:brightness-125"
 								>
 									Sign in

@@ -10,6 +10,7 @@
 	import { Button } from '$lib/components/ui/button';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Skeleton } from '$lib/components/ui/skeleton';
+	import ConfirmDialog from '$lib/components/ui/ConfirmDialog.svelte';
 	import { getConvexErrorMessage } from '$lib/utils/convex-errors';
 	import { slide } from 'svelte/transition';
 	import ArrowRightIcon from '@lucide/svelte/icons/arrow-right';
@@ -75,6 +76,10 @@
 		return null;
 	});
 	let switchingWorkspaceId = $state<Id<'workspaces'> | null>(null);
+	let pendingPrimaryWorkspace = $state<{ workspaceId: Id<'workspaces'>; name: string } | null>(
+		null
+	);
+	let confirmPrimaryOpen = $state(false);
 	let showFeatures = $state(false);
 
 	function formatDate(epochMs: number | null | undefined): string {
@@ -95,6 +100,18 @@
 		team_access: 'Team access',
 		multi_workspace: 'Multiple workspaces'
 	};
+
+	function requestMakePrimary(workspace: { workspaceId: Id<'workspaces'>; name: string }) {
+		if (switchingWorkspaceId || convex.disabled) return;
+		pendingPrimaryWorkspace = { workspaceId: workspace.workspaceId, name: workspace.name };
+		confirmPrimaryOpen = true;
+	}
+
+	async function confirmMakePrimary() {
+		if (!pendingPrimaryWorkspace) return;
+		await makePrimary(pendingPrimaryWorkspace.workspaceId);
+		confirmPrimaryOpen = false;
+	}
 
 	async function makePrimary(workspaceId: Id<'workspaces'>) {
 		if (switchingWorkspaceId || convex.disabled) return;
@@ -162,6 +179,15 @@
 	<title>Plan usage | Waiver Director</title>
 	<meta name="description" content="Manage which workspace is live on your Waiver Director plan." />
 </svelte:head>
+
+<ConfirmDialog
+	bind:open={confirmPrimaryOpen}
+	title={`Make ${pendingPrimaryWorkspace?.name ?? 'this workspace'} live?`}
+	description="Your current live workspace will be paused: its signing links and integrations are suspended until it is live again. You can switch the live workspace once per billing cycle."
+	confirmLabel="Make live"
+	isConfirming={switchingWorkspaceId !== null}
+	onConfirm={confirmMakePrimary}
+/>
 
 <div class="w-full min-w-0 p-4 sm:p-6">
 	<div class="mx-auto flex w-full max-w-6xl flex-col gap-6">
@@ -479,7 +505,7 @@
 											size="sm"
 											disabled={!billing.workspaceLimit.canSwitchPrimaryWorkspace ||
 												switchingWorkspaceId !== null}
-											onclick={() => void makePrimary(workspace.workspaceId)}
+											onclick={() => requestMakePrimary(workspace)}
 											class="h-8 text-xs font-semibold"
 											aria-label="Make {workspace.name} the live workspace"
 										>

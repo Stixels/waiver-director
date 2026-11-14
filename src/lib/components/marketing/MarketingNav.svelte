@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { afterNavigate } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { onMount } from 'svelte';
@@ -10,6 +11,7 @@
 	const DESKTOP_BREAKPOINT_QUERY = '(min-width: 768px)';
 
 	let mobileNavOpen = $state(false);
+	let menuTriggerRef = $state<HTMLElement | null>(null);
 	let scrollY = $state(0);
 	let scrolled = $derived(scrollY > 24);
 
@@ -33,8 +35,17 @@
 	}
 
 	function onNavKeydown(e: KeyboardEvent) {
-		if (e.key === 'Escape' && mobileNavOpen) closeMobileNav();
+		if (e.key === 'Escape' && mobileNavOpen) {
+			closeMobileNav();
+			// Return focus to the toggle so keyboard users aren't left on a removed element.
+			menuTriggerRef?.focus();
+		}
 	}
+
+	// The nav lives in the layout, so close the menu after any navigation (e.g. the logo link).
+	afterNavigate(() => {
+		mobileNavOpen = false;
+	});
 
 	onMount(() => {
 		const desktopMediaQuery = window.matchMedia(DESKTOP_BREAKPOINT_QUERY);
@@ -114,6 +125,7 @@
 
 			<div class="flex shrink-0 justify-end md:hidden">
 				<Button
+					bind:ref={menuTriggerRef}
 					type="button"
 					variant="ghost"
 					size="icon-sm"

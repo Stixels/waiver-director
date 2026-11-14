@@ -37,6 +37,7 @@
 	let qrDialogOpen = $state(false);
 	let copied = $state(false);
 	let copiedResetTimeout: ReturnType<typeof setTimeout> | null = null;
+	const MAX_SEGMENTED_GUESTS = 40;
 
 	type BookingDetail = NonNullable<
 		FunctionReturnType<typeof api.bookings.getWorkspaceBookingDetail>
@@ -48,8 +49,13 @@
 		() => ({ keepPreviousData: true })
 	);
 
-	const detail = $derived((bookingQuery.data ?? null) as BookingDetail | null);
-	const isLoading = $derived(bookingQuery.isLoading);
+	// keepPreviousData returns the previously opened booking while the next one
+	// loads; show the skeleton instead of another booking's details.
+	const isSwitchingBooking = $derived(bookingQuery.isStale);
+	const detail = $derived(
+		isSwitchingBooking ? null : ((bookingQuery.data ?? null) as BookingDetail | null)
+	);
+	const isLoading = $derived(bookingQuery.isLoading || isSwitchingBooking);
 	const isCanceled = $derived(detail?.booking.status === 'canceled');
 	const signedCount = $derived(detail?.booking.signedCount ?? 0);
 	const expectedCount = $derived(detail?.booking.participantCount ?? 0);
@@ -139,7 +145,9 @@
 		{#if isLoading}
 			<!-- Skeleton -->
 			<SheetHeader class="shrink-0 border-b border-border px-4 py-4">
-				<div class="flex items-start gap-3 pr-8">
+				<SheetTitle class="sr-only">Loading booking</SheetTitle>
+				<SheetDescription class="sr-only">Booking details are loading.</SheetDescription>
+				<div class="flex items-start gap-3 pr-8" aria-hidden="true">
 					<Skeleton class="size-10 shrink-0 rounded-full" />
 					<div class="flex-1 space-y-2 pt-0.5">
 						<Skeleton class="h-4 w-44" />
@@ -251,20 +259,36 @@
 
 				<!-- Segmented coverage bar -->
 				{#if expectedCount > 0}
-					<div class="mt-3 flex gap-[3px]" aria-hidden="true">
-						{#each Array.from({ length: expectedCount }, (_, i) => i) as i (i)}
+					{#if expectedCount <= MAX_SEGMENTED_GUESTS}
+						<div class="mt-3 flex gap-[3px]" aria-hidden="true">
+							{#each Array.from({ length: expectedCount }, (_, i) => i) as i (i)}
+								<div
+									class={cn(
+										'h-[7px] flex-1 rounded-sm border transition-colors duration-300',
+										i < signedCount
+											? isComplete
+												? 'border-emerald-500 bg-emerald-500'
+												: 'border-primary/25 bg-primary dark:border-primary/40'
+											: 'border-border/80 bg-muted/70 dark:bg-muted/80'
+									)}
+								></div>
+							{/each}
+						</div>
+					{:else}
+						<!-- Large groups: one continuous bar instead of hundreds of slivers. -->
+						<div
+							class="mt-3 h-[7px] overflow-hidden rounded-sm border border-border/80 bg-muted/70 dark:bg-muted/80"
+							aria-hidden="true"
+						>
 							<div
 								class={cn(
-									'h-[7px] flex-1 rounded-sm border transition-colors duration-300',
-									i < signedCount
-										? isComplete
-											? 'border-emerald-500 bg-emerald-500'
-											: 'border-primary/25 bg-primary dark:border-primary/40'
-										: 'border-border/80 bg-muted/70 dark:bg-muted/80'
+									'h-full transition-all duration-300',
+									isComplete ? 'bg-emerald-500' : 'bg-primary'
 								)}
+								style={`width: ${Math.min(100, (signedCount / expectedCount) * 100)}%;`}
 							></div>
-						{/each}
-					</div>
+						</div>
+					{/if}
 					<!-- Fixed-height status line: no layout shift -->
 					<div class="mt-1.5 flex h-[18px] items-center">
 						{#if isComplete}

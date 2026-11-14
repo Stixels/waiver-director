@@ -17,6 +17,7 @@
 	const currentWorkspace = $derived(
 		appContext.workspaces.find((w) => w.slug === page.params.workspaceSlug) ?? null
 	);
+	const isOwner = $derived(currentWorkspace?.role === 'owner');
 
 	let name = $state('');
 	let loadedWorkspaceId = $state<string | null>(null);
@@ -37,7 +38,7 @@
 	const nameValid = $derived(trimmedName.length >= 2 && trimmedName.length <= 80);
 
 	async function saveName() {
-		if (!currentWorkspace || !nameChanged || !nameValid) return;
+		if (!currentWorkspace || !isOwner || !nameChanged || !nameValid || isSavingName) return;
 		isSavingName = true;
 		try {
 			await convex.mutation(api.workspaces.updateWorkspace, {
@@ -58,24 +59,35 @@
 	title="Workspace name"
 	description="Shown in the sidebar, in your customer's email inbox, and on your waiver page."
 >
-	<div class="space-y-2">
+	<form
+		class="space-y-2"
+		onsubmit={(event) => {
+			event.preventDefault();
+			void saveName();
+		}}
+	>
+		<label class="sr-only" for="workspace-name">Workspace name</label>
 		<Input
 			id="workspace-name"
 			bind:value={name}
 			placeholder="Atlas Escape & VR"
 			maxlength={80}
-			disabled={!currentWorkspace}
+			disabled={!currentWorkspace || !isOwner || isSavingName}
 			autocomplete="organization"
 			class="h-10"
+			aria-invalid={!nameValid && nameChanged ? true : undefined}
+			aria-describedby="workspace-name-hint"
 		/>
-		<p class="settings-hint" class:invalid={!nameValid && trimmedName.length > 0}>
-			{#if trimmedName.length > 0 && !nameValid}
+		<p id="workspace-name-hint" class="settings-hint" class:invalid={!nameValid && nameChanged}>
+			{#if currentWorkspace && !isOwner}
+				Only workspace owners can rename the workspace.
+			{:else if nameChanged && !nameValid}
 				Use 2–80 characters.
 			{:else}
 				This is the friendly name your team and customers will see.
 			{/if}
 		</p>
-	</div>
+	</form>
 
 	{#snippet footer()}
 		<div class="settings-section-foot-status">
@@ -91,7 +103,7 @@
 		</div>
 		<Button
 			size="sm"
-			disabled={!nameChanged || !nameValid || isSavingName}
+			disabled={!isOwner || !nameChanged || !nameValid || isSavingName}
 			onclick={saveName}
 			class="gap-1.5"
 		>

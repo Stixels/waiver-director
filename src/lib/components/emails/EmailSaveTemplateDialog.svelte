@@ -44,7 +44,8 @@
 				bind:value={templateName}
 				placeholder="e.g. Summer promotion, Default thank-you..."
 				onkeydown={(event) => {
-					if (event.key === 'Enter' && templateName.trim() && canSave) {
+					if (event.key === 'Enter' && templateName.trim() && canSave && !isSaving) {
+						event.preventDefault();
 						onConfirm();
 					}
 				}}

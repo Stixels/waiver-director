@@ -51,7 +51,12 @@
 </script>
 
 <Dialog bind:open>
-	<DialogContent class="max-w-md">
+	<DialogContent
+		class="max-w-md"
+		showCloseButton={!isBusy}
+		escapeKeydownBehavior={isBusy ? 'ignore' : 'close'}
+		interactOutsideBehavior={isBusy ? 'ignore' : 'close'}
+	>
 		<DialogHeader>
 			<DialogTitle>{title}</DialogTitle>
 			<DialogDescription>{description}</DialogDescription>

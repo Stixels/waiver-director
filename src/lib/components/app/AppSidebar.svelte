@@ -370,8 +370,9 @@
 									{#if ws.slug === activeWorkspaceSlug}
 										<div
 											class="h-1.5 w-1.5 shrink-0 rounded-full bg-primary"
-											aria-label="Active workspace"
+											aria-hidden="true"
 										></div>
+										<span class="sr-only">(current workspace)</span>
 									{/if}
 								</div>
 							</DropdownMenuItem>
@@ -529,6 +530,7 @@
 		{#if mode === 'sidebar'}
 			<div class="sidebar-toggle-row mt-auto flex pt-2">
 				<button
+					type="button"
 					class="collapse-btn flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground/50 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground"
 					onclick={() => (collapsed = !collapsed)}
 					title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
