@@ -490,7 +490,7 @@ export function validateSignerDateOfBirth(value: string, minimumAge: number): st
 	if (!signingDaysAroundUtc().some((today) => isSignerBirthDate(dateOfBirth, today, minimumAge))) {
 		throw new ConvexError({
 			code: 'invalid_argument',
-			message: `You must be at least ${minimumAge} to sign this waiver. A parent or guardian can sign and add minors instead.`
+			message: `You must be at least ${minimumAge} to sign this waiver. Guests under 18 can be added as minors by an adult who signs.`
 		});
 	}
 	return dateOfBirth;

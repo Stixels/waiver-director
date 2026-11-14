@@ -364,7 +364,7 @@
 				<div class="min-w-0">
 					<label class="panel-section-label" for="minimum-signer-age">Minimum signer age</label>
 					<p class="text-[10.5px] leading-tight text-muted-foreground/65">
-						Younger guests are added as minors by an adult.
+						Signers must be at least this age. Only guests under 18 can be added as minors.
 					</p>
 				</div>
 				<Input

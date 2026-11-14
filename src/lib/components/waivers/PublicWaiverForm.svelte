@@ -123,7 +123,7 @@
 		}
 
 		if (!isSignerBirthDate(signerDateOfBirth, todayIsoDate(), waiver.minimumSignerAge)) {
-			submitError = `You must be at least ${waiver.minimumSignerAge} to sign this waiver. A parent or guardian can sign and add minors instead.`;
+			submitError = `You must be at least ${waiver.minimumSignerAge} to sign this waiver. Guests under 18 can be added as minors by an adult who signs.`;
 			return;
 		}
 
@@ -288,7 +288,7 @@
 									required
 								/>
 								<p id="signer-dob-hint" class="mt-1.5 text-xs text-muted-foreground">
-									You must be {waiver.minimumSignerAge} or older to sign. Signing for someone younger?
+									You must be {waiver.minimumSignerAge} or older to sign. Signing for someone under 18?
 									Add them as a minor below.
 								</p>
 							</div>
