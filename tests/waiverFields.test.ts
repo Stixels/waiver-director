@@ -209,3 +209,14 @@ test('gives a short hint without the question name for inline errors', () => {
 		}
 	}
 });
+
+test('rejects long numbers that only round onto a min or max', () => {
+	for (const raw of ['120.0000000000000001', '-1e-400', '119.99999999999999999']) {
+		const result = normalizeSubmissionAnswers(fields, { ...validAnswers, age: raw });
+		assert.equal(result.ok, false, `${raw} should be rejected`);
+	}
+	for (const raw of ['120', '120.000', '1.2e2', '0', '-0', '0.0e5', '119.99999999999999']) {
+		const result = normalizeSubmissionAnswers(fields, { ...validAnswers, age: raw });
+		assert.equal(result.ok, true, `${raw} should be accepted`);
+	}
+});

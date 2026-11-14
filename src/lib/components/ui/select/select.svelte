@@ -84,7 +84,7 @@
 						class="relative flex min-h-8 cursor-default items-center gap-2 rounded-md py-1.5 pr-8 pl-2 text-sm outline-hidden select-none data-highlighted:bg-foreground/10 pointer-coarse:min-h-11 pointer-coarse:py-2.5 data-disabled:pointer-events-none data-disabled:opacity-50"
 					>
 						{#snippet children({ selected })}
-							<span class="min-w-0 truncate">{option.label}</span>
+							<span class="min-w-0 break-words">{option.label}</span>
 							{#if selected}
 								<CheckIcon class="absolute right-2 size-3.5" aria-hidden="true" />
 							{/if}

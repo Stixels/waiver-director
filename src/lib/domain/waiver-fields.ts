@@ -94,6 +94,30 @@ function parseNumberAnswer(value: string): number | null {
 	return Number.isFinite(parsed) ? parsed : null;
 }
 
+/** Exact decimal form ("-12e-1") of a number string, ignoring zero padding. */
+function canonicalDecimal(value: string): string {
+	const match = /^([+-]?)(\d*)\.?(\d*)(?:e([+-]?\d+))?$/i.exec(value.trim());
+	if (!match) return value;
+	const [, sign, whole, fraction, exponent] = match;
+	let digits = (whole + fraction).replace(/^0+/, '');
+	if (!digits) return '0';
+	let power = Number(exponent ?? 0) - fraction.length;
+	const trailing = digits.length - digits.replace(/0+$/, '').length;
+	digits = digits.slice(0, digits.length - trailing);
+	power += trailing;
+	return `${sign === '-' ? '-' : ''}${digits}e${power}`;
+}
+
+/**
+ * A long answer can round onto a min or max while really sitting just outside
+ * it (1.0000000000000001 with max 1, or -1e-400 with min 0). When the parsed
+ * value lands exactly on a bound, require the typed value to equal it too.
+ */
+function isExactAtBound(text: string, parsed: number, bound: number | undefined): boolean {
+	if (bound === undefined || parsed !== bound) return true;
+	return canonicalDecimal(text) === canonicalDecimal(String(bound));
+}
+
 export function isOptionField(
 	field: WaiverField
 ): field is Extract<WaiverField, { type: 'select' | 'multiselect' }> {
@@ -283,6 +307,16 @@ export function normalizeSubmissionAnswers(
 					const parsed = parseNumberAnswer(text);
 					if (parsed === null) {
 						return fail(field, `Enter a number for "${field.label}".`, 'Enter a number.');
+					}
+					if (
+						!isExactAtBound(text, parsed, field.min) ||
+						!isExactAtBound(text, parsed, field.max)
+					) {
+						return fail(
+							field,
+							`Enter a shorter number for "${field.label}".`,
+							'Enter a shorter number.'
+						);
 					}
 					if (field.min !== undefined && parsed < field.min) {
 						return fail(
