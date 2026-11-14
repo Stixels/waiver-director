@@ -17,9 +17,54 @@ Once your waiver is published, the **Waiver** page gives you several ways to sha
 	<img src="/images/app/waiver-qr-code.png" alt="Waiver QR code with a copy link button" />
 </Frame>
 
-## Embed on your website
+## Add it to your website
 
-**Copy embed code** gives you an `iframe` snippet that shows the waiver form inside your own site:
+Open **Settings > Website widget** to get code you can paste into your own site. The widget always shows your live published waiver, so you don't need to change your site when you publish a new version.
+
+- **Button**: a "Sign waiver" button that opens the waiver in a pop-up over your page. Pick the button text and color, then copy the code.
+- **Inline form**: the full waiver form inside your page. The frame grows to fit the form, so there's no inner scroll bar.
+
+```html
+<script
+	src="https://<your-app>/embed.js"
+	data-waiver-url="https://<your-waiver-link>"
+	data-mode="button"
+	data-label="Sign waiver"
+	data-color="#111827"
+	async
+></script>
+```
+
+Paste it into a custom HTML or code block, for example on Squarespace, Wix, WordPress, or Webflow.
+
+<Frame caption="Sample data from a fictional workspace.">
+	<img
+		src="/images/app/settings-website-widget.png"
+		alt="Website widget settings with button text, color, preview, and embed code"
+	/>
+</Frame>
+
+<Frame caption="The button opens the waiver in a pop-up on your site.">
+	<img
+		src="/images/app/website-widget-popup.png"
+		alt="Waiver form open in a pop-up over a business website"
+	/>
+</Frame>
+
+<Frame caption="The inline form grows to fit, with no inner scroll bar.">
+	<img
+		src="/images/app/website-widget-inline.png"
+		alt="Waiver form embedded inline on a business website"
+	/>
+</Frame>
+
+**Use your own button.** Keep the script on the page and add `data-waiver-director-open` to any link or button. Clicking it opens the waiver in the pop-up. Without the script, the link still opens the waiver page.
+
+```html
+<a href="https://<your-waiver-link>" data-waiver-director-open>Sign your waiver</a>
+```
+
+**Site builders that block scripts.** Use the plain `iframe` from the same settings page, or **Copy embed code** on the **Waiver** page. It has a fixed height and scrolls inside:
 
 ```html
 <iframe
@@ -30,6 +75,8 @@ Once your waiver is published, the **Waiver** page gives you several ways to sha
 	style="border:0;border-radius:16px;overflow:hidden"
 ></iframe>
 ```
+
+For developers: the widget fires `waiver-director:open`, `waiver-director:close`, and `waiver-director:submitted` events on the button or inline frame, so you can track signatures in your own analytics.
 
 ## Booking links
 

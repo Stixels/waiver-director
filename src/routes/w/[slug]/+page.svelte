@@ -13,4 +13,4 @@
 	<title>{waiver.title} | {waiver.workspaceName}</title>
 </svelte:head>
 
-<PublicWaiverForm {waiver} />
+<PublicWaiverForm {waiver} embed={data.embed} />
