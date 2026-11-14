@@ -56,7 +56,23 @@
 	let endDateStr = $state(toDateInputValue(new Date()));
 
 	const rangeStartAt = $derived(dateFromInput(startDateStr).getTime());
-	const rangeEndAt = $derived(dateFromInput(endDateStr).getTime() + 24 * 60 * 60 * 1000);
+	// Each boundary is a real local midnight, so days that are 23 or 25 hours
+	// long around a daylight saving change are bucketed correctly.
+	const dayBoundaries = $derived.by(() => {
+		const start = dateFromInput(startDateStr);
+		const end = dateFromInput(endDateStr);
+		const boundaries: number[] = [];
+		for (
+			let day = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+			day.getTime() <= end.getTime() && boundaries.length <= 31;
+			day = new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1)
+		) {
+			boundaries.push(day.getTime());
+		}
+		boundaries.push(new Date(end.getFullYear(), end.getMonth(), end.getDate() + 1).getTime());
+		return boundaries;
+	});
+	const rangeEndAt = $derived(dayBoundaries[dayBoundaries.length - 1]);
 
 	const analyticsQuery = useProtectedQuery(
 		api.dashboard.getAnalyticsSeries,
@@ -65,7 +81,8 @@
 				? {
 						workspaceId: currentWorkspace.workspaceId,
 						rangeStartAt,
-						rangeEndAt
+						rangeEndAt,
+						dayBoundaries
 					}
 				: 'skip',
 		() => ({ keepPreviousData: true })

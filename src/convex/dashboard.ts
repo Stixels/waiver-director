@@ -2,13 +2,21 @@ import { ConvexError, v } from 'convex/values';
 import { query } from './_generated/server';
 import { requireWorkspaceFeature } from './lib/billing';
 import { requireWorkspaceMember } from './lib/waivers';
+import {
+	DAY_MS,
+	customerActivityByDay,
+	dayCount,
+	dayIndexFor,
+	resolveDayBoundaries
+} from './lib/dayBuckets';
 
-const DAY_MS = 24 * 60 * 60 * 1000;
-const MAX_ANALYTICS_RANGE_MS = 30 * DAY_MS;
+const MAX_RANGE_DAYS = 30;
+// A 30-day range that crosses a daylight saving change is 30 days plus an hour.
+const MAX_RANGE_MS = MAX_RANGE_DAYS * DAY_MS + 2 * 60 * 60 * 1000;
+const MAX_DAY_BOUNDARIES = MAX_RANGE_DAYS + 1;
 const DASHBOARD_COUNT_CAP = 1000;
 
 const trendDayValue = v.object({
-	dayLabel: v.string(),
 	dayStartAt: v.number(),
 	count: v.number()
 });
@@ -18,46 +26,60 @@ const kpiComparisonValue = v.object({
 	previousTotal: v.number()
 });
 
-function bucketStartForRange(epochMs: number, rangeStartAt: number): number {
-	return rangeStartAt + Math.floor((epochMs - rangeStartAt) / DAY_MS) * DAY_MS;
-}
-
-function dayLabel(epochMs: number): string {
-	return new Date(epochMs).toLocaleDateString('en-US', { weekday: 'short' });
-}
-
-function analyticsDateLabel(epochMs: number): string {
-	return new Date(epochMs).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-}
-
-function buildDayBuckets(
-	startAt: number,
-	endAt: number,
-	counts: Map<number, number>,
-	labelFn: (epochMs: number) => string
-): Array<{ dayLabel: string; dayStartAt: number; count: number }> {
-	const buckets: Array<{ dayLabel: string; dayStartAt: number; count: number }> = [];
-	let cursor = startAt;
-	const end = endAt;
-	while (cursor <= end) {
-		buckets.push({
-			dayLabel: labelFn(cursor),
-			dayStartAt: cursor,
-			count: counts.get(cursor) ?? 0
+function assertDayRange(startAt: number, endAt: number, dayBoundaries: number[] | undefined) {
+	if (endAt <= startAt) {
+		throw new ConvexError({
+			code: 'invalid_argument',
+			message: 'The date range must include at least one day.'
 		});
-		cursor += DAY_MS;
+	}
+	if (
+		endAt - startAt > MAX_RANGE_MS ||
+		(dayBoundaries && dayBoundaries.length > MAX_DAY_BOUNDARIES)
+	) {
+		throw new ConvexError({
+			code: 'invalid_argument',
+			message: 'The date range cannot exceed 30 days.'
+		});
+	}
+}
+
+function countByDay(boundaries: number[], timestamps: Iterable<number | undefined>): number[] {
+	const counts = new Array<number>(dayCount(boundaries)).fill(0);
+	for (const timestamp of timestamps) {
+		if (typeof timestamp !== 'number') continue;
+		const index = dayIndexFor(boundaries, timestamp);
+		if (index >= 0) counts[index] += 1;
+	}
+	return counts;
+}
+
+function sumRange(counts: number[], fromIndex: number, toIndex: number): number {
+	let total = 0;
+	for (let index = Math.max(0, fromIndex); index < Math.min(counts.length, toIndex); index += 1) {
+		total += counts[index];
+	}
+	return total;
+}
+
+function dayBucketsFromCounts(
+	boundaries: number[],
+	counts: number[],
+	fromIndex: number,
+	toIndex: number
+): Array<{ dayStartAt: number; count: number }> {
+	const buckets: Array<{ dayStartAt: number; count: number }> = [];
+	for (let index = Math.max(0, fromIndex); index < Math.min(counts.length, toIndex); index += 1) {
+		buckets.push({
+			dayStartAt: boundaries[index],
+			count: counts[index]
+		});
 	}
 	return buckets;
 }
 
-function sumCountsBetween(counts: Map<number, number>, startAt: number, endAt: number): number {
-	let total = 0;
-	for (const [dayStartAt, count] of counts) {
-		if (dayStartAt >= startAt && dayStartAt < endAt) {
-			total += count;
-		}
-	}
-	return total;
+function isActiveBooking(booking: { status?: string }) {
+	return booking.status !== 'canceled';
 }
 
 export const getDashboardSnapshot = query({
@@ -65,7 +87,10 @@ export const getDashboardSnapshot = query({
 		workspaceId: v.id('workspaces'),
 		todayStartAt: v.number(),
 		todayEndAt: v.number(),
-		trendStartAt: v.number()
+		trendStartAt: v.number(),
+		// Exact local midnights from trendStartAt through todayEndAt (15 values).
+		// Optional so older clients keep working.
+		dayBoundaries: v.optional(v.array(v.number()))
 	},
 	returns: v.object({
 		kpi: v.object({
@@ -106,6 +131,8 @@ export const getDashboardSnapshot = query({
 	}),
 	handler: async (ctx, args) => {
 		await requireWorkspaceMember(ctx, args.workspaceId);
+		assertDayRange(args.trendStartAt, args.todayEndAt, args.dayBoundaries);
+		const boundaries = resolveDayBoundaries(args.trendStartAt, args.todayEndAt, args.dayBoundaries);
 
 		const [
 			trendBookings,
@@ -124,6 +151,7 @@ export const getDashboardSnapshot = query({
 						.gte('startAt', args.trendStartAt)
 						.lt('startAt', args.todayEndAt)
 				)
+				.order('desc')
 				.take(5000),
 			ctx.db
 				.query('waiver_submissions')
@@ -160,6 +188,7 @@ export const getDashboardSnapshot = query({
 						.gte('sentAt', args.trendStartAt)
 						.lt('sentAt', args.todayEndAt)
 				)
+				.order('desc')
 				.take(DASHBOARD_COUNT_CAP + 1),
 			ctx.db
 				.query('customers')
@@ -178,96 +207,53 @@ export const getDashboardSnapshot = query({
 						.gte('firstSeenAt', args.trendStartAt)
 						.lt('firstSeenAt', args.todayEndAt)
 				)
+				.order('desc')
 				.take(5000)
 		]);
 
-		const currentTrendStartAt = args.todayStartAt - 6 * DAY_MS;
-		const previousTrendEndAt = currentTrendStartAt;
+		// The range ends at the end of today, so today is always its last day.
+		const todayIndex = dayCount(boundaries) - 1;
+		const currentStartIndex = Math.max(0, todayIndex - 6);
+		const trendFor = (counts: number[]) =>
+			dayBucketsFromCounts(boundaries, counts, currentStartIndex, todayIndex + 1);
+		const comparisonFor = (counts: number[]) => ({
+			currentTotal: sumRange(counts, currentStartIndex, todayIndex + 1),
+			previousTotal: sumRange(counts, 0, currentStartIndex)
+		});
 
-		const bookingsToday = trendBookings.filter(
+		const activeTrendBookings = trendBookings.filter(isActiveBooking);
+		const bookingsToday = activeTrendBookings.filter(
 			(b) => (b.startAt ?? 0) >= args.todayStartAt && (b.startAt ?? 0) < args.todayEndAt
 		);
 		const submissionsToday = todaySubmissions.length;
 
-		const bookingTrendCounts = new Map<number, number>();
-		for (const booking of trendBookings) {
-			if (typeof booking.startAt !== 'number') continue;
-			const day = bucketStartForRange(booking.startAt, args.trendStartAt);
-			bookingTrendCounts.set(day, (bookingTrendCounts.get(day) ?? 0) + 1);
-		}
-		const bookingsTodayTrend = buildDayBuckets(
-			currentTrendStartAt,
-			args.todayStartAt,
-			bookingTrendCounts,
-			dayLabel
+		const bookingTrendCounts = countByDay(
+			boundaries,
+			activeTrendBookings.map((booking) => booking.startAt)
 		);
-		const bookingsComparison = {
-			currentTotal: sumCountsBetween(bookingTrendCounts, currentTrendStartAt, args.todayEndAt),
-			previousTotal: sumCountsBetween(bookingTrendCounts, args.trendStartAt, previousTrendEndAt)
-		};
+		const bookingsTodayTrend = trendFor(bookingTrendCounts);
+		const bookingsComparison = comparisonFor(bookingTrendCounts);
 
-		const trendCounts = new Map<number, number>();
-		for (const s of trendSubmissions) {
-			if (s.submittedAt < args.trendStartAt) break;
-			const day = bucketStartForRange(s.submittedAt, args.trendStartAt);
-			trendCounts.set(day, (trendCounts.get(day) ?? 0) + 1);
-		}
-		const submissionsTodayTrend = buildDayBuckets(
-			currentTrendStartAt,
-			args.todayStartAt,
-			trendCounts,
-			dayLabel
+		const trendCounts = countByDay(
+			boundaries,
+			trendSubmissions.map((submission) => submission.submittedAt)
 		);
-		const submissionsComparison = {
-			currentTotal: sumCountsBetween(trendCounts, currentTrendStartAt, args.todayEndAt),
-			previousTotal: sumCountsBetween(trendCounts, args.trendStartAt, previousTrendEndAt)
-		};
+		const submissionsTodayTrend = trendFor(trendCounts);
+		const submissionsComparison = comparisonFor(trendCounts);
 
-		const followUpSentTrendCounts = new Map<number, number>();
-		for (const followUp of trendSentFollowUps) {
-			if (
-				followUp.sentAt === undefined ||
-				followUp.sentAt < args.trendStartAt ||
-				followUp.sentAt >= args.todayEndAt
-			) {
-				continue;
-			}
-			const day = bucketStartForRange(followUp.sentAt, args.trendStartAt);
-			followUpSentTrendCounts.set(day, (followUpSentTrendCounts.get(day) ?? 0) + 1);
-		}
-		const followUpsSentTrend = buildDayBuckets(
-			currentTrendStartAt,
-			args.todayStartAt,
-			followUpSentTrendCounts,
-			dayLabel
+		const followUpSentTrendCounts = countByDay(
+			boundaries,
+			trendSentFollowUps.map((followUp) => followUp.sentAt)
 		);
-		const followUpsComparison = {
-			currentTotal: sumCountsBetween(followUpSentTrendCounts, currentTrendStartAt, args.todayEndAt),
-			previousTotal: sumCountsBetween(
-				followUpSentTrendCounts,
-				args.trendStartAt,
-				previousTrendEndAt
-			)
-		};
+		const followUpsSentTrend = trendFor(followUpSentTrendCounts);
+		const followUpsComparison = comparisonFor(followUpSentTrendCounts);
 
-		const customerTrendCounts = new Map<number, number>();
-		for (const customer of trendCustomers) {
-			if (customer.firstSeenAt < args.trendStartAt || customer.firstSeenAt >= args.todayEndAt) {
-				continue;
-			}
-			const day = bucketStartForRange(customer.firstSeenAt, args.trendStartAt);
-			customerTrendCounts.set(day, (customerTrendCounts.get(day) ?? 0) + 1);
-		}
-		const newCustomersTodayTrend = buildDayBuckets(
-			currentTrendStartAt,
-			args.todayStartAt,
-			customerTrendCounts,
-			dayLabel
+		const customerTrendCounts = countByDay(
+			boundaries,
+			trendCustomers.map((customer) => customer.firstSeenAt)
 		);
-		const customersComparison = {
-			currentTotal: sumCountsBetween(customerTrendCounts, currentTrendStartAt, args.todayEndAt),
-			previousTotal: sumCountsBetween(customerTrendCounts, args.trendStartAt, previousTrendEndAt)
-		};
+		const newCustomersTodayTrend = trendFor(customerTrendCounts);
+		const customersComparison = comparisonFor(customerTrendCounts);
 
 		// Email pipeline — run all status counts in parallel
 		const [sentCount, failedCount, blockedCount, unscheduledCount] = await Promise.all([
@@ -313,11 +299,7 @@ export const getDashboardSnapshot = query({
 			kpi: {
 				bookingsToday: bookingsToday.length,
 				submissionsToday,
-				followUpsSent: sumCountsBetween(
-					followUpSentTrendCounts,
-					args.todayStartAt,
-					args.todayEndAt
-				),
+				followUpsSent: followUpSentTrendCounts[todayIndex] ?? 0,
 				newCustomersToday: todayCustomers.length
 			},
 			kpiTrends: {
@@ -348,7 +330,9 @@ export const getAnalyticsSeries = query({
 	args: {
 		workspaceId: v.id('workspaces'),
 		rangeStartAt: v.number(),
-		rangeEndAt: v.number()
+		rangeEndAt: v.number(),
+		// Exact local midnights from rangeStartAt through rangeEndAt.
+		dayBoundaries: v.optional(v.array(v.number()))
 	},
 	returns: v.object({
 		submissionsByDay: v.array(trendDayValue),
@@ -366,7 +350,6 @@ export const getAnalyticsSeries = query({
 		}),
 		customerActivityByDay: v.array(
 			v.object({
-				dayLabel: v.string(),
 				dayStartAt: v.number(),
 				newCustomers: v.number(),
 				returningCustomers: v.number()
@@ -377,29 +360,23 @@ export const getAnalyticsSeries = query({
 		await requireWorkspaceMember(ctx, args.workspaceId);
 		await requireWorkspaceFeature(ctx, args.workspaceId, 'analytics');
 
-		if (args.rangeEndAt - args.rangeStartAt > MAX_ANALYTICS_RANGE_MS) {
-			throw new ConvexError({
-				code: 'invalid_argument',
-				message: 'Analytics range cannot exceed 30 days.'
-			});
-		}
-		if (args.rangeEndAt <= args.rangeStartAt) {
-			throw new ConvexError({
-				code: 'invalid_argument',
-				message: 'Analytics range must include at least one day.'
-			});
-		}
+		assertDayRange(args.rangeStartAt, args.rangeEndAt, args.dayBoundaries);
+		const boundaries = resolveDayBoundaries(args.rangeStartAt, args.rangeEndAt, args.dayBoundaries);
+		const rangeDays = dayCount(boundaries);
 
 		const rangeDurationMs = args.rangeEndAt - args.rangeStartAt;
 		const previousRangeStartAt = args.rangeStartAt - rangeDurationMs;
 		const previousRangeEndAt = args.rangeStartAt;
+		// The client only sends the selected range's local midnights, so the
+		// previous period is split into 24-hour days counted back from its end.
+		const previousBoundaries = resolveDayBoundaries(previousRangeStartAt, previousRangeEndAt);
 
 		const [
 			submissions,
 			previousSubmissions,
 			bookings,
 			previousBookings,
-			customers,
+			recentCustomers,
 			sentFollowUps,
 			queuedFollowUps,
 			failedFollowUps,
@@ -443,9 +420,18 @@ export const getAnalyticsSeries = query({
 						.lt('startAt', previousRangeEndAt)
 				)
 				.take(5000),
+			// Customers first seen in either range, newest first. Anyone who
+			// signed in these ranges but is not in this list was first seen
+			// earlier, so they count as returning.
 			ctx.db
 				.query('customers')
-				.withIndex('by_workspaceId', (q) => q.eq('workspaceId', args.workspaceId))
+				.withIndex('by_workspaceId_and_firstSeenAt', (q) =>
+					q
+						.eq('workspaceId', args.workspaceId)
+						.gte('firstSeenAt', previousRangeStartAt)
+						.lt('firstSeenAt', args.rangeEndAt)
+				)
+				.order('desc')
 				.take(5000),
 			ctx.db
 				.query('email_follow_ups')
@@ -496,90 +482,36 @@ export const getAnalyticsSeries = query({
 		]);
 
 		// Submissions by day
-		const submissionCounts = new Map<number, number>();
-		for (const s of submissions) {
-			const day = bucketStartForRange(s.submittedAt, args.rangeStartAt);
-			submissionCounts.set(day, (submissionCounts.get(day) ?? 0) + 1);
-		}
-		const submissionsByDay = buildDayBuckets(
-			args.rangeStartAt,
-			args.rangeEndAt - 1,
-			submissionCounts,
-			analyticsDateLabel
+		const submissionCounts = countByDay(
+			boundaries,
+			submissions.map((submission) => submission.submittedAt)
 		);
+		const submissionsByDay = dayBucketsFromCounts(boundaries, submissionCounts, 0, rangeDays);
 
-		// Bookings by day
-		const bookingCounts = new Map<number, number>();
-		for (const b of bookings) {
-			if (!b.startAt) continue;
-			const day = bucketStartForRange(b.startAt, args.rangeStartAt);
-			bookingCounts.set(day, (bookingCounts.get(day) ?? 0) + 1);
-		}
-		const bookingsByDay = buildDayBuckets(
-			args.rangeStartAt,
-			args.rangeEndAt - 1,
-			bookingCounts,
-			analyticsDateLabel
+		// Bookings by day (canceled bookings are not counted)
+		const activeBookings = bookings.filter(isActiveBooking);
+		const activePreviousBookings = previousBookings.filter(isActiveBooking);
+		const bookingCounts = countByDay(
+			boundaries,
+			activeBookings.map((booking) => booking.startAt)
 		);
+		const bookingsByDay = dayBucketsFromCounts(boundaries, bookingCounts, 0, rangeDays);
 
-		const customersById = new Map(customers.map((customer) => [customer._id, customer]));
-		const newCustomerIdsByDay = new Map<number, Set<string>>();
-		const returningCustomerIdsByDay = new Map<number, Set<string>>();
-		const previousCustomerActivityIdsByDay = new Map<number, Set<string>>();
-		for (const submission of submissions) {
-			if (submission.submittedAt < args.rangeStartAt || submission.submittedAt >= args.rangeEndAt) {
-				continue;
-			}
-			if (!submission.customerId) continue;
-
-			const customer = customersById.get(submission.customerId);
-			if (!customer) continue;
-
-			const day = bucketStartForRange(submission.submittedAt, args.rangeStartAt);
-			const firstSeenDay = bucketStartForRange(customer.firstSeenAt, args.rangeStartAt);
-			const bucket =
-				firstSeenDay === day
-					? newCustomerIdsByDay
-					: firstSeenDay < day
-						? returningCustomerIdsByDay
-						: null;
-			if (!bucket) continue;
-
-			const customerIds = bucket.get(day) ?? new Set<string>();
-			customerIds.add(submission.customerId);
-			bucket.set(day, customerIds);
-		}
-		for (const submission of previousSubmissions) {
-			if (
-				submission.submittedAt < previousRangeStartAt ||
-				submission.submittedAt >= previousRangeEndAt
-			) {
-				continue;
-			}
-			if (!submission.customerId) continue;
-			const customer = customersById.get(submission.customerId);
-			if (!customer) continue;
-
-			const day = bucketStartForRange(submission.submittedAt, previousRangeStartAt);
-			const firstSeenDay = bucketStartForRange(customer.firstSeenAt, previousRangeStartAt);
-			if (firstSeenDay > day) continue;
-
-			const customerIds = previousCustomerActivityIdsByDay.get(day) ?? new Set<string>();
-			customerIds.add(submission.customerId);
-			previousCustomerActivityIdsByDay.set(day, customerIds);
-		}
-		const customerActivityRaw = buildDayBuckets(
-			args.rangeStartAt,
-			args.rangeEndAt - 1,
-			new Map<number, number>(),
-			analyticsDateLabel
+		const firstSeenAtByCustomerId = new Map<string, number>(
+			recentCustomers.map((customer) => [customer._id, customer.firstSeenAt])
 		);
-		const customerActivityByDay = customerActivityRaw.map((bucket) => ({
-			dayLabel: bucket.dayLabel,
-			dayStartAt: bucket.dayStartAt,
-			newCustomers: newCustomerIdsByDay.get(bucket.dayStartAt)?.size ?? 0,
-			returningCustomers: returningCustomerIdsByDay.get(bucket.dayStartAt)?.size ?? 0
-		}));
+		const customerActivity = customerActivityByDay(
+			boundaries,
+			submissions,
+			firstSeenAtByCustomerId
+		).map((day, index) => ({ dayStartAt: boundaries[index], ...day }));
+		const previousCustomerActivity = customerActivityByDay(
+			previousBoundaries,
+			previousSubmissions,
+			firstSeenAtByCustomerId
+		);
+		const totalCustomerActivity = (days: typeof previousCustomerActivity) =>
+			days.reduce((total, day) => total + day.newCustomers + day.returningCustomers, 0);
 
 		return {
 			submissionsByDay,
@@ -590,18 +522,12 @@ export const getAnalyticsSeries = query({
 					previousTotal: previousSubmissions.length
 				},
 				bookings: {
-					currentTotal: bookings.length,
-					previousTotal: previousBookings.length
+					currentTotal: activeBookings.length,
+					previousTotal: activePreviousBookings.length
 				},
 				customerActivity: {
-					currentTotal: customerActivityByDay.reduce(
-						(total, day) => total + day.newCustomers + day.returningCustomers,
-						0
-					),
-					previousTotal: Array.from(previousCustomerActivityIdsByDay.values()).reduce(
-						(total, customerIds) => total + customerIds.size,
-						0
-					)
+					currentTotal: totalCustomerActivity(customerActivity),
+					previousTotal: totalCustomerActivity(previousCustomerActivity)
 				}
 			},
 			emailTotals: {
@@ -610,7 +536,7 @@ export const getAnalyticsSeries = query({
 				failed: failedFollowUps.length,
 				blocked: blockedFollowUps.length
 			},
-			customerActivityByDay
+			customerActivityByDay: customerActivity
 		};
 	}
 });

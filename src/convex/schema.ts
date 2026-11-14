@@ -358,6 +358,10 @@ export default defineSchema({
 		accountId: v.optional(v.string()),
 		permissions: v.array(v.string()),
 		lastSyncError: v.optional(v.string()),
+		syncStartedAt: v.optional(v.number()),
+		// Set when a sync was requested while another was running, so one more
+		// sync runs after it finishes instead of the request being dropped.
+		resyncRequested: v.optional(v.boolean()),
 		connectedAt: v.optional(v.number()),
 		disconnectedAt: v.optional(v.number()),
 		updatedAt: v.number()
@@ -446,6 +450,9 @@ export default defineSchema({
 		lookupToken: v.string(),
 		searchText: v.string(),
 		status: v.union(v.literal('active'), v.literal('canceled')),
+		// When the provider data behind `status` was read. Syncs and webhooks
+		// finish in any order, so older data must not replace a newer status.
+		statusObservedAt: v.optional(v.number()),
 		activityName: v.string(),
 		startTime: v.optional(v.string()),
 		endTime: v.optional(v.string()),

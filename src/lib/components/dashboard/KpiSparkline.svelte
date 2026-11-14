@@ -3,7 +3,7 @@
 	import { BarChart } from 'layerchart';
 	import { cubicInOut } from 'svelte/easing';
 
-	type TrendPoint = { dayLabel: string; dayStartAt: number; count: number };
+	type TrendPoint = { dayStartAt: number; count: number };
 
 	let {
 		data = [],
@@ -15,7 +15,14 @@
 		color: string;
 	} = $props();
 
-	const points = $derived(data ?? []);
+	// Weekday labels are formatted here because only the browser knows the
+	// viewer's time zone.
+	const points = $derived(
+		(data ?? []).map((point) => ({
+			...point,
+			dayLabel: new Date(point.dayStartAt).toLocaleDateString('en-US', { weekday: 'short' })
+		}))
+	);
 	const hasSignal = $derived(points.some((point) => point.count > 0));
 	const maxCount = $derived(Math.max(1, ...points.map((point) => point.count)));
 	const chartConfig = $derived({

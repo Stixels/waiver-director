@@ -16,6 +16,11 @@ import { requireWorkspaceFeature } from './lib/billing';
 import { requireWorkspaceMember, requireWorkspaceOwner } from './lib/waivers';
 import { escapeHtml, sanitizeRichTextHtml } from '../lib/utils/rich-text';
 import { richTextHtmlToPlainText } from '../lib/utils/rich-text-shared';
+import {
+	formatFollowUpActivityDate,
+	resolveTemplateVariables,
+	type FollowUpTemplateVariables
+} from '../lib/utils/email-variables';
 
 const DEFAULT_SEND_AFTER_AMOUNT = 2;
 const DEFAULT_SEND_AFTER_UNIT = 'hours' as const;
@@ -1170,22 +1175,8 @@ export const markFollowUpBlocked = internalMutation({
 	}
 });
 
-function resolveVariables(
-	template: string,
-	vars: { signerName: string; bookingId: string; businessName: string; activityDate: string }
-): string {
-	return template
-		.replace(/\{\{customer_name\}\}|\{customer_name\}/g, vars.signerName)
-		.replace(/\{\{booking_id\}\}|\{booking_id\}/g, vars.bookingId)
-		.replace(/\{\{business_name\}\}|\{business_name\}/g, vars.businessName)
-		.replace(/\{\{activity_date\}\}|\{activity_date\}/g, vars.activityDate);
-}
-
-function resolveHtmlVariables(
-	template: string,
-	vars: { signerName: string; bookingId: string; businessName: string; activityDate: string }
-): string {
-	return resolveVariables(template, {
+function resolveHtmlVariables(template: string, vars: FollowUpTemplateVariables): string {
+	return resolveTemplateVariables(template, {
 		signerName: escapeHtml(vars.signerName),
 		bookingId: escapeHtml(vars.bookingId),
 		businessName: escapeHtml(vars.businessName),
@@ -1193,11 +1184,8 @@ function resolveHtmlVariables(
 	});
 }
 
-function plainTextTemplateWithVariables(
-	template: string,
-	vars: { signerName: string; bookingId: string; businessName: string; activityDate: string }
-): string {
-	return resolveVariables(richTextHtmlToPlainText(template), vars).trim();
+function plainTextTemplateWithVariables(template: string, vars: FollowUpTemplateVariables): string {
+	return resolveTemplateVariables(richTextHtmlToPlainText(template), vars).trim();
 }
 
 function mergeInlineStyleAttributes(attributes: string | undefined, styles: string): string {
@@ -1325,9 +1313,9 @@ export const deliverFollowUpEmail = internalAction({
 		const bookingId = followUpWithBooking.bookingNumber
 			? `#${followUpWithBooking.bookingNumber}`
 			: '';
-		const bookingStartAt = parseTimestamp(followUp.bookingStartTime);
-		const activityDate = new Intl.DateTimeFormat('en-US', { dateStyle: 'long' }).format(
-			new Date(bookingStartAt ?? followUp.submittedAt)
+		const activityDate = formatFollowUpActivityDate(
+			followUp.bookingStartTime,
+			followUp.submittedAt
 		);
 
 		const vars = {
@@ -1338,7 +1326,7 @@ export const deliverFollowUpEmail = internalAction({
 		};
 		const subjectTemplate = followUp.subjectTemplate ?? template.subject;
 		const bodyTemplate = sanitizeRichTextHtml(followUp.bodyTemplate ?? template.body);
-		const subject = resolveVariables(subjectTemplate, vars);
+		const subject = resolveTemplateVariables(subjectTemplate, vars);
 		const bodyHtml = resolveHtmlVariables(bodyTemplate, vars);
 		const bodyText = plainTextTemplateWithVariables(bodyTemplate, vars);
 

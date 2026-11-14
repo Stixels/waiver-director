@@ -14,6 +14,7 @@
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import WaiverRichText from '$lib/components/waivers/WaiverRichText.svelte';
 	import { getConvexErrorMessage } from '$lib/utils/convex-errors';
+	import { formatFollowUpActivityDate, resolveTemplateVariables } from '$lib/utils/email-variables';
 	import { escapeHtml } from '$lib/utils/rich-text-client';
 	import { queryString } from '$lib/utils/url';
 	import { useConvexClient } from 'convex-svelte';
@@ -93,18 +94,20 @@
 		);
 	}
 
-	function parseTimestamp(value: string | null | undefined) {
-		if (!value) return null;
-		const timestamp = Date.parse(value);
-		return Number.isNaN(timestamp) ? null : timestamp;
+	function formatActivityDate(item: FollowUp | number) {
+		if (typeof item === 'number') {
+			return new Intl.DateTimeFormat('en-US', { dateStyle: 'long' }).format(new Date(item));
+		}
+		return formatFollowUpActivityDate(item.bookingStartTime, item.submittedAt);
 	}
 
-	function formatActivityDate(item: FollowUp | number) {
-		const bookingStartAt = typeof item === 'number' ? null : parseTimestamp(item.bookingStartTime);
-		const submittedAt = typeof item === 'number' ? item : item.submittedAt;
-		return new Intl.DateTimeFormat('en-US', { dateStyle: 'long' }).format(
-			new Date(bookingStartAt ?? submittedAt)
-		);
+	function templateVariables(item: FollowUp) {
+		return {
+			signerName: item.signerName,
+			bookingId: item.bookingNumber ? `#${item.bookingNumber}` : '',
+			businessName: workspaceName,
+			activityDate: formatActivityDate(item)
+		};
 	}
 
 	function closeDialog() {
@@ -143,21 +146,17 @@
 	}
 
 	function resolveTemplate(template: string, item: FollowUp) {
-		const bookingId = item.bookingNumber ? `#${item.bookingNumber}` : '';
-		return template
-			.replace(/\{\{customer_name\}\}|\{customer_name\}/g, item.signerName)
-			.replace(/\{\{booking_id\}\}|\{booking_id\}/g, bookingId)
-			.replace(/\{\{business_name\}\}|\{business_name\}/g, workspaceName)
-			.replace(/\{\{activity_date\}\}|\{activity_date\}/g, formatActivityDate(item));
+		return resolveTemplateVariables(template, templateVariables(item));
 	}
 
 	function resolveHtmlTemplate(template: string, item: FollowUp) {
-		const bookingId = item.bookingNumber ? `#${item.bookingNumber}` : '';
-		return template
-			.replace(/\{\{customer_name\}\}|\{customer_name\}/g, escapeHtml(item.signerName))
-			.replace(/\{\{booking_id\}\}|\{booking_id\}/g, escapeHtml(bookingId))
-			.replace(/\{\{business_name\}\}|\{business_name\}/g, escapeHtml(workspaceName))
-			.replace(/\{\{activity_date\}\}|\{activity_date\}/g, escapeHtml(formatActivityDate(item)));
+		const vars = templateVariables(item);
+		return resolveTemplateVariables(template, {
+			signerName: escapeHtml(vars.signerName),
+			bookingId: escapeHtml(vars.bookingId),
+			businessName: escapeHtml(vars.businessName),
+			activityDate: escapeHtml(vars.activityDate)
+		});
 	}
 
 	const resolvedSubject = $derived.by(() => {

@@ -14,7 +14,7 @@
 		newCustomersToday: number;
 	};
 
-	type TrendDay = { dayLabel: string; dayStartAt: number; count: number };
+	type TrendDay = { dayStartAt: number; count: number };
 
 	type KpiTrends = {
 		bookingsToday: TrendDay[];
