@@ -1,6 +1,6 @@
 import { paginationOptsValidator } from 'convex/server';
 import { ConvexError, v } from 'convex/values';
-import { mutation, query } from './_generated/server';
+import { internalMutation, mutation, query } from './_generated/server';
 import type { Doc, Id } from './_generated/dataModel';
 import type { MutationCtx, QueryCtx } from './_generated/server';
 import { internal } from './_generated/api';
@@ -10,9 +10,21 @@ import { upsertSignerCustomer } from './lib/customers';
 import { submissionSearchText } from './lib/submissions';
 import { getOwnedWorkspaceLogoUrl } from './lib/workspaces';
 import { marketingConsentLabel } from './lib/marketing';
+import {
+	AUDIT_HASH_ALGORITHM,
+	sanitizeClientTimestamp,
+	waiverDocumentHash,
+	waiverSubmissionHash
+} from './lib/audit';
+import {
+	submissionAuditRequestValidator,
+	submissionAuditValidator,
+	submissionClientTimingValidator
+} from './lib/submissionAudit';
 import { sanitizeRichTextHtml } from '../lib/utils/rich-text';
 import {
 	assertWorkspaceRecord,
+	collectsMinorDateOfBirth,
 	minorInputValidator,
 	normalizeWaiverDefinition,
 	requireWorkspaceMember,
@@ -33,6 +45,7 @@ const workspaceWaiverValue = v.object({
 	title: v.string(),
 	introCopy: v.string(),
 	theme: waiverThemeValidator,
+	collectMinorDateOfBirth: v.boolean(),
 	fields: v.array(waiverFieldValidator),
 	publishedVersionId: v.union(v.id('waiver_versions'), v.null()),
 	hasUnpublishedChanges: v.boolean()
@@ -44,6 +57,7 @@ const waiverVersionPreviewValue = v.object({
 	title: v.string(),
 	introCopy: v.string(),
 	theme: waiverThemeValidator,
+	collectMinorDateOfBirth: v.boolean(),
 	fields: v.array(waiverFieldValidator),
 	workspaceName: v.string(),
 	publishedAt: v.number(),
@@ -58,6 +72,7 @@ const publicWaiverValue = v.object({
 	title: v.string(),
 	introCopy: v.string(),
 	theme: waiverThemeValidator,
+	collectMinorDateOfBirth: v.boolean(),
 	fields: v.array(waiverFieldValidator),
 	marketingOptIn: v.union(
 		v.null(),
@@ -73,6 +88,7 @@ const publicBookingWaiverValue = v.object({
 	title: v.string(),
 	introCopy: v.string(),
 	theme: waiverThemeValidator,
+	collectMinorDateOfBirth: v.boolean(),
 	fields: v.array(waiverFieldValidator),
 	marketingOptIn: v.union(
 		v.null(),
@@ -122,12 +138,14 @@ async function waiverHasUnpublishedChanges(ctx: FunctionCtx, waiver: Doc<'worksp
 			title: waiver.title,
 			introCopy: waiver.introCopy,
 			theme: waiver.theme,
+			collectMinorDateOfBirth: waiver.collectMinorDateOfBirth,
 			fields: waiver.fields
 		},
 		{
 			title: version.title,
 			introCopy: version.introCopy,
 			theme: version.theme,
+			collectMinorDateOfBirth: version.collectMinorDateOfBirth,
 			fields: version.fields
 		}
 	);
@@ -142,6 +160,7 @@ async function workspaceWaiverSummary(ctx: FunctionCtx, waiver: Doc<'workspace_w
 		title: waiver.title,
 		introCopy: waiver.introCopy,
 		theme: waiver.theme ?? 'dark',
+		collectMinorDateOfBirth: collectsMinorDateOfBirth(waiver),
 		fields: waiver.fields,
 		publishedVersionId: waiver.publishedVersionId ?? null,
 		hasUnpublishedChanges
@@ -192,6 +211,7 @@ export const updateWorkspaceWaiver = mutation({
 			title: definition.title,
 			introCopy: definition.introCopy,
 			theme: definition.theme ?? 'dark',
+			collectMinorDateOfBirth: definition.collectMinorDateOfBirth ?? false,
 			fields: definition.fields
 		});
 
@@ -221,6 +241,7 @@ export const publishWorkspaceWaiver = mutation({
 			title: waiver.title,
 			introCopy: waiver.introCopy,
 			theme: waiver.theme,
+			collectMinorDateOfBirth: waiver.collectMinorDateOfBirth,
 			fields: waiver.fields
 		});
 		const publishedVersionId = waiver.publishedVersionId ?? null;
@@ -237,6 +258,7 @@ export const publishWorkspaceWaiver = mutation({
 			title: definition.title,
 			introCopy: definition.introCopy,
 			theme: definition.theme ?? 'dark',
+			collectMinorDateOfBirth: definition.collectMinorDateOfBirth ?? false,
 			fields: definition.fields,
 			publishedAt: Date.now()
 		});
@@ -287,6 +309,7 @@ export const listWaiverVersions = query({
 			title: version.title,
 			introCopy: version.introCopy,
 			theme: version.theme ?? 'dark',
+			collectMinorDateOfBirth: collectsMinorDateOfBirth(version),
 			fields: version.fields,
 			workspaceName: workspace.name,
 			publishedAt: version.publishedAt,
@@ -316,9 +339,16 @@ export const getSubmission = query({
 			workspaceName: v.string(),
 			waiver: waiverDefinitionValidator,
 			minors: v.array(v.string()),
+			minorDetails: v.array(
+				v.object({
+					fullName: v.string(),
+					dateOfBirth: v.union(v.string(), v.null())
+				})
+			),
 			booking: v.union(v.null(), bookingSnapshotValidator),
 			marketingConsent: v.boolean(),
-			marketingConsentLabel: v.union(v.string(), v.null())
+			marketingConsentLabel: v.union(v.string(), v.null()),
+			audit: v.union(v.null(), submissionAuditValidator)
 		})
 	),
 	handler: async (ctx, args) => {
@@ -374,9 +404,14 @@ export const getSubmission = query({
 				fields: version.fields
 			},
 			minors: submission.minors.map((participant) => participant.fullName),
+			minorDetails: submission.minors.map((participant) => ({
+				fullName: participant.fullName,
+				dateOfBirth: participant.dateOfBirth ?? null
+			})),
 			booking: submission.bookingSnapshot ?? null,
 			marketingConsent: submission.marketingConsent ?? false,
-			marketingConsentLabel: submission.marketingConsentLabel ?? null
+			marketingConsentLabel: submission.marketingConsentLabel ?? null,
+			audit: submission.audit ?? null
 		};
 	}
 });
@@ -485,6 +520,7 @@ export const getPublicWaiverBySlug = query({
 			title: version.title,
 			introCopy: sanitizeRichTextHtml(version.introCopy),
 			theme: version.theme ?? 'dark',
+			collectMinorDateOfBirth: collectsMinorDateOfBirth(version),
 			fields: version.fields,
 			marketingOptIn:
 				marketingIntegration?.status === 'connected' && marketingIntegration.audienceId
@@ -548,6 +584,7 @@ export const getPublicWaiverForBooking = query({
 			title: version.title,
 			introCopy: sanitizeRichTextHtml(version.introCopy),
 			theme: version.theme ?? 'dark',
+			collectMinorDateOfBirth: collectsMinorDateOfBirth(version),
 			fields: version.fields,
 			marketingOptIn:
 				marketingIntegration?.status === 'connected' && marketingIntegration.audienceId
@@ -566,8 +603,15 @@ export const getPublicWaiverForBooking = query({
 	}
 });
 
-export const submitPublicWaiver = mutation({
+/**
+ * Records a signed public waiver. Internal only: the public entry point is the
+ * `POST /waivers/submit` HTTP action, which captures the signer's IP address
+ * and user agent from the request so they cannot be supplied by the client.
+ */
+export const submitPublicWaiver = internalMutation({
 	args: {
+		request: submissionAuditRequestValidator,
+		clientTiming: v.optional(submissionClientTimingValidator),
 		slug: v.string(),
 		versionId: v.id('waiver_versions'),
 		bookingLookupToken: v.optional(v.string()),
@@ -653,7 +697,9 @@ export const submitPublicWaiver = mutation({
 		}
 
 		validateSubmissionAnswers(version, args.answers);
-		const minors = validateMinors(args.minors);
+		const minors = validateMinors(args.minors, {
+			requireDateOfBirth: collectsMinorDateOfBirth(version)
+		});
 		const marketingIntegration = await ctx.db
 			.query('marketing_integrations')
 			.withIndex('by_workspaceId_and_provider', (q) =>
@@ -681,6 +727,37 @@ export const submitPublicWaiver = mutation({
 		}
 
 		const submittedAt = Date.now();
+		const documentHash = await waiverDocumentHash({
+			versionId: version._id,
+			title: version.title,
+			introCopy: version.introCopy,
+			fields: version.fields
+		});
+		const submissionHash = await waiverSubmissionHash({
+			documentHash,
+			signerName,
+			signerEmail: originalSignerEmail,
+			signerDateOfBirth,
+			signatureDataUrl: args.signatureDataUrl,
+			answers: args.answers,
+			minors,
+			submittedAt
+		});
+		const audit = {
+			captureMethod: 'http_action' as const,
+			ipAddress: args.request.ipAddress,
+			forwardedFor: args.request.forwardedFor,
+			userAgent: args.request.userAgent,
+			hashAlgorithm: AUDIT_HASH_ALGORITHM,
+			documentHash,
+			submissionHash,
+			receivedAt: submittedAt,
+			clientFormOpenedAt: sanitizeClientTimestamp(args.clientTiming?.formOpenedAt, submittedAt),
+			clientSignatureCompletedAt: sanitizeClientTimestamp(
+				args.clientTiming?.signatureCompletedAt,
+				submittedAt
+			)
+		};
 		const submissionId = await ctx.db.insert('waiver_submissions', {
 			workspaceId: waiver.workspaceId,
 			versionId: waiver.publishedVersionId,
@@ -704,7 +781,8 @@ export const submitPublicWaiver = mutation({
 			status: 'submitted',
 			marketingConsent,
 			...(consentLabel ? { marketingConsentLabel: consentLabel } : {}),
-			submittedAt
+			submittedAt,
+			audit
 		});
 		const customerId = await upsertSignerCustomer(ctx, {
 			workspaceId: waiver.workspaceId,

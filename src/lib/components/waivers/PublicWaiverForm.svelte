@@ -1,8 +1,7 @@
 <script lang="ts">
 	import type { Id } from '$convex/_generated/dataModel';
-	import { useConvexClient } from 'convex-svelte';
 	import { toast } from 'svelte-sonner';
-	import { api } from '$convex/_generated/api';
+	import { publicEnv } from '$lib/config/public';
 	import SignaturePad from '$lib/components/waivers/SignaturePad.svelte';
 	import WaiverCopySection from '$lib/components/waivers/WaiverCopySection.svelte';
 	import WaiverDocumentShell from '$lib/components/waivers/WaiverDocumentShell.svelte';
@@ -16,7 +15,7 @@
 		waiverUnderlineTextareaClass
 	} from '$lib/components/waivers/waiver-public-form-classes';
 	import type { WaiverField, WaiverMinor, WaiverTheme } from '$lib/domain/waivers';
-	import { getConvexErrorMessage } from '$lib/utils/convex-errors';
+	import { minorBirthDateBounds } from '$lib/domain/waiver-constraints';
 	import { formatBookingTimestamp } from '$lib/utils/date';
 
 	type PublicWaiver = {
@@ -27,6 +26,7 @@
 		title: string;
 		introCopy: string;
 		theme: WaiverTheme;
+		collectMinorDateOfBirth: boolean;
 		fields: WaiverField[];
 		marketingOptIn: { provider: 'mailchimp'; label: string } | null;
 	};
@@ -49,8 +49,6 @@
 
 	let { waiver, booking = null }: Props = $props();
 
-	const convex = useConvexClient();
-
 	let signerName = $state('');
 	let signerEmail = $state('');
 	let signerDateOfBirth = $state('');
@@ -58,16 +56,44 @@
 	let answers = $state<Record<string, string | boolean | null>>({});
 	let marketingConsent = $state(false);
 	let minors = $state<MinorFormState[]>([]);
+	// Client-side timing for the audit trail. The server records its own receive time.
+	let formOpenedAt = Date.now();
+	let signatureCompletedAt: number | null = null;
 	let isSubmitting = $state(false);
 	let submitError = $state<string | null>(null);
 	let isSubmitted = $state(false);
 
 	function addMinor() {
-		minors.push({ _uid: crypto.randomUUID(), fullName: '' });
+		minors.push({ _uid: crypto.randomUUID(), fullName: '', dateOfBirth: '' });
 	}
 
 	function removeMinor(index: number) {
 		minors.splice(index, 1);
+	}
+
+	$effect(() => {
+		signatureCompletedAt = signatureDataUrl ? Date.now() : null;
+	});
+
+	function todayIsoDate() {
+		const now = new Date();
+		const month = String(now.getMonth() + 1).padStart(2, '0');
+		const day = String(now.getDate()).padStart(2, '0');
+		return `${now.getFullYear()}-${month}-${day}`;
+	}
+
+	async function postSubmission(body: Record<string, unknown>) {
+		const response = await fetch(`${publicEnv.convexSiteUrl}/waivers/submit`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify(body)
+		});
+		const result = (await response.json().catch(() => null)) as { message?: unknown } | null;
+		if (!response.ok) {
+			throw new Error(
+				typeof result?.message === 'string' ? result.message : 'Unable to submit this waiver.'
+			);
+		}
 	}
 
 	function setFieldAnswer(fieldId: string, value: string | boolean | null) {
@@ -86,11 +112,6 @@
 	async function handleSubmit(event: SubmitEvent) {
 		event.preventDefault();
 
-		if (convex.disabled) {
-			submitError = 'The waiver form is still loading. Please try again.';
-			return;
-		}
-
 		if (!signatureDataUrl || !signatureDataUrl.startsWith('data:image/')) {
 			submitError = 'Please provide a signature.';
 			return;
@@ -98,10 +119,14 @@
 
 		isSubmitting = true;
 		submitError = null;
-		const minorsPayload = minors.map((minor) => ({ fullName: minor.fullName }));
+		const minorsPayload = minors.map((minor) =>
+			waiver.collectMinorDateOfBirth
+				? { fullName: minor.fullName, dateOfBirth: minor.dateOfBirth ?? '' }
+				: { fullName: minor.fullName }
+		);
 
 		try {
-			await convex.mutation(api.waivers.submitPublicWaiver, {
+			await postSubmission({
 				slug: waiver.slug,
 				versionId: waiver.versionId,
 				...(booking ? { bookingLookupToken: booking.lookupToken } : {}),
@@ -111,13 +136,17 @@
 				signatureDataUrl,
 				marketingConsent,
 				answers,
-				minors: minorsPayload
+				minors: minorsPayload,
+				clientTiming: {
+					formOpenedAt,
+					...(signatureCompletedAt ? { signatureCompletedAt } : {})
+				}
 			});
 
 			isSubmitted = true;
 			toast.success('Waiver submitted.');
 		} catch (error) {
-			submitError = getConvexErrorMessage(error, 'Unable to submit this waiver.');
+			submitError = error instanceof Error ? error.message : 'Unable to submit this waiver.';
 		} finally {
 			isSubmitting = false;
 		}
@@ -131,6 +160,7 @@
 		answers = {};
 		marketingConsent = false;
 		minors = [];
+		formOpenedAt = Date.now();
 		submitError = null;
 		isSubmitted = false;
 	}
@@ -175,7 +205,7 @@
 				{#if booking}
 					<button
 						type="button"
-						class="mt-8 h-12 bg-foreground px-8 text-sm font-semibold tracking-wide text-background transition-opacity hover:opacity-85"
+						class="mt-8 h-12 rounded-2xl bg-foreground px-8 text-sm font-semibold tracking-wide text-background transition-opacity hover:opacity-85"
 						onclick={resetForm}
 					>
 						Sign another waiver
@@ -282,6 +312,22 @@
 													bind:value={minor.fullName}
 													required
 												/>
+
+												{#if waiver.collectMinorDateOfBirth}
+													<label class={`${waiverFieldLabelClass} mt-4`} for={`minor-dob-${index}`}>
+														Date of birth
+													</label>
+													<input
+														id={`minor-dob-${index}`}
+														type="date"
+														class={waiverUnderlineInputClass}
+														bind:value={minor.dateOfBirth}
+														min={minorBirthDateBounds(todayIsoDate()).min}
+														max={todayIsoDate()}
+														title="Minors must be under 18"
+														required
+													/>
+												{/if}
 											</div>
 										{/each}
 									</div>
@@ -446,7 +492,7 @@
 					<div class="pb-16">
 						<button
 							type="submit"
-							class="h-12 w-full bg-foreground text-sm font-semibold tracking-wide text-background transition-opacity hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-40"
+							class="h-12 w-full rounded-2xl bg-foreground text-sm font-semibold tracking-wide text-background transition-opacity hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-40"
 							disabled={isSubmitting}
 						>
 							{isSubmitting ? 'Submitting...' : 'Submit waiver'}

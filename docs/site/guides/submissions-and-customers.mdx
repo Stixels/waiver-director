@@ -17,7 +17,7 @@ description: 'Review signed waivers and each customer’s visit history.'
 - Signer details and the time they signed
 - Custom field answers
 - The drawn signature
-- Covered minors
+- Covered minors and their dates of birth
 - The booking details captured at signing, if the signature came from a booking link
 - The follow-up email created from the submission, if any
 
@@ -25,6 +25,26 @@ description: 'Review signed waivers and each customer’s visit history.'
 	<img
 		src="/images/app/submission-detail.png"
 		alt="Submission detail showing signed time, customer, booking, and follow-up links above the signer's name, email, date of birth, minor, custom answers, marketing consent, and drawn signature"
+	/>
+</Frame>
+
+## Audit trail
+
+Below the signed document, each submission shows an **Audit trail** you can point to if a signature is ever disputed:
+
+- **Received by server**: when Waiver Director recorded the signature.
+- **IP address**: the address the signature came from, recorded by the server. The signer can't change it.
+- **Device / browser**: the browser and device the signer's browser reported.
+- **Document hash**: a SHA-256 fingerprint of the exact waiver version the signer saw. Two submissions with the same document hash signed identical text.
+- **Record hash**: a SHA-256 fingerprint of the signed record (signer details, answers, minors, and signature). Any later change to the record would no longer match it.
+- **Form opened** and **Signature drawn**: times reported by the signer's browser, for context.
+
+Waivers signed before the audit trail was added show "No audit trail was recorded."
+
+<Frame caption="The audit trail on a signed submission. Sample data.">
+	<img
+		src="/images/app/submission-audit-trail.png"
+		alt="Audit trail panel listing server receive time, IP address, device and browser, document and record hashes, and browser-reported form-opened and signature times"
 	/>
 </Frame>
 
