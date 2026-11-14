@@ -13,7 +13,7 @@ import type { MutationCtx, QueryCtx } from './_generated/server';
 import { Resend } from 'resend';
 import { internal } from './_generated/api';
 import { requireWorkspaceFeature } from './lib/billing';
-import { requireWorkspaceMember } from './lib/waivers';
+import { requireWorkspaceMember, requireWorkspaceOwner } from './lib/waivers';
 import { escapeHtml, sanitizeRichTextHtml } from '../lib/utils/rich-text';
 import { richTextHtmlToPlainText } from '../lib/utils/rich-text-shared';
 
@@ -26,6 +26,10 @@ const EMAIL_TEMPLATE_LIMIT = 100;
 const FOLLOW_UP_STATS_LIMIT = 1000;
 const REPLY_TO_VERIFICATION_TTL_MS = 15 * 60 * 1000;
 const REPLY_TO_VERIFICATION_MAX_ATTEMPTS = 5;
+const REPLY_TO_VERIFICATION_RESEND_COOLDOWN_MS = 60 * 1000;
+// A delivery claim older than this is treated as abandoned (e.g. the action
+// crashed) so the follow-up can be sent again.
+const FOLLOW_UP_DELIVERY_CLAIM_TTL_MS = 10 * 60 * 1000;
 const EMAIL_ADDRESS_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const followUpStatusValue = v.union(
@@ -305,8 +309,10 @@ export const startReplyToVerification = action({
 	},
 	handler: async (ctx, args) => {
 		const email = normalizeReplyToEmail(args.replyToEmail);
-		const workspace: { name: string } = await ctx.runQuery(
-			internal.emails.getWorkspaceForEmailAction,
+		// Reserve the send slot atomically before calling Resend, so parallel
+		// clicks, failed sends, and cancel-then-resend all count toward the cooldown.
+		const workspace: { name: string } = await ctx.runMutation(
+			internal.emails.reserveReplyToVerificationSend,
 			{ workspaceId: args.workspaceId }
 		);
 		const code = verificationCode();
@@ -350,7 +356,10 @@ export const confirmReplyToVerification = action({
 		workspaceId: v.id('workspaces'),
 		code: v.string()
 	},
-	handler: async (ctx, args) => {
+	handler: async (
+		ctx,
+		args
+	): Promise<{ queuedCount: number; dueCount: number; scheduledCount: number }> => {
 		const pending: { pendingReplyToEmail: string } = await ctx.runQuery(
 			internal.emails.getPendingReplyToVerification,
 			{ workspaceId: args.workspaceId }
@@ -363,7 +372,9 @@ export const confirmReplyToVerification = action({
 			});
 		}
 
-		const result: { queuedCount: number; dueCount: number; scheduledCount: number } =
+		const result:
+			| { ok: false }
+			| { ok: true; queuedCount: number; dueCount: number; scheduledCount: number } =
 			await ctx.runMutation(internal.emails.confirmReplyToVerificationWithHash, {
 				workspaceId: args.workspaceId,
 				verificationCodeHash: await verificationCodeHash({
@@ -371,7 +382,17 @@ export const confirmReplyToVerification = action({
 					code
 				})
 			});
-		return result;
+		if (!result.ok) {
+			throw new ConvexError({
+				code: 'invalid_argument',
+				message: 'Verification code is incorrect.'
+			});
+		}
+		return {
+			queuedCount: result.queuedCount,
+			dueCount: result.dueCount,
+			scheduledCount: result.scheduledCount
+		};
 	}
 });
 
@@ -380,7 +401,7 @@ export const cancelReplyToVerification = mutation({
 		workspaceId: v.id('workspaces')
 	},
 	handler: async (ctx, args) => {
-		await requireWorkspaceMember(ctx, args.workspaceId);
+		await requireWorkspaceOwner(ctx, args.workspaceId, 'change the reply-to email');
 		const settings = await ctx.db
 			.query('workspace_email_settings')
 			.withIndex('by_workspaceId', (q) => q.eq('workspaceId', args.workspaceId))
@@ -778,13 +799,43 @@ export const unscheduleSelected = mutation({
 
 // ─── Internal functions ───────────────────────────────────────────────────────
 
-export const getWorkspaceForEmailAction = internalQuery({
+export const reserveReplyToVerificationSend = internalMutation({
 	args: { workspaceId: v.id('workspaces') },
+	returns: v.object({ name: v.string() }),
 	handler: async (ctx, args) => {
-		await requireWorkspaceMember(ctx, args.workspaceId);
+		await requireWorkspaceOwner(ctx, args.workspaceId, 'change the reply-to email');
 		const workspace = await ctx.db.get(args.workspaceId);
 		if (!workspace) {
 			throw new ConvexError({ code: 'not_found', message: 'Workspace not found.' });
+		}
+		const settings = await ctx.db
+			.query('workspace_email_settings')
+			.withIndex('by_workspaceId', (q) => q.eq('workspaceId', args.workspaceId))
+			.unique();
+		const now = Date.now();
+		const lastSendAt = Math.max(
+			settings?.verificationSendReservedAt ?? 0,
+			settings?.verificationCodeSentAt ?? 0
+		);
+		if (now - lastSendAt < REPLY_TO_VERIFICATION_RESEND_COOLDOWN_MS) {
+			const waitSeconds = Math.ceil(
+				(REPLY_TO_VERIFICATION_RESEND_COOLDOWN_MS - (now - lastSendAt)) / 1000
+			);
+			throw new ConvexError({
+				code: 'rate_limited',
+				message: `A code was just sent. Try again in ${waitSeconds} seconds.`
+			});
+		}
+
+		if (settings) {
+			await ctx.db.patch(settings._id, { verificationSendReservedAt: now });
+		} else {
+			await ctx.db.insert('workspace_email_settings', {
+				workspaceId: args.workspaceId,
+				verificationSendReservedAt: now,
+				verificationAttempts: 0,
+				updatedAt: now
+			});
 		}
 		return { name: workspace.name };
 	}
@@ -799,7 +850,7 @@ export const storeReplyToVerification = internalMutation({
 		verificationCodeSentAt: v.number()
 	},
 	handler: async (ctx, args) => {
-		await requireWorkspaceMember(ctx, args.workspaceId);
+		await requireWorkspaceOwner(ctx, args.workspaceId, 'change the reply-to email');
 		const existing = await ctx.db
 			.query('workspace_email_settings')
 			.withIndex('by_workspaceId', (q) => q.eq('workspaceId', args.workspaceId))
@@ -833,7 +884,7 @@ export const storeReplyToVerification = internalMutation({
 export const getPendingReplyToVerification = internalQuery({
 	args: { workspaceId: v.id('workspaces') },
 	handler: async (ctx, args) => {
-		await requireWorkspaceMember(ctx, args.workspaceId);
+		await requireWorkspaceOwner(ctx, args.workspaceId, 'change the reply-to email');
 		const settings = await ctx.db
 			.query('workspace_email_settings')
 			.withIndex('by_workspaceId', (q) => q.eq('workspaceId', args.workspaceId))
@@ -871,7 +922,7 @@ export const confirmReplyToVerificationWithHash = internalMutation({
 		verificationCodeHash: v.string()
 	},
 	handler: async (ctx, args) => {
-		await requireWorkspaceMember(ctx, args.workspaceId);
+		await requireWorkspaceOwner(ctx, args.workspaceId, 'change the reply-to email');
 		const settings = await ctx.db
 			.query('workspace_email_settings')
 			.withIndex('by_workspaceId', (q) => q.eq('workspaceId', args.workspaceId))
@@ -899,14 +950,13 @@ export const confirmReplyToVerificationWithHash = internalMutation({
 			});
 		}
 		if (settings.verificationCodeHash !== args.verificationCodeHash) {
+			// Return instead of throwing: a throw would roll back this increment and
+			// leave the attempt limit unenforced, allowing the code to be brute-forced.
 			await ctx.db.patch(settings._id, {
 				verificationAttempts: settings.verificationAttempts + 1,
 				updatedAt: Date.now()
 			});
-			throw new ConvexError({
-				code: 'invalid_argument',
-				message: 'Verification code is incorrect.'
-			});
+			return { ok: false as const };
 		}
 
 		const now = Date.now();
@@ -922,10 +972,13 @@ export const confirmReplyToVerificationWithHash = internalMutation({
 		});
 
 		if (!configuredFromEmail()) {
-			return { queuedCount: 0, dueCount: 0, scheduledCount: 0 };
+			return { ok: true as const, queuedCount: 0, dueCount: 0, scheduledCount: 0 };
 		}
 
-		return await queueBlockedFollowUpsForWorkspace(ctx, args.workspaceId);
+		return {
+			ok: true as const,
+			...(await queueBlockedFollowUpsForWorkspace(ctx, args.workspaceId))
+		};
 	}
 });
 
@@ -1047,6 +1100,7 @@ export const markFollowUpSent = internalMutation({
 		await ctx.db.patch(args.followUpId, {
 			status: 'sent',
 			sentAt: Date.now(),
+			deliveryClaimedAt: undefined,
 			sentSubject: args.sentSubject,
 			sentBodyHtml: args.sentBodyHtml,
 			sentFrom: args.sentFrom,
@@ -1068,8 +1122,34 @@ export const markFollowUpFailed = internalMutation({
 		await ctx.db.patch(args.followUpId, {
 			status: 'failed',
 			failedAt: Date.now(),
-			failureReason: args.reason
+			failureReason: args.reason,
+			deliveryClaimedAt: undefined
 		});
+	}
+});
+
+/**
+ * Atomically claim a queued follow-up for one delivery attempt. Returns the
+ * claim timestamp (used to build a per-attempt Resend idempotency key), or
+ * null when the follow-up is not queued or another attempt is in flight.
+ */
+export const claimFollowUpForDelivery = internalMutation({
+	args: { followUpId: v.id('email_follow_ups') },
+	returns: v.union(v.number(), v.null()),
+	handler: async (ctx, args) => {
+		const followUp = await ctx.db.get(args.followUpId);
+		if (!followUp || followUp.status !== 'queued') return null;
+
+		const now = Date.now();
+		if (
+			followUp.deliveryClaimedAt !== undefined &&
+			now - followUp.deliveryClaimedAt < FOLLOW_UP_DELIVERY_CLAIM_TTL_MS
+		) {
+			return null;
+		}
+
+		await ctx.db.patch(args.followUpId, { deliveryClaimedAt: now });
+		return now;
 	}
 });
 
@@ -1301,6 +1381,14 @@ export const deliverFollowUpEmail = internalAction({
 			return;
 		}
 
+		// Only one delivery action may call Resend for this follow-up at a time
+		// (e.g. "Send now" pressed while the scheduled send is already running).
+		const claimedAt: number | null = await ctx.runMutation(
+			internal.emails.claimFollowUpForDelivery,
+			{ followUpId: args.followUpId }
+		);
+		if (claimedAt === null) return;
+
 		const resend = new Resend(apiKey);
 		const sentFrom = friendlyFromAddress(
 			sender.workspaceName || template.workspaceName,
@@ -1309,14 +1397,19 @@ export const deliverFollowUpEmail = internalAction({
 		let resendMessageId: string | undefined;
 
 		try {
-			const { data, error } = await resend.emails.send({
-				from: sentFrom,
-				to: followUp.signerEmail,
-				replyTo: sender.replyToEmail,
-				subject,
-				html,
-				text: bodyText
-			});
+			const { data, error } = await resend.emails.send(
+				{
+					from: sentFrom,
+					to: followUp.signerEmail,
+					replyTo: sender.replyToEmail,
+					subject,
+					html,
+					text: bodyText
+				},
+				// Scoped to this claimed attempt: protects against SDK-level retries of
+				// this request without blocking a later retry with edited content.
+				{ idempotencyKey: `follow-up/${args.followUpId}/${claimedAt}` }
+			);
 
 			if (error) throw new Error(error.message);
 			resendMessageId = data?.id;

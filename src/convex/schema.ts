@@ -43,6 +43,7 @@ export default defineSchema({
 		primaryWorkspaceSwitchPeriod: v.optional(v.string()),
 		lastEventId: v.optional(v.string()),
 		lastEventType: v.optional(v.string()),
+		lastEventAt: v.optional(v.number()),
 		updatedAt: v.number()
 	})
 		.index('by_userId', ['userId'])
@@ -295,6 +296,9 @@ export default defineSchema({
 		verificationCodeHash: v.optional(v.string()),
 		verificationCodeExpiresAt: v.optional(v.number()),
 		verificationCodeSentAt: v.optional(v.number()),
+		// Last time a code send was attempted. Kept across cancel and failed sends so
+		// the resend cooldown cannot be skipped.
+		verificationSendReservedAt: v.optional(v.number()),
 		verificationAttempts: v.number(),
 		updatedAt: v.number()
 	}).index('by_workspaceId', ['workspaceId']),
@@ -323,6 +327,9 @@ export default defineSchema({
 		sentFrom: v.optional(v.string()),
 		sentReplyTo: v.optional(v.string()),
 		resendMessageId: v.optional(v.string()),
+		// Set when a delivery action claims this follow-up, so only one action
+		// at a time can call Resend for it. Cleared when it is marked sent/failed.
+		deliveryClaimedAt: v.optional(v.number()),
 		failedAt: v.optional(v.number()),
 		failureReason: v.optional(v.string()),
 		unscheduledAt: v.optional(v.number())

@@ -63,7 +63,7 @@ export const listWorkspaceCustomers = query({
 		}
 
 		const searchQuery = normalizedMatchValue(args.searchQuery);
-		const pageSize = Math.max(1, Math.floor(args.paginationOpts.numItems));
+		const pageSize = Math.min(100, Math.max(1, Math.floor(args.paginationOpts.numItems)));
 
 		if (!searchQuery) {
 			const customerPage = await ctx.db

@@ -10,6 +10,9 @@ export const MAX_SELECT_OPTION_LABEL_LENGTH = 80;
 export const MAX_MINORS = 50;
 export const MIN_MINOR_NAME_LENGTH = 2;
 export const MAX_MINOR_NAME_LENGTH = 120;
+export const MAX_ANSWER_LENGTH = 5_000;
+// Drawn signatures are PNG data URLs; even high-DPI canvases stay well under this.
+export const MAX_SIGNATURE_DATA_URL_LENGTH = 400_000;
 
 /** Age at which a participant is no longer a minor. */
 export const MINOR_AGE_LIMIT_YEARS = 18;
