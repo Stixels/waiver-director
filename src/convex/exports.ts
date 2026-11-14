@@ -4,6 +4,11 @@ import { query } from './_generated/server';
 import type { Doc, Id } from './_generated/dataModel';
 import { bookingProviderValidator } from './lib/bookings';
 import { requireWorkspaceOwner } from './lib/waivers';
+import {
+	formatAnswerDisplay,
+	type WaiverAnswerValue,
+	type WaiverField
+} from '../lib/domain/waiver-fields';
 
 // Exports are fetched page by page by the client and assembled into a CSV in
 // the browser. Submission docs carry signature data URLs, so pages are also
@@ -53,23 +58,19 @@ function exportPageOpts<T extends { numItems: number }>(paginationOpts: T): T {
 	};
 }
 
-function formatAnswer(value: string | boolean | null | undefined): string {
-	if (value === true) return 'Yes';
-	if (value === false) return 'No';
-	return value ?? '';
+/** One CSV cell per answer: option labels instead of ids, address parts on one line. */
+function formatAnswer(field: WaiverField, value: WaiverAnswerValue | undefined): string {
+	const text = formatAnswerDisplay(field, value);
+	return text === '—' ? '' : text.replace(/\n/g, ', ');
 }
 
 function historicalAnswers(submission: Doc<'waiver_submissions'>, version: Doc<'waiver_versions'>) {
 	// Answers are read against the published version the signer accepted, so
 	// labels reflect what the signer saw rather than the current template.
 	return version.fields.map((field) => {
-		const answer = submission.answers[field.id];
-		// Select answers are stored as option ids; export the label the signer
-		// picked, falling back to the raw value if the option is missing.
-		const value =
-			field.type === 'select' && typeof answer === 'string'
-				? (field.options.find((option) => option.id === answer)?.label ?? answer)
-				: formatAnswer(answer);
+		// Select answers are stored as option ids; formatAnswer exports the label
+		// the signer picked, falling back to the raw value if the option is missing.
+		const value = formatAnswer(field, submission.answers[field.id]);
 		return { fieldId: field.id, label: field.label, value };
 	});
 }

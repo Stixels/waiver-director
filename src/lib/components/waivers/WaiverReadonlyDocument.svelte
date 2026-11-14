@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { WaiverField, WaiverTheme } from '$lib/domain/waivers';
+	import type { WaiverAnswers, WaiverField, WaiverTheme } from '$lib/domain/waivers';
 	import WaiverCopySection from '$lib/components/waivers/WaiverCopySection.svelte';
 	import WaiverDocumentShell from '$lib/components/waivers/WaiverDocumentShell.svelte';
 	import WaiverFieldDisplay from '$lib/components/waivers/WaiverFieldDisplay.svelte';
@@ -25,7 +25,7 @@
 		minors?: string[];
 		/** Parallel to `minors`; null for submissions signed before minor DOB capture. */
 		minorDatesOfBirth?: Array<string | null>;
-		answers?: Record<string, string | boolean | null>;
+		answers?: WaiverAnswers;
 		marketingConsent?: boolean;
 		marketingConsentLabel?: string | null;
 		signatureDataUrl?: string;

@@ -31,15 +31,13 @@ import {
 	normalizeWaiverDefinition,
 	requireWorkspaceMember,
 	validateMinors,
-	pickSubmissionAnswers,
 	validateSignerDateOfBirth,
 	validateSubmissionAnswers,
 	waiverDefinitionsEqual,
-	waiverAnswerValueValidator,
-	waiverFieldValidator,
 	waiverDefinitionValidator,
 	waiverThemeValidator
 } from './lib/waivers';
+import { waiverAnswerValueValidator, waiverFieldValidator } from './lib/waiverFields';
 
 type FunctionCtx = QueryCtx | MutationCtx;
 const MAX_PAGE_SIZE = 100;
@@ -355,6 +353,7 @@ export const getSubmission = query({
 			signerDateOfBirth: v.string(),
 			signatureDataUrl: v.string(),
 			answers: v.record(v.string(), waiverAnswerValueValidator),
+			flaggedFieldIds: v.array(v.string()),
 			submittedAt: v.number(),
 			workspaceName: v.string(),
 			waiver: waiverDefinitionValidator,
@@ -415,6 +414,7 @@ export const getSubmission = query({
 			signerDateOfBirth: submission.signerDateOfBirth,
 			signatureDataUrl: submission.signatureDataUrl,
 			answers: submission.answers,
+			flaggedFieldIds: submission.flaggedFieldIds ?? [],
 			submittedAt: submission.submittedAt,
 			workspaceName: workspace.name,
 			waiver: {
@@ -450,6 +450,7 @@ export const listRecentSubmissions = query({
 				signerEmail: v.string(),
 				signerDateOfBirth: v.string(),
 				minorCount: v.number(),
+				flaggedCount: v.number(),
 				bookingActivityName: v.union(v.string(), v.null()),
 				bookingStartTime: v.union(v.string(), v.null()),
 				submittedAt: v.number()
@@ -482,6 +483,7 @@ export const listRecentSubmissions = query({
 				signerEmail: submission.signerEmail,
 				signerDateOfBirth: submission.signerDateOfBirth,
 				minorCount: submission.minors.length,
+				flaggedCount: submission.flaggedFieldIds?.length ?? 0,
 				bookingActivityName: submission.bookingSnapshot?.activityName ?? null,
 				bookingStartTime: submission.bookingSnapshot?.startTime ?? null,
 				submittedAt: submission.submittedAt
@@ -724,8 +726,7 @@ export const submitPublicWaiver = internalMutation({
 			});
 		}
 
-		validateSubmissionAnswers(version, args.answers);
-		const answers = pickSubmissionAnswers(version, args.answers);
+		const { answers, flaggedFieldIds } = validateSubmissionAnswers(version, args.answers);
 		const minors = validateMinors(args.minors, {
 			requireDateOfBirth: collectsMinorDateOfBirth(version)
 		});
@@ -806,6 +807,7 @@ export const submitPublicWaiver = internalMutation({
 			signerDateOfBirth,
 			signatureDataUrl: args.signatureDataUrl,
 			answers,
+			flaggedFieldIds,
 			minors,
 			status: 'submitted',
 			marketingConsent,

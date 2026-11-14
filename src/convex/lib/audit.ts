@@ -74,7 +74,8 @@ export type AuditSubmissionInput = {
 	signerEmail: string;
 	signerDateOfBirth: string;
 	signatureDataUrl: string;
-	answers: Record<string, string | boolean | null>;
+	// Field answers as stored: strings, booleans, option-id arrays or address/contact parts.
+	answers: Record<string, unknown>;
 	minors: Array<{ fullName: string; dateOfBirth?: string }>;
 	submittedAt: number;
 };

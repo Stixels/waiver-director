@@ -17,6 +17,7 @@
 	import ExternalLinkIcon from '@lucide/svelte/icons/external-link';
 	import RefreshCwIcon from '@lucide/svelte/icons/refresh-cw';
 	import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
+	import { Select } from '$lib/components/ui/select';
 
 	type Integration = FunctionReturnType<
 		typeof api.marketingIntegrations.getWorkspaceMarketingIntegration
@@ -136,21 +137,19 @@
 					again.
 				</div>
 			{:else}
-				<label class="space-y-2 text-sm font-medium" for="mailchimp-audience">
-					<span>Audience</span>
-					<select
+				<div class="space-y-2 text-sm font-medium">
+					<label for="mailchimp-audience">Audience</label>
+					<Select
 						id="mailchimp-audience"
-						class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
 						bind:value={selectedAudienceId}
-					>
-						<option value="">Select an audience</option>
-						{#each audiences as audience (audience.id)}
-							<option value={audience.id}>
-								{audience.name} ({audience.memberCount.toLocaleString()} contacts)
-							</option>
-						{/each}
-					</select>
-				</label>
+						placeholder="Select an audience"
+						options={audiences.map((audience) => ({
+							value: audience.id,
+							label: `${audience.name} (${audience.memberCount.toLocaleString()} contacts)`
+						}))}
+						class="font-normal"
+					/>
+				</div>
 			{/if}
 		</div>
 

@@ -1,7 +1,9 @@
 <script lang="ts">
 	import type { Id } from '$convex/_generated/dataModel';
+	import type { FullAutoFill } from 'svelte/elements';
 	import { toast } from 'svelte-sonner';
 	import { publicEnv } from '$lib/config/public';
+	import { Select } from '$lib/components/ui/select';
 	import SignaturePad from '$lib/components/waivers/SignaturePad.svelte';
 	import WaiverCopySection from '$lib/components/waivers/WaiverCopySection.svelte';
 	import WaiverDocumentShell from '$lib/components/waivers/WaiverDocumentShell.svelte';
@@ -14,9 +16,24 @@
 		waiverUnderlineInputClass,
 		waiverUnderlineTextareaClass
 	} from '$lib/components/waivers/waiver-public-form-classes';
-	import type { WaiverField, WaiverMinor, WaiverTheme } from '$lib/domain/waivers';
+	import type {
+		WaiverAnswers,
+		WaiverAnswerValue,
+		WaiverField,
+		WaiverMinor,
+		WaiverTheme
+	} from '$lib/domain/waivers';
 	import {
+		compositeParts,
+		MAX_INITIALS_LENGTH,
+		MAX_TEXT_ANSWER_LENGTH,
+		normalizeSubmissionAnswers
+	} from '$lib/domain/waiver-fields';
+	import {
+		isMinorBirthDate,
 		isSignerBirthDate,
+		isValidIsoDate,
+		MIN_MINOR_NAME_LENGTH,
 		minorBirthDateBounds,
 		signerBirthDateBounds
 	} from '$lib/domain/waiver-constraints';
@@ -58,7 +75,7 @@
 	let signerEmail = $state('');
 	let signerDateOfBirth = $state('');
 	let signatureDataUrl = $state('');
-	let answers = $state<Record<string, string | boolean | null>>({});
+	let answers = $state<WaiverAnswers>({});
 	let marketingConsent = $state(false);
 	let minors = $state<MinorFormState[]>([]);
 	// Client-side timing for the audit trail. The server records its own receive time.
@@ -66,6 +83,68 @@
 	let signatureCompletedAt: number | null = null;
 	let isSubmitting = $state(false);
 	let submitError = $state<string | null>(null);
+	let fieldErrors = $state<Record<string, string>>({});
+
+	function clearFieldError(fieldId: string) {
+		if (fieldErrors[fieldId]) delete fieldErrors[fieldId];
+	}
+
+	// Mirrors the server's signer checks in submitPublicWaiver; the server stays the source of truth.
+	const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+	/** Errors keyed by input id, in the order the inputs appear on the page. */
+	function collectFormErrors(): Record<string, string> {
+		const errors: Record<string, string> = {};
+		const name = signerName.trim();
+		if (name.length < 2) errors['signer-name'] = 'Please enter your full name.';
+		if (!EMAIL_PATTERN.test(signerEmail.trim())) {
+			errors['signer-email'] = signerEmail.trim()
+				? 'Enter a valid email address.'
+				: 'Please enter your email.';
+		}
+		const dob = signerDateOfBirth.trim();
+		const today = todayIsoDate();
+		if (!isValidIsoDate(dob)) {
+			errors['signer-dob'] = dob
+				? 'Enter a valid date of birth.'
+				: 'Please enter your date of birth.';
+		} else if (!isSignerBirthDate(dob, today, waiver.minimumSignerAge)) {
+			errors['signer-dob'] = `You must be at least ${waiver.minimumSignerAge} to sign.`;
+		}
+		minors.forEach((minor, index) => {
+			if (minor.fullName.trim().length < MIN_MINOR_NAME_LENGTH) {
+				errors[`minor-name-${index}`] = "Please enter this minor's full name.";
+			}
+			if (waiver.collectMinorDateOfBirth) {
+				const minorDob = minor.dateOfBirth?.trim() ?? '';
+				if (!minorDob) {
+					errors[`minor-dob-${index}`] = "Please enter this minor's date of birth.";
+				} else if (!isMinorBirthDate(minorDob, today)) {
+					errors[`minor-dob-${index}`] = isValidIsoDate(minorDob)
+						? 'Minors must be under 18.'
+						: 'Enter a valid date of birth.';
+				}
+			}
+		});
+		for (const field of waiver.fields) {
+			const result = normalizeSubmissionAnswers([field], { [field.id]: answers[field.id] });
+			if (!result.ok) errors[field.id] = result.hint;
+		}
+		if (!signatureDataUrl || !signatureDataUrl.startsWith('data:image/')) {
+			errors['signature-pad'] = 'Please sign above.';
+		}
+		return errors;
+	}
+
+	$effect(() => {
+		if (signatureDataUrl) clearFieldError('signature-pad');
+	});
+
+	function errorAttrs(fieldId: string) {
+		return fieldErrors[fieldId]
+			? { 'aria-invalid': 'true' as const, 'aria-describedby': `${fieldId}-error` }
+			: {};
+	}
 	let isSubmitted = $state(false);
 
 	function addMinor() {
@@ -73,6 +152,10 @@
 	}
 
 	function removeMinor(index: number) {
+		// Minor error keys are index-based, so drop them rather than let them shift.
+		for (const key of Object.keys(fieldErrors)) {
+			if (key.startsWith('minor-')) delete fieldErrors[key];
+		}
 		minors.splice(index, 1);
 	}
 
@@ -101,8 +184,42 @@
 		}
 	}
 
-	function setFieldAnswer(fieldId: string, value: string | boolean | null) {
+	const groupFieldTypes = new Set<WaiverField['type']>([
+		'multiselect',
+		'address',
+		'emergency_contact',
+		'initials'
+	]);
+
+	function setFieldAnswer(fieldId: string, value: WaiverAnswerValue) {
+		clearFieldError(fieldId);
 		answers[fieldId] = value;
+	}
+
+	function currentSelections(fieldId: string): string[] {
+		const value = answers[fieldId];
+		return Array.isArray(value) ? value : [];
+	}
+
+	function toggleSelection(fieldId: string, optionId: string, checked: boolean) {
+		clearFieldError(fieldId);
+		const current = currentSelections(fieldId).filter((entry) => entry !== optionId);
+		answers[fieldId] = checked ? [...current, optionId] : current;
+	}
+
+	function currentPart(fieldId: string, key: string): string {
+		const value = answers[fieldId];
+		if (value && typeof value === 'object' && !Array.isArray(value)) {
+			return value[key] ?? '';
+		}
+		return '';
+	}
+
+	function setPart(fieldId: string, key: string, partValue: string) {
+		clearFieldError(fieldId);
+		const value = answers[fieldId];
+		const current = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+		answers[fieldId] = { ...current, [key]: partValue };
 	}
 
 	function currentStringAnswer(fieldId: string): string {
@@ -117,13 +234,22 @@
 	async function handleSubmit(event: SubmitEvent) {
 		event.preventDefault();
 
-		if (!signatureDataUrl || !signatureDataUrl.startsWith('data:image/')) {
-			submitError = 'Please provide a signature.';
+		// Check everything up front so each problem shows right under its own input.
+		const nextFieldErrors = collectFormErrors();
+		fieldErrors = nextFieldErrors;
+		const firstInvalidId = Object.keys(nextFieldErrors)[0];
+		if (firstInvalidId) {
+			submitError = 'Please fix the highlighted fields above.';
+			const target = document.getElementById(firstInvalidId);
+			target?.focus({ preventScroll: true });
+			target?.scrollIntoView({ block: 'center', behavior: 'smooth' });
 			return;
 		}
 
-		if (!isSignerBirthDate(signerDateOfBirth, todayIsoDate(), waiver.minimumSignerAge)) {
-			submitError = `You must be at least ${waiver.minimumSignerAge} to sign this waiver. Guests under 18 can be added as minors by an adult who signs.`;
+		const checkedAnswers = normalizeSubmissionAnswers(waiver.fields, answers);
+		if (!checkedAnswers.ok) {
+			submitError = checkedAnswers.message;
+			document.getElementById(checkedAnswers.fieldId)?.focus();
 			return;
 		}
 
@@ -145,7 +271,7 @@
 				signerDateOfBirth,
 				signatureDataUrl,
 				marketingConsent,
-				answers,
+				answers: checkedAnswers.answers,
 				minors: minorsPayload,
 				clientTiming: {
 					formOpenedAt,
@@ -168,6 +294,7 @@
 		signerDateOfBirth = '';
 		signatureDataUrl = '';
 		answers = {};
+		fieldErrors = {};
 		marketingConsent = false;
 		minors = [];
 		formOpenedAt = Date.now();
@@ -250,47 +377,64 @@
 
 				<WaiverCopySection introCopy={waiver.introCopy} />
 
-				<form onsubmit={handleSubmit} class="space-y-6">
+				{#snippet inlineError(id: string)}
+					{#if fieldErrors[id]}
+						<p id={`${id}-error`} class="mt-2 text-sm text-destructive">{fieldErrors[id]}</p>
+					{/if}
+				{/snippet}
+
+				<form onsubmit={handleSubmit} class="space-y-6" novalidate>
 					<WaiverPublicAboutSignerCard>
 						<div class="space-y-6">
 							<div>
 								<label class={waiverFieldLabelClass} for="signer-name">Full name</label>
 								<input
 									id="signer-name"
+									{...errorAttrs('signer-name')}
+									oninput={() => clearFieldError('signer-name')}
 									class={waiverUnderlineInputClass}
 									bind:value={signerName}
 									required
 									maxlength={120}
 								/>
+								{@render inlineError('signer-name')}
 							</div>
 
 							<div>
 								<label class={waiverFieldLabelClass} for="signer-email">Email</label>
 								<input
 									id="signer-email"
+									{...errorAttrs('signer-email')}
+									oninput={() => clearFieldError('signer-email')}
 									type="email"
 									class={waiverUnderlineInputClass}
 									bind:value={signerEmail}
 									required
 								/>
+								{@render inlineError('signer-email')}
 							</div>
 
 							<div>
 								<label class={waiverFieldLabelClass} for="signer-dob">Date of birth</label>
 								<input
 									id="signer-dob"
+									aria-invalid={fieldErrors['signer-dob'] ? 'true' : undefined}
+									oninput={() => clearFieldError('signer-dob')}
 									type="date"
 									class={waiverUnderlineInputClass}
 									bind:value={signerDateOfBirth}
 									min={signerBirthDateBounds(todayIsoDate(), waiver.minimumSignerAge).min}
 									max={signerBirthDateBounds(todayIsoDate(), waiver.minimumSignerAge).max}
-									aria-describedby="signer-dob-hint"
+									aria-describedby={fieldErrors['signer-dob']
+										? 'signer-dob-hint signer-dob-error'
+										: 'signer-dob-hint'}
 									required
 								/>
 								<p id="signer-dob-hint" class="mt-1.5 text-xs text-muted-foreground">
 									You must be {waiver.minimumSignerAge} or older to sign. Signing for someone under 18?
 									Add them as a minor below.
 								</p>
+								{@render inlineError('signer-dob')}
 							</div>
 						</div>
 
@@ -325,10 +469,13 @@
 												</label>
 												<input
 													id={`minor-name-${index}`}
+													{...errorAttrs(`minor-name-${index}`)}
 													class={waiverUnderlineInputClass}
 													bind:value={minor.fullName}
+													oninput={() => clearFieldError(`minor-name-${index}`)}
 													required
 												/>
+												{@render inlineError(`minor-name-${index}`)}
 
 												{#if waiver.collectMinorDateOfBirth}
 													<label class={`${waiverFieldLabelClass} mt-4`} for={`minor-dob-${index}`}>
@@ -337,6 +484,8 @@
 													<input
 														id={`minor-dob-${index}`}
 														type="date"
+														{...errorAttrs(`minor-dob-${index}`)}
+														oninput={() => clearFieldError(`minor-dob-${index}`)}
 														class={waiverUnderlineInputClass}
 														bind:value={minor.dateOfBirth}
 														min={minorBirthDateBounds(todayIsoDate()).min}
@@ -344,6 +493,7 @@
 														title="Minors must be under 18"
 														required
 													/>
+													{@render inlineError(`minor-dob-${index}`)}
 												{/if}
 											</div>
 										{/each}
@@ -355,8 +505,20 @@
 						{#if waiver.fields.length > 0}
 							<WaiverPublicAdditionalInfoSection>
 								{#each waiver.fields as field (field.id)}
-									<div>
-										{#if field.type !== 'checkbox'}
+									<div
+										role={groupFieldTypes.has(field.type) ? 'group' : undefined}
+										aria-labelledby={groupFieldTypes.has(field.type)
+											? `${field.id}-label`
+											: undefined}
+									>
+										{#if groupFieldTypes.has(field.type)}
+											<div class={waiverFieldLabelClass} id={`${field.id}-label`}>
+												{field.label}
+												{#if field.required}
+													<span class="text-foreground/40">*</span>
+												{/if}
+											</div>
+										{:else if field.type !== 'checkbox'}
 											<label class={waiverFieldLabelClass} for={field.id}>
 												{field.label}
 												{#if field.required}
@@ -368,11 +530,13 @@
 										{#if field.type === 'text'}
 											<textarea
 												id={field.id}
+												{...errorAttrs(field.id)}
 												class={waiverUnderlineTextareaClass}
 												rows={1}
 												value={currentStringAnswer(field.id)}
 												placeholder={field.placeholder ?? ''}
 												required={field.required}
+												maxlength={MAX_TEXT_ANSWER_LENGTH}
 												oninput={(event) =>
 													setFieldAnswer(
 														field.id,
@@ -405,6 +569,7 @@
 												</span>
 												<input
 													id={field.id}
+													{...errorAttrs(field.id)}
 													type="checkbox"
 													class="sr-only"
 													checked={currentBooleanAnswer(field.id)}
@@ -423,25 +588,24 @@
 												</span>
 											</label>
 										{:else if field.type === 'select'}
-											<select
+											<Select
 												id={field.id}
-												class={waiverUnderlineInputClass}
+												aria-invalid={fieldErrors[field.id] ? 'true' : undefined}
+												aria-describedby={fieldErrors[field.id] ? `${field.id}-error` : undefined}
+												inline
 												value={currentStringAnswer(field.id)}
-												required={field.required}
-												onchange={(event) =>
-													setFieldAnswer(
-														field.id,
-														(event.currentTarget as HTMLSelectElement).value
-													)}
-											>
-												<option value="">Select one</option>
-												{#each field.options as option (option.id)}
-													<option value={option.id}>{option.label}</option>
-												{/each}
-											</select>
+												placeholder="Select one"
+												options={field.options.map((option) => ({
+													value: option.id,
+													label: option.label
+												}))}
+												onValueChange={(value) => setFieldAnswer(field.id, value)}
+												class="h-auto rounded-none border-0 border-b border-foreground/20 bg-transparent px-0 py-3 text-base focus-visible:border-foreground focus-visible:ring-0"
+											/>
 										{:else if field.type === 'date'}
 											<input
 												id={field.id}
+												{...errorAttrs(field.id)}
 												type="date"
 												class={waiverUnderlineInputClass}
 												value={currentStringAnswer(field.id)}
@@ -449,7 +613,147 @@
 												oninput={(event) =>
 													setFieldAnswer(field.id, (event.currentTarget as HTMLInputElement).value)}
 											/>
+										{:else if field.type === 'phone'}
+											<input
+												id={field.id}
+												{...errorAttrs(field.id)}
+												type="tel"
+												inputmode="tel"
+												autocomplete="tel"
+												class={waiverUnderlineInputClass}
+												value={currentStringAnswer(field.id)}
+												placeholder={field.placeholder ?? ''}
+												required={field.required}
+												maxlength={25}
+												oninput={(event) =>
+													setFieldAnswer(field.id, (event.currentTarget as HTMLInputElement).value)}
+											/>
+										{:else if field.type === 'number'}
+											<input
+												id={field.id}
+												{...errorAttrs(field.id)}
+												type="number"
+												inputmode="decimal"
+												step="any"
+												class={waiverUnderlineInputClass}
+												value={currentStringAnswer(field.id)}
+												min={field.min}
+												max={field.max}
+												required={field.required}
+												oninput={(event) =>
+													setFieldAnswer(field.id, (event.currentTarget as HTMLInputElement).value)}
+											/>
+										{:else if field.type === 'multiselect'}
+											<div class="mt-2 space-y-3">
+												{#each field.options as option, optionIndex (option.id)}
+													{@const checked = currentSelections(field.id).includes(option.id)}
+													<label
+														class="waiver-checkbox-label flex cursor-pointer items-center gap-3"
+													>
+														<span
+															class={`waiver-checkbox-box flex h-5 w-5 shrink-0 items-center justify-center border transition-colors ${checked ? 'border-foreground bg-foreground' : 'border-foreground/25 bg-transparent'}`}
+															aria-hidden="true"
+														>
+															{#if checked}
+																<svg
+																	xmlns="http://www.w3.org/2000/svg"
+																	width="12"
+																	height="12"
+																	viewBox="0 0 24 24"
+																	fill="none"
+																	stroke="currentColor"
+																	stroke-width="2.5"
+																	stroke-linecap="round"
+																	stroke-linejoin="round"
+																	class="text-background"
+																	aria-hidden="true"
+																>
+																	<polyline points="20 6 9 17 4 12" />
+																</svg>
+															{/if}
+														</span>
+														<input
+															id={optionIndex === 0 ? field.id : `${field.id}-${option.id}`}
+															{...errorAttrs(field.id)}
+															type="checkbox"
+															class="sr-only"
+															{checked}
+															onchange={(event) =>
+																toggleSelection(
+																	field.id,
+																	option.id,
+																	(event.currentTarget as HTMLInputElement).checked
+																)}
+														/>
+														<span class="text-sm">{option.label}</span>
+													</label>
+												{/each}
+											</div>
+										{:else if field.type === 'address' || field.type === 'emergency_contact'}
+											<div class="grid gap-x-4 sm:grid-cols-2">
+												{#each compositeParts(field.type) as part, partIndex (part.key)}
+													{@const inputId = partIndex === 0 ? field.id : `${field.id}-${part.key}`}
+													<div>
+														<label
+															class="mt-3 block text-[11px] font-medium tracking-wide text-muted-foreground uppercase"
+															for={inputId}
+														>
+															{part.label}
+															{#if field.required && part.required}
+																<span class="text-foreground/40">*</span>
+															{/if}
+														</label>
+														<input
+															id={inputId}
+															{...errorAttrs(field.id)}
+															type={part.key === 'phone' ? 'tel' : 'text'}
+															inputmode={part.key === 'phone' ? 'tel' : undefined}
+															autocomplete={field.type === 'address'
+																? (part.autocomplete as FullAutoFill)
+																: undefined}
+															class={waiverUnderlineInputClass}
+															value={currentPart(field.id, part.key)}
+															required={field.required && part.required}
+															maxlength={200}
+															oninput={(event) =>
+																setPart(
+																	field.id,
+																	part.key,
+																	(event.currentTarget as HTMLInputElement).value
+																)}
+														/>
+													</div>
+												{/each}
+											</div>
+										{:else if field.type === 'initials'}
+											<div class="mt-2 rounded-lg border border-border bg-muted/20 p-4">
+												<p class="text-sm leading-relaxed whitespace-pre-wrap">{field.clause}</p>
+												<div class="mt-3 flex items-center gap-3">
+													<label
+														class="shrink-0 text-[11px] font-medium tracking-wide whitespace-nowrap text-muted-foreground uppercase"
+														for={field.id}
+													>
+														Your initials
+													</label>
+													<input
+														id={field.id}
+														{...errorAttrs(field.id)}
+														class={`${waiverUnderlineInputClass} max-w-28 py-1 text-center font-semibold tracking-widest uppercase`}
+														autocomplete="off"
+														autocapitalize="characters"
+														maxlength={MAX_INITIALS_LENGTH}
+														value={currentStringAnswer(field.id)}
+														required={field.required}
+														oninput={(event) =>
+															setFieldAnswer(
+																field.id,
+																(event.currentTarget as HTMLInputElement).value
+															)}
+													/>
+												</div>
+											</div>
 										{/if}
+										{@render inlineError(field.id)}
 									</div>
 								{/each}
 							</WaiverPublicAdditionalInfoSection>
@@ -497,11 +801,12 @@
 								<h3 class="text-lg font-semibold tracking-tight">Signature</h3>
 							</div>
 							<SignaturePad bind:value={signatureDataUrl} canvasId="signature-pad" />
+							{@render inlineError('signature-pad')}
 						</div>
 					</WaiverPublicAboutSignerCard>
 
 					{#if submitError}
-						<p class="text-sm text-destructive">
+						<p class="text-sm text-destructive" role="alert">
 							{submitError}
 						</p>
 					{/if}
