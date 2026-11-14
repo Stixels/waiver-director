@@ -16,6 +16,11 @@ import { requireWorkspaceFeature } from './lib/billing';
 import { requireWorkspaceMember } from './lib/waivers';
 import { escapeHtml, sanitizeRichTextHtml } from '../lib/utils/rich-text';
 import { richTextHtmlToPlainText } from '../lib/utils/rich-text-shared';
+import {
+	formatFollowUpActivityDate,
+	resolveTemplateVariables,
+	type FollowUpTemplateVariables
+} from '../lib/utils/email-variables';
 
 const DEFAULT_SEND_AFTER_AMOUNT = 2;
 const DEFAULT_SEND_AFTER_UNIT = 'hours' as const;
@@ -1090,15 +1095,8 @@ export const markFollowUpBlocked = internalMutation({
 	}
 });
 
-function resolveVariables(
-	template: string,
-	vars: { signerName: string; bookingId: string; businessName: string; activityDate: string }
-): string {
-	return template
-		.replace(/\{\{customer_name\}\}|\{customer_name\}/g, vars.signerName)
-		.replace(/\{\{booking_id\}\}|\{booking_id\}/g, vars.bookingId)
-		.replace(/\{\{business_name\}\}|\{business_name\}/g, vars.businessName)
-		.replace(/\{\{activity_date\}\}|\{activity_date\}/g, vars.activityDate);
+function resolveVariables(template: string, vars: FollowUpTemplateVariables): string {
+	return resolveTemplateVariables(template, vars);
 }
 
 function resolveHtmlVariables(
@@ -1245,9 +1243,9 @@ export const deliverFollowUpEmail = internalAction({
 		const bookingId = followUpWithBooking.bookingNumber
 			? `#${followUpWithBooking.bookingNumber}`
 			: '';
-		const bookingStartAt = parseTimestamp(followUp.bookingStartTime);
-		const activityDate = new Intl.DateTimeFormat('en-US', { dateStyle: 'long' }).format(
-			new Date(bookingStartAt ?? followUp.submittedAt)
+		const activityDate = formatFollowUpActivityDate(
+			followUp.bookingStartTime,
+			followUp.submittedAt
 		);
 
 		const vars = {

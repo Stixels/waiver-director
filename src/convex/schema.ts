@@ -347,6 +347,10 @@ export default defineSchema({
 		accountId: v.optional(v.string()),
 		permissions: v.array(v.string()),
 		lastSyncError: v.optional(v.string()),
+		syncStartedAt: v.optional(v.number()),
+		// Set when a sync was requested while another was running, so one more
+		// sync runs after it finishes instead of the request being dropped.
+		resyncRequested: v.optional(v.boolean()),
 		connectedAt: v.optional(v.number()),
 		disconnectedAt: v.optional(v.number()),
 		updatedAt: v.number()

@@ -15,7 +15,14 @@
 		color: string;
 	} = $props();
 
-	const points = $derived(data ?? []);
+	// Weekday labels are formatted here, in the viewer's time zone, rather than
+	// on the server (which runs in UTC and can label a day as the one before).
+	const points = $derived(
+		(data ?? []).map((point) => ({
+			...point,
+			dayLabel: new Date(point.dayStartAt).toLocaleDateString('en-US', { weekday: 'short' })
+		}))
+	);
 	const hasSignal = $derived(points.some((point) => point.count > 0));
 	const maxCount = $derived(Math.max(1, ...points.map((point) => point.count)));
 	const chartConfig = $derived({
