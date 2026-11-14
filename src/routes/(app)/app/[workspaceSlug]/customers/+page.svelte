@@ -7,6 +7,7 @@
 	import { page } from '$app/state';
 	import { useAppContext } from '$lib/components/app/app-context.svelte';
 	import DataTableEmptyState from '$lib/components/app/DataTableEmptyState.svelte';
+	import ExportCsvButton from '$lib/components/app/ExportCsvButton.svelte';
 	import DataTablePage from '$lib/components/app/DataTablePage.svelte';
 	import DataTablePagination from '$lib/components/app/DataTablePagination.svelte';
 	import DataTableShell from '$lib/components/app/DataTableShell.svelte';
@@ -25,6 +26,8 @@
 	import { parseConvexId, queryString } from '$lib/utils/url';
 	import { cn } from '$lib/utils';
 	import { onMount } from 'svelte';
+	import { useConvexClient } from 'convex-svelte';
+	import { buildCustomersCsv, collectAllPages, exportFilename } from '$lib/domain/csv-export';
 	import CalendarClockIcon from '@lucide/svelte/icons/calendar-clock';
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 	import MailIcon from '@lucide/svelte/icons/mail';
@@ -40,6 +43,27 @@
 	const currentWorkspace = $derived(
 		appContext.workspaces.find((workspace) => workspace.slug === page.params.workspaceSlug) ?? null
 	);
+	const convex = useConvexClient();
+	const isOwner = $derived(currentWorkspace?.role === 'owner');
+
+	async function buildCustomerExport(onProgress: (rowCount: number) => void) {
+		const workspace = currentWorkspace;
+		if (!workspace) throw new Error('Workspace not loaded yet.');
+		const rows = await collectAllPages(
+			(cursor, endCursor) =>
+				convex.query(api.exports.exportCustomersPage, {
+					workspaceId: workspace.workspaceId,
+					paginationOpts: { numItems: 200, cursor, endCursor }
+				}),
+			onProgress
+		);
+		return {
+			filename: exportFilename(workspace.slug, 'customers'),
+			csv: buildCustomersCsv(rows),
+			rowCount: rows.length
+		};
+	}
+
 	const initialQuery = initialSearchQuery();
 
 	let cursor = $state<string | null>(null);
@@ -408,17 +432,22 @@
 			{/if}
 		</div>
 
-		<span
-			class="inline-flex h-9 w-fit items-center gap-2 rounded-full border border-border bg-card/40 px-3 text-xs font-medium text-muted-foreground"
-		>
-			<UsersRoundIcon class="size-3.5" aria-hidden="true" />
-			{#if isLoadingCustomers && !customerPage}
-				<Skeleton class="h-3 w-10" />
-			{:else}
-				<span class="text-foreground tabular-nums">{totalCount ?? 0}</span>
-				{(totalCount ?? 0) === 1 ? 'customer' : 'customers'}
+		<div class="flex flex-wrap items-center gap-2">
+			<span
+				class="inline-flex h-9 w-fit items-center gap-2 rounded-full border border-border bg-card/40 px-3 text-xs font-medium text-muted-foreground"
+			>
+				<UsersRoundIcon class="size-3.5" aria-hidden="true" />
+				{#if isLoadingCustomers && !customerPage}
+					<Skeleton class="h-3 w-10" />
+				{:else}
+					<span class="text-foreground tabular-nums">{totalCount ?? 0}</span>
+					{(totalCount ?? 0) === 1 ? 'customer' : 'customers'}
+				{/if}
+			</span>
+			{#if isOwner}
+				<ExportCsvButton label="Export CSV" buildCsv={buildCustomerExport} />
 			{/if}
-		</span>
+		</div>
 	</div>
 
 	<div
