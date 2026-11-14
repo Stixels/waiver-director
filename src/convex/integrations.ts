@@ -1188,7 +1188,7 @@ export const upsertProviderBooking = internalMutation({
 			participantCount: v.number()
 		})
 	},
-	returns: v.id('bookings'),
+	returns: v.union(v.id('bookings'), v.null()),
 	handler: async (ctx, args) => {
 		const integration = await ctx.db.get(args.integrationId);
 		if (!integration) {
@@ -1196,6 +1196,11 @@ export const upsertProviderBooking = internalMutation({
 				code: 'not_found',
 				message: 'Integration not found.'
 			});
+		}
+		// A sync or queued webhook that outlives a disconnect must not keep
+		// writing provider bookings into the workspace.
+		if (integration.status === 'disconnected') {
+			return null;
 		}
 
 		const now = Date.now();
@@ -1627,6 +1632,17 @@ export const verifyAndRecordBookeoWebhook = internalAction({
 		});
 		if (!integration || integration.status === 'disconnected') {
 			return { status: 'rejected' };
+		}
+
+		// Booking integrations are a paid feature. Webhooks registered while the
+		// workspace was on Pro keep firing after a downgrade, so acknowledge them
+		// without importing anything until the workspace regains access.
+		const hasBookingIntegrations: boolean = await ctx.runQuery(
+			internal.billing.getWorkspaceFeatureAccess,
+			{ workspaceId: integration.workspaceId, feature: 'booking_integrations' }
+		);
+		if (!hasBookingIntegrations) {
+			return { status: 'accepted' };
 		}
 
 		let itemId = 'unknown';

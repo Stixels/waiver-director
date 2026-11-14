@@ -1,9 +1,8 @@
 <script lang="ts">
 	import type { Id } from '$convex/_generated/dataModel';
 	import type { FullAutoFill } from 'svelte/elements';
-	import { useConvexClient } from 'convex-svelte';
 	import { toast } from 'svelte-sonner';
-	import { api } from '$convex/_generated/api';
+	import { publicEnv } from '$lib/config/public';
 	import { Select } from '$lib/components/ui/select';
 	import SignaturePad from '$lib/components/waivers/SignaturePad.svelte';
 	import WaiverCopySection from '$lib/components/waivers/WaiverCopySection.svelte';
@@ -30,8 +29,14 @@
 		MAX_TEXT_ANSWER_LENGTH,
 		normalizeSubmissionAnswers
 	} from '$lib/domain/waiver-fields';
-	import { MIN_MINOR_NAME_LENGTH } from '$lib/domain/waiver-constraints';
-	import { getConvexErrorMessage } from '$lib/utils/convex-errors';
+	import {
+		isMinorBirthDate,
+		isSignerBirthDate,
+		isValidIsoDate,
+		MIN_MINOR_NAME_LENGTH,
+		minorBirthDateBounds,
+		signerBirthDateBounds
+	} from '$lib/domain/waiver-constraints';
 	import { formatBookingTimestamp } from '$lib/utils/date';
 
 	type PublicWaiver = {
@@ -42,6 +47,8 @@
 		title: string;
 		introCopy: string;
 		theme: WaiverTheme;
+		minimumSignerAge: number;
+		collectMinorDateOfBirth: boolean;
 		fields: WaiverField[];
 		marketingOptIn: { provider: 'mailchimp'; label: string } | null;
 	};
@@ -64,8 +71,6 @@
 
 	let { waiver, booking = null }: Props = $props();
 
-	const convex = useConvexClient();
-
 	let signerName = $state('');
 	let signerEmail = $state('');
 	let signerDateOfBirth = $state('');
@@ -73,6 +78,9 @@
 	let answers = $state<WaiverAnswers>({});
 	let marketingConsent = $state(false);
 	let minors = $state<MinorFormState[]>([]);
+	// Client-side timing for the audit trail. The server records its own receive time.
+	let formOpenedAt = Date.now();
+	let signatureCompletedAt: number | null = null;
 	let isSubmitting = $state(false);
 	let submitError = $state<string | null>(null);
 	let fieldErrors = $state<Record<string, string>>({});
@@ -95,14 +103,27 @@
 				: 'Please enter your email.';
 		}
 		const dob = signerDateOfBirth.trim();
-		if (!/^\d{4}-\d{2}-\d{2}$/.test(dob) || Number.isNaN(Date.parse(dob))) {
+		const today = todayIsoDate();
+		if (!isValidIsoDate(dob)) {
 			errors['signer-dob'] = dob
 				? 'Enter a valid date of birth.'
 				: 'Please enter your date of birth.';
+		} else if (!isSignerBirthDate(dob, today, waiver.minimumSignerAge)) {
+			errors['signer-dob'] = `You must be at least ${waiver.minimumSignerAge} to sign.`;
 		}
 		minors.forEach((minor, index) => {
 			if (minor.fullName.trim().length < MIN_MINOR_NAME_LENGTH) {
 				errors[`minor-name-${index}`] = "Please enter this minor's full name.";
+			}
+			if (waiver.collectMinorDateOfBirth) {
+				const minorDob = minor.dateOfBirth?.trim() ?? '';
+				if (!minorDob) {
+					errors[`minor-dob-${index}`] = "Please enter this minor's date of birth.";
+				} else if (!isMinorBirthDate(minorDob, today)) {
+					errors[`minor-dob-${index}`] = isValidIsoDate(minorDob)
+						? 'Minors must be under 18.'
+						: 'Enter a valid date of birth.';
+				}
 			}
 		});
 		for (const field of waiver.fields) {
@@ -127,15 +148,40 @@
 	let isSubmitted = $state(false);
 
 	function addMinor() {
-		minors.push({ _uid: crypto.randomUUID(), fullName: '' });
+		minors.push({ _uid: crypto.randomUUID(), fullName: '', dateOfBirth: '' });
 	}
 
 	function removeMinor(index: number) {
 		// Minor error keys are index-based, so drop them rather than let them shift.
 		for (const key of Object.keys(fieldErrors)) {
-			if (key.startsWith('minor-name-')) delete fieldErrors[key];
+			if (key.startsWith('minor-')) delete fieldErrors[key];
 		}
 		minors.splice(index, 1);
+	}
+
+	$effect(() => {
+		signatureCompletedAt = signatureDataUrl ? Date.now() : null;
+	});
+
+	function todayIsoDate() {
+		const now = new Date();
+		const month = String(now.getMonth() + 1).padStart(2, '0');
+		const day = String(now.getDate()).padStart(2, '0');
+		return `${now.getFullYear()}-${month}-${day}`;
+	}
+
+	async function postSubmission(body: Record<string, unknown>) {
+		const response = await fetch(`${publicEnv.convexSiteUrl}/waivers/submit`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify(body)
+		});
+		const result = (await response.json().catch(() => null)) as { message?: unknown } | null;
+		if (!response.ok) {
+			throw new Error(
+				typeof result?.message === 'string' ? result.message : 'Unable to submit this waiver.'
+			);
+		}
 	}
 
 	const groupFieldTypes = new Set<WaiverField['type']>([
@@ -188,11 +234,6 @@
 	async function handleSubmit(event: SubmitEvent) {
 		event.preventDefault();
 
-		if (convex.disabled) {
-			submitError = 'The waiver form is still loading. Please try again.';
-			return;
-		}
-
 		// Check everything up front so each problem shows right under its own input.
 		const nextFieldErrors = collectFormErrors();
 		fieldErrors = nextFieldErrors;
@@ -214,10 +255,14 @@
 
 		isSubmitting = true;
 		submitError = null;
-		const minorsPayload = minors.map((minor) => ({ fullName: minor.fullName }));
+		const minorsPayload = minors.map((minor) =>
+			waiver.collectMinorDateOfBirth
+				? { fullName: minor.fullName, dateOfBirth: minor.dateOfBirth ?? '' }
+				: { fullName: minor.fullName }
+		);
 
 		try {
-			await convex.mutation(api.waivers.submitPublicWaiver, {
+			await postSubmission({
 				slug: waiver.slug,
 				versionId: waiver.versionId,
 				...(booking ? { bookingLookupToken: booking.lookupToken } : {}),
@@ -227,13 +272,17 @@
 				signatureDataUrl,
 				marketingConsent,
 				answers: checkedAnswers.answers,
-				minors: minorsPayload
+				minors: minorsPayload,
+				clientTiming: {
+					formOpenedAt,
+					...(signatureCompletedAt ? { signatureCompletedAt } : {})
+				}
 			});
 
 			isSubmitted = true;
 			toast.success('Waiver submitted.');
 		} catch (error) {
-			submitError = getConvexErrorMessage(error, 'Unable to submit this waiver.');
+			submitError = error instanceof Error ? error.message : 'Unable to submit this waiver.';
 		} finally {
 			isSubmitting = false;
 		}
@@ -248,6 +297,7 @@
 		fieldErrors = {};
 		marketingConsent = false;
 		minors = [];
+		formOpenedAt = Date.now();
 		submitError = null;
 		isSubmitted = false;
 	}
@@ -292,7 +342,7 @@
 				{#if booking}
 					<button
 						type="button"
-						class="mt-8 h-12 bg-foreground px-8 text-sm font-semibold tracking-wide text-background transition-opacity hover:opacity-85"
+						class="mt-8 h-12 rounded-2xl bg-foreground px-8 text-sm font-semibold tracking-wide text-background transition-opacity hover:opacity-85"
 						onclick={resetForm}
 					>
 						Sign another waiver
@@ -368,13 +418,22 @@
 								<label class={waiverFieldLabelClass} for="signer-dob">Date of birth</label>
 								<input
 									id="signer-dob"
-									{...errorAttrs('signer-dob')}
+									aria-invalid={fieldErrors['signer-dob'] ? 'true' : undefined}
 									oninput={() => clearFieldError('signer-dob')}
 									type="date"
 									class={waiverUnderlineInputClass}
 									bind:value={signerDateOfBirth}
+									min={signerBirthDateBounds(todayIsoDate(), waiver.minimumSignerAge).min}
+									max={signerBirthDateBounds(todayIsoDate(), waiver.minimumSignerAge).max}
+									aria-describedby={fieldErrors['signer-dob']
+										? 'signer-dob-hint signer-dob-error'
+										: 'signer-dob-hint'}
 									required
 								/>
+								<p id="signer-dob-hint" class="mt-1.5 text-xs text-muted-foreground">
+									You must be {waiver.minimumSignerAge} or older to sign. Signing for someone under 18?
+									Add them as a minor below.
+								</p>
 								{@render inlineError('signer-dob')}
 							</div>
 						</div>
@@ -417,6 +476,25 @@
 													required
 												/>
 												{@render inlineError(`minor-name-${index}`)}
+
+												{#if waiver.collectMinorDateOfBirth}
+													<label class={`${waiverFieldLabelClass} mt-4`} for={`minor-dob-${index}`}>
+														Date of birth
+													</label>
+													<input
+														id={`minor-dob-${index}`}
+														type="date"
+														{...errorAttrs(`minor-dob-${index}`)}
+														oninput={() => clearFieldError(`minor-dob-${index}`)}
+														class={waiverUnderlineInputClass}
+														bind:value={minor.dateOfBirth}
+														min={minorBirthDateBounds(todayIsoDate()).min}
+														max={todayIsoDate()}
+														title="Minors must be under 18"
+														required
+													/>
+													{@render inlineError(`minor-dob-${index}`)}
+												{/if}
 											</div>
 										{/each}
 									</div>
@@ -736,7 +814,7 @@
 					<div class="pb-16">
 						<button
 							type="submit"
-							class="h-12 w-full bg-foreground text-sm font-semibold tracking-wide text-background transition-opacity hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-40"
+							class="h-12 w-full rounded-2xl bg-foreground text-sm font-semibold tracking-wide text-background transition-opacity hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-40"
 							disabled={isSubmitting}
 						>
 							{isSubmitting ? 'Submitting...' : 'Submit waiver'}

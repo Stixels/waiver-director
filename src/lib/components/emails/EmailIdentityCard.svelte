@@ -26,13 +26,16 @@
 		workspaceName: string;
 		subjectPreview?: string;
 		snippetPreview?: string;
+		/** Only workspace owners may change the reply-to email. */
+		canEdit?: boolean;
 	}
 
 	let {
 		workspaceId,
 		workspaceName,
 		subjectPreview: subjectPreviewOverride,
-		snippetPreview: snippetPreviewOverride
+		snippetPreview: snippetPreviewOverride,
+		canEdit = true
 	}: Props = $props();
 
 	const convex = useConvexClient();
@@ -114,10 +117,21 @@
 			: 0
 	);
 	const codeExpired = $derived(replyToPendingVerification && codeExpiresInMs <= 0);
+	// Mirrors the server's 60s resend cooldown so the button can't be spammed.
+	let resendCooldownActive = $state(false);
+	let resendCooldownTimer: ReturnType<typeof setTimeout> | undefined;
+	function startResendCooldown() {
+		resendCooldownActive = true;
+		clearTimeout(resendCooldownTimer);
+		resendCooldownTimer = setTimeout(() => (resendCooldownActive = false), 60_000);
+	}
+	$effect(() => () => clearTimeout(resendCooldownTimer));
+
 	const canRequestReplyToVerification = $derived(
 		Boolean(
 			senderSettings?.platformFromEmail &&
 			replyToEmail.trim() &&
+			!resendCooldownActive &&
 			!isSendingVerification &&
 			!isConfirmingVerification &&
 			!isCancellingVerification
@@ -202,6 +216,7 @@
 		} catch (err) {
 			toast.error(getConvexErrorMessage(err, 'Failed to send verification code.'));
 		} finally {
+			startResendCooldown();
 			isSendingVerification = false;
 		}
 	}
@@ -336,18 +351,24 @@
 						· verified {timeAgoShort(senderSettings.replyToVerifiedAt)}{/if}.
 				</p>
 			</div>
-			<button
-				type="button"
-				class="verified-edit"
-				onclick={() => {
-					editingReplyTo = true;
-					replyToEmail = senderSettings?.replyToEmail ?? '';
-				}}
-			>
-				<PencilIcon class="size-3.5" />
-				Change
-			</button>
+			{#if canEdit}
+				<button
+					type="button"
+					class="verified-edit"
+					onclick={() => {
+						editingReplyTo = true;
+						replyToEmail = senderSettings?.replyToEmail ?? '';
+					}}
+				>
+					<PencilIcon class="size-3.5" />
+					Change
+				</button>
+			{/if}
 		</div>
+	{:else if !canEdit}
+		<p class="settings-readonly-hint">
+			Only workspace owners can set or change the reply-to email.
+		</p>
 	{:else}
 		<ol class="setup-steps">
 			<li class="setup-step" data-state={setupPhase === 'verifying' ? 'done' : 'active'}>
@@ -536,6 +557,11 @@
 </div>
 
 <style>
+	.settings-readonly-hint {
+		font-size: 0.72rem;
+		color: var(--muted-foreground);
+	}
+
 	.sender-identity {
 		display: flex;
 		flex-direction: column;
