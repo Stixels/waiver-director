@@ -4,6 +4,9 @@
 	import { navigating, page } from '$app/state';
 	import AppSidebar from '$lib/components/app/AppSidebar.svelte';
 	import { useAppContext } from '$lib/components/app/app-context.svelte';
+	import { useConvexClient } from 'convex-svelte';
+	import { api } from '$convex/_generated/api';
+	import { deviceTimeZone } from '$lib/utils/time-zone';
 	import {
 		Sheet,
 		SheetContent,
@@ -30,6 +33,28 @@
 	function closeMobileNav(): void {
 		mobileNavOpen = false;
 	}
+
+	// Workspaces created before the time zone setting existed have none. Fill
+	// it in from an owner's browser once; they can change it in Settings.
+	const convex = useConvexClient();
+	const timeZoneAttempts: Record<string, true> = {};
+	$effect(() => {
+		const workspace = appContext.workspaces.find((w) => w.slug === page.params.workspaceSlug);
+		if (!workspace || workspace.role !== 'owner' || workspace.timeZone !== null) return;
+		if (timeZoneAttempts[workspace.workspaceId]) return;
+		timeZoneAttempts[workspace.workspaceId] = true;
+
+		const timeZone = deviceTimeZone();
+		if (!timeZone) return;
+		const { workspaceId } = workspace;
+		void (async () => {
+			try {
+				await convex.mutation(api.workspaces.updateWorkspace, { workspaceId, timeZone });
+			} catch (error) {
+				console.error('[workspace] unable to set the time zone', error);
+			}
+		})();
+	});
 
 	onMount(() => {
 		const mql = window.matchMedia(DESKTOP_BREAKPOINT_QUERY);

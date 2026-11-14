@@ -13,6 +13,7 @@
 	} from '$lib/components/ui/dialog';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import WaiverRichText from '$lib/components/waivers/WaiverRichText.svelte';
+	import { useAppContext } from '$lib/components/app/app-context.svelte';
 	import { getConvexErrorMessage } from '$lib/utils/convex-errors';
 	import { formatFollowUpActivityDate, resolveTemplateVariables } from '$lib/utils/email-variables';
 	import { escapeHtml } from '$lib/utils/rich-text-client';
@@ -47,6 +48,11 @@
 	}: Props = $props();
 
 	const convex = useConvexClient();
+	const appContext = useAppContext();
+	const workspaceTimeZone = $derived(
+		appContext.workspaces.find((workspace) => workspace.workspaceId === workspaceId)?.timeZone ??
+			null
+	);
 	const metaLinkClass =
 		'group/link inline-flex max-w-full items-center gap-1.5 rounded-md border border-border bg-background px-2 py-1 text-xs font-medium text-foreground shadow-xs transition-colors hover:border-foreground/30 hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none';
 	const metaItemClass =
@@ -98,7 +104,7 @@
 		if (typeof item === 'number') {
 			return new Intl.DateTimeFormat('en-US', { dateStyle: 'long' }).format(new Date(item));
 		}
-		return formatFollowUpActivityDate(item.bookingStartTime, item.submittedAt);
+		return formatFollowUpActivityDate(item.bookingStartTime, item.submittedAt, workspaceTimeZone);
 	}
 
 	function templateVariables(item: FollowUp) {
