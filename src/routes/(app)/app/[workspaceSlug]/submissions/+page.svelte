@@ -310,7 +310,11 @@
 			{/if}
 		</div>
 		{#if isOwner}
-			<ExportCsvButton label="Export CSV" buildCsv={buildSubmissionExport} />
+			<ExportCsvButton
+				label="Export all"
+				title="Download every submission in this workspace as a CSV, not just the current search."
+				buildCsv={buildSubmissionExport}
+			/>
 		{/if}
 	</div>
 

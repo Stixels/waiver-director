@@ -7,6 +7,8 @@
 
 	type Props = {
 		label: string;
+		/** Tooltip that spells out what the export includes. */
+		title?: string;
 		/** Collects rows and returns the finished CSV. Reports row progress as it goes. */
 		buildCsv: (onProgress: (rowCount: number) => void) => Promise<{
 			filename: string;
@@ -15,7 +17,7 @@
 		}>;
 	};
 
-	let { label, buildCsv }: Props = $props();
+	let { label, title, buildCsv }: Props = $props();
 
 	let isExporting = $state(false);
 	let progressCount = $state(0);
@@ -59,6 +61,7 @@
 	size="lg"
 	class="h-9 cursor-pointer gap-2"
 	disabled={isExporting}
+	{title}
 	onclick={handleExport}
 	aria-live="polite"
 >
