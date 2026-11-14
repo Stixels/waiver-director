@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
 	decodeHtml,
+	isRichTextEmpty,
 	normalizeRichTextSource,
 	richTextHtmlToPlainText
 } from '../src/lib/utils/rich-text-shared.ts';
@@ -39,4 +40,12 @@ test('removes actual and entity-encoded tags from email plain text', () => {
 test('decodes numeric whitespace and named entities safely', () => {
 	assert.equal(decodeHtml('Waiver&#x20;Director &amp; Co.&#32;'), 'Waiver Director & Co. ');
 	assert.equal(decodeHtml('Invalid: &#99999999;'), 'Invalid: &#99999999;');
+});
+
+test('detects empty waiver copy so the public section can be hidden', () => {
+	assert.equal(isRichTextEmpty(''), true);
+	assert.equal(isRichTextEmpty('<p></p>'), true);
+	assert.equal(isRichTextEmpty('<p>&nbsp;</p><p><br></p>'), true);
+	assert.equal(isRichTextEmpty('<p>Read before signing.</p>'), false);
+	assert.equal(isRichTextEmpty('<p><img src="https://example.com/logo.png" /></p>'), false);
 });

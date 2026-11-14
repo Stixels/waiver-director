@@ -165,6 +165,12 @@ export function richTextHtmlToPlainText(input: string): string {
 		.trim();
 }
 
+/** True when rich-text HTML has no visible content (no text and no images), e.g. `<p></p>`. */
+export function isRichTextEmpty(input: string): boolean {
+	if (/<img\b/i.test(input)) return false;
+	return richTextHtmlToPlainText(input).length === 0;
+}
+
 export function sanitizeStyle(tagName: string, style: string | null): string | null {
 	if (!style) return null;
 
