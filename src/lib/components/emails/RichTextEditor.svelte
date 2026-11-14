@@ -339,6 +339,9 @@
 					text: safeHref.replace(/^(mailto|tel):/i, ''),
 					marks: [{ type: 'link', attrs: { href: safeHref } }]
 				})
+				// Link marks are inclusive while autolink is on; without this, whatever is
+				// typed next would become part of the link.
+				.unsetMark('link')
 				.run();
 		} else {
 			editor.chain().focus().extendMarkRange('link').setLink({ href: safeHref }).run();

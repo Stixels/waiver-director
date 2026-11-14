@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { beforeNavigate, goto } from '$app/navigation';
+	import { afterNavigate, beforeNavigate, goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { onMount, tick, untrack } from 'svelte';
@@ -200,6 +200,12 @@
 		void saveThenNavigate(target, historyDelta);
 	});
 
+	// The bypass only covers the single navigation replayed by saveThenNavigate. This page
+	// is reused when switching workspaces, so it cannot rely on unmounting to clear it.
+	afterNavigate(() => {
+		isLeavingAfterSave = false;
+	});
+
 	async function saveThenNavigate(target: URL, historyDelta: number | null) {
 		const saved = await flushAndWaitForSave();
 		if (!saved) {
@@ -208,8 +214,8 @@
 		}
 		isLeavingAfterSave = true;
 		if (historyDelta !== null) {
-			// The flag stays set until this page unmounts, so the replayed popstate
-			// passes straight through the guard above.
+			// The flag lets the replayed popstate pass straight through the guard above;
+			// afterNavigate clears it once that navigation lands.
 			history.go(historyDelta);
 			return;
 		}

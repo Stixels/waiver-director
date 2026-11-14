@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, untrack } from 'svelte';
 	import { Button } from '$lib/components/ui/button';
 
 	interface Props {
@@ -20,13 +20,24 @@
 	let context = $state<CanvasRenderingContext2D | null>(null);
 	let drawing = $state(false);
 	let hasSignature = $state(false);
+	// True once anything is on the canvas, even marks too small to count as a signature.
+	let hasInk = $state(false);
 	let activePointerId: number | null = null;
-	let strokeHasInk = false;
+	let lastPoint: { x: number; y: number } | null = null;
+	// Total length drawn since the pad was last empty, in CSS pixels.
+	let inkLength = 0;
 	let canvasSetupVersion = 0;
 	let configuredWidth = 0;
 	let configuredPixelRatio = 0;
+	// The signature as it was when the last stroke finished, and the pad width it was drawn
+	// at. Resizes always redraw from this original, never from an already-resized copy, so
+	// repeated rotations cannot shrink or blur it further.
+	let sourceImage = '';
+	let sourceWidth = 0;
 
 	const CANVAS_HEIGHT = 180;
+	// A tap or a tiny wobble is not a signature; require a real stroke.
+	const MIN_INK_LENGTH = 24;
 
 	function configureContext(nextContext: CanvasRenderingContext2D, pixelRatio: number) {
 		nextContext.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
@@ -58,11 +69,10 @@
 		if (drawing) return;
 
 		const setupVersion = ++canvasSetupVersion;
-		const previousWidth = configuredWidth;
-		const preservedImage =
-			hasSignature && canvas.width > 0 && canvas.height > 0
-				? canvas.toDataURL('image/png')
-				: value || '';
+		// A value supplied from outside (not drawn here) has no recorded width; treat it as
+		// drawn at the current width.
+		const preservedImage = sourceImage || value || '';
+		const preservedWidth = sourceImage && sourceWidth > 0 ? sourceWidth : width;
 
 		canvas.width = width * pixelRatio;
 		canvas.height = CANVAS_HEIGHT * pixelRatio;
@@ -77,7 +87,8 @@
 		nextContext.clearRect(0, 0, width, CANVAS_HEIGHT);
 
 		if (!preservedImage) {
-			hasSignature = false;
+			// Any marks too small to count were wiped with the canvas.
+			resetInk();
 			return;
 		}
 
@@ -88,13 +99,21 @@
 			return;
 		}
 
-		// Redraw the existing signature without distorting it: keep its aspect ratio and
-		// only scale it down when the pad got narrower than the area it was drawn in.
-		const sourceWidth = previousWidth > 0 ? previousWidth : width;
-		const scale = Math.min(1, width / sourceWidth);
-		context.drawImage(savedImage, 0, 0, sourceWidth * scale, CANVAS_HEIGHT * scale);
+		// Redraw the original signature without distorting it: keep its aspect ratio and
+		// only scale it down when the pad is narrower than the area it was drawn in.
+		const scale = Math.min(1, width / preservedWidth);
+		context.drawImage(savedImage, 0, 0, preservedWidth * scale, CANVAS_HEIGHT * scale);
 		value = canvas.toDataURL('image/png') ?? '';
 		hasSignature = value.length > 0;
+		hasInk = hasSignature;
+	}
+
+	function resetInk() {
+		hasSignature = false;
+		hasInk = false;
+		inkLength = 0;
+		sourceImage = '';
+		sourceWidth = 0;
 	}
 
 	function relativePoint(event: PointerEvent) {
@@ -118,7 +137,7 @@
 		event.preventDefault();
 		canvas.setPointerCapture(event.pointerId);
 		activePointerId = event.pointerId;
-		strokeHasInk = false;
+		lastPoint = point;
 		context.beginPath();
 		context.moveTo(point.x, point.y);
 		drawing = true;
@@ -133,7 +152,11 @@
 
 		context.lineTo(point.x, point.y);
 		context.stroke();
-		strokeHasInk = true;
+		if (lastPoint) {
+			inkLength += Math.hypot(point.x - lastPoint.x, point.y - lastPoint.y);
+		}
+		lastPoint = point;
+		hasInk = true;
 	}
 
 	function endStroke(event: PointerEvent) {
@@ -143,22 +166,37 @@
 		if (canvas.hasPointerCapture(event.pointerId)) {
 			canvas.releasePointerCapture(event.pointerId);
 		}
-		// A tap with no movement leaves the canvas blank; don't treat it as a signature.
-		if (strokeHasInk) {
-			value = canvas.toDataURL('image/png') ?? '';
+		// A tap or a tiny mark is not a signature; only capture once enough has been drawn.
+		if (inkLength >= MIN_INK_LENGTH) {
+			sourceImage = canvas.toDataURL('image/png') ?? '';
+			sourceWidth = configuredWidth;
+			value = sourceImage;
 			hasSignature = value.length > 0;
 		}
 		drawing = false;
 		activePointerId = null;
-		strokeHasInk = false;
+		lastPoint = null;
+		// Pick up any resize that was skipped while the stroke was in progress.
+		void setupCanvas();
 	}
 
 	function clearSignature() {
 		if (!canvas || !context) return;
+		// Cancel any redraw still waiting on an image decode.
+		canvasSetupVersion += 1;
 		context.clearRect(0, 0, canvas.clientWidth, CANVAS_HEIGHT);
 		value = '';
-		hasSignature = false;
+		resetInk();
 	}
+
+	// The parent can clear the signature by resetting the bound value (for example when
+	// the waiver text changes and the signer has to sign again).
+	$effect(() => {
+		if (value) return;
+		untrack(() => {
+			if (hasSignature) clearSignature();
+		});
+	});
 
 	onMount(() => {
 		const handleResize = () => {
@@ -209,7 +247,7 @@
 			variant="outline"
 			size="sm"
 			onclick={clearSignature}
-			disabled={disabled || !hasSignature}
+			disabled={disabled || !hasInk}
 			aria-label="Clear signature"
 		>
 			Clear

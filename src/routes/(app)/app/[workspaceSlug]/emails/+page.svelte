@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { beforeNavigate, goto } from '$app/navigation';
+	import { afterNavigate, beforeNavigate, goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
 	import { onMount, tick, untrack } from 'svelte';
@@ -469,7 +469,14 @@
 		return `Last saved at ${time}`;
 	});
 
+	// Set while replaying a navigation that was held back for a save.
+	let isLeavingAfterSave = false;
+	afterNavigate(() => {
+		isLeavingAfterSave = false;
+	});
+
 	beforeNavigate((navigation) => {
+		if (isLeavingAfterSave) return;
 		if (!isDirty && !isSavingEditorContent) return;
 		if (navigation.willUnload) return;
 		// Tab switches and follow-up preview deep links stay on this page, so the
@@ -513,13 +520,42 @@
 		}
 
 		// Leaving this page unmounts it and would drop the pending debounced
-		// autosave, so flush the latest changes now instead of losing them.
+		// autosave, so save the latest changes first and only then continue. If the
+		// save fails the editor stays open with the text intact.
 		if (autosaveTimer) {
 			clearTimeout(autosaveTimer);
 			autosaveTimer = null;
 		}
-		void persistEditorContent({ showToast: false, showErrorToast: true });
+		navigation.cancel();
+		const target = navigation.to?.url;
+		if (!target) return;
+		// Browser Back/Forward must be replayed through history, not with goto(),
+		// otherwise the target is pushed as a new entry and the next Back returns here.
+		const historyDelta =
+			navigation.type === 'popstate' && typeof navigation.delta === 'number'
+				? navigation.delta
+				: null;
+		void saveThenNavigate(target, historyDelta);
 	});
+
+	async function saveThenNavigate(target: URL, historyDelta: number | null) {
+		await persistEditorContent({ showToast: false, showErrorToast: true });
+		// On failure the error toast has been shown and the next attempt to leave
+		// asks whether to discard.
+		if (lastSaveError) return;
+		isLeavingAfterSave = true;
+		if (historyDelta !== null) {
+			history.go(historyDelta);
+			return;
+		}
+		try {
+			// The target URL comes from SvelteKit's own navigation, so it is already resolved.
+			// eslint-disable-next-line svelte/no-navigation-without-resolve
+			await goto(`${target.pathname}${target.search}${target.hash}`);
+		} finally {
+			isLeavingAfterSave = false;
+		}
+	}
 
 	$effect(() => {
 		const currentFingerprint = editorContentFingerprint;
