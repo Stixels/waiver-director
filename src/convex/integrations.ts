@@ -12,6 +12,7 @@ import type { ActionCtx } from './_generated/server';
 import {
 	bookingProviderValidator,
 	bookingSearchText,
+	type BookingProvider,
 	missingBookeoRequiredPermissions,
 	normalizeEmail,
 	normalizeNullableString,
@@ -20,6 +21,15 @@ import {
 	UNKNOWN_ACTIVITY_NAME
 } from './lib/bookings';
 import { requireWorkspaceFeature } from './lib/billing';
+import {
+	bytesToHex,
+	convexSiteUrl,
+	decryptSecret,
+	encryptSecret,
+	requiredEnv,
+	timingSafeEqual,
+	token
+} from './lib/bookingCredentials';
 import { requireWorkspaceMember, requireWorkspaceOwner } from './lib/waivers';
 
 const BOOKEO_API_BASE_URL = 'https://api.bookeo.com/v2';
@@ -92,17 +102,6 @@ const webhookEventSummaryValue = v.object({
 	errorMessage: v.union(v.string(), v.null())
 });
 
-function requiredEnv(name: string): string {
-	const value = process.env[name]?.trim();
-	if (!value) {
-		throw new ConvexError({
-			code: 'invalid_configuration',
-			message: `Missing Convex environment variable: ${name}.`
-		});
-	}
-	return value;
-}
-
 function appUrl(): string {
 	const configuredUrl =
 		process.env.APP_URL?.trim() ||
@@ -130,68 +129,6 @@ function appUrl(): string {
 	return url.origin;
 }
 
-function convexSiteUrl(): string {
-	return process.env.CONVEX_SITE_URL?.trim() || process.env.PUBLIC_CONVEX_SITE_URL?.trim() || '';
-}
-
-function bytesToBase64(bytes: Uint8Array): string {
-	let binary = '';
-	for (const byte of bytes) binary += String.fromCharCode(byte);
-	return btoa(binary);
-}
-
-function base64ToBytes(value: string): Uint8Array {
-	const binary = atob(value);
-	const bytes = new Uint8Array(binary.length);
-	for (let index = 0; index < binary.length; index += 1) {
-		bytes[index] = binary.charCodeAt(index);
-	}
-	return bytes;
-}
-
-function bytesToHex(bytes: ArrayBuffer): string {
-	return [...new Uint8Array(bytes)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
-}
-
-async function encryptionKey(): Promise<CryptoKey> {
-	const secret = requiredEnv('BOOKING_CREDENTIALS_ENCRYPTION_KEY');
-	const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(secret));
-	return await crypto.subtle.importKey('raw', digest, 'AES-GCM', false, ['encrypt', 'decrypt']);
-}
-
-async function encryptSecret(value: string): Promise<string> {
-	const iv = crypto.getRandomValues(new Uint8Array(12));
-	const ciphertext = await crypto.subtle.encrypt(
-		{ name: 'AES-GCM', iv },
-		await encryptionKey(),
-		new TextEncoder().encode(value)
-	);
-
-	return `${bytesToBase64(iv)}.${bytesToBase64(new Uint8Array(ciphertext))}`;
-}
-
-async function decryptSecret(value: string): Promise<string> {
-	const [ivBase64, ciphertextBase64] = value.split('.');
-	if (!ivBase64 || !ciphertextBase64) {
-		throw new ConvexError({
-			code: 'invalid_state',
-			message: 'Stored booking credential is invalid.'
-		});
-	}
-
-	const decrypted = await crypto.subtle.decrypt(
-		{ name: 'AES-GCM', iv: base64ToBytes(ivBase64) as unknown as BufferSource },
-		await encryptionKey(),
-		base64ToBytes(ciphertextBase64) as unknown as BufferSource
-	);
-	return new TextDecoder().decode(decrypted);
-}
-
-function token(): string {
-	const bytes = crypto.getRandomValues(new Uint8Array(24));
-	return bytesToBase64(bytes).replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '');
-}
-
 async function bookeoSignature(input: {
 	timestamp: string;
 	messageId: string;
@@ -211,15 +148,6 @@ async function bookeoSignature(input: {
 		new TextEncoder().encode(`${input.timestamp}${input.messageId}${input.url}${input.body}`)
 	);
 	return bytesToHex(signature);
-}
-
-function timingSafeEqual(a: string, b: string): boolean {
-	if (a.length !== b.length) return false;
-	let diff = 0;
-	for (let index = 0; index < a.length; index += 1) {
-		diff |= a.charCodeAt(index) ^ b.charCodeAt(index);
-	}
-	return diff === 0;
 }
 
 async function bookeoFetch(apiKey: string, path: string, init: RequestInit = {}) {
@@ -621,7 +549,7 @@ export const disconnectBookingIntegration = action({
 	handler: async (ctx, args) => {
 		const integration: {
 			integrationId: Id<'booking_integrations'>;
-			provider: 'bookeo' | 'xola';
+			provider: BookingProvider;
 			status: 'connected' | 'syncing' | 'error' | 'disconnected';
 			encryptedApiKey: string | null;
 		} = await ctx.runQuery(internal.integrations.getIntegrationForDisconnect, {
@@ -825,6 +753,8 @@ export const markBookingIntegrationDisconnected = internalMutation({
 		await ctx.db.patch(integration._id, {
 			status: 'disconnected',
 			encryptedApiKey: undefined,
+			encryptedWebhookToken: undefined,
+			syncCursor: undefined,
 			...(args.remoteCleanupError ? { lastSyncError: args.remoteCleanupError } : {}),
 			disconnectedAt: now,
 			updatedAt: now
@@ -1408,7 +1338,7 @@ export const syncBookeoIntegration = internalAction({
 		const integration: {
 			integrationId: Id<'booking_integrations'>;
 			workspaceId: Id<'workspaces'>;
-			provider: 'bookeo' | 'xola';
+			provider: BookingProvider;
 			status: 'connected' | 'syncing' | 'error' | 'disconnected';
 			encryptedApiKey: string | null;
 		} | null = await ctx.runQuery(internal.integrations.getIntegrationSecret, {
@@ -1472,7 +1402,7 @@ export const completeBookeoCallback = internalAction({
 		const session: {
 			sessionId: Id<'booking_connection_sessions'>;
 			workspaceId: Id<'workspaces'>;
-			provider: 'bookeo' | 'xola';
+			provider: BookingProvider;
 			status: 'pending' | 'completed' | 'failed' | 'expired';
 			expiresAt: number;
 		} | null = await ctx.runQuery(internal.integrations.getPendingConnectionSession, {

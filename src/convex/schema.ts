@@ -344,6 +344,10 @@ export default defineSchema({
 			v.literal('disconnected')
 		),
 		encryptedApiKey: v.optional(v.string()),
+		// FareHarbor only: secret token embedded in the webhook URL the operator registers.
+		encryptedWebhookToken: v.optional(v.string()),
+		// FareHarbor only: start_at of the first availability the last truncated sync did not reach.
+		syncCursor: v.optional(v.string()),
 		accountId: v.optional(v.string()),
 		permissions: v.array(v.string()),
 		lastSyncError: v.optional(v.string()),
@@ -352,7 +356,8 @@ export default defineSchema({
 		updatedAt: v.number()
 	})
 		.index('by_workspaceId', ['workspaceId'])
-		.index('by_workspaceId_and_provider', ['workspaceId', 'provider']),
+		.index('by_workspaceId_and_provider', ['workspaceId', 'provider'])
+		.index('by_provider_and_status', ['provider', 'status']),
 
 	marketing_integrations: defineTable({
 		workspaceId: v.id('workspaces'),

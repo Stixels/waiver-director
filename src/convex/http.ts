@@ -124,6 +124,46 @@ http.route({
 });
 
 http.route({
+	path: '/fareharbor/webhook',
+	method: 'POST',
+	handler: httpAction(async (ctx, request) => {
+		const url = new URL(request.url);
+		const integrationId = url.searchParams.get(
+			'integrationId'
+		) as Id<'booking_integrations'> | null;
+		const token = url.searchParams.get('token') ?? '';
+		if (!integrationId || !token) {
+			return new Response('Bad request', { status: 400 });
+		}
+		const body = await request.text();
+
+		let result: { status: 'accepted' | 'duplicate' | 'rejected' | 'invalid' };
+		try {
+			result = await ctx.runAction(internal.fareharbor.verifyAndRecordFareHarborWebhook, {
+				integrationId,
+				token,
+				body
+			});
+		} catch (error) {
+			if (
+				error instanceof Error &&
+				(error.name === 'ArgumentValidationError' ||
+					error.message.includes('ArgumentValidationError'))
+			) {
+				return new Response('Bad request', { status: 400 });
+			}
+			console.error('[fareharbor/webhook] unexpected webhook error', error);
+			return new Response('Internal server error', { status: 500 });
+		}
+
+		if (result.status === 'rejected') return new Response('Rejected', { status: 401 });
+		if (result.status === 'invalid') return new Response('Bad request', { status: 400 });
+		// FareHarbor expects 200; other statuses trigger retries and can deactivate the webhook.
+		return new Response(result.status, { status: 200 });
+	})
+});
+
+http.route({
 	path: '/clerk/billing/webhook',
 	method: 'POST',
 	handler: httpAction(async (ctx, request) => {

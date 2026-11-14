@@ -1,0 +1,63 @@
+---
+title: 'FareHarbor'
+description: 'Import FareHarbor bookings so every signature is tied to the right tour.'
+---
+
+Connecting FareHarbor imports your upcoming bookings into Waiver Director, re-syncs them every 6 hours, and gives each booking its own waiver link. Guests can find their booking with the number FareHarbor shows them, without the `#`.
+
+<Note>
+	Booking integrations require a Pro plan or trial. On Pro, they work in your primary workspace; on
+	Business, in every workspace. See [Plans and billing](/account/plans-and-billing).
+</Note>
+
+## Before you start
+
+FareHarbor issues API access per company. Contact FareHarbor support and ask them to enable API access for Waiver Director on your company. They give you an **API user key**. You also need your **company shortname**: the part after `fareharbor.com/` in your FareHarbor dashboard URL.
+
+## Connect
+
+<Frame caption="The FareHarbor connect form on the Integrations page.">
+	<img
+		src="/images/app/integrations-fareharbor-connect.png"
+		alt="FareHarbor selected on the Integrations page, with fields for the company shortname and API user key and a Connect FareHarbor button"
+	/>
+</Frame>
+
+<Steps>
+	<Step title="Open Integrations">
+		As an Owner, open **Integrations** and select **FareHarbor**.
+	</Step>
+	<Step title="Enter your details">
+		Enter your company shortname and API user key, then click **Connect FareHarbor**. Waiver
+		Director checks the key with FareHarbor before saving it, and stores it encrypted.
+	</Step>
+	<Step title="Initial sync">
+		Waiver Director imports bookings from the last 7 days through the next 120 days. They appear on
+		the [Bookings](/guides/bookings) page as the sync completes.
+	</Step>
+</Steps>
+
+## Real-time updates (optional)
+
+<Frame caption="FareHarbor connected, with the real-time updates card. Sample data.">
+	<img
+		src="/images/app/integrations-fareharbor-connected.png"
+		alt="FareHarbor connected, showing the company shortname as the account ID, the connection date, and a Show webhook URL button"
+	/>
+</Frame>
+
+Without webhooks, bookings for the next 30 days refresh every 6 hours. For instant updates, open FareHarbor in **Integrations**, click **Show webhook URL**, and ask FareHarbor support to send booking webhooks to that URL. The URL contains a secret, so share it only with FareHarbor.
+
+Cancelled and rebooked bookings are marked canceled. A rebooking arrives as a new booking with its own number.
+
+## Troubleshooting
+
+- **FareHarbor rejected the API key**: check the user key and that it was issued for the same company shortname.
+- **FareHarbor company not found**: check the shortname in your FareHarbor dashboard URL.
+- **Integration needs attention**: the last sync hit an error. It retries on the next 6-hour sync, or you can reconnect.
+- **FareHarbor has more bookings than one sync can fetch**: very large accounts take more than one sync to cover every date. Each sync continues where the last one stopped, so nothing is skipped, but some bookings can lag by up to 12 hours. Turning on webhooks keeps them instant.
+- **Owner access required**: ask a workspace Owner to connect the integration.
+
+## Disconnect
+
+Owners can disconnect FareHarbor from the Integrations page. This deletes the stored key and invalidates the webhook URL. Signed submissions keep the booking snapshot captured when they were signed.

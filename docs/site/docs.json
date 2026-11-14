@@ -49,7 +49,12 @@
 					},
 					{
 						"group": "Integrations",
-						"pages": ["integrations/overview", "integrations/bookeo", "integrations/mailchimp"]
+						"pages": [
+							"integrations/overview",
+							"integrations/bookeo",
+							"integrations/fareharbor",
+							"integrations/mailchimp"
+						]
 					},
 					{
 						"group": "Workspace and account",
