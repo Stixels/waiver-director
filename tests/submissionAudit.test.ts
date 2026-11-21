@@ -92,15 +92,25 @@ test('client timestamps outside a plausible window are dropped', () => {
 
 test('minor birth dates must be under 18 on the signing day and not before 1900', () => {
 	const today = '2026-11-08';
-	assert.deepEqual(minorBirthDateBounds(today), { min: '2008-11-09', max: '2026-11-08' });
-	assert.equal(isMinorBirthDate('2015-06-03', today), true);
-	assert.equal(isMinorBirthDate('2008-11-09', today), true);
-	assert.equal(isMinorBirthDate('2008-11-08', today), false, 'turns 18 today');
-	assert.equal(isMinorBirthDate('1975-01-01', today), false);
-	assert.equal(isMinorBirthDate('2026-11-09', today), false, 'future');
-	assert.equal(isMinorBirthDate('2015-02-30', today), false, 'invalid date');
-	assert.equal(minorBirthDateBounds('1910-03-01').min, '1900-01-01');
+	assert.deepEqual(minorBirthDateBounds(today, 18), { min: '2008-11-09', max: '2026-11-08' });
+	assert.equal(isMinorBirthDate('2015-06-03', today, 18), true);
+	assert.equal(isMinorBirthDate('2008-11-09', today, 18), true);
+	assert.equal(isMinorBirthDate('2008-11-08', today, 18), false, 'turns 18 today');
+	assert.equal(isMinorBirthDate('1975-01-01', today, 18), false);
+	assert.equal(isMinorBirthDate('2026-11-09', today, 18), false, 'future');
+	assert.equal(isMinorBirthDate('2015-02-30', today, 18), false, 'invalid date');
+	assert.equal(minorBirthDateBounds('1910-03-01', 18).min, '1900-01-01');
 	// Leap-day birthdays: born 2008-02-29 is still a minor on 2026-02-28.
-	assert.equal(isMinorBirthDate('2008-02-29', '2026-02-28'), true);
-	assert.equal(isMinorBirthDate('2008-02-29', '2026-03-01'), false);
+	assert.equal(isMinorBirthDate('2008-02-29', '2026-02-28', 18), true);
+	assert.equal(isMinorBirthDate('2008-02-29', '2026-03-01', 18), false);
+});
+
+test('minors follow the waiver adult age, not a fixed 18', () => {
+	const today = '2026-11-08';
+	// An 18-year-old is still a minor where the adult age is 19 (e.g. Alabama).
+	assert.equal(isMinorBirthDate('2008-11-08', today, 19), true);
+	assert.equal(isMinorBirthDate('2007-11-08', today, 19), false, 'turns 19 today');
+	assert.equal(isMinorBirthDate('2006-01-01', today, 21), true);
+	assert.equal(isMinorBirthDate('2005-11-08', today, 21), false, 'turns 21 today');
+	assert.deepEqual(minorBirthDateBounds(today, 21), { min: '2005-11-09', max: today });
 });

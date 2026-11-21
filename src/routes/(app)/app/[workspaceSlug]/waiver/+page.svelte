@@ -872,7 +872,7 @@
 					{#if draft}
 						<WaiverBuilderCanvas
 							bind:introCopy={draft.introCopy}
-							bind:theme={draft.theme}
+							theme={draft.theme}
 							fields={currentDraft.fields}
 							workspaceName={currentWorkspace?.name}
 							workspaceId={currentWorkspace?.workspaceId ?? null}

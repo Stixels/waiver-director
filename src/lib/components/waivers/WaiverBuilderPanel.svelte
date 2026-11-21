@@ -9,6 +9,7 @@
 		DropdownMenuTrigger
 	} from '$lib/components/ui/dropdown-menu';
 	import { Tooltip, TooltipContent, TooltipTrigger } from '$lib/components/ui/tooltip';
+	import { Tabs } from 'bits-ui';
 	import { DragDropProvider } from '@dnd-kit/svelte';
 	import { createSortable, isSortable } from '@dnd-kit/svelte/sortable';
 	import GripVerticalIcon from '@lucide/svelte/icons/grip-vertical';
@@ -18,19 +19,23 @@
 	import SquareCheckIcon from '@lucide/svelte/icons/square-check';
 	import ChevronsUpDownIcon from '@lucide/svelte/icons/chevrons-up-down';
 	import CalendarIcon from '@lucide/svelte/icons/calendar';
+	import MoonStarIcon from '@lucide/svelte/icons/moon-star';
+	import SunIcon from '@lucide/svelte/icons/sun';
 	import {
 		createBlankField,
 		createOptionId,
 		formatFieldTypeLabel,
 		type WaiverDefinition,
 		type WaiverField,
-		type WaiverFieldType
+		type WaiverFieldType,
+		type WaiverTheme
 	} from '$lib/domain/waivers';
 	import {
+		ADULT_AGE_OPTIONS,
 		MAX_MINIMUM_SIGNER_AGE,
 		MAX_SELECT_OPTIONS,
 		MAX_WAIVER_FIELDS,
-		MIN_MINIMUM_SIGNER_AGE,
+		excludedAgeRange,
 		isValidMinimumSignerAge
 	} from '$lib/domain/waiver-constraints';
 
@@ -56,6 +61,30 @@
 		{ type: 'date', label: 'Date', icon: CalendarIcon, hint: 'Calendar picker' }
 	];
 	const canAddField = $derived((draft?.fields.length ?? 0) < MAX_WAIVER_FIELDS);
+	const themes: { value: WaiverTheme; label: string; icon: typeof SunIcon }[] = [
+		{ value: 'light', label: 'Light', icon: SunIcon },
+		{ value: 'dark', label: 'Dark', icon: MoonStarIcon }
+	];
+
+	let tab = $state<'fields' | 'settings'>('fields');
+
+	const minimumSignerAgeIsValid = $derived(
+		!draft || isValidMinimumSignerAge(draft.minimumSignerAge, draft.adultAge)
+	);
+	const excludedAges = $derived(
+		draft && minimumSignerAgeIsValid
+			? excludedAgeRange(draft.minimumSignerAge, draft.adultAge)
+			: null
+	);
+
+	function setAdultAge(age: number) {
+		if (!draft) return;
+		draft.adultAge = age;
+		// Minors can't sign, so the minimum signer age moves up with the adult age.
+		if (typeof draft.minimumSignerAge !== 'number' || draft.minimumSignerAge < age) {
+			draft.minimumSignerAge = age;
+		}
+	}
 
 	function getFieldTypeIcon(type: WaiverFieldType) {
 		return fieldTypes.find((entry) => entry.type === type)?.icon ?? TypeIcon;
@@ -162,253 +191,330 @@
 </script>
 
 {#if draft}
-	<div class="flex h-full min-h-0 flex-col">
-		<!-- Header row: Custom fields label + Add button -->
-		<div
-			class="flex shrink-0 items-center justify-between gap-3 border-b border-border/80 px-4 py-2.5"
-		>
-			<div class="min-w-0">
-				<p class="panel-section-label">Custom fields</p>
-				<p class="text-[10.5px] leading-tight text-muted-foreground/65">
-					Questions before the signature.
-				</p>
-			</div>
-			<DropdownMenu>
-				<DropdownMenuTrigger
-					class="h-8 shrink-0 cursor-pointer gap-1 rounded-md px-2.5 text-[11px] font-medium tracking-wide disabled:cursor-not-allowed"
-					disabled={!canAddField}
-				>
-					{#snippet child({ props })}
-						<Button size="sm" variant="outline" {...props}>
-							<PlusIcon class="size-3" />
-							Add field
-						</Button>
-					{/snippet}
-				</DropdownMenuTrigger>
-				<DropdownMenuContent align="end" class="w-56">
-					{#each fieldTypes as type (type.type)}
-						<DropdownMenuItem disabled={!canAddField} onclick={() => addField(type.type)}>
-							<type.icon class="size-4 text-muted-foreground" />
-							<div class="flex flex-col">
-								<span class="text-sm font-medium">{type.label}</span>
-								<span class="text-[11px] text-muted-foreground">{type.hint}</span>
-							</div>
-						</DropdownMenuItem>
-					{/each}
-				</DropdownMenuContent>
-			</DropdownMenu>
-		</div>
+	<Tabs.Root bind:value={tab} class="flex h-full min-h-0 flex-col">
+		<Tabs.List class="panel-tabs" aria-label="Waiver editor">
+			<Tabs.Trigger value="fields" class="panel-tab">
+				Fields
+				<span class="panel-tab-count" aria-label={`${draft.fields.length} fields`}>
+					{draft.fields.length}
+				</span>
+			</Tabs.Trigger>
+			<Tabs.Trigger value="settings" class="panel-tab">
+				Settings
+				{#if !minimumSignerAgeIsValid}
+					<span class="panel-tab-alert" aria-label="Needs attention"></span>
+				{/if}
+			</Tabs.Trigger>
+		</Tabs.List>
 
-		<!-- Scrollable fields list -->
-		<div class="min-h-0 flex-1 overflow-y-auto overscroll-y-contain p-4">
-			{#if draft.fields.length === 0}
-				<div
-					class="rounded-lg border border-dashed border-border bg-muted/10 px-4 py-10 text-center"
-				>
-					<p class="text-[11px] text-muted-foreground">No custom fields yet.</p>
-					<p class="mt-1 text-[11px] text-muted-foreground/70">
-						Use <span class="font-medium text-foreground/80">Add field</span> to collect extra info before
-						the signature.
-					</p>
-				</div>
-			{:else}
-				<DragDropProvider onDragEnd={handleFieldDragEnd}>
-					<ul class="space-y-1.5">
-						{#each draft.fields as field, index (field.id)}
-							{@const sortable = createSortable({
-								id: field.id,
-								get index() {
-									return index;
-								}
-							})}
-							{@const FieldIcon = getFieldTypeIcon(field.type)}
-							<li
-								{@attach sortable.attach}
-								class="field-row"
-								class:is-dragging={sortable.isDragging}
-								class:is-drop-target={sortable.isDropTarget}
-							>
-								<button
-									type="button"
-									{@attach sortable.attachHandle}
-									class="field-grip"
-									aria-label="Drag to reorder field"
-									title="Drag to reorder"
-								>
-									<GripVerticalIcon class="size-3.5" />
-								</button>
-
-								<div class="min-w-0 flex-1 px-2.5 py-1.5">
-									<!-- Meta row: type pill + required toggle + delete -->
-									<div class="flex items-center justify-between gap-2">
-										<div class="flex min-w-0 items-center gap-1.5">
-											<span class="field-type-pill">
-												<FieldIcon class="field-type-pill-icon size-3" />
-												<span class="field-type-pill-text">
-													{formatFieldTypeLabel(field.type)}
-												</span>
-											</span>
-											<label class="required-switch">
-												<input type="checkbox" bind:checked={field.required} />
-												<span class="switch-track">
-													<span class="switch-thumb"></span>
-												</span>
-												<span class="switch-label">Required</span>
-											</label>
-										</div>
-
-										<Tooltip>
-											<TooltipTrigger
-												class="field-delete"
-												onclick={() => removeField(index)}
-												aria-label="Delete field"
-											>
-												{#snippet child({ props })}
-													<button {...props}>
-														<Trash2Icon class="size-3.5" />
-													</button>
-												{/snippet}
-											</TooltipTrigger>
-											<TooltipContent side="top" sideOffset={4}>Delete field</TooltipContent>
-										</Tooltip>
-									</div>
-
-									<!-- Label input below -->
-									<div class="mt-1.5">
-										<label for={`${field.id}-label`} class="sr-only"> Label guests will see </label>
-										<Input
-											id={`${field.id}-label`}
-											bind:value={field.label}
-											maxlength={120}
-											placeholder="Label guests will see"
-											class="field-label-input"
-										/>
-									</div>
-
-									{#if field.type === 'select'}
-										<div class="options-card mt-2">
-											<div class="flex items-center justify-between gap-2">
-												<p class="options-label">Options</p>
-												<span class="options-count">
-													{field.options.length}
-													{field.options.length === 1 ? 'item' : 'items'}
-												</span>
-											</div>
-											<DragDropProvider onDragEnd={(event) => handleOptionDragEnd(field.id, event)}>
-												<div class="mt-1.5 space-y-1">
-													{#each field.options as option, optionIndex (option.id)}
-														{@const optionSortable = createSortable({
-															id: `${field.id}:${option.id}`,
-															group: field.id,
-															get index() {
-																return optionIndex;
-															}
-														})}
-														<div
-															{@attach optionSortable.attach}
-															class="option-row"
-															class:is-dragging={optionSortable.isDragging}
-															class:is-drop-target={optionSortable.isDropTarget}
-														>
-															<button
-																type="button"
-																{@attach optionSortable.attachHandle}
-																class="option-grip"
-																aria-label="Drag to reorder option"
-																title="Drag to reorder"
-															>
-																<GripVerticalIcon class="size-3" />
-															</button>
-															<Input
-																id={`${field.id}-option-${optionIndex}`}
-																bind:value={option.label}
-																maxlength={80}
-																class="option-input"
-																placeholder="Option label"
-															/>
-															<button
-																type="button"
-																class="option-remove"
-																disabled={field.options.length === 1}
-																onclick={() => removeOption(field, optionIndex)}
-																aria-label="Remove option"
-															>
-																<Trash2Icon class="size-3" />
-															</button>
-														</div>
-													{/each}
-												</div>
-											</DragDropProvider>
-											<button
-												type="button"
-												class="add-option-btn"
-												disabled={field.options.length >= MAX_SELECT_OPTIONS}
-												onclick={() => addOption(field)}
-											>
-												<PlusIcon class="size-3" />
-												<span>Add option</span>
-											</button>
-										</div>
-									{/if}
-								</div>
-							</li>
-						{/each}
-					</ul>
-				</DragDropProvider>
-			{/if}
-		</div>
-
-		<!-- Signer age: who can sign for themselves. Younger people are added as minors. -->
-		<div class="shrink-0 border-t border-border/80 px-4 py-3">
-			<div class="flex items-center justify-between gap-3">
+		<Tabs.Content value="fields" class="flex min-h-0 flex-1 flex-col">
+			<!-- Header row: Custom fields label + Add button -->
+			<div
+				class="flex shrink-0 items-center justify-between gap-3 border-b border-border/80 px-4 py-2.5"
+			>
 				<div class="min-w-0">
-					<label class="panel-section-label" for="minimum-signer-age">Minimum signer age</label>
+					<p class="panel-section-label">Custom fields</p>
 					<p class="text-[10.5px] leading-tight text-muted-foreground/65">
-						Signers must be at least this age. Only guests under 18 can be added as minors.
+						Questions before the signature.
 					</p>
 				</div>
-				<Input
-					id="minimum-signer-age"
-					type="number"
-					inputmode="numeric"
-					min={MIN_MINIMUM_SIGNER_AGE}
-					max={MAX_MINIMUM_SIGNER_AGE}
-					step={1}
-					class="field-label-input w-16 shrink-0 text-center"
-					aria-invalid={!isValidMinimumSignerAge(draft.minimumSignerAge)}
-					bind:value={draft.minimumSignerAge}
-				/>
+				<DropdownMenu>
+					<DropdownMenuTrigger
+						class="h-8 shrink-0 cursor-pointer gap-1 rounded-md px-2.5 text-[11px] font-medium tracking-wide disabled:cursor-not-allowed"
+						disabled={!canAddField}
+					>
+						{#snippet child({ props })}
+							<Button size="sm" variant="outline" {...props}>
+								<PlusIcon class="size-3" />
+								Add field
+							</Button>
+						{/snippet}
+					</DropdownMenuTrigger>
+					<DropdownMenuContent align="end" class="w-56">
+						{#each fieldTypes as type (type.type)}
+							<DropdownMenuItem disabled={!canAddField} onclick={() => addField(type.type)}>
+								<type.icon class="size-4 text-muted-foreground" />
+								<div class="flex flex-col">
+									<span class="text-sm font-medium">{type.label}</span>
+									<span class="text-[11px] text-muted-foreground">{type.hint}</span>
+								</div>
+							</DropdownMenuItem>
+						{/each}
+					</DropdownMenuContent>
+				</DropdownMenu>
 			</div>
-			{#if !isValidMinimumSignerAge(draft.minimumSignerAge)}
-				<p class="mt-1.5 text-[10.5px] leading-tight text-destructive">
-					Enter a whole number from {MIN_MINIMUM_SIGNER_AGE} to {MAX_MINIMUM_SIGNER_AGE}. Changes
-					won't save until it's fixed.
-				</p>
-			{/if}
-		</div>
 
-		<!-- Minors: optionally ask for each minor's date of birth and check they are under 18. -->
-		<div class="shrink-0 border-t border-border/80 px-4 py-3">
-			<label class="flex cursor-pointer items-center justify-between gap-3">
-				<span class="min-w-0">
-					<span class="panel-section-label block">Minor date of birth</span>
-					<span class="block text-[10.5px] leading-tight text-muted-foreground/65">
-						Ask for each minor's date of birth and check they're under 18.
-					</span>
-				</span>
-				<span class="required-switch shrink-0">
-					<input
-						id="collect-minor-date-of-birth"
-						type="checkbox"
-						bind:checked={draft.collectMinorDateOfBirth}
+			<!-- Scrollable fields list -->
+			<div class="min-h-0 flex-1 overflow-y-auto overscroll-y-contain p-4">
+				{#if draft.fields.length === 0}
+					<div
+						class="rounded-lg border border-dashed border-border bg-muted/10 px-4 py-10 text-center"
+					>
+						<p class="text-[11px] text-muted-foreground">No custom fields yet.</p>
+						<p class="mt-1 text-[11px] text-muted-foreground/70">
+							Use <span class="font-medium text-foreground/80">Add field</span> to collect extra info
+							before the signature.
+						</p>
+					</div>
+				{:else}
+					<DragDropProvider onDragEnd={handleFieldDragEnd}>
+						<ul class="space-y-1.5">
+							{#each draft.fields as field, index (field.id)}
+								{@const sortable = createSortable({
+									id: field.id,
+									get index() {
+										return index;
+									}
+								})}
+								{@const FieldIcon = getFieldTypeIcon(field.type)}
+								<li
+									{@attach sortable.attach}
+									class="field-row"
+									class:is-dragging={sortable.isDragging}
+									class:is-drop-target={sortable.isDropTarget}
+								>
+									<button
+										type="button"
+										{@attach sortable.attachHandle}
+										class="field-grip"
+										aria-label="Drag to reorder field"
+										title="Drag to reorder"
+									>
+										<GripVerticalIcon class="size-3.5" />
+									</button>
+
+									<div class="min-w-0 flex-1 px-2.5 py-1.5">
+										<!-- Meta row: type pill + required toggle + delete -->
+										<div class="flex items-center justify-between gap-2">
+											<div class="flex min-w-0 items-center gap-1.5">
+												<span class="field-type-pill">
+													<FieldIcon class="field-type-pill-icon size-3" />
+													<span class="field-type-pill-text">
+														{formatFieldTypeLabel(field.type)}
+													</span>
+												</span>
+												<label class="required-switch">
+													<input type="checkbox" bind:checked={field.required} />
+													<span class="switch-track">
+														<span class="switch-thumb"></span>
+													</span>
+													<span class="switch-label">Required</span>
+												</label>
+											</div>
+
+											<Tooltip>
+												<TooltipTrigger
+													class="field-delete"
+													onclick={() => removeField(index)}
+													aria-label="Delete field"
+												>
+													{#snippet child({ props })}
+														<button {...props}>
+															<Trash2Icon class="size-3.5" />
+														</button>
+													{/snippet}
+												</TooltipTrigger>
+												<TooltipContent side="top" sideOffset={4}>Delete field</TooltipContent>
+											</Tooltip>
+										</div>
+
+										<!-- Label input below -->
+										<div class="mt-1.5">
+											<label for={`${field.id}-label`} class="sr-only">
+												Label guests will see
+											</label>
+											<Input
+												id={`${field.id}-label`}
+												bind:value={field.label}
+												maxlength={120}
+												placeholder="Label guests will see"
+												class="field-label-input"
+											/>
+										</div>
+
+										{#if field.type === 'select'}
+											<div class="options-card mt-2">
+												<div class="flex items-center justify-between gap-2">
+													<p class="options-label">Options</p>
+													<span class="options-count">
+														{field.options.length}
+														{field.options.length === 1 ? 'item' : 'items'}
+													</span>
+												</div>
+												<DragDropProvider
+													onDragEnd={(event) => handleOptionDragEnd(field.id, event)}
+												>
+													<div class="mt-1.5 space-y-1">
+														{#each field.options as option, optionIndex (option.id)}
+															{@const optionSortable = createSortable({
+																id: `${field.id}:${option.id}`,
+																group: field.id,
+																get index() {
+																	return optionIndex;
+																}
+															})}
+															<div
+																{@attach optionSortable.attach}
+																class="option-row"
+																class:is-dragging={optionSortable.isDragging}
+																class:is-drop-target={optionSortable.isDropTarget}
+															>
+																<button
+																	type="button"
+																	{@attach optionSortable.attachHandle}
+																	class="option-grip"
+																	aria-label="Drag to reorder option"
+																	title="Drag to reorder"
+																>
+																	<GripVerticalIcon class="size-3" />
+																</button>
+																<Input
+																	id={`${field.id}-option-${optionIndex}`}
+																	bind:value={option.label}
+																	maxlength={80}
+																	class="option-input"
+																	placeholder="Option label"
+																/>
+																<button
+																	type="button"
+																	class="option-remove"
+																	disabled={field.options.length === 1}
+																	onclick={() => removeOption(field, optionIndex)}
+																	aria-label="Remove option"
+																>
+																	<Trash2Icon class="size-3" />
+																</button>
+															</div>
+														{/each}
+													</div>
+												</DragDropProvider>
+												<button
+													type="button"
+													class="add-option-btn"
+													disabled={field.options.length >= MAX_SELECT_OPTIONS}
+													onclick={() => addOption(field)}
+												>
+													<PlusIcon class="size-3" />
+													<span>Add option</span>
+												</button>
+											</div>
+										{/if}
+									</div>
+								</li>
+							{/each}
+						</ul>
+					</DragDropProvider>
+				{/if}
+			</div>
+		</Tabs.Content>
+
+		<Tabs.Content value="settings" class="min-h-0 flex-1 overflow-y-auto overscroll-y-contain">
+			<!-- Signers: who signs for themselves, who is a minor, and what we ask about minors. -->
+			<section class="settings-section" aria-labelledby="settings-signers">
+				<h2 id="settings-signers" class="panel-section-label">Signers</h2>
+				<p class="settings-hint">Who can sign, and what we ask about minors.</p>
+
+				<div class="settings-row">
+					<p id="adult-age-label" class="settings-label">Adult age</p>
+					<div
+						class="segmented"
+						role="group"
+						aria-labelledby="adult-age-label"
+						aria-describedby="adult-age-hint"
+					>
+						{#each ADULT_AGE_OPTIONS as age (age)}
+							<button
+								type="button"
+								class="segmented-option"
+								aria-pressed={draft.adultAge === age}
+								onclick={() => setAdultAge(age)}
+							>
+								{age}
+							</button>
+						{/each}
+					</div>
+				</div>
+				<p id="adult-age-hint" class="settings-hint mt-1">
+					Younger guests are minors, added by an adult who signs. It's 19 in Alabama and Nebraska,
+					and 21 in Mississippi.
+				</p>
+
+				<div class="settings-row">
+					<label class="settings-label" for="minimum-signer-age">Minimum signer age</label>
+					<Input
+						id="minimum-signer-age"
+						type="number"
+						inputmode="numeric"
+						min={draft.adultAge}
+						max={MAX_MINIMUM_SIGNER_AGE}
+						step={1}
+						class="field-label-input w-16 shrink-0 text-center"
+						aria-invalid={!minimumSignerAgeIsValid}
+						aria-describedby="minimum-signer-age-hint minimum-signer-age-note"
+						bind:value={draft.minimumSignerAge}
 					/>
-					<span class="switch-track">
-						<span class="switch-thumb"></span>
+				</div>
+				<p id="minimum-signer-age-hint" class="settings-hint mt-1">
+					Signers must be at least this age. It can't be below the adult age.
+				</p>
+				<div id="minimum-signer-age-note">
+					{#if !minimumSignerAgeIsValid}
+						<p class="settings-note text-destructive">
+							Enter a whole number from {draft.adultAge} to {MAX_MINIMUM_SIGNER_AGE}. Changes won't
+							save until it's fixed.
+						</p>
+					{:else if excludedAges}
+						<p class="settings-note text-muted-foreground">
+							Guests aged {excludedAges} can't take part: they're too young to sign and too old to be
+							added as minors. The signing page tells them.
+						</p>
+					{/if}
+				</div>
+
+				<label class="settings-row cursor-pointer">
+					<span class="min-w-0">
+						<span class="settings-label block">Minor date of birth</span>
+						<span class="settings-hint block">
+							Ask for each minor's date of birth and check they're under {draft.adultAge}.
+						</span>
 					</span>
-				</span>
-			</label>
-		</div>
-	</div>
+					<span class="required-switch shrink-0">
+						<input
+							id="collect-minor-date-of-birth"
+							type="checkbox"
+							bind:checked={draft.collectMinorDateOfBirth}
+						/>
+						<span class="switch-track">
+							<span class="switch-thumb"></span>
+						</span>
+					</span>
+				</label>
+			</section>
+
+			<!-- Appearance: the signing page theme. -->
+			<section class="settings-section" aria-labelledby="settings-appearance">
+				<div class="flex items-center justify-between gap-3">
+					<div class="min-w-0">
+						<h2 id="settings-appearance" class="panel-section-label">Appearance</h2>
+						<p class="settings-hint">How the signing page looks.</p>
+					</div>
+					<div class="segmented" role="group" aria-labelledby="settings-appearance">
+						{#each themes as theme (theme.value)}
+							<button
+								type="button"
+								class="segmented-option"
+								aria-pressed={draft.theme === theme.value}
+								onclick={() => draft && (draft.theme = theme.value)}
+							>
+								<theme.icon class="size-3" aria-hidden="true" />
+								{theme.label}
+							</button>
+						{/each}
+					</div>
+				</div>
+			</section>
+		</Tabs.Content>
+	</Tabs.Root>
 {:else}
 	<div
 		class="flex h-full items-center justify-center p-6 text-center text-xs text-muted-foreground"
@@ -418,6 +524,146 @@
 {/if}
 
 <style>
+	:global(.panel-tabs) {
+		display: flex;
+		flex-shrink: 0;
+		gap: 0.25rem;
+		padding: 0 0.75rem;
+		border-bottom: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+	}
+
+	:global(.panel-tab) {
+		position: relative;
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4rem;
+		height: 2.5rem;
+		padding: 0 0.6rem;
+		font-size: 0.78rem;
+		font-weight: 600;
+		color: var(--muted-foreground);
+		cursor: pointer;
+		transition: color 150ms ease;
+	}
+
+	:global(.panel-tab:hover) {
+		color: var(--foreground);
+	}
+
+	:global(.panel-tab[data-state='active']) {
+		color: var(--foreground);
+	}
+
+	:global(.panel-tab[data-state='active'])::after {
+		content: '';
+		position: absolute;
+		left: 0.35rem;
+		right: 0.35rem;
+		bottom: -1px;
+		height: 2px;
+		border-radius: var(--radius-full);
+		background: var(--primary);
+	}
+
+	:global(.panel-tab:focus-visible) {
+		outline: none;
+		box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--primary) 35%, transparent);
+		border-radius: var(--radius-sm);
+	}
+
+	.panel-tab-count {
+		min-width: 1.15rem;
+		padding: 0 0.3rem;
+		border-radius: var(--radius-full);
+		background: color-mix(in srgb, var(--muted) 70%, transparent);
+		font-size: 0.62rem;
+		line-height: 1.15rem;
+		text-align: center;
+		font-variant-numeric: tabular-nums;
+	}
+
+	.panel-tab-alert {
+		width: 0.4rem;
+		height: 0.4rem;
+		border-radius: var(--radius-full);
+		background: var(--destructive);
+	}
+
+	.settings-section {
+		padding: 0.9rem 1rem;
+		border-bottom: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+	}
+
+	.settings-row {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.75rem;
+		margin-top: 0.85rem;
+	}
+
+	.settings-label {
+		font-size: 0.8rem;
+		font-weight: 600;
+		color: var(--foreground);
+	}
+
+	.settings-hint {
+		font-size: 0.68rem;
+		line-height: 1.3;
+		color: color-mix(in srgb, var(--muted-foreground) 80%, transparent);
+	}
+
+	.settings-note {
+		margin-top: 0.4rem;
+		font-size: 0.68rem;
+		line-height: 1.3;
+	}
+
+	.segmented {
+		display: inline-flex;
+		flex: 0 0 auto;
+		gap: 0.125rem;
+		padding: 0.125rem;
+		border: 1px solid var(--border);
+		border-radius: var(--radius-md);
+		background: color-mix(in srgb, var(--muted) 35%, transparent);
+	}
+
+	.segmented-option {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.3rem;
+		height: 1.6rem;
+		min-width: 2rem;
+		justify-content: center;
+		padding: 0 0.5rem;
+		border-radius: var(--radius-sm);
+		font-size: 0.72rem;
+		font-weight: 500;
+		font-variant-numeric: tabular-nums;
+		color: var(--muted-foreground);
+		cursor: pointer;
+		transition:
+			background 150ms ease,
+			color 150ms ease;
+	}
+
+	.segmented-option:hover {
+		color: var(--foreground);
+	}
+
+	.segmented-option[aria-pressed='true'] {
+		background: var(--background);
+		color: var(--foreground);
+		box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+	}
+
+	.segmented-option:focus-visible {
+		outline: none;
+		box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 35%, transparent);
+	}
+
 	.panel-section-label {
 		font-size: 0.68rem;
 		font-weight: 700;

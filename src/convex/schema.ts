@@ -107,9 +107,11 @@ export default defineSchema({
 		title: v.string(),
 		introCopy: v.string(),
 		theme: v.optional(v.union(v.literal('light'), v.literal('dark'))),
-		// Optional so waivers and versions saved before this setting default to 18.
+		// Optional so waivers and versions saved before these settings default to 18.
+		// adultAge is the age of majority: younger guests are added as minors.
+		adultAge: v.optional(v.number()),
 		minimumSignerAge: v.optional(v.number()),
-		// Ask for each minor's date of birth and check they are under 18. Missing means off.
+		// Ask for each minor's date of birth and check they are under the adult age. Missing means off.
 		collectMinorDateOfBirth: v.optional(v.boolean()),
 		fields: v.array(
 			v.union(
@@ -157,9 +159,11 @@ export default defineSchema({
 		title: v.string(),
 		introCopy: v.string(),
 		theme: v.optional(v.union(v.literal('light'), v.literal('dark'))),
-		// Optional so waivers and versions saved before this setting default to 18.
+		// Optional so waivers and versions saved before these settings default to 18.
+		// adultAge is the age of majority: younger guests are added as minors.
+		adultAge: v.optional(v.number()),
 		minimumSignerAge: v.optional(v.number()),
-		// Ask for each minor's date of birth and check they are under 18. Missing means off.
+		// Ask for each minor's date of birth and check they are under the adult age. Missing means off.
 		collectMinorDateOfBirth: v.optional(v.boolean()),
 		fields: v.array(
 			v.union(

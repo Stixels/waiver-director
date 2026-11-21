@@ -16,9 +16,11 @@
 	} from '$lib/components/waivers/waiver-public-form-classes';
 	import type { WaiverField, WaiverMinor, WaiverTheme } from '$lib/domain/waivers';
 	import {
+		excludedAgeRange,
 		isSignerBirthDate,
 		minorBirthDateBounds,
-		signerBirthDateBounds
+		signerBirthDateBounds,
+		signerTooYoungMessage
 	} from '$lib/domain/waiver-constraints';
 	import { formatBookingTimestamp } from '$lib/utils/date';
 
@@ -30,6 +32,7 @@
 		title: string;
 		introCopy: string;
 		theme: WaiverTheme;
+		adultAge: number;
 		minimumSignerAge: number;
 		collectMinorDateOfBirth: boolean;
 		fields: WaiverField[];
@@ -123,7 +126,7 @@
 		}
 
 		if (!isSignerBirthDate(signerDateOfBirth, todayIsoDate(), waiver.minimumSignerAge)) {
-			submitError = `You must be at least ${waiver.minimumSignerAge} to sign this waiver. Guests under 18 can be added as minors by an adult who signs.`;
+			submitError = signerTooYoungMessage(waiver.minimumSignerAge, waiver.adultAge);
 			return;
 		}
 
@@ -288,8 +291,12 @@
 									required
 								/>
 								<p id="signer-dob-hint" class="mt-1.5 text-xs text-muted-foreground">
-									You must be {waiver.minimumSignerAge} or older to sign. Signing for someone under 18?
+									You must be {waiver.minimumSignerAge} or older to sign. Signing for someone under {waiver.adultAge}?
 									Add them as a minor below.
+									{#if excludedAgeRange(waiver.minimumSignerAge, waiver.adultAge)}
+										Guests aged {excludedAgeRange(waiver.minimumSignerAge, waiver.adultAge)} can't take
+										part.
+									{/if}
 								</p>
 							</div>
 						</div>
@@ -339,9 +346,9 @@
 														type="date"
 														class={waiverUnderlineInputClass}
 														bind:value={minor.dateOfBirth}
-														min={minorBirthDateBounds(todayIsoDate()).min}
+														min={minorBirthDateBounds(todayIsoDate(), waiver.adultAge).min}
 														max={todayIsoDate()}
-														title="Minors must be under 18"
+														title={`Minors must be under ${waiver.adultAge}`}
 														required
 													/>
 												{/if}
