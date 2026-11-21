@@ -28,7 +28,6 @@
 	import { useProtectedQuery } from '$lib/components/auth/convex-auth.svelte';
 	import type { WaiverField, WaiverTheme } from '$lib/domain/waivers';
 	import WaiverDocumentShell from '$lib/components/waivers/WaiverDocumentShell.svelte';
-	import WaiverThemeToggle from '$lib/components/waivers/WaiverThemeToggle.svelte';
 	import WorkspaceLogoUploader from '$lib/components/workspaces/WorkspaceLogoUploader.svelte';
 	import WaiverPublicAboutSignerCard from '$lib/components/waivers/WaiverPublicAboutSignerCard.svelte';
 	import WaiverPublicAdditionalInfoSection from '$lib/components/waivers/WaiverPublicAdditionalInfoSection.svelte';
@@ -78,7 +77,7 @@
 	let {
 		introCopy = $bindable('<p></p>'),
 		fields,
-		theme = $bindable('dark'),
+		theme = 'dark',
 		workspaceName,
 		workspaceId = null,
 		canEditBranding = false,
@@ -591,10 +590,6 @@
 			>
 				<RemoveFormattingIcon class="size-3.5" />
 			</button>
-
-			<span class="toolbar-divider"></span>
-
-			<WaiverThemeToggle bind:theme />
 		</div>
 	</div>
 

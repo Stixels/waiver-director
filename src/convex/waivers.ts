@@ -25,6 +25,7 @@ import { sanitizeRichTextHtml } from '../lib/utils/rich-text';
 import { MAX_SIGNATURE_DATA_URL_LENGTH } from '../lib/domain/waiver-constraints';
 import {
 	assertWorkspaceRecord,
+	adultAgeOf,
 	minimumSignerAgeOf,
 	collectsMinorDateOfBirth,
 	minorInputValidator,
@@ -54,6 +55,7 @@ const workspaceWaiverValue = v.object({
 	title: v.string(),
 	introCopy: v.string(),
 	theme: waiverThemeValidator,
+	adultAge: v.number(),
 	minimumSignerAge: v.number(),
 	collectMinorDateOfBirth: v.boolean(),
 	fields: v.array(waiverFieldValidator),
@@ -67,6 +69,7 @@ const waiverVersionPreviewValue = v.object({
 	title: v.string(),
 	introCopy: v.string(),
 	theme: waiverThemeValidator,
+	adultAge: v.number(),
 	minimumSignerAge: v.number(),
 	collectMinorDateOfBirth: v.boolean(),
 	fields: v.array(waiverFieldValidator),
@@ -83,6 +86,7 @@ const publicWaiverValue = v.object({
 	title: v.string(),
 	introCopy: v.string(),
 	theme: waiverThemeValidator,
+	adultAge: v.number(),
 	minimumSignerAge: v.number(),
 	collectMinorDateOfBirth: v.boolean(),
 	fields: v.array(waiverFieldValidator),
@@ -100,6 +104,7 @@ const publicBookingWaiverValue = v.object({
 	title: v.string(),
 	introCopy: v.string(),
 	theme: waiverThemeValidator,
+	adultAge: v.number(),
 	minimumSignerAge: v.number(),
 	collectMinorDateOfBirth: v.boolean(),
 	fields: v.array(waiverFieldValidator),
@@ -151,6 +156,7 @@ async function waiverHasUnpublishedChanges(ctx: FunctionCtx, waiver: Doc<'worksp
 			title: waiver.title,
 			introCopy: waiver.introCopy,
 			theme: waiver.theme,
+			adultAge: waiver.adultAge,
 			minimumSignerAge: waiver.minimumSignerAge,
 			collectMinorDateOfBirth: waiver.collectMinorDateOfBirth,
 			fields: waiver.fields
@@ -159,6 +165,7 @@ async function waiverHasUnpublishedChanges(ctx: FunctionCtx, waiver: Doc<'worksp
 			title: version.title,
 			introCopy: version.introCopy,
 			theme: version.theme,
+			adultAge: version.adultAge,
 			minimumSignerAge: version.minimumSignerAge,
 			collectMinorDateOfBirth: version.collectMinorDateOfBirth,
 			fields: version.fields
@@ -175,6 +182,7 @@ async function workspaceWaiverSummary(ctx: FunctionCtx, waiver: Doc<'workspace_w
 		title: waiver.title,
 		introCopy: waiver.introCopy,
 		theme: waiver.theme ?? 'dark',
+		adultAge: adultAgeOf(waiver),
 		minimumSignerAge: minimumSignerAgeOf(waiver),
 		collectMinorDateOfBirth: collectsMinorDateOfBirth(waiver),
 		fields: waiver.fields,
@@ -227,6 +235,7 @@ export const updateWorkspaceWaiver = mutation({
 			title: definition.title,
 			introCopy: definition.introCopy,
 			theme: definition.theme ?? 'dark',
+			adultAge: definition.adultAge,
 			minimumSignerAge: definition.minimumSignerAge,
 			collectMinorDateOfBirth: definition.collectMinorDateOfBirth ?? false,
 			fields: definition.fields
@@ -258,6 +267,7 @@ export const publishWorkspaceWaiver = mutation({
 			title: waiver.title,
 			introCopy: waiver.introCopy,
 			theme: waiver.theme,
+			adultAge: waiver.adultAge,
 			minimumSignerAge: waiver.minimumSignerAge,
 			collectMinorDateOfBirth: waiver.collectMinorDateOfBirth,
 			fields: waiver.fields
@@ -276,6 +286,7 @@ export const publishWorkspaceWaiver = mutation({
 			title: definition.title,
 			introCopy: definition.introCopy,
 			theme: definition.theme ?? 'dark',
+			adultAge: definition.adultAge,
 			minimumSignerAge: definition.minimumSignerAge,
 			collectMinorDateOfBirth: definition.collectMinorDateOfBirth ?? false,
 			fields: definition.fields,
@@ -328,6 +339,7 @@ export const listWaiverVersions = query({
 			title: version.title,
 			introCopy: version.introCopy,
 			theme: version.theme ?? 'dark',
+			adultAge: adultAgeOf(version),
 			minimumSignerAge: minimumSignerAgeOf(version),
 			collectMinorDateOfBirth: collectsMinorDateOfBirth(version),
 			fields: version.fields,
@@ -540,6 +552,7 @@ export const getPublicWaiverBySlug = query({
 			title: version.title,
 			introCopy: sanitizeRichTextHtml(version.introCopy),
 			theme: version.theme ?? 'dark',
+			adultAge: adultAgeOf(version),
 			minimumSignerAge: minimumSignerAgeOf(version),
 			collectMinorDateOfBirth: collectsMinorDateOfBirth(version),
 			fields: version.fields,
@@ -605,6 +618,7 @@ export const getPublicWaiverForBooking = query({
 			title: version.title,
 			introCopy: sanitizeRichTextHtml(version.introCopy),
 			theme: version.theme ?? 'dark',
+			adultAge: adultAgeOf(version),
 			minimumSignerAge: minimumSignerAgeOf(version),
 			collectMinorDateOfBirth: collectsMinorDateOfBirth(version),
 			fields: version.fields,
@@ -704,10 +718,10 @@ export const submitPublicWaiver = internalMutation({
 				message: 'Enter a valid email address.'
 			});
 		}
-		const signerDateOfBirth = validateSignerDateOfBirth(
-			args.signerDateOfBirth,
-			minimumSignerAgeOf(version)
-		);
+		const signerDateOfBirth = validateSignerDateOfBirth(args.signerDateOfBirth, {
+			minimumAge: minimumSignerAgeOf(version),
+			adultAge: adultAgeOf(version)
+		});
 		if (!/^data:image\/png;base64,[A-Za-z0-9+/]+={0,2}$/.test(args.signatureDataUrl)) {
 			throw new ConvexError({
 				code: 'invalid_argument',
@@ -727,7 +741,8 @@ export const submitPublicWaiver = internalMutation({
 		validateSubmissionAnswers(version, args.answers);
 		const answers = pickSubmissionAnswers(version, args.answers);
 		const minors = validateMinors(args.minors, {
-			requireDateOfBirth: collectsMinorDateOfBirth(version)
+			requireDateOfBirth: collectsMinorDateOfBirth(version),
+			adultAge: adultAgeOf(version)
 		});
 		const marketingIntegration = await ctx.db
 			.query('marketing_integrations')

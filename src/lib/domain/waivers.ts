@@ -9,7 +9,9 @@ import {
 	MIN_SELECT_OPTIONS,
 	MIN_WAIVER_FIELD_LABEL_LENGTH,
 	MIN_WAIVER_TITLE_LENGTH,
+	DEFAULT_ADULT_AGE,
 	DEFAULT_MINIMUM_SIGNER_AGE,
+	isValidAdultAge,
 	isValidMinimumSignerAge
 } from '$lib/domain/waiver-constraints';
 
@@ -52,8 +54,11 @@ export type WaiverDefinition = {
 	introCopy: string;
 	fields: WaiverField[];
 	theme: WaiverTheme;
+	/** Age of majority: younger guests are added as minors by an adult. */
+	adultAge: number;
+	/** Signers must be at least this age. Never below `adultAge`. */
 	minimumSignerAge: number;
-	/** Ask for each minor's date of birth and check they are under 18. */
+	/** Ask for each minor's date of birth and check they are under the adult age. */
 	collectMinorDateOfBirth: boolean;
 };
 
@@ -151,6 +156,7 @@ export function createBlankDefinition(title = 'New waiver'): WaiverDefinition {
 		introCopy: '<p></p>',
 		fields: [],
 		theme: 'dark',
+		adultAge: DEFAULT_ADULT_AGE,
 		minimumSignerAge: DEFAULT_MINIMUM_SIGNER_AGE,
 		collectMinorDateOfBirth: false
 	};
@@ -161,6 +167,7 @@ export function cloneDefinition(definition: WaiverDefinition): WaiverDefinition 
 		title: definition.title,
 		introCopy: sanitizeRichTextHtml(definition.introCopy),
 		theme: definition.theme ?? 'dark',
+		adultAge: definition.adultAge ?? DEFAULT_ADULT_AGE,
 		minimumSignerAge: definition.minimumSignerAge ?? DEFAULT_MINIMUM_SIGNER_AGE,
 		collectMinorDateOfBirth: definition.collectMinorDateOfBirth ?? false,
 		fields: definition.fields.map((field) => {
@@ -188,7 +195,8 @@ export function isWaiverDefinitionAutosaveable(definition: WaiverDefinition | nu
 		return false;
 	}
 	if (definition.fields.length > MAX_WAIVER_FIELDS) return false;
-	if (!isValidMinimumSignerAge(definition.minimumSignerAge)) return false;
+	if (!isValidAdultAge(definition.adultAge)) return false;
+	if (!isValidMinimumSignerAge(definition.minimumSignerAge, definition.adultAge)) return false;
 
 	for (const field of definition.fields) {
 		const label = field.label.trim();
@@ -224,6 +232,7 @@ export function normalizeDefinitionForCompare(definition: WaiverDefinition): Wai
 		title: definition.title.trim(),
 		introCopy: sanitizeRichTextHtml(definition.introCopy),
 		theme: definition.theme ?? 'dark',
+		adultAge: definition.adultAge ?? DEFAULT_ADULT_AGE,
 		minimumSignerAge: definition.minimumSignerAge ?? DEFAULT_MINIMUM_SIGNER_AGE,
 		collectMinorDateOfBirth: definition.collectMinorDateOfBirth ?? false,
 		fields: definition.fields.map((field) => {
